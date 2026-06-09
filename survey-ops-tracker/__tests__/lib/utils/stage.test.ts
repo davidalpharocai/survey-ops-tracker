@@ -77,8 +77,13 @@ describe('getCheckboxesForColumn', () => {
     expect(r.stage_survey_programming).toBe(false)
     expect(r.stage_delivery).toBe(false)
   })
-  it('returns only doc=true for Doc Programming', () => {
+  it('returns all false for Doc Programming (no prior checkboxes)', () => {
     const r = getCheckboxesForColumn('Doc Programming')
+    expect(r.stage_doc_programming).toBe(false)  // Doc Programming is the destination, not yet done
+    expect(r.stage_survey_programming).toBe(false)
+  })
+  it('checks doc=true for Survey Programming (doc is prior stage)', () => {
+    const r = getCheckboxesForColumn('Survey Programming')
     expect(r.stage_doc_programming).toBe(true)
     expect(r.stage_survey_programming).toBe(false)
   })

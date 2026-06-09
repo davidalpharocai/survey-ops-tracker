@@ -43,7 +43,7 @@ export function deriveCurrentStage(fields: StageFields): BoardColumn {
 export function getCheckboxesForColumn(column: BoardColumn): StageFields {
   const idx = STAGE_ORDER.indexOf(column)
   return {
-    stage_doc_programming: idx >= 1,
+    stage_doc_programming: idx > 1,
     stage_survey_programming: idx > 2,
     stage_edwin_qa: idx > 3,
     stage_fielding: idx > 4,
