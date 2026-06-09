@@ -7,6 +7,7 @@ import { LinkedDocuments } from '@/components/project/LinkedDocuments'
 import { NProgressBar } from '@/components/shared/NProgressBar'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
 import { formatDate } from '@/lib/utils/date'
+import { BudgetWidget } from '@/components/project/BudgetWidget'
 
 const TOOLTIPS: Record<string, string> = {
   'N Target': "Total number of survey responses you're aiming to collect.",
@@ -170,6 +171,12 @@ export default function ProjectDetailPage() {
                   tooltip={TOOLTIPS['Terminations']}
                 />
               </div>
+
+              <BudgetWidget
+                projectId={project.id}
+                budget={project.budget ?? null}
+                actualSpend={project.actual_spend ?? null}
+              />
             </div>
           </div>
 
