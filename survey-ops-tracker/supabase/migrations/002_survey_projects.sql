@@ -14,7 +14,7 @@ create table public.survey_projects (
   id uuid primary key default gen_random_uuid(),
   project_name text not null,
   client text not null,
-  type public.project_type,
+  project_type public.project_type,
   captain_id uuid references public.team_members(id),
   phase public.project_phase not null default 'Scoping',
   status public.project_status not null default 'Open',

@@ -38,7 +38,7 @@ export type Database = {
           id: string
           project_name: string
           client: string
-          type: Database['public']['Enums']['project_type'] | null
+          project_type: Database['public']['Enums']['project_type'] | null
           captain_id: string | null
           phase: Database['public']['Enums']['project_phase']
           status: Database['public']['Enums']['project_status']
@@ -71,7 +71,7 @@ export type Database = {
           id?: string
           project_name: string
           client: string
-          type?: Database['public']['Enums']['project_type'] | null
+          project_type?: Database['public']['Enums']['project_type'] | null
           captain_id?: string | null
           phase?: Database['public']['Enums']['project_phase']
           status?: Database['public']['Enums']['project_status']
@@ -104,7 +104,7 @@ export type Database = {
           id?: string
           project_name?: string
           client?: string
-          type?: Database['public']['Enums']['project_type'] | null
+          project_type?: Database['public']['Enums']['project_type'] | null
           captain_id?: string | null
           phase?: Database['public']['Enums']['project_phase']
           status?: Database['public']['Enums']['project_status']
