@@ -1,35 +1,26 @@
-import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-export async function middleware(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({ request })
+export function middleware(request: NextRequest) {
+  const pathname = request.nextUrl.pathname
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() { return request.cookies.getAll() },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value))
-          supabaseResponse = NextResponse.next({ request })
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options))
-        },
-      },
-    }
+  // Let the login page through always
+  if (pathname.startsWith('/login')) {
+    return NextResponse.next()
+  }
+
+  // Supabase stores auth tokens in cookies named sb-*-auth-token or sb-*-auth-token.0
+  const cookies = request.cookies.getAll()
+  const hasAuthToken = cookies.some(
+    c => c.name.includes('auth-token') && c.value.length > 0
   )
 
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user && !request.nextUrl.pathname.startsWith('/login')) {
+  if (!hasAuthToken) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
   }
 
-  return supabaseResponse
+  return NextResponse.next()
 }
 
 export const config = {
