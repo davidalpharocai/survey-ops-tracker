@@ -1,0 +1,219 @@
+<h2>Section 4: Project Detail Page</h2>
+<p class="subtitle">What you see when you click a project card. All fields, the pipeline checklist, linked docs, and integration data in one place.</p>
+
+<div style="background:#0f172a;border-radius:10px;padding:16px;font-size:10px;color:#94a3b8;">
+
+  <!-- Header -->
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+    <span style="color:#475569;cursor:pointer;">← Board</span>
+    <span style="color:#334155;">/</span>
+    <span style="color:#e2e8f0;font-size:13px;font-weight:700;">AARP Membership (2 questions)</span>
+    <span style="background:#3b82f620;color:#3b82f6;font-size:8px;padding:2px 7px;border-radius:4px;margin-left:4px;">PS</span>
+    <span style="background:#10b98120;color:#10b981;font-size:8px;padding:2px 7px;border-radius:4px;">Open</span>
+    <div style="margin-left:auto;display:flex;gap:6px;">
+      <button style="background:#1e293b;color:#94a3b8;border:none;padding:4px 10px;border-radius:5px;font-size:9px;cursor:pointer;">✕ Close Project</button>
+      <button style="background:#3b82f6;color:#fff;border:none;padding:4px 10px;border-radius:5px;font-size:9px;cursor:pointer;">+ Update</button>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 280px;gap:14px;">
+
+    <!-- LEFT COLUMN -->
+    <div style="display:flex;flex-direction:column;gap:10px;">
+
+      <!-- Pipeline Progress -->
+      <div style="background:#1e293b;border-radius:8px;padding:12px;">
+        <div style="font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px;">Pipeline Progress</div>
+        <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;">
+          <div style="display:flex;align-items:center;gap:4px;background:#10b98115;border:1px solid #10b98140;border-radius:5px;padding:4px 8px;">
+            <span style="color:#10b981;font-size:10px;">✓</span>
+            <span style="color:#10b981;font-size:9px;">Doc Programming</span>
+          </div>
+          <div style="color:#334155;font-size:10px;">→</div>
+          <div style="display:flex;align-items:center;gap:4px;background:#f59e0b15;border:1px solid #f59e0b60;border-radius:5px;padding:4px 8px;">
+            <span style="color:#f59e0b;font-size:10px;">▶</span>
+            <span style="color:#f59e0b;font-size:9px;font-weight:600;">Survey Programming</span>
+            <span style="font-size:8px;color:#64748b;margin-left:2px;">(current)</span>
+          </div>
+          <div style="color:#334155;font-size:10px;">→</div>
+          <div style="display:flex;align-items:center;gap:4px;background:#1e293b;border:1px solid #334155;border-radius:5px;padding:4px 8px;">
+            <span style="color:#334155;font-size:10px;">○</span>
+            <span style="color:#475569;font-size:9px;">EdWin QA</span>
+          </div>
+          <div style="color:#334155;font-size:10px;">→</div>
+          <div style="display:flex;align-items:center;gap:4px;background:#1e293b;border:1px solid #334155;border-radius:5px;padding:4px 8px;">
+            <span style="color:#334155;font-size:10px;">○</span>
+            <span style="color:#475569;font-size:9px;">Fielding</span>
+          </div>
+          <div style="color:#334155;font-size:10px;">→</div>
+          <div style="display:flex;align-items:center;gap:4px;background:#1e293b;border:1px solid #334155;border-radius:5px;padding:4px 8px;">
+            <span style="color:#334155;font-size:10px;">○</span>
+            <span style="color:#475569;font-size:9px;">Data QA</span>
+          </div>
+          <div style="color:#334155;font-size:10px;">→</div>
+          <div style="display:flex;align-items:center;gap:4px;background:#1e293b;border:1px solid #334155;border-radius:5px;padding:4px 8px;">
+            <span style="color:#334155;font-size:10px;">○</span>
+            <span style="color:#475569;font-size:9px;">Delivery</span>
+          </div>
+        </div>
+        <div style="margin-top:8px;font-size:8px;color:#475569;">Checking a stage advances the board card automatically. Uncheck to move it back.</div>
+      </div>
+
+      <!-- Latest / Next Steps -->
+      <div style="background:#1e293b;border-radius:8px;padding:12px;">
+        <div style="display:flex;align-items:center;gap:5px;margin-bottom:6px;">
+          <span style="font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:.6px;">Latest / Next Steps</span>
+          <span style="background:#334155;color:#64748b;border-radius:50%;width:13px;height:13px;font-size:7px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;" title="Free-text field for current status and next actions. Updated by the project captain.">i</span>
+        </div>
+        <div style="background:#0f172a;border-radius:5px;padding:8px;color:#e2e8f0;font-size:9px;line-height:1.6;margin-bottom:6px;">
+          5/29: Waiting to hear back from client on survey doc feedback.<br>
+          — Bryan to investigate why buyer participants are being terminated<br>
+          — Anne to address inline open text for Other option
+        </div>
+        <div style="display:flex;gap:4px;">
+          <input style="flex:1;background:#0f172a;border:1px solid #334155;border-radius:5px;padding:5px 8px;color:#e2e8f0;font-size:9px;" placeholder="Add update... (auto-stamps date + your name)" />
+          <button style="background:#3b82f6;color:#fff;border:none;padding:5px 10px;border-radius:5px;font-size:9px;cursor:pointer;">Save</button>
+        </div>
+      </div>
+
+      <!-- Linked Google Doc -->
+      <div style="background:#1e293b;border-radius:8px;padding:12px;">
+        <div style="display:flex;align-items:center;gap:5px;margin-bottom:6px;">
+          <span style="font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:.6px;">Linked Documents</span>
+          <span style="background:#334155;color:#64748b;border-radius:50%;width:13px;height:13px;font-size:7px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;" title="Google Docs linked to this project. Paste a Doc URL to link it — it will appear here for the whole team.">i</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px;">
+          <div style="display:flex;align-items:center;gap:6px;background:#0f172a;border-radius:5px;padding:6px 8px;">
+            <span style="font-size:11px;">📄</span>
+            <span style="color:#3b82f6;font-size:9px;text-decoration:underline;cursor:pointer;">AARP Membership Survey Doc</span>
+            <span style="margin-left:auto;color:#475569;font-size:8px;">Linked 5/18</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;background:#0f172a;border-radius:5px;padding:6px 8px;">
+            <span style="font-size:11px;">📄</span>
+            <span style="color:#3b82f6;font-size:9px;text-decoration:underline;cursor:pointer;">Proposal — AARP Q2</span>
+            <span style="margin-left:auto;color:#475569;font-size:8px;">Linked 5/10</span>
+          </div>
+          <div style="border:1px dashed #334155;border-radius:5px;padding:5px 8px;font-size:8px;color:#475569;cursor:pointer;">+ Paste Google Doc URL</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- RIGHT COLUMN -->
+    <div style="display:flex;flex-direction:column;gap:8px;">
+
+      <!-- Key Fields -->
+      <div style="background:#1e293b;border-radius:8px;padding:12px;">
+        <div style="font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px;">Project Details</div>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div style="display:flex;align-items:center;gap:4px;">
+              <span style="color:#64748b;font-size:9px;">Client</span>
+            </div>
+            <span style="color:#e2e8f0;font-size:9px;">AARP</span>
+          </div>
+
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div style="display:flex;align-items:center;gap:4px;">
+              <span style="color:#64748b;font-size:9px;">Project Captain</span>
+              <span style="background:#334155;color:#64748b;border-radius:50%;width:12px;height:12px;font-size:7px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;" title="The team member responsible for this project end-to-end.">i</span>
+            </div>
+            <span style="background:#334155;color:#e2e8f0;font-size:9px;padding:1px 7px;border-radius:8px;">AW</span>
+          </div>
+
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="color:#64748b;font-size:9px;">Submitted Date</span>
+            <span style="color:#e2e8f0;font-size:9px;">May 18, 2026</span>
+          </div>
+
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="color:#64748b;font-size:9px;">Launch Date</span>
+            <span style="color:#e2e8f0;font-size:9px;">May 22, 2026</span>
+          </div>
+
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="color:#64748b;font-size:9px;">Due Date</span>
+            <span style="color:#f59e0b;font-size:9px;">Jun 5, 2026</span>
+          </div>
+
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="color:#64748b;font-size:9px;">Deliver Date</span>
+            <span style="color:#94a3b8;font-size:9px;">—</span>
+          </div>
+
+          <div style="height:1px;background:#334155;margin:2px 0;"></div>
+
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div style="display:flex;align-items:center;gap:4px;">
+              <span style="color:#64748b;font-size:9px;">N (Target)</span>
+              <span style="background:#334155;color:#64748b;border-radius:50%;width:12px;height:12px;font-size:7px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;" title="Total number of survey responses you're aiming to collect.">i</span>
+            </div>
+            <span style="color:#e2e8f0;font-size:9px;">1,350</span>
+          </div>
+
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div style="display:flex;align-items:center;gap:4px;">
+              <span style="color:#64748b;font-size:9px;">N Collected</span>
+              <span style="background:#334155;color:#64748b;border-radius:50%;width:12px;height:12px;font-size:7px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;" title="Responses collected so far. Auto-synced from the survey platform every 15 minutes.">i</span>
+            </div>
+            <span style="color:#10b981;font-size:9px;">1,200 <span style="color:#475569;font-size:8px;">(89%)</span></span>
+          </div>
+
+          <div style="background:#0f172a;border-radius:4px;height:4px;margin:2px 0;">
+            <div style="background:#10b981;height:4px;border-radius:4px;width:89%;"></div>
+          </div>
+
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div style="display:flex;align-items:center;gap:4px;">
+              <span style="color:#64748b;font-size:9px;">Audience Size</span>
+              <span style="background:#334155;color:#64748b;border-radius:50%;width:12px;height:12px;font-size:7px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;" title="Total size of the panel or population being surveyed. Different from N (target responses).">i</span>
+            </div>
+            <span style="color:#e2e8f0;font-size:9px;">5,000</span>
+          </div>
+
+          <div style="height:1px;background:#334155;margin:2px 0;"></div>
+
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div style="display:flex;align-items:center;gap:4px;">
+              <span style="color:#64748b;font-size:9px;">Row-Level Data</span>
+              <span style="background:#334155;color:#64748b;border-radius:50%;width:12px;height:12px;font-size:7px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;" title="Whether individual respondent-level data is included in the deliverable.">i</span>
+            </div>
+            <span style="color:#10b981;font-size:9px;">✓ Yes</span>
+          </div>
+
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div style="display:flex;align-items:center;gap:4px;">
+              <span style="color:#64748b;font-size:9px;">Terminations</span>
+              <span style="background:#334155;color:#64748b;border-radius:50%;width:12px;height:12px;font-size:7px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;" title="Whether any survey participants have been terminated (screened out) from the study.">i</span>
+            </div>
+            <span style="color:#ef4444;font-size:9px;">⚠ Yes</span>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Google Calendar -->
+      <div style="background:#1e293b;border-radius:8px;padding:10px;">
+        <div style="font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;">Calendar</div>
+        <div style="display:flex;flex-direction:column;gap:4px;">
+          <div style="display:flex;align-items:center;gap:5px;font-size:8px;color:#94a3b8;"><span>📅</span><span>Launch: May 22</span></div>
+          <div style="display:flex;align-items:center;gap:5px;font-size:8px;color:#f59e0b;"><span>📅</span><span>Due: Jun 5</span></div>
+          <div style="font-size:8px;color:#475569;margin-top:2px;cursor:pointer;text-decoration:underline;">+ Sync to Google Calendar</div>
+        </div>
+      </div>
+
+      <!-- Slack Notifications -->
+      <div style="background:#1e293b;border-radius:8px;padding:10px;">
+        <div style="font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;">Notifications</div>
+        <div style="font-size:8px;color:#94a3b8;line-height:1.6;">
+          Slack alerts sent to <span style="color:#e2e8f0;">#survey-ops</span> when:<br>
+          • Stage advances<br>
+          • Due date is tomorrow<br>
+          • N target is hit
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>

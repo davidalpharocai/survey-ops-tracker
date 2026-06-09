@@ -18,7 +18,7 @@
 
 - [ ] **Step 1: Create Base44 account**
 
-  Go to [base44.com](https://base44.com) → Sign up with your work email (davidschwartzman93@gmail.com). Choose the team plan (supports multiple users).
+  Go to [base44.com](https://base44.com) → Sign up with your work email (david@alpharoc.ai). Choose the team plan (supports multiple users).
 
 - [ ] **Step 2: Create a new app**
 

@@ -1,0 +1,267 @@
+<h2>Board & List Views — does this feel right?</h2>
+<p class="subtitle">This is what your team would see every day. Click "List" to switch views. Let me know what to change.</p>
+
+<div style="margin-bottom:12px;">
+  <div style="display:inline-flex;background:#1e293b;border-radius:6px;padding:3px;gap:2px;">
+    <button onclick="showBoard()" id="btn-board" style="background:#3b82f6;color:#fff;border:none;padding:5px 14px;border-radius:4px;font-size:11px;cursor:pointer;font-weight:600;">Board</button>
+    <button onclick="showList()" id="btn-list" style="background:transparent;color:#64748b;border:none;padding:5px 14px;border-radius:4px;font-size:11px;cursor:pointer;">List</button>
+  </div>
+  <span style="margin-left:10px;font-size:10px;color:#475569;">Filter by:
+    <select style="background:#1e293b;color:#94a3b8;border:1px solid #334155;border-radius:4px;padding:2px 6px;font-size:10px;margin-left:4px;">
+      <option>All Captains</option><option>AL</option><option>AW</option><option>BF</option><option>SC</option>
+    </select>
+    <select style="background:#1e293b;color:#94a3b8;border:1px solid #334155;border-radius:4px;padding:2px 6px;font-size:10px;margin-left:4px;">
+      <option>All Types</option><option>PS</option><option>B2B</option><option>Rerun</option>
+    </select>
+  </span>
+</div>
+
+<!-- BOARD VIEW -->
+<div id="board-view">
+  <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px;overflow-x:auto;">
+
+    <!-- Submitted -->
+    <div style="background:#1e293b;border-radius:8px;padding:8px;min-width:130px;">
+      <div style="font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;display:flex;justify-content:space-between;"><span>Submitted</span><span style="background:#334155;border-radius:8px;padding:1px 6px;">2</span></div>
+      <!-- Card -->
+      <div style="background:#0f172a;border-radius:6px;padding:8px;border-left:3px solid #3b82f6;margin-bottom:5px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:2px;">
+          <span style="color:#e2e8f0;font-size:9px;font-weight:600;line-height:1.3;">Charles Schwab</span>
+          <span style="background:#3b82f620;color:#3b82f6;font-size:7px;padding:1px 4px;border-radius:3px;flex-shrink:0;margin-left:3px;">PS</span>
+        </div>
+        <div style="color:#64748b;font-size:8px;margin-bottom:5px;">BAM - Jeff</div>
+        <div style="background:#1e293b;border-radius:3px;padding:3px 5px;margin-bottom:5px;">
+          <div style="display:flex;justify-content:space-between;font-size:7px;color:#64748b;margin-bottom:2px;"><span>N Collected</span><span style="color:#64748b;">— / 1,350</span></div>
+          <div style="background:#334155;border-radius:2px;height:2px;"><div style="background:#3b82f6;height:2px;border-radius:2px;width:0%;"></div></div>
+        </div>
+        <div style="background:#1e293b;border-radius:3px;padding:3px 5px;margin-bottom:5px;font-size:7px;color:#475569;line-height:1.4;">Submitted 5/13. Waiting on kickoff.</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="background:#334155;color:#94a3b8;font-size:7px;padding:1px 5px;border-radius:8px;">AL</span>
+          <span style="color:#94a3b8;font-size:7px;">6/2</span>
+        </div>
+      </div>
+      <!-- Card 2 -->
+      <div style="background:#0f172a;border-radius:6px;padding:8px;border-left:3px solid #3b82f6;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:2px;">
+          <span style="color:#e2e8f0;font-size:9px;font-weight:600;line-height:1.3;">Online Travel</span>
+          <span style="background:#3b82f620;color:#3b82f6;font-size:7px;padding:1px 4px;border-radius:3px;flex-shrink:0;margin-left:3px;">PS</span>
+        </div>
+        <div style="color:#64748b;font-size:8px;margin-bottom:5px;">BNP - Nick</div>
+        <div style="background:#1e293b;border-radius:3px;padding:3px 5px;margin-bottom:5px;">
+          <div style="display:flex;justify-content:space-between;font-size:7px;color:#64748b;margin-bottom:2px;"><span>N Collected</span><span style="color:#64748b;">— / 501</span></div>
+          <div style="background:#334155;border-radius:2px;height:2px;"><div style="background:#3b82f6;height:2px;border-radius:2px;width:0%;"></div></div>
+        </div>
+        <div style="background:#1e293b;border-radius:3px;padding:3px 5px;margin-bottom:5px;font-size:7px;color:#475569;line-height:1.4;">David QA'd. Waiting on Nachi response.</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="background:#334155;color:#94a3b8;font-size:7px;padding:1px 5px;border-radius:8px;">BF</span>
+          <span style="color:#f59e0b;font-size:7px;">6/1</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Doc Programming -->
+    <div style="background:#1e293b;border-radius:8px;padding:8px;min-width:130px;">
+      <div style="font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;display:flex;justify-content:space-between;"><span>Doc Prog.</span><span style="background:#334155;border-radius:8px;padding:1px 6px;">1</span></div>
+      <div style="background:#0f172a;border-radius:6px;padding:8px;border-left:3px solid #f59e0b;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:2px;">
+          <span style="color:#e2e8f0;font-size:9px;font-weight:600;line-height:1.3;">B2B Logitudinal</span>
+          <span style="background:#8b5cf620;color:#8b5cf6;font-size:7px;padding:1px 4px;border-radius:3px;flex-shrink:0;margin-left:3px;">B2B</span>
+        </div>
+        <div style="color:#64748b;font-size:8px;margin-bottom:5px;">Coatue</div>
+        <div style="background:#1e293b;border-radius:3px;padding:3px 5px;margin-bottom:5px;">
+          <div style="display:flex;justify-content:space-between;font-size:7px;color:#64748b;margin-bottom:2px;"><span>N Collected</span><span>— / 5,000</span></div>
+          <div style="background:#334155;border-radius:2px;height:2px;"><div style="background:#f59e0b;height:2px;border-radius:2px;width:0%;"></div></div>
+        </div>
+        <div style="background:#1e293b;border-radius:3px;padding:3px 5px;margin-bottom:5px;font-size:7px;color:#475569;line-height:1.4;">Bryan to investigate termination issue.</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="background:#334155;color:#94a3b8;font-size:7px;padding:1px 5px;border-radius:8px;">BF</span>
+          <span style="color:#94a3b8;font-size:7px;">6/15</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Survey Programming -->
+    <div style="background:#1e293b;border-radius:8px;padding:8px;min-width:130px;">
+      <div style="font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;display:flex;justify-content:space-between;"><span>Survey Prog.</span><span style="background:#334155;border-radius:8px;padding:1px 6px;">2</span></div>
+      <div style="background:#0f172a;border-radius:6px;padding:8px;border-left:3px solid #f59e0b;margin-bottom:5px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:2px;">
+          <span style="color:#e2e8f0;font-size:9px;font-weight:600;line-height:1.3;">AARP Membership</span>
+          <span style="background:#3b82f620;color:#3b82f6;font-size:7px;padding:1px 4px;border-radius:3px;flex-shrink:0;margin-left:3px;">PS</span>
+        </div>
+        <div style="color:#64748b;font-size:8px;margin-bottom:5px;">AARP</div>
+        <div style="background:#1e293b;border-radius:3px;padding:3px 5px;margin-bottom:5px;">
+          <div style="display:flex;justify-content:space-between;font-size:7px;color:#64748b;margin-bottom:2px;"><span>N Collected</span><span>— / 1,350</span></div>
+          <div style="background:#334155;border-radius:2px;height:2px;"><div style="background:#f59e0b;height:2px;border-radius:2px;width:0%;"></div></div>
+        </div>
+        <div style="background:#1e293b;border-radius:3px;padding:3px 5px;margin-bottom:5px;font-size:7px;color:#475569;line-height:1.4;">Waiting on client feedback on survey doc.</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="background:#334155;color:#94a3b8;font-size:7px;padding:1px 5px;border-radius:8px;">AW</span>
+          <span style="color:#94a3b8;font-size:7px;">6/5</span>
+        </div>
+      </div>
+      <div style="background:#0f172a;border-radius:6px;padding:8px;border-left:3px solid #f59e0b;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:2px;">
+          <span style="color:#e2e8f0;font-size:9px;font-weight:600;line-height:1.3;">May Survey (National)</span>
+          <span style="background:#10b98120;color:#10b981;font-size:7px;padding:1px 4px;border-radius:3px;flex-shrink:0;margin-left:3px;">Rerun</span>
+        </div>
+        <div style="color:#64748b;font-size:8px;margin-bottom:5px;">HingeVoter/Jenna</div>
+        <div style="background:#1e293b;border-radius:3px;padding:3px 5px;margin-bottom:5px;">
+          <div style="display:flex;justify-content:space-between;font-size:7px;color:#64748b;margin-bottom:2px;"><span>N Collected</span><span>1,200 / 1,350</span></div>
+          <div style="background:#334155;border-radius:2px;height:2px;"><div style="background:#f59e0b;height:2px;border-radius:2px;width:85%;"></div></div>
+        </div>
+        <div style="background:#1e293b;border-radius:3px;padding:3px 5px;margin-bottom:5px;font-size:7px;color:#475569;line-height:1.4;">Look for changes in doc Jenna shared.</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="background:#334155;color:#94a3b8;font-size:7px;padding:1px 5px;border-radius:8px;">SC</span>
+          <span style="color:#f59e0b;font-size:7px;">5/29</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- EdWin QA -->
+    <div style="background:#1e293b;border-radius:8px;padding:8px;min-width:130px;">
+      <div style="font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;display:flex;justify-content:space-between;"><span>EdWin QA</span><span style="background:#334155;border-radius:8px;padding:1px 6px;">1</span></div>
+      <div style="background:#0f172a;border-radius:6px;padding:8px;border-left:3px solid #06b6d4;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:2px;">
+          <span style="color:#e2e8f0;font-size:9px;font-weight:600;line-height:1.3;">AI Coding Tools</span>
+          <span style="background:#8b5cf620;color:#8b5cf6;font-size:7px;padding:1px 4px;border-radius:3px;flex-shrink:0;margin-left:3px;">B2B</span>
+        </div>
+        <div style="color:#64748b;font-size:8px;margin-bottom:5px;">Yeshiva University</div>
+        <div style="background:#1e293b;border-radius:3px;padding:3px 5px;margin-bottom:5px;">
+          <div style="display:flex;justify-content:space-between;font-size:7px;color:#64748b;margin-bottom:2px;"><span>N Collected</span><span>730 / 1,500</span></div>
+          <div style="background:#334155;border-radius:2px;height:2px;"><div style="background:#06b6d4;height:2px;border-radius:2px;width:49%;"></div></div>
+        </div>
+        <div style="background:#1e293b;border-radius:3px;padding:3px 5px;margin-bottom:5px;font-size:7px;color:#475569;line-height:1.4;">Engineers on how they use AI.</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="background:#334155;color:#94a3b8;font-size:7px;padding:1px 5px;border-radius:8px;">AL</span>
+          <span style="color:#94a3b8;font-size:7px;">6/5</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Fielding -->
+    <div style="background:#1e293b;border-radius:8px;padding:8px;min-width:130px;">
+      <div style="font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;display:flex;justify-content:space-between;"><span>Fielding</span><span style="background:#334155;border-radius:8px;padding:1px 6px;">2</span></div>
+      <div style="background:#0f172a;border-radius:6px;padding:8px;border-left:3px solid #10b981;margin-bottom:5px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:2px;">
+          <span style="color:#e2e8f0;font-size:9px;font-weight:600;line-height:1.3;">Ohio Survey</span>
+          <span style="background:#3b82f620;color:#3b82f6;font-size:7px;padding:1px 4px;border-radius:3px;flex-shrink:0;margin-left:3px;">PS</span>
+        </div>
+        <div style="color:#64748b;font-size:8px;margin-bottom:5px;">HingeVoter/Jenna</div>
+        <div style="background:#1e293b;border-radius:3px;padding:3px 5px;margin-bottom:5px;">
+          <div style="display:flex;justify-content:space-between;font-size:7px;color:#64748b;margin-bottom:2px;"><span>N Collected</span><span style="color:#10b981;font-weight:600;">401 / 400 ✓</span></div>
+          <div style="background:#334155;border-radius:2px;height:2px;"><div style="background:#10b981;height:2px;border-radius:2px;width:100%;"></div></div>
+        </div>
+        <div style="background:#1e293b;border-radius:3px;padding:3px 5px;margin-bottom:5px;font-size:7px;color:#475569;line-height:1.4;">Michael has data for review.</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="background:#334155;color:#94a3b8;font-size:7px;padding:1px 5px;border-radius:8px;">SC</span>
+          <span style="color:#ef4444;font-size:7px;">5/29 ⚠</span>
+        </div>
+      </div>
+      <div style="background:#0f172a;border-radius:6px;padding:8px;border-left:3px solid #10b981;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:2px;">
+          <span style="color:#e2e8f0;font-size:9px;font-weight:600;line-height:1.3;">Starlink</span>
+          <span style="background:#3b82f620;color:#3b82f6;font-size:7px;padding:1px 4px;border-radius:3px;flex-shrink:0;margin-left:3px;">PS</span>
+        </div>
+        <div style="color:#64748b;font-size:8px;margin-bottom:5px;">BNP</div>
+        <div style="background:#1e293b;border-radius:3px;padding:3px 5px;margin-bottom:5px;">
+          <div style="display:flex;justify-content:space-between;font-size:7px;color:#64748b;margin-bottom:2px;"><span>N Collected</span><span>350 / 390</span></div>
+          <div style="background:#334155;border-radius:2px;height:2px;"><div style="background:#10b981;height:2px;border-radius:2px;width:90%;"></div></div>
+        </div>
+        <div style="background:#1e293b;border-radius:3px;padding:3px 5px;margin-bottom:5px;font-size:7px;color:#475569;line-height:1.4;">Nachi to redo AI summary then good to send.</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="background:#334155;color:#94a3b8;font-size:7px;padding:1px 5px;border-radius:8px;">BF</span>
+          <span style="color:#f59e0b;font-size:7px;">6/4</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Data QA -->
+    <div style="background:#1e293b;border-radius:8px;padding:8px;min-width:130px;">
+      <div style="font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;display:flex;justify-content:space-between;"><span>Data QA</span><span style="background:#334155;border-radius:8px;padding:1px 6px;">1</span></div>
+      <div style="background:#0f172a;border-radius:6px;padding:8px;border-left:3px solid #8b5cf6;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:2px;">
+          <span style="color:#e2e8f0;font-size:9px;font-weight:600;line-height:1.3;">Future of Food</span>
+          <span style="background:#3b82f620;color:#3b82f6;font-size:7px;padding:1px 4px;border-radius:3px;flex-shrink:0;margin-left:3px;">PS</span>
+        </div>
+        <div style="color:#64748b;font-size:8px;margin-bottom:5px;">Bain - Ruth</div>
+        <div style="background:#1e293b;border-radius:3px;padding:3px 5px;margin-bottom:5px;">
+          <div style="display:flex;justify-content:space-between;font-size:7px;color:#64748b;margin-bottom:2px;"><span>N Collected</span><span style="color:#10b981;">100 / 100 ✓</span></div>
+          <div style="background:#334155;border-radius:2px;height:2px;"><div style="background:#8b5cf6;height:2px;border-radius:2px;width:100%;"></div></div>
+        </div>
+        <div style="background:#1e293b;border-radius:3px;padding:3px 5px;margin-bottom:5px;font-size:7px;color:#475569;line-height:1.4;">AL needs to address termination issue.</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="background:#334155;color:#94a3b8;font-size:7px;padding:1px 5px;border-radius:8px;">AL</span>
+          <span style="color:#94a3b8;font-size:7px;">6/4</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Delivery -->
+    <div style="background:#1e293b;border-radius:8px;padding:8px;min-width:130px;">
+      <div style="font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;display:flex;justify-content:space-between;"><span>Delivery</span><span style="background:#334155;border-radius:8px;padding:1px 6px;">1</span></div>
+      <div style="background:#0f172a;border-radius:6px;padding:8px;border-left:3px solid #e2e8f0;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:2px;">
+          <span style="color:#e2e8f0;font-size:9px;font-weight:600;line-height:1.3;">Cruise Lines B2B</span>
+          <span style="background:#8b5cf620;color:#8b5cf6;font-size:7px;padding:1px 4px;border-radius:3px;flex-shrink:0;margin-left:3px;">B2B</span>
+        </div>
+        <div style="color:#64748b;font-size:8px;margin-bottom:5px;">BAM - James Cook</div>
+        <div style="background:#1e293b;border-radius:3px;padding:3px 5px;margin-bottom:5px;">
+          <div style="display:flex;justify-content:space-between;font-size:7px;color:#64748b;margin-bottom:2px;"><span>N Collected</span><span style="color:#10b981;">✓ Complete</span></div>
+          <div style="background:#334155;border-radius:2px;height:2px;"><div style="background:#e2e8f0;height:2px;border-radius:2px;width:100%;"></div></div>
+        </div>
+        <div style="background:#1e293b;border-radius:3px;padding:3px 5px;margin-bottom:5px;font-size:7px;color:#475569;line-height:1.4;">Waiting on Alex to get back re: final delivery.</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="background:#334155;color:#94a3b8;font-size:7px;padding:1px 5px;border-radius:8px;">CN</span>
+          <span style="color:#94a3b8;font-size:7px;">5/18</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- LIST VIEW -->
+<div id="list-view" style="display:none;">
+  <div style="background:#1e293b;border-radius:8px;overflow:hidden;">
+    <div style="display:grid;grid-template-columns:2fr 1.2fr 0.7fr 1.2fr 0.8fr 0.6fr 0.8fr;gap:4px;padding:8px 10px;background:#0f172a;font-size:9px;color:#475569;text-transform:uppercase;letter-spacing:.5px;">
+      <span>Project</span><span>Client</span><span>Type</span><span>Stage</span><span>Captain</span><span>N / Target</span><span>Due Date</span>
+    </div>
+    <div style="display:grid;grid-template-columns:2fr 1.2fr 0.7fr 1.2fr 0.8fr 0.6fr 0.8fr;gap:4px;padding:7px 10px;border-top:1px solid #0f172a;font-size:9px;color:#e2e8f0;align-items:center;">
+      <span style="font-weight:600;">Charles Schwab</span><span style="color:#94a3b8;">BAM - Jeff</span><span><span style="background:#3b82f620;color:#3b82f6;padding:1px 5px;border-radius:3px;">PS</span></span><span><span style="background:#3b82f615;color:#3b82f6;padding:2px 6px;border-radius:4px;">Submitted</span></span><span>AL</span><span style="color:#64748b;">— / 1350</span><span style="color:#94a3b8;">6/2</span>
+    </div>
+    <div style="display:grid;grid-template-columns:2fr 1.2fr 0.7fr 1.2fr 0.8fr 0.6fr 0.8fr;gap:4px;padding:7px 10px;border-top:1px solid #0f172a;font-size:9px;color:#e2e8f0;align-items:center;background:#1a2535;">
+      <span style="font-weight:600;">AARP Membership</span><span style="color:#94a3b8;">AARP</span><span><span style="background:#3b82f620;color:#3b82f6;padding:1px 5px;border-radius:3px;">PS</span></span><span><span style="background:#f59e0b15;color:#f59e0b;padding:2px 6px;border-radius:4px;">Survey Prog.</span></span><span>AW</span><span style="color:#94a3b8;">— / 1350</span><span style="color:#94a3b8;">6/5</span>
+    </div>
+    <div style="display:grid;grid-template-columns:2fr 1.2fr 0.7fr 1.2fr 0.8fr 0.6fr 0.8fr;gap:4px;padding:7px 10px;border-top:1px solid #0f172a;font-size:9px;color:#e2e8f0;align-items:center;">
+      <span style="font-weight:600;">Ohio Survey</span><span style="color:#94a3b8;">HingeVoter</span><span><span style="background:#3b82f620;color:#3b82f6;padding:1px 5px;border-radius:3px;">PS</span></span><span><span style="background:#10b98115;color:#10b981;padding:2px 6px;border-radius:4px;">Fielding</span></span><span>SC</span><span style="color:#10b981;">401 / 400 ✓</span><span style="color:#ef4444;">5/29 ⚠</span>
+    </div>
+    <div style="display:grid;grid-template-columns:2fr 1.2fr 0.7fr 1.2fr 0.8fr 0.6fr 0.8fr;gap:4px;padding:7px 10px;border-top:1px solid #0f172a;font-size:9px;color:#e2e8f0;align-items:center;background:#1a2535;">
+      <span style="font-weight:600;">AI Coding Tools</span><span style="color:#94a3b8;">Yeshiva Univ.</span><span><span style="background:#8b5cf620;color:#8b5cf6;padding:1px 5px;border-radius:3px;">B2B</span></span><span><span style="background:#06b6d415;color:#06b6d4;padding:2px 6px;border-radius:4px;">EdWin QA</span></span><span>AL</span><span style="color:#94a3b8;">730 / 1500</span><span style="color:#94a3b8;">6/5</span>
+    </div>
+    <div style="display:grid;grid-template-columns:2fr 1.2fr 0.7fr 1.2fr 0.8fr 0.6fr 0.8fr;gap:4px;padding:7px 10px;border-top:1px solid #0f172a;font-size:9px;color:#e2e8f0;align-items:center;">
+      <span style="font-weight:600;">Future of Food</span><span style="color:#94a3b8;">Bain - Ruth</span><span><span style="background:#3b82f620;color:#3b82f6;padding:1px 5px;border-radius:3px;">PS</span></span><span><span style="background:#8b5cf615;color:#8b5cf6;padding:2px 6px;border-radius:4px;">Data QA</span></span><span>AL</span><span style="color:#10b981;">100 / 100 ✓</span><span style="color:#94a3b8;">6/4</span>
+    </div>
+    <div style="display:grid;grid-template-columns:2fr 1.2fr 0.7fr 1.2fr 0.8fr 0.6fr 0.8fr;gap:4px;padding:7px 10px;border-top:1px solid #0f172a;font-size:9px;color:#e2e8f0;align-items:center;background:#1a2535;">
+      <span style="font-weight:600;">Cruise Lines B2B</span><span style="color:#94a3b8;">BAM - Cook</span><span><span style="background:#8b5cf620;color:#8b5cf6;padding:1px 5px;border-radius:3px;">B2B</span></span><span><span style="background:#e2e8f015;color:#e2e8f0;padding:2px 6px;border-radius:4px;">Delivery</span></span><span>CN</span><span style="color:#10b981;">✓</span><span style="color:#94a3b8;">5/18</span>
+    </div>
+  </div>
+</div>
+
+<script>
+function showBoard() {
+  document.getElementById('board-view').style.display = 'block';
+  document.getElementById('list-view').style.display = 'none';
+  document.getElementById('btn-board').style.background = '#3b82f6';
+  document.getElementById('btn-board').style.color = '#fff';
+  document.getElementById('btn-list').style.background = 'transparent';
+  document.getElementById('btn-list').style.color = '#64748b';
+}
+function showList() {
+  document.getElementById('board-view').style.display = 'none';
+  document.getElementById('list-view').style.display = 'block';
+  document.getElementById('btn-list').style.background = '#3b82f6';
+  document.getElementById('btn-list').style.color = '#fff';
+  document.getElementById('btn-board').style.background = 'transparent';
+  document.getElementById('btn-board').style.color = '#64748b';
+}
+</script>

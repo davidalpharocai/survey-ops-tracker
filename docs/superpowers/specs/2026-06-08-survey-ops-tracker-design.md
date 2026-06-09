@@ -22,14 +22,23 @@ The app tracks **Survey Projects** from initial scoping through final delivery, 
 
 ## 2. Architecture
 
-### Base44 (the app)
-Hosts the database, user accounts/login, board view, list view, project detail pages, and AI assistant. All UI changes (rename a stage, add a field, change a color) are made directly in Base44's editor — no code required.
+### Frontend: Next.js 14 (App Router, TypeScript)
+React-based web app hosted on Vercel (free tier). Handles all UI: board view, list view, project detail pages, scoping phase, AI assistant chat panel. Styled with Tailwind CSS + shadcn/ui components.
 
-### Make.com (the automation layer)
-Sits between Base44 and external tools. Each integration is an independent Make "scenario" — breaking one doesn't affect others, and new integrations can be added without touching Base44.
+### Backend: Next.js API Routes
+Serverless API routes handle: AI assistant queries (Claude API), webhook receiver for N Collected sync from internal survey tool.
+
+### Database & Auth: Supabase (PostgreSQL)
+Free tier. Stores all data (survey projects, team members). Handles user login/auth. Row Level Security ensures users only see their workspace data. Real-time subscriptions power live N Collected updates.
+
+### Hosting: Vercel (free tier)
+Auto-deploys from GitHub. Zero config for Next.js.
+
+### Automations: Make.com
+Still used for all external integrations (email → Scoping card, Google Calendar sync, Slack notifications, Google Sheets import). Calls Supabase via API or the Next.js webhook endpoint.
 
 ### Offline
-Base44 is cloud-first. The app requires internet connectivity. Treat as online-only.
+Web-first, requires internet connectivity. Treat as online-only.
 
 ---
 

@@ -1,0 +1,100 @@
+<h2>What's the first thing you see when you open the app?</h2>
+<p class="subtitle">This sets the tone for the whole experience. Pick the layout that fits how your team thinks about work.</p>
+
+<div class="cards">
+
+  <div class="card" data-choice="board" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#0f172a;border-radius:8px;padding:12px;font-size:11px;color:#94a3b8;">
+        <div style="display:flex;gap:6px;margin-bottom:8px;">
+          <span style="background:#3b82f6;color:#fff;padding:2px 8px;border-radius:4px;font-size:10px;">Board</span>
+          <span style="background:#1e293b;color:#94a3b8;padding:2px 8px;border-radius:4px;font-size:10px;">List</span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;">
+          <div style="background:#1e293b;border-radius:6px;padding:6px;">
+            <div style="font-size:9px;color:#64748b;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px;">Submitted</div>
+            <div style="background:#0f172a;border-radius:4px;padding:5px;margin-bottom:3px;border-left:2px solid #3b82f6;"><div style="color:#e2e8f0;font-size:9px;">Charles Schwab</div><div style="color:#64748b;font-size:8px;">BAM · AL</div></div>
+            <div style="background:#0f172a;border-radius:4px;padding:5px;border-left:2px solid #3b82f6;"><div style="color:#e2e8f0;font-size:9px;">Online Travel</div><div style="color:#64748b;font-size:8px;">BNP · BF</div></div>
+          </div>
+          <div style="background:#1e293b;border-radius:6px;padding:6px;">
+            <div style="font-size:9px;color:#64748b;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px;">Programming</div>
+            <div style="background:#0f172a;border-radius:4px;padding:5px;border-left:2px solid #f59e0b;"><div style="color:#e2e8f0;font-size:9px;">AARP Membership</div><div style="color:#64748b;font-size:8px;">AARP · AW</div></div>
+          </div>
+          <div style="background:#1e293b;border-radius:6px;padding:6px;">
+            <div style="font-size:9px;color:#64748b;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px;">Fielding</div>
+            <div style="background:#0f172a;border-radius:4px;padding:5px;border-left:2px solid #10b981;"><div style="color:#e2e8f0;font-size:9px;">Ohio Survey</div><div style="color:#64748b;font-size:8px;">HingeVoter · SC</div></div>
+            <div style="background:#0f172a;border-radius:4px;padding:5px;border-left:2px solid #10b981;"><div style="color:#e2e8f0;font-size:9px;">AI Coding Tools</div><div style="color:#64748b;font-size:8px;">Yeshiva · AL</div></div>
+          </div>
+          <div style="background:#1e293b;border-radius:6px;padding:6px;">
+            <div style="font-size:9px;color:#64748b;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px;">Delivery</div>
+            <div style="background:#0f172a;border-radius:4px;padding:5px;border-left:2px solid #8b5cf6;"><div style="color:#e2e8f0;font-size:9px;">Starlink</div><div style="color:#64748b;font-size:8px;">BNP · BF</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>Board First</h3>
+      <p>Kanban board is the landing view. Stages as columns, each project is a draggable card. Switch to list view via a tab. Best if your team thinks in terms of "where is this project right now?"</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="dashboard" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#0f172a;border-radius:8px;padding:12px;font-size:11px;color:#94a3b8;">
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-bottom:8px;">
+          <div style="background:#1e293b;border-radius:5px;padding:6px;text-align:center;"><div style="font-size:16px;color:#e2e8f0;font-weight:700;">12</div><div style="font-size:8px;color:#64748b;">Active</div></div>
+          <div style="background:#1e293b;border-radius:5px;padding:6px;text-align:center;"><div style="font-size:16px;color:#f59e0b;font-weight:700;">3</div><div style="font-size:8px;color:#64748b;">Due Today</div></div>
+          <div style="background:#1e293b;border-radius:5px;padding:6px;text-align:center;"><div style="font-size:16px;color:#ef4444;font-weight:700;">2</div><div style="font-size:8px;color:#64748b;">Overdue</div></div>
+          <div style="background:#1e293b;border-radius:5px;padding:6px;text-align:center;"><div style="font-size:16px;color:#10b981;font-weight:700;">5</div><div style="font-size:8px;color:#64748b;">Delivered</div></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;">
+          <div style="background:#1e293b;border-radius:5px;padding:6px;">
+            <div style="font-size:8px;color:#64748b;margin-bottom:3px;">IN FIELD NOW</div>
+            <div style="font-size:8px;color:#e2e8f0;">Ohio Survey — 401/400 ✓</div>
+            <div style="font-size:8px;color:#e2e8f0;">AI Coding Tools — 730/1500</div>
+          </div>
+          <div style="background:#1e293b;border-radius:5px;padding:6px;">
+            <div style="font-size:8px;color:#64748b;margin-bottom:3px;">MY PROJECTS</div>
+            <div style="font-size:8px;color:#e2e8f0;">AARP Membership</div>
+            <div style="font-size:8px;color:#e2e8f0;">Future of Food</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>Dashboard First</h3>
+      <p>Landing page shows KPI cards (active, due today, overdue, delivered), in-field projects with live N counts, and your personal projects. Board and list views accessible from nav. Best for managers who want the pulse at a glance.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="list" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#0f172a;border-radius:8px;padding:12px;font-size:11px;color:#94a3b8;">
+        <div style="display:flex;gap:6px;margin-bottom:8px;align-items:center;">
+          <span style="background:#1e293b;color:#94a3b8;padding:2px 8px;border-radius:4px;font-size:10px;">Board</span>
+          <span style="background:#3b82f6;color:#fff;padding:2px 8px;border-radius:4px;font-size:10px;">List</span>
+          <span style="margin-left:auto;background:#1e293b;color:#64748b;padding:2px 8px;border-radius:4px;font-size:9px;">Filter ▾</span>
+        </div>
+        <div style="background:#1e293b;border-radius:5px;overflow:hidden;">
+          <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr;gap:4px;padding:4px 6px;background:#0f172a;font-size:8px;color:#475569;">
+            <span>Project</span><span>Client</span><span>Stage</span><span>Captain</span><span>Due</span>
+          </div>
+          <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr;gap:4px;padding:4px 6px;border-top:1px solid #1e293b;font-size:8px;color:#e2e8f0;align-items:center;">
+            <span>Charles Schwab</span><span style="color:#94a3b8;">BAM</span><span><span style="background:#3b82f620;color:#3b82f6;padding:1px 4px;border-radius:3px;">Submit</span></span><span>AL</span><span style="color:#f59e0b;">6/2</span>
+          </div>
+          <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr;gap:4px;padding:4px 6px;border-top:1px solid #1e293b;font-size:8px;color:#e2e8f0;align-items:center;">
+            <span>AARP Membership</span><span style="color:#94a3b8;">AARP</span><span><span style="background:#f59e0b20;color:#f59e0b;padding:1px 4px;border-radius:3px;">Prog.</span></span><span>AW</span><span style="color:#94a3b8;">6/5</span>
+          </div>
+          <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr;gap:4px;padding:4px 6px;border-top:1px solid #1e293b;font-size:8px;color:#e2e8f0;align-items:center;">
+            <span>Ohio Survey</span><span style="color:#94a3b8;">HingeVoter</span><span><span style="background:#10b98120;color:#10b981;padding:1px 4px;border-radius:3px;">Field</span></span><span>SC</span><span style="color:#ef4444;">5/29 !</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>List First</h3>
+      <p>Sortable, filterable table is the default view — closest to the spreadsheet you use today. Columns are your fields, rows are projects. Board view available as a tab. Best for teams that prefer scanning all projects at once.</p>
+    </div>
+  </div>
+
+</div>

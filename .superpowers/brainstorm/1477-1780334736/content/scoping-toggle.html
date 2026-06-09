@@ -1,0 +1,267 @@
+<h2>Operations view vs. Full view — does this work?</h2>
+<p class="subtitle">Toggle between what your team sees day-to-day and what you show in meetings. Try clicking the toggle.</p>
+
+<div style="margin-bottom:14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+  <div style="display:inline-flex;background:#1e293b;border-radius:6px;padding:3px;gap:2px;">
+    <button onclick="showBoard()" id="btn-board" style="background:#3b82f6;color:#fff;border:none;padding:5px 14px;border-radius:4px;font-size:11px;cursor:pointer;font-weight:600;">Board</button>
+    <button onclick="showList()" id="btn-list" style="background:transparent;color:#64748b;border:none;padding:5px 14px;border-radius:4px;font-size:11px;cursor:pointer;">List</button>
+  </div>
+  <div style="display:inline-flex;background:#0f172a;border:1px solid #334155;border-radius:20px;padding:3px;gap:2px;">
+    <button onclick="setView('ops')" id="btn-ops" style="background:#6366f1;color:#fff;border:none;padding:4px 14px;border-radius:16px;font-size:11px;cursor:pointer;font-weight:600;">⚙ Operations</button>
+    <button onclick="setView('full')" id="btn-full" style="background:transparent;color:#64748b;border:none;padding:4px 14px;border-radius:16px;font-size:11px;cursor:pointer;">◉ Full View</button>
+  </div>
+  <span id="view-label" style="font-size:10px;color:#475569;font-style:italic;">Your team's default — scoping hidden</span>
+</div>
+
+<!-- BOARD VIEW -->
+<div id="board-view">
+
+  <!-- SCOPING SECTION (Full View only) -->
+  <div id="scoping-section" style="display:none;margin-bottom:14px;">
+    <div style="font-size:10px;color:#a78bfa;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;display:flex;align-items:center;gap:6px;">
+      <span style="display:inline-block;width:24px;height:1px;background:#a78bfa;"></span>
+      Scoping Phase
+      <span style="display:inline-block;flex:1;height:1px;background:#a78bfa;opacity:0.3;"></span>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:4px;">
+
+      <!-- New Inquiry -->
+      <div style="background:#1e293b;border-radius:8px;padding:8px;min-width:120px;">
+        <div style="font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;display:flex;justify-content:space-between;"><span>New Inquiry</span><span style="background:#334155;border-radius:8px;padding:1px 6px;">1</span></div>
+        <div style="background:#0f172a;border-radius:6px;padding:8px;border-left:3px solid #a78bfa;">
+          <div style="color:#e2e8f0;font-size:9px;font-weight:600;margin-bottom:2px;">Alaska Voter Gas</div>
+          <div style="color:#64748b;font-size:8px;margin-bottom:5px;">Alaska State Chamber</div>
+          <div style="background:#1e293b;border-radius:3px;padding:3px 5px;margin-bottom:5px;font-size:7px;color:#475569;">Inquiry received 5/28. Initial scoping call TBD.</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="background:#334155;color:#94a3b8;font-size:7px;padding:1px 5px;border-radius:8px;">BF</span>
+            <span style="color:#94a3b8;font-size:7px;">—</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Proposal Sent -->
+      <div style="background:#1e293b;border-radius:8px;padding:8px;min-width:120px;">
+        <div style="font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;display:flex;justify-content:space-between;"><span>Proposal Sent</span><span style="background:#334155;border-radius:8px;padding:1px 6px;">1</span></div>
+        <div style="background:#0f172a;border-radius:6px;padding:8px;border-left:3px solid #a78bfa;">
+          <div style="color:#e2e8f0;font-size:9px;font-weight:600;margin-bottom:2px;">BioPharma Study</div>
+          <div style="color:#64748b;font-size:8px;margin-bottom:5px;">BAM - Jared Khoo</div>
+          <div style="background:#1e293b;border-radius:3px;padding:3px 5px;margin-bottom:5px;font-size:7px;color:#475569;">Shanu has survey proposal (Doc). Waiting on response.</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="background:#334155;color:#94a3b8;font-size:7px;padding:1px 5px;border-radius:8px;">SC</span>
+            <span style="color:#94a3b8;font-size:7px;">—</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pricing Discussion -->
+      <div style="background:#1e293b;border-radius:8px;padding:8px;min-width:120px;">
+        <div style="font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;display:flex;justify-content:space-between;"><span>Pricing</span><span style="background:#334155;border-radius:8px;padding:1px 6px;">1</span></div>
+        <div style="background:#0f172a;border-radius:6px;padding:8px;border-left:3px solid #a78bfa;">
+          <div style="color:#e2e8f0;font-size:9px;font-weight:600;margin-bottom:2px;">Mattress Firm Employees</div>
+          <div style="color:#64748b;font-size:8px;margin-bottom:5px;">BAM - Grey Jones</div>
+          <div style="background:#1e293b;border-radius:3px;padding:3px 5px;margin-bottom:5px;font-size:7px;color:#475569;">Back and forth on N size. Client wants 30–45.</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="background:#334155;color:#94a3b8;font-size:7px;padding:1px 5px;border-radius:8px;">SC</span>
+            <span style="color:#94a3b8;font-size:7px;">—</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Awaiting Approval -->
+      <div style="background:#1e293b;border-radius:8px;padding:8px;min-width:120px;">
+        <div style="font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;display:flex;justify-content:space-between;"><span>Awaiting Approval</span><span style="background:#334155;border-radius:8px;padding:1px 6px;">0</span></div>
+        <div style="border:1px dashed #334155;border-radius:6px;padding:12px;text-align:center;font-size:8px;color:#334155;">Empty</div>
+      </div>
+
+      <!-- Closed (Scoping) -->
+      <div style="background:#1e293b;border-radius:8px;padding:8px;min-width:120px;opacity:0.7;">
+        <div style="font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;display:flex;justify-content:space-between;"><span>✕ Closed</span><span style="background:#334155;border-radius:8px;padding:1px 6px;">3</span></div>
+        <div style="background:#0f172a;border-radius:6px;padding:8px;border-left:3px solid #ef4444;margin-bottom:5px;">
+          <div style="color:#64748b;font-size:9px;font-weight:600;margin-bottom:2px;text-decoration:line-through;">TOAST IQ Users</div>
+          <div style="color:#475569;font-size:8px;">BAM - Grey Jones</div>
+        </div>
+        <div style="background:#0f172a;border-radius:6px;padding:8px;border-left:3px solid #ef4444;">
+          <div style="color:#64748b;font-size:9px;font-weight:600;margin-bottom:2px;text-decoration:line-through;">POS System Study</div>
+          <div style="color:#475569;font-size:8px;">BofA</div>
+        </div>
+      </div>
+
+    </div>
+    <div style="font-size:10px;color:#475569;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;display:flex;align-items:center;gap:6px;margin-top:10px;">
+      <span style="display:inline-block;width:24px;height:1px;background:#475569;"></span>
+      Active Pipeline
+      <span style="display:inline-block;flex:1;height:1px;background:#475569;opacity:0.3;"></span>
+    </div>
+  </div>
+
+  <!-- MAIN PIPELINE (always visible in board) -->
+  <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px;">
+
+    <div style="background:#1e293b;border-radius:8px;padding:8px;min-width:120px;">
+      <div style="font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;display:flex;justify-content:space-between;"><span>Submitted</span><span style="background:#334155;border-radius:8px;padding:1px 6px;">2</span></div>
+      <div style="background:#0f172a;border-radius:6px;padding:8px;border-left:3px solid #3b82f6;margin-bottom:5px;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:2px;"><span style="color:#e2e8f0;font-size:9px;font-weight:600;">Charles Schwab</span><span style="background:#3b82f620;color:#3b82f6;font-size:7px;padding:1px 4px;border-radius:3px;">PS</span></div>
+        <div style="color:#64748b;font-size:8px;margin-bottom:5px;">BAM - Jeff</div>
+        <div style="background:#1e293b;border-radius:3px;padding:3px 5px;margin-bottom:5px;font-size:7px;color:#475569;">Submitted 5/13. Waiting on kickoff.</div>
+        <div style="display:flex;justify-content:space-between;"><span style="background:#334155;color:#94a3b8;font-size:7px;padding:1px 5px;border-radius:8px;">AL</span><span style="color:#94a3b8;font-size:7px;">6/2</span></div>
+      </div>
+      <div style="background:#0f172a;border-radius:6px;padding:8px;border-left:3px solid #3b82f6;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:2px;"><span style="color:#e2e8f0;font-size:9px;font-weight:600;">Online Travel</span><span style="background:#3b82f620;color:#3b82f6;font-size:7px;padding:1px 4px;border-radius:3px;">PS</span></div>
+        <div style="color:#64748b;font-size:8px;margin-bottom:5px;">BNP - Nick</div>
+        <div style="background:#1e293b;border-radius:3px;padding:3px 5px;margin-bottom:5px;font-size:7px;color:#475569;">David QA'd. Waiting on Nachi.</div>
+        <div style="display:flex;justify-content:space-between;"><span style="background:#334155;color:#94a3b8;font-size:7px;padding:1px 5px;border-radius:8px;">BF</span><span style="color:#f59e0b;font-size:7px;">6/1</span></div>
+      </div>
+    </div>
+
+    <div style="background:#1e293b;border-radius:8px;padding:8px;min-width:120px;">
+      <div style="font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;display:flex;justify-content:space-between;"><span>Doc Prog.</span><span style="background:#334155;border-radius:8px;padding:1px 6px;">1</span></div>
+      <div style="background:#0f172a;border-radius:6px;padding:8px;border-left:3px solid #f59e0b;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:2px;"><span style="color:#e2e8f0;font-size:9px;font-weight:600;">B2B Logitudinal</span><span style="background:#8b5cf620;color:#8b5cf6;font-size:7px;padding:1px 4px;border-radius:3px;">B2B</span></div>
+        <div style="color:#64748b;font-size:8px;margin-bottom:5px;">Coatue</div>
+        <div style="background:#1e293b;border-radius:3px;padding:3px 5px;margin-bottom:5px;font-size:7px;color:#475569;">Bryan to investigate termination issue.</div>
+        <div style="display:flex;justify-content:space-between;"><span style="background:#334155;color:#94a3b8;font-size:7px;padding:1px 5px;border-radius:8px;">BF</span><span style="color:#94a3b8;font-size:7px;">6/15</span></div>
+      </div>
+    </div>
+
+    <div style="background:#1e293b;border-radius:8px;padding:8px;min-width:120px;">
+      <div style="font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;display:flex;justify-content:space-between;"><span>Survey Prog.</span><span style="background:#334155;border-radius:8px;padding:1px 6px;">2</span></div>
+      <div style="background:#0f172a;border-radius:6px;padding:8px;border-left:3px solid #f59e0b;margin-bottom:5px;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:2px;"><span style="color:#e2e8f0;font-size:9px;font-weight:600;">AARP Membership</span><span style="background:#3b82f620;color:#3b82f6;font-size:7px;padding:1px 4px;border-radius:3px;">PS</span></div>
+        <div style="color:#64748b;font-size:8px;margin-bottom:5px;">AARP</div>
+        <div style="background:#1e293b;border-radius:3px;padding:3px 5px;margin-bottom:5px;font-size:7px;color:#475569;">Waiting on client feedback.</div>
+        <div style="display:flex;justify-content:space-between;"><span style="background:#334155;color:#94a3b8;font-size:7px;padding:1px 5px;border-radius:8px;">AW</span><span style="color:#94a3b8;font-size:7px;">6/5</span></div>
+      </div>
+      <div style="background:#0f172a;border-radius:6px;padding:8px;border-left:3px solid #f59e0b;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:2px;"><span style="color:#e2e8f0;font-size:9px;font-weight:600;">May Survey (Natl.)</span><span style="background:#10b98120;color:#10b981;font-size:7px;padding:1px 4px;border-radius:3px;">Rerun</span></div>
+        <div style="color:#64748b;font-size:8px;margin-bottom:5px;">HingeVoter/Jenna</div>
+        <div style="background:#1e293b;border-radius:3px;padding:3px 5px;margin-bottom:5px;font-size:7px;color:#475569;">Look for changes in Jenna's doc.</div>
+        <div style="display:flex;justify-content:space-between;"><span style="background:#334155;color:#94a3b8;font-size:7px;padding:1px 5px;border-radius:8px;">SC</span><span style="color:#f59e0b;font-size:7px;">5/29</span></div>
+      </div>
+    </div>
+
+    <div style="background:#1e293b;border-radius:8px;padding:8px;min-width:120px;">
+      <div style="font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;display:flex;justify-content:space-between;"><span>EdWin QA</span><span style="background:#334155;border-radius:8px;padding:1px 6px;">1</span></div>
+      <div style="background:#0f172a;border-radius:6px;padding:8px;border-left:3px solid #06b6d4;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:2px;"><span style="color:#e2e8f0;font-size:9px;font-weight:600;">AI Coding Tools</span><span style="background:#8b5cf620;color:#8b5cf6;font-size:7px;padding:1px 4px;border-radius:3px;">B2B</span></div>
+        <div style="color:#64748b;font-size:8px;margin-bottom:5px;">Yeshiva University</div>
+        <div style="background:#1e293b;border-radius:3px;padding:3px 5px;margin-bottom:5px;font-size:7px;color:#475569;">Engineers on how they use AI.</div>
+        <div style="display:flex;justify-content:space-between;"><span style="background:#334155;color:#94a3b8;font-size:7px;padding:1px 5px;border-radius:8px;">AL</span><span style="color:#94a3b8;font-size:7px;">6/5</span></div>
+      </div>
+    </div>
+
+    <div style="background:#1e293b;border-radius:8px;padding:8px;min-width:120px;">
+      <div style="font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;display:flex;justify-content:space-between;"><span>Fielding</span><span style="background:#334155;border-radius:8px;padding:1px 6px;">2</span></div>
+      <div style="background:#0f172a;border-radius:6px;padding:8px;border-left:3px solid #10b981;margin-bottom:5px;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:2px;"><span style="color:#e2e8f0;font-size:9px;font-weight:600;">Ohio Survey</span><span style="background:#3b82f620;color:#3b82f6;font-size:7px;padding:1px 4px;border-radius:3px;">PS</span></div>
+        <div style="color:#64748b;font-size:8px;margin-bottom:5px;">HingeVoter/Jenna</div>
+        <div style="background:#1e293b;border-radius:3px;padding:3px 5px;margin-bottom:5px;font-size:7px;color:#10b981;">401 / 400 ✓ Target hit!</div>
+        <div style="display:flex;justify-content:space-between;"><span style="background:#334155;color:#94a3b8;font-size:7px;padding:1px 5px;border-radius:8px;">SC</span><span style="color:#ef4444;font-size:7px;">5/29 ⚠</span></div>
+      </div>
+      <div style="background:#0f172a;border-radius:6px;padding:8px;border-left:3px solid #10b981;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:2px;"><span style="color:#e2e8f0;font-size:9px;font-weight:600;">Starlink</span><span style="background:#3b82f620;color:#3b82f6;font-size:7px;padding:1px 4px;border-radius:3px;">PS</span></div>
+        <div style="color:#64748b;font-size:8px;margin-bottom:5px;">BNP</div>
+        <div style="background:#1e293b;border-radius:3px;padding:3px 5px;margin-bottom:5px;font-size:7px;color:#475569;">Nachi to redo AI summary.</div>
+        <div style="display:flex;justify-content:space-between;"><span style="background:#334155;color:#94a3b8;font-size:7px;padding:1px 5px;border-radius:8px;">BF</span><span style="color:#f59e0b;font-size:7px;">6/4</span></div>
+      </div>
+    </div>
+
+    <div style="background:#1e293b;border-radius:8px;padding:8px;min-width:120px;">
+      <div style="font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;display:flex;justify-content:space-between;"><span>Data QA</span><span style="background:#334155;border-radius:8px;padding:1px 6px;">1</span></div>
+      <div style="background:#0f172a;border-radius:6px;padding:8px;border-left:3px solid #8b5cf6;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:2px;"><span style="color:#e2e8f0;font-size:9px;font-weight:600;">Future of Food</span><span style="background:#3b82f620;color:#3b82f6;font-size:7px;padding:1px 4px;border-radius:3px;">PS</span></div>
+        <div style="color:#64748b;font-size:8px;margin-bottom:5px;">Bain - Ruth</div>
+        <div style="background:#1e293b;border-radius:3px;padding:3px 5px;margin-bottom:5px;font-size:7px;color:#475569;">AL addressing termination issue.</div>
+        <div style="display:flex;justify-content:space-between;"><span style="background:#334155;color:#94a3b8;font-size:7px;padding:1px 5px;border-radius:8px;">AL</span><span style="color:#94a3b8;font-size:7px;">6/4</span></div>
+      </div>
+    </div>
+
+    <div style="background:#1e293b;border-radius:8px;padding:8px;min-width:120px;">
+      <div style="font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;display:flex;justify-content:space-between;"><span>Delivery</span><span style="background:#334155;border-radius:8px;padding:1px 6px;">1</span></div>
+      <div style="background:#0f172a;border-radius:6px;padding:8px;border-left:3px solid #e2e8f0;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:2px;"><span style="color:#e2e8f0;font-size:9px;font-weight:600;">Cruise Lines B2B</span><span style="background:#8b5cf620;color:#8b5cf6;font-size:7px;padding:1px 4px;border-radius:3px;">B2B</span></div>
+        <div style="color:#64748b;font-size:8px;margin-bottom:5px;">BAM - James Cook</div>
+        <div style="background:#1e293b;border-radius:3px;padding:3px 5px;margin-bottom:5px;font-size:7px;color:#475569;">Waiting on Alex for final delivery.</div>
+        <div style="display:flex;justify-content:space-between;"><span style="background:#334155;color:#94a3b8;font-size:7px;padding:1px 5px;border-radius:8px;">CN</span><span style="color:#94a3b8;font-size:7px;">5/18</span></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- LIST VIEW -->
+<div id="list-view" style="display:none;">
+  <div id="scoping-list" style="display:none;margin-bottom:12px;">
+    <div style="font-size:9px;color:#a78bfa;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Scoping Phase</div>
+    <div style="background:#1e293b;border-radius:8px;overflow:hidden;">
+      <div style="display:grid;grid-template-columns:2fr 1.2fr 1.2fr 0.8fr 0.8fr;gap:4px;padding:7px 10px;background:#0f172a;font-size:9px;color:#475569;text-transform:uppercase;letter-spacing:.5px;">
+        <span>Project</span><span>Client</span><span>Scoping Stage</span><span>Captain</span><span>Status</span>
+      </div>
+      <div style="display:grid;grid-template-columns:2fr 1.2fr 1.2fr 0.8fr 0.8fr;gap:4px;padding:7px 10px;border-top:1px solid #0f172a;font-size:9px;color:#e2e8f0;align-items:center;">
+        <span style="font-weight:600;">Alaska Voter Gas</span><span style="color:#94a3b8;">Alaska State Chamber</span><span><span style="background:#a78bfa20;color:#a78bfa;padding:2px 6px;border-radius:4px;">New Inquiry</span></span><span>BF</span><span style="color:#10b981;">Open</span>
+      </div>
+      <div style="display:grid;grid-template-columns:2fr 1.2fr 1.2fr 0.8fr 0.8fr;gap:4px;padding:7px 10px;border-top:1px solid #0f172a;font-size:9px;color:#e2e8f0;align-items:center;background:#1a2535;">
+        <span style="font-weight:600;">BioPharma Study</span><span style="color:#94a3b8;">BAM - Jared Khoo</span><span><span style="background:#a78bfa20;color:#a78bfa;padding:2px 6px;border-radius:4px;">Proposal Sent</span></span><span>SC</span><span style="color:#10b981;">Open</span>
+      </div>
+      <div style="display:grid;grid-template-columns:2fr 1.2fr 1.2fr 0.8fr 0.8fr;gap:4px;padding:7px 10px;border-top:1px solid #0f172a;font-size:9px;color:#64748b;align-items:center;opacity:0.6;">
+        <span style="font-weight:600;text-decoration:line-through;">TOAST IQ Users</span><span>BAM - Grey Jones</span><span><span style="background:#ef444420;color:#ef4444;padding:2px 6px;border-radius:4px;">Closed</span></span><span>SC</span><span style="color:#ef4444;">Closed</span>
+      </div>
+    </div>
+    <div style="font-size:9px;color:#475569;text-transform:uppercase;letter-spacing:1px;margin:10px 0 6px;">Active Pipeline</div>
+  </div>
+  <div style="background:#1e293b;border-radius:8px;overflow:hidden;">
+    <div style="display:grid;grid-template-columns:2fr 1.2fr 0.7fr 1.2fr 0.8fr 0.6fr 0.8fr;gap:4px;padding:8px 10px;background:#0f172a;font-size:9px;color:#475569;text-transform:uppercase;letter-spacing:.5px;">
+      <span>Project</span><span>Client</span><span>Type</span><span>Stage</span><span>Captain</span><span>N / Target</span><span>Due</span>
+    </div>
+    <div style="display:grid;grid-template-columns:2fr 1.2fr 0.7fr 1.2fr 0.8fr 0.6fr 0.8fr;gap:4px;padding:7px 10px;border-top:1px solid #0f172a;font-size:9px;color:#e2e8f0;align-items:center;">
+      <span style="font-weight:600;">Charles Schwab</span><span style="color:#94a3b8;">BAM - Jeff</span><span><span style="background:#3b82f620;color:#3b82f6;padding:1px 5px;border-radius:3px;">PS</span></span><span><span style="background:#3b82f615;color:#3b82f6;padding:2px 6px;border-radius:4px;">Submitted</span></span><span>AL</span><span style="color:#64748b;">— / 1350</span><span style="color:#94a3b8;">6/2</span>
+    </div>
+    <div style="display:grid;grid-template-columns:2fr 1.2fr 0.7fr 1.2fr 0.8fr 0.6fr 0.8fr;gap:4px;padding:7px 10px;border-top:1px solid #0f172a;font-size:9px;color:#e2e8f0;align-items:center;background:#1a2535;">
+      <span style="font-weight:600;">Ohio Survey</span><span style="color:#94a3b8;">HingeVoter</span><span><span style="background:#3b82f620;color:#3b82f6;padding:1px 5px;border-radius:3px;">PS</span></span><span><span style="background:#10b98115;color:#10b981;padding:2px 6px;border-radius:4px;">Fielding</span></span><span>SC</span><span style="color:#10b981;">401/400 ✓</span><span style="color:#ef4444;">5/29 ⚠</span>
+    </div>
+    <div style="display:grid;grid-template-columns:2fr 1.2fr 0.7fr 1.2fr 0.8fr 0.6fr 0.8fr;gap:4px;padding:7px 10px;border-top:1px solid #0f172a;font-size:9px;color:#e2e8f0;align-items:center;">
+      <span style="font-weight:600;">Future of Food</span><span style="color:#94a3b8;">Bain - Ruth</span><span><span style="background:#3b82f620;color:#3b82f6;padding:1px 5px;border-radius:3px;">PS</span></span><span><span style="background:#8b5cf615;color:#8b5cf6;padding:2px 6px;border-radius:4px;">Data QA</span></span><span>AL</span><span style="color:#10b981;">100/100 ✓</span><span style="color:#94a3b8;">6/4</span>
+    </div>
+  </div>
+</div>
+
+<script>
+var currentView = 'ops';
+function setView(v) {
+  currentView = v;
+  var scoping = document.getElementById('scoping-section');
+  var scopingList = document.getElementById('scoping-list');
+  var label = document.getElementById('view-label');
+  var btnOps = document.getElementById('btn-ops');
+  var btnFull = document.getElementById('btn-full');
+  if (v === 'full') {
+    if (scoping) scoping.style.display = 'block';
+    if (scopingList) scopingList.style.display = 'block';
+    label.textContent = 'Full view — scoping + pipeline + closed projects visible';
+    btnOps.style.background = 'transparent'; btnOps.style.color = '#64748b';
+    btnFull.style.background = '#6366f1'; btnFull.style.color = '#fff';
+  } else {
+    if (scoping) scoping.style.display = 'none';
+    if (scopingList) scopingList.style.display = 'none';
+    label.textContent = 'Your team\'s default — scoping hidden';
+    btnFull.style.background = 'transparent'; btnFull.style.color = '#64748b';
+    btnOps.style.background = '#6366f1'; btnOps.style.color = '#fff';
+  }
+}
+function showBoard() {
+  document.getElementById('board-view').style.display = 'block';
+  document.getElementById('list-view').style.display = 'none';
+  document.getElementById('btn-board').style.background = '#3b82f6';
+  document.getElementById('btn-board').style.color = '#fff';
+  document.getElementById('btn-list').style.background = 'transparent';
+  document.getElementById('btn-list').style.color = '#64748b';
+}
+function showList() {
+  document.getElementById('board-view').style.display = 'none';
+  document.getElementById('list-view').style.display = 'block';
+  document.getElementById('btn-list').style.background = '#3b82f6';
+  document.getElementById('btn-list').style.color = '#fff';
+  document.getElementById('btn-board').style.background = 'transparent';
+  document.getElementById('btn-board').style.color = '#64748b';
+  setView(currentView);
+}
+</script>

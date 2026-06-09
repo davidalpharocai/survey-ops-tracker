@@ -1,0 +1,110 @@
+<h2>What should each project card show?</h2>
+<p class="subtitle">These are the cards on the board — your team sees these all day. Pick the density that feels right.</p>
+
+<div class="cards">
+
+  <div class="card" data-choice="minimal" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#0f172a;border-radius:8px;padding:14px;display:flex;flex-direction:column;gap:6px;">
+        <div style="background:#1e293b;border-radius:8px;padding:10px;border-left:3px solid #f59e0b;max-width:200px;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:5px;">
+            <span style="color:#e2e8f0;font-size:10px;font-weight:600;">AARP Membership</span>
+            <span style="background:#3b82f620;color:#3b82f6;font-size:8px;padding:1px 5px;border-radius:3px;">PS</span>
+          </div>
+          <div style="color:#64748b;font-size:9px;">AARP</div>
+          <div style="display:flex;justify-content:space-between;margin-top:6px;align-items:center;">
+            <span style="background:#334155;color:#94a3b8;font-size:9px;padding:2px 6px;border-radius:10px;">AW</span>
+            <span style="color:#f59e0b;font-size:9px;">Due 6/5</span>
+          </div>
+        </div>
+        <div style="background:#1e293b;border-radius:8px;padding:10px;border-left:3px solid #10b981;max-width:200px;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:5px;">
+            <span style="color:#e2e8f0;font-size:10px;font-weight:600;">Ohio Survey</span>
+            <span style="background:#8b5cf620;color:#8b5cf6;font-size:8px;padding:1px 5px;border-radius:3px;">B2B</span>
+          </div>
+          <div style="color:#64748b;font-size:9px;">HingeVoter/Jenna</div>
+          <div style="display:flex;justify-content:space-between;margin-top:6px;align-items:center;">
+            <span style="background:#334155;color:#94a3b8;font-size:9px;padding:2px 6px;border-radius:10px;">SC</span>
+            <span style="color:#ef4444;font-size:9px;">Due 5/29 !</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>Minimal</h3>
+      <p>Project name, client, type badge, captain initials, due date. Clean, fast to scan. Best when you have lots of projects in a column and don't want clutter.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="medium" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#0f172a;border-radius:8px;padding:14px;display:flex;flex-direction:column;gap:6px;">
+        <div style="background:#1e293b;border-radius:8px;padding:10px;border-left:3px solid #f59e0b;max-width:220px;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;">
+            <span style="color:#e2e8f0;font-size:10px;font-weight:600;">AARP Membership</span>
+            <span style="background:#3b82f620;color:#3b82f6;font-size:8px;padding:1px 5px;border-radius:3px;">PS</span>
+          </div>
+          <div style="color:#64748b;font-size:9px;margin-bottom:6px;">AARP</div>
+          <div style="background:#0f172a;border-radius:4px;padding:4px 6px;margin-bottom:6px;">
+            <div style="display:flex;justify-content:space-between;font-size:8px;color:#64748b;margin-bottom:3px;"><span>N Collected</span><span style="color:#10b981;">1200 / 1350</span></div>
+            <div style="background:#1e293b;border-radius:2px;height:3px;"><div style="background:#10b981;height:3px;border-radius:2px;width:89%;"></div></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="background:#334155;color:#94a3b8;font-size:9px;padding:2px 6px;border-radius:10px;">AW</span>
+            <span style="color:#f59e0b;font-size:9px;">Due 6/5</span>
+          </div>
+        </div>
+        <div style="background:#1e293b;border-radius:8px;padding:10px;border-left:3px solid #10b981;max-width:220px;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;">
+            <span style="color:#e2e8f0;font-size:10px;font-weight:600;">Ohio Survey</span>
+            <span style="background:#8b5cf620;color:#8b5cf6;font-size:8px;padding:1px 5px;border-radius:3px;">B2B</span>
+          </div>
+          <div style="color:#64748b;font-size:9px;margin-bottom:6px;">HingeVoter/Jenna</div>
+          <div style="background:#0f172a;border-radius:4px;padding:4px 6px;margin-bottom:6px;">
+            <div style="display:flex;justify-content:space-between;font-size:8px;color:#64748b;margin-bottom:3px;"><span>N Collected</span><span style="color:#10b981;">401 / 400 ✓</span></div>
+            <div style="background:#1e293b;border-radius:2px;height:3px;"><div style="background:#10b981;height:3px;border-radius:2px;width:100%;"></div></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="background:#334155;color:#94a3b8;font-size:9px;padding:2px 6px;border-radius:10px;">SC</span>
+            <span style="color:#ef4444;font-size:9px;">Due 5/29 !</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>Medium + N Progress</h3>
+      <p>Everything in Minimal, plus a live progress bar showing N Collected vs. N Target. Critical for in-field projects — you can see completion at a glance without opening the project.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="full" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#0f172a;border-radius:8px;padding:14px;display:flex;flex-direction:column;gap:6px;">
+        <div style="background:#1e293b;border-radius:8px;padding:10px;border-left:3px solid #f59e0b;max-width:240px;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;">
+            <span style="color:#e2e8f0;font-size:10px;font-weight:600;">AARP Membership</span>
+            <span style="background:#3b82f620;color:#3b82f6;font-size:8px;padding:1px 5px;border-radius:3px;">PS</span>
+          </div>
+          <div style="color:#64748b;font-size:9px;margin-bottom:5px;">AARP</div>
+          <div style="background:#0f172a;border-radius:4px;padding:4px 6px;margin-bottom:5px;">
+            <div style="display:flex;justify-content:space-between;font-size:8px;color:#64748b;margin-bottom:3px;"><span>N Collected</span><span style="color:#10b981;">1200 / 1350</span></div>
+            <div style="background:#1e293b;border-radius:2px;height:3px;"><div style="background:#10b981;height:3px;border-radius:2px;width:89%;"></div></div>
+          </div>
+          <div style="background:#0f172a;border-radius:4px;padding:5px 6px;margin-bottom:5px;">
+            <div style="font-size:8px;color:#64748b;margin-bottom:2px;">LATEST</div>
+            <div style="font-size:8px;color:#94a3b8;line-height:1.4;">Waiting to hear back from client on survey doc feedback</div>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="background:#334155;color:#94a3b8;font-size:9px;padding:2px 6px;border-radius:10px;">AW</span>
+            <span style="color:#f59e0b;font-size:9px;">Due 6/5</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>Full + Latest Update</h3>
+      <p>Everything in Medium, plus a snippet of the "Latest/Next Steps" note. Most context at a glance — no need to open the project to know what's happening. Cards are taller, so fewer fit on screen at once.</p>
+    </div>
+  </div>
+
+</div>
