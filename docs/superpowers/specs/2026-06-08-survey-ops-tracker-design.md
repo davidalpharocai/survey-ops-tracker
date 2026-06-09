@@ -75,6 +75,20 @@ Web-first, requires internet connectivity. Treat as online-only.
 | Row-Level Data | Boolean | Whether individual respondent data is included in deliverable |
 | Terminations | Boolean | Whether any participants have been terminated/screened out |
 
+#### Budget
+| Field | Type | Notes |
+|---|---|---|
+| Budget | Number (USD) | Allocated internal budget for this project — how much we're authorized to spend |
+| Actual Spend | Number (USD) | How much was actually spent. Manually entered. |
+
+Budget vs. Actual Spend is displayed on the project detail page as:
+- **Budget** — allocated amount
+- **Actual Spend** — amount spent so far
+- **Remaining** — computed as Budget − Actual Spend (not stored; derived in UI)
+- **Progress bar** — Actual Spend / Budget. Green when under budget, red when over budget (remaining goes negative with a ⚠ warning).
+
+Both Budget and Actual Spend are optional — projects can exist without budget data. When both are present, Remaining and the progress bar are shown automatically.
+
 #### Pipeline (checkboxes — each represents a completed stage)
 | Field | Type |
 |---|---|
