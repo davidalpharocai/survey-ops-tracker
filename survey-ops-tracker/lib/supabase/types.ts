@@ -64,6 +64,8 @@ export type Database = {
           linked_documents: string[]
           calendar_event_id: string | null
           survey_tool_id: string | null
+          budget: number | null
+          actual_spend: number | null
           created_at: string
           updated_at: string
         }
@@ -97,6 +99,8 @@ export type Database = {
           linked_documents?: string[]
           calendar_event_id?: string | null
           survey_tool_id?: string | null
+          budget?: number | null
+          actual_spend?: number | null
           created_at?: string
           updated_at?: string
         }
@@ -130,6 +134,8 @@ export type Database = {
           linked_documents?: string[]
           calendar_event_id?: string | null
           survey_tool_id?: string | null
+          budget?: number | null
+          actual_spend?: number | null
           created_at?: string
           updated_at?: string
         }

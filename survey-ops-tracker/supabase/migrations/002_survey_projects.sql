@@ -40,6 +40,8 @@ create table public.survey_projects (
   linked_documents text[] default '{}',
   calendar_event_id text,
   survey_tool_id text,
+  budget numeric(10,2),
+  actual_spend numeric(10,2),
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
