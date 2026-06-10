@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useProjects, useUpdateProject } from '@/lib/hooks/useProjects'
 import { PipelineProgress } from '@/components/project/PipelineProgress'
+import { ScopingProgress } from '@/components/project/ScopingProgress'
 import { LatestNextSteps } from '@/components/project/LatestNextSteps'
 import { LinkedDocuments } from '@/components/project/LinkedDocuments'
 import { SlackChannel } from '@/components/project/SlackChannel'
@@ -86,6 +87,11 @@ export default function ProjectDetailPage() {
         >
           {project.status}
         </span>
+        {project.phase === 'Scoping' && (
+          <span className="text-xs px-2 py-1 rounded bg-violet-500/20 text-violet-600 dark:text-violet-400">
+            Scoping
+          </span>
+        )}
         <div className="ml-auto">
           <button
             onClick={handleClose}
@@ -102,9 +108,13 @@ export default function ProjectDetailPage() {
         <div className="flex flex-col gap-4">
           <div className="bg-card rounded-xl p-4">
             <h3 className="text-xs text-muted-foreground uppercase tracking-widest mb-4 font-medium">
-              Pipeline Progress
+              {project.phase === 'Scoping' ? 'Scoping Stage' : 'Pipeline Progress'}
             </h3>
-            <PipelineProgress project={project} />
+            {project.phase === 'Scoping' ? (
+              <ScopingProgress project={project} />
+            ) : (
+              <PipelineProgress project={project} />
+            )}
           </div>
           <LatestNextSteps projectId={project.id} notes={project.latest_next_steps} />
           <LinkedDocuments

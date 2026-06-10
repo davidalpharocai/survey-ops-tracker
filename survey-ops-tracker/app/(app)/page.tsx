@@ -1,5 +1,8 @@
 'use client'
+import { useState } from 'react'
 import { Board } from '@/components/board/Board'
+import { ScopingBoard } from '@/components/board/ScopingBoard'
+import { NewProjectModal } from '@/components/board/NewProjectModal'
 import { ViewToggle } from '@/components/shared/ViewToggle'
 import { useProjects, useMoveProjectToColumn } from '@/lib/hooks/useProjects'
 import { useTeamMembers } from '@/lib/hooks/useTeamMembers'
@@ -11,9 +14,15 @@ export default function BoardPage() {
   const { data: teamMembers = [] } = useTeamMembers()
   const moveProject = useMoveProjectToColumn()
   const { mode, setMode } = useViewMode()
+  const [showNewProject, setShowNewProject] = useState(false)
 
-  const visibleProjects = projects.filter(p =>
-    mode === 'full' ? true : p.phase === 'Active' && p.status === 'Open'
+  const scopingProjects = projects.filter(
+    p => p.phase === 'Scoping' && p.status === 'Open'
+  )
+  const activeProjects = projects.filter(p =>
+    mode === 'full'
+      ? p.phase === 'Active'
+      : p.phase === 'Active' && p.status === 'Open'
   )
 
   if (isLoading) {
@@ -39,17 +48,35 @@ export default function BoardPage() {
           </div>
           <ViewToggle mode={mode} onChange={setMode} />
         </div>
-        <button className="text-xs bg-blue-600 hover:bg-blue-500 text-white px-3 py-2 rounded-lg transition-colors">
+        <button
+          onClick={() => setShowNewProject(true)}
+          className="text-xs bg-blue-600 hover:bg-blue-500 text-white px-3 py-2 rounded-lg transition-colors"
+        >
           + New Project
         </button>
       </div>
 
-      {/* Board */}
+      {/* Scoping board (Full View only) */}
+      {mode === 'full' && <ScopingBoard projects={scopingProjects} />}
+
+      {/* Operations pipeline */}
+      {mode === 'full' && (
+        <h2 className="text-xs text-muted-foreground uppercase tracking-widest font-semibold -mb-1">
+          Operations Pipeline
+        </h2>
+      )}
       <Board
-        projects={visibleProjects}
+        projects={activeProjects}
         teamMembers={teamMembers}
         onMoveProject={moveProject}
       />
+
+      {showNewProject && (
+        <NewProjectModal
+          teamMembers={teamMembers}
+          onClose={() => setShowNewProject(false)}
+        />
+      )}
     </div>
   )
 }
