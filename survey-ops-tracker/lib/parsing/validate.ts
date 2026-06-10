@@ -10,6 +10,12 @@ export type DraftQuestion = {
   answer_options: string[]
 }
 
+/**
+ * `ok: false` means at least one question failed validation (or extraction
+ * was truncated). `questions` is still populated so human review/edit UIs
+ * can show what was recovered — it MUST NOT be persisted without a
+ * subsequent `ok: true` normalization pass.
+ */
 export type NormalizeResult = {
   ok: boolean
   questions: DraftQuestion[]

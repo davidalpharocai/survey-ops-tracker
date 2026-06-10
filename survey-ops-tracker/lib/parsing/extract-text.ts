@@ -5,7 +5,7 @@ export type FileKind = 'docx' | 'sheet' | 'pdf' | 'unsupported'
 
 export function kindFromFilename(filename: string): FileKind {
   const ext = filename.toLowerCase().split('.').pop() ?? ''
-  if (ext === 'docx' || ext === 'doc') return 'docx'
+  if (ext === 'docx') return 'docx'
   if (ext === 'xlsx' || ext === 'xls' || ext === 'csv') return 'sheet'
   if (ext === 'pdf') return 'pdf'
   return 'unsupported'
@@ -31,5 +31,5 @@ export async function extractText(buffer: Buffer, filename: string): Promise<str
     ).join('\n\n')
   }
 
-  throw new Error(`Unsupported file type: ${filename}. Use .docx, .xlsx, .csv, or .pdf.`)
+  throw new Error(`Unsupported file type: ${filename}. Use .docx, .xlsx, .csv, or .pdf (re-save legacy .doc files as .docx).`)
 }

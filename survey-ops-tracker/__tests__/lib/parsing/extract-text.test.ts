@@ -10,6 +10,10 @@ describe('kindFromFilename', () => {
     expect(kindFromFilename('q.pdf')).toBe('pdf')
     expect(kindFromFilename('q.txt')).toBe('unsupported')
   })
+
+  it('rejects legacy .doc as unsupported', () => {
+    expect(kindFromFilename('q.doc')).toBe('unsupported')
+  })
 })
 
 describe('extractText', () => {

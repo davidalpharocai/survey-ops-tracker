@@ -37,7 +37,7 @@ export const EXTRACTION_TOOL = {
     },
     required: ['questions'],
   },
-}
+} satisfies Anthropic.Tool
 
 export type ParseInput =
   | { kind: 'text'; text: string }
@@ -55,20 +55,32 @@ export async function parseQuestionnaire(
         ]
       : [{ type: 'text' as const, text: `Extract all survey questions from this questionnaire:\n\n${input.text}` }]
 
-  const response = await client.messages.create({
+  const stream = client.messages.stream({
     model: 'claude-sonnet-4-6',
-    max_tokens: 16000,
+    max_tokens: 32000,
     system: SYSTEM_PROMPT,
-    tools: [EXTRACTION_TOOL as Anthropic.Tool],
-    tool_choice: { type: 'tool', name: 'record_questions' },
+    tools: [EXTRACTION_TOOL],
+    tool_choice: { type: 'tool', name: EXTRACTION_TOOL.name },
     messages: [{ role: 'user', content: userContent as Anthropic.MessageParam['content'] }],
   })
+  const response = await stream.finalMessage()
 
-  const toolUse = response.content.find(b => b.type === 'tool_use')
-  if (!toolUse || toolUse.type !== 'tool_use') {
+  const toolUse = response.content.find((b): b is Anthropic.ToolUseBlock => b.type === 'tool_use')
+  if (!toolUse) {
     return { ok: false, questions: [], errors: ['Could not extract questions from the document'] }
   }
 
   const raw = (toolUse.input as { questions?: DraftQuestion[] }).questions ?? []
-  return normalizeQuestions(raw)
+  const result = normalizeQuestions(raw)
+  if (response.stop_reason === 'max_tokens') {
+    return {
+      ok: false,
+      questions: result.questions,
+      errors: [
+        'Extraction was truncated — the document may contain more questions than were returned',
+        ...result.errors,
+      ],
+    }
+  }
+  return result
 }
