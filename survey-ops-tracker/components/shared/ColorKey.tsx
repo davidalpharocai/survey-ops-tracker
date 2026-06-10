@@ -13,7 +13,7 @@ const TYPE_ITEMS = [
 export function ColorKey() {
   return (
     <div className="flex items-center gap-x-4 gap-y-1.5 flex-wrap text-xs text-muted-foreground bg-card rounded-lg px-3 py-2">
-      <span className="font-medium uppercase tracking-wider text-[10px]">Key</span>
+      <span className="font-medium uppercase tracking-wider text-[11px]">Key</span>
       {URGENCY_ITEMS.map(item => (
         <span key={item.label} className="flex items-center gap-1.5">
           <span className={`inline-block w-3.5 h-3.5 rounded bg-background ${item.classes}`} />
@@ -23,7 +23,7 @@ export function ColorKey() {
       <span className="text-border">|</span>
       {TYPE_ITEMS.map(item => (
         <span key={item.label} className="flex items-center gap-1.5">
-          <span className={`text-[10px] px-1.5 py-0.5 rounded ${item.classes}`}>{item.label}</span>
+          <span className={`text-[11px] px-1.5 py-0.5 rounded ${item.classes}`}>{item.label}</span>
           type
         </span>
       ))}

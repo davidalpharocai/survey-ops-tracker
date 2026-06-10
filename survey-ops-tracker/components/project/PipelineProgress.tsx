@@ -98,7 +98,7 @@ export function PipelineProgress({ project }: PipelineProgressProps) {
               >
                 <span>{isDone ? '✓' : isCurrent ? '▶' : '○'}</span>
                 <span>{stage}</span>
-                {isCurrent && <span className="text-muted-foreground/50 text-[10px]">(current)</span>}
+                {isCurrent && <span className="text-muted-foreground/50 text-[11px]">(current)</span>}
               </button>
               {i < STAGE_ORDER.length - 1 && (
                 <span className="text-muted-foreground/50 text-xs select-none">→</span>

@@ -53,7 +53,7 @@ export function ProjectCard({ project, onClick }: ProjectCardProps) {
         </span>
         {project.project_type && (
           <span
-            className={`text-[10px] px-2 py-0.5 rounded shrink-0 ${TYPE_BADGE[project.project_type] ?? ''}`}
+            className={`text-[11px] px-2 py-0.5 rounded shrink-0 ${TYPE_BADGE[project.project_type] ?? ''}`}
           >
             {project.project_type}
           </span>
