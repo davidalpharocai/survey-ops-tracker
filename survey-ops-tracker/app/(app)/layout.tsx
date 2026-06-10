@@ -8,6 +8,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles').select('role').eq('id', user.id).single()
+  if (profile?.role === 'compliance') redirect('/portal')
+  if (profileError) redirect('/login')
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
       <nav className="border-b border-slate-800 px-6 py-3 flex items-center gap-4">

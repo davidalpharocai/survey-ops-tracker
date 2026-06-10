@@ -11,7 +11,7 @@ export async function GET(request: Request) {
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (!error) {
       // Only allow same-origin relative redirects
-      const safeNext = next.startsWith('/') ? next : '/portal'
+      const safeNext = next.startsWith('/') && !next.startsWith('//') ? next : '/portal'
       return NextResponse.redirect(`${origin}${safeNext}`)
     }
   }

@@ -60,7 +60,9 @@ export default function PortalLoginForm() {
       </div>
       {linkError && (
         <p className="text-amber-400 text-sm bg-amber-400/10 px-3 py-2 rounded-lg mb-4">
-          That sign-in link expired or was already used. Request a new one below.
+          {linkError === 'profile'
+            ? 'We could not load your portal profile. Try signing in again, or contact your AlphaRoc representative.'
+            : 'That sign-in link expired or was already used. Request a new one below.'}
         </p>
       )}
       <form onSubmit={handleSendLink} className="flex flex-col gap-4">

@@ -1,6 +1,8 @@
+'use client'
 import { getDueDateStatus, formatDate } from '@/lib/utils/date'
 import { NProgressBar } from '@/components/shared/NProgressBar'
 import type { SurveyProject } from '@/lib/hooks/useProjects'
+import { useLatestSubmissionStatuses } from '@/lib/hooks/useSubmissions'
 
 const STAGE_BORDER: Record<string, string> = {
   'Submitted': 'border-l-blue-500',
@@ -26,6 +28,8 @@ interface ProjectCardProps {
 export function ProjectCard({ project, onClick }: ProjectCardProps) {
   const dueDateStatus = getDueDateStatus(project.due_date)
   const borderColor = STAGE_BORDER[project.board_column] ?? 'border-l-slate-500'
+  const { data: complianceStatuses } = useLatestSubmissionStatuses()
+  const complianceStatus = complianceStatuses?.get(project.id)
   const snippet = project.latest_next_steps
     ? project.latest_next_steps.slice(0, 100) +
       (project.latest_next_steps.length > 100 ? '…' : '')
@@ -41,13 +45,29 @@ export function ProjectCard({ project, onClick }: ProjectCardProps) {
         <span className="text-slate-100 text-sm font-semibold leading-tight">
           {project.project_name}
         </span>
-        {project.project_type && (
-          <span
-            className={`text-[10px] px-2 py-0.5 rounded shrink-0 ${TYPE_BADGE[project.project_type] ?? ''}`}
-          >
-            {project.project_type}
-          </span>
-        )}
+        <div className="flex items-center gap-1 shrink-0">
+          {project.project_type && (
+            <span
+              className={`text-[10px] px-2 py-0.5 rounded ${TYPE_BADGE[project.project_type] ?? ''}`}
+            >
+              {project.project_type}
+            </span>
+          )}
+          {complianceStatus && (
+            <span
+              title={`Compliance: ${complianceStatus.replace('_', ' ')}`}
+              className={`text-xs px-1.5 py-0.5 rounded ${
+                complianceStatus === 'approved'
+                  ? 'bg-emerald-500/20 text-emerald-400'
+                  : complianceStatus === 'rejected'
+                    ? 'bg-red-500/20 text-red-400'
+                    : 'bg-amber-500/20 text-amber-400'
+              }`}
+            >
+              {complianceStatus === 'pending_review' ? 'Compliance ⏳' : complianceStatus === 'approved' ? 'Compliance ✓' : 'Compliance ✕'}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Client */}
