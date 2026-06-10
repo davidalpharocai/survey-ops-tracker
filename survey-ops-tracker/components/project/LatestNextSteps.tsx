@@ -32,12 +32,12 @@ export function LatestNextSteps({ projectId, notes }: LatestNextStepsProps) {
   }
 
   return (
-    <div className="bg-slate-900 rounded-xl p-4">
-      <h3 className="text-xs text-slate-400 uppercase tracking-widest mb-3 font-medium">
+    <div className="bg-card rounded-xl p-4">
+      <h3 className="text-xs text-muted-foreground uppercase tracking-widest mb-3 font-medium">
         Latest / Next Steps
       </h3>
       {notes && (
-        <pre className="text-slate-300 text-sm leading-relaxed whitespace-pre-wrap mb-4 font-sans">
+        <pre className="text-foreground/80 text-sm leading-relaxed whitespace-pre-wrap mb-4 font-sans">
           {notes}
         </pre>
       )}
@@ -47,7 +47,7 @@ export function LatestNextSteps({ projectId, notes }: LatestNextStepsProps) {
           onChange={e => setNewText(e.target.value)}
           placeholder="Add update... (auto-stamps date + your name)"
           rows={2}
-          className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 placeholder-slate-500 resize-none focus:outline-none focus:border-slate-500 transition-colors"
+          className="flex-1 bg-muted border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:border-ring transition-colors"
           onKeyDown={e => {
             if (e.key === 'Enter' && e.metaKey) handleSave()
           }}
@@ -60,7 +60,7 @@ export function LatestNextSteps({ projectId, notes }: LatestNextStepsProps) {
           Save
         </button>
       </div>
-      <p className="text-xs text-slate-600 mt-1">Cmd+Enter to save</p>
+      <p className="text-xs text-muted-foreground/50 mt-1">Cmd+Enter to save</p>
     </div>
   )
 }

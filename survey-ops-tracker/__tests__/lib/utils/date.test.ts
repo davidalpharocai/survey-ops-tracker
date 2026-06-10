@@ -1,5 +1,32 @@
 import { describe, it, expect } from 'vitest'
-import { getDueDateStatus, formatDate, autoStamp } from '@/lib/utils/date'
+import { getDueDateStatus, getDueUrgency, formatDate, autoStamp } from '@/lib/utils/date'
+
+function daysFromNow(n: number): string {
+  const d = new Date()
+  d.setDate(d.getDate() + n)
+  return d.toISOString().split('T')[0]
+}
+
+describe('getDueUrgency', () => {
+  it('returns null for null input', () => {
+    expect(getDueUrgency(null)).toBe(null)
+  })
+  it('returns overdue for past date', () => {
+    expect(getDueUrgency('2020-01-01')).toBe('overdue')
+  })
+  it('returns overdue for today', () => {
+    expect(getDueUrgency(daysFromNow(0))).toBe('overdue')
+  })
+  it('returns tomorrow for 1 day out', () => {
+    expect(getDueUrgency(daysFromNow(1))).toBe('tomorrow')
+  })
+  it('returns twodays for 2 days out', () => {
+    expect(getDueUrgency(daysFromNow(2))).toBe('twodays')
+  })
+  it('returns normal for 3 days out', () => {
+    expect(getDueUrgency(daysFromNow(3))).toBe('normal')
+  })
+})
 
 describe('getDueDateStatus', () => {
   it('returns null for null input', () => {

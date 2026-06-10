@@ -17,14 +17,14 @@ export default function ListView() {
     <div className="flex flex-col gap-4">
       {/* Top bar */}
       <div className="flex items-center gap-3 flex-wrap">
-        <div className="flex bg-slate-800 rounded-lg p-1 gap-1">
+        <div className="flex bg-muted rounded-lg p-1 gap-1">
           <Link
             href="/"
-            className="text-xs text-slate-400 hover:text-white px-3 py-1.5 rounded transition-colors"
+            className="text-xs text-muted-foreground hover:text-foreground px-3 py-1.5 rounded transition-colors"
           >
             Board
           </Link>
-          <span className="text-xs bg-slate-700 text-white px-3 py-1.5 rounded font-medium">
+          <span className="text-xs bg-background text-foreground px-3 py-1.5 rounded font-medium">
             List
           </span>
         </div>
@@ -32,7 +32,7 @@ export default function ListView() {
       </div>
 
       {isLoading ? (
-        <div className="text-slate-400 text-sm">Loading projects...</div>
+        <div className="text-muted-foreground text-sm">Loading projects...</div>
       ) : (
         <ProjectTable projects={visibleProjects} />
       )}

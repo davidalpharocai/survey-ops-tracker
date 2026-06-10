@@ -31,8 +31,8 @@ export function LinkedDocuments({ projectId, documents }: LinkedDocumentsProps) 
   }
 
   return (
-    <div className="bg-slate-900 rounded-xl p-4">
-      <h3 className="text-xs text-slate-400 uppercase tracking-widest mb-3 font-medium">
+    <div className="bg-card rounded-xl p-4">
+      <h3 className="text-xs text-muted-foreground uppercase tracking-widest mb-3 font-medium">
         Linked Documents
       </h3>
       <div className="flex flex-col gap-2 mb-3">
@@ -42,14 +42,14 @@ export function LinkedDocuments({ projectId, documents }: LinkedDocumentsProps) 
             href={url}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-2 bg-slate-800 rounded-lg px-3 py-2 text-sm text-blue-400 hover:text-blue-300 hover:bg-slate-700 transition-colors"
+            className="flex items-center gap-2 bg-muted rounded-lg px-3 py-2 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-accent transition-colors"
           >
             <span>📄</span>
             <span className="truncate">{getDisplayName(url)}</span>
           </a>
         ))}
         {documents.length === 0 && (
-          <p className="text-slate-600 text-xs">No documents linked yet</p>
+          <p className="text-muted-foreground/50 text-xs">No documents linked yet</p>
         )}
       </div>
       <div className="flex gap-2">
@@ -57,13 +57,13 @@ export function LinkedDocuments({ projectId, documents }: LinkedDocumentsProps) 
           value={newUrl}
           onChange={e => setNewUrl(e.target.value)}
           placeholder="Paste Google Doc URL"
-          className="flex-1 bg-slate-800 border border-dashed border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-300 placeholder-slate-600 focus:outline-none focus:border-slate-400 transition-colors"
+          className="flex-1 bg-muted border border-dashed border-border rounded-lg px-3 py-2 text-sm text-foreground/80 placeholder:text-muted-foreground focus:outline-none focus:border-ring transition-colors"
           onKeyDown={e => e.key === 'Enter' && handleAdd()}
         />
         <button
           onClick={handleAdd}
           disabled={!newUrl.trim()}
-          className="bg-slate-700 hover:bg-slate-600 disabled:opacity-40 disabled:cursor-not-allowed text-slate-200 text-xs px-3 py-2 rounded-lg transition-colors"
+          className="bg-muted hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed text-foreground text-xs px-3 py-2 rounded-lg transition-colors"
         >
           Add
         </button>

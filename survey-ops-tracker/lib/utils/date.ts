@@ -11,6 +11,21 @@ export function getDueDateStatus(dueDate: string | null): DueDateStatus {
   return 'normal'
 }
 
+export type DueUrgency = 'overdue' | 'tomorrow' | 'twodays' | 'normal' | null
+
+// Granular urgency for kanban card borders:
+// overdue = due today or already past, tomorrow = due in 1 day, twodays = due in 2 days
+export function getDueUrgency(dueDate: string | null): DueUrgency {
+  if (!dueDate) return null
+  const today = startOfDay(new Date())
+  const due = startOfDay(parseISO(dueDate))
+  const days = differenceInCalendarDays(due, today)
+  if (days <= 0) return 'overdue'
+  if (days === 1) return 'tomorrow'
+  if (days === 2) return 'twodays'
+  return 'normal'
+}
+
 export function formatDate(date: string | null): string {
   if (!date) return '—'
   return new Date(date).toLocaleDateString('en-US', {
