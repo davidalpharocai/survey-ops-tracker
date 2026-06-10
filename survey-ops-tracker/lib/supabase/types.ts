@@ -378,7 +378,7 @@ export type Database = {
       question_type: 'open_text' | 'single_select' | 'multi_select' | 'scale' | 'other'
       recipient_role: 'alpharoc' | 'compliance'
       project_type: 'PS' | 'B2B' | 'Rerun'
-      project_status: 'Open' | 'Closed'
+      project_status: 'Open' | 'Closed' | 'Hold'
       project_phase: 'Scoping' | 'Active'
       board_column:
         | 'Submitted'

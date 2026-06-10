@@ -24,7 +24,7 @@ export default function BoardPage() {
   const activeProjects = projects.filter(p =>
     mode === 'full'
       ? p.phase === 'Active'
-      : p.phase === 'Active' && p.status === 'Open'
+      : p.phase === 'Active' && (p.status === 'Open' || p.status === 'Hold')
   )
 
   if (isLoading) {

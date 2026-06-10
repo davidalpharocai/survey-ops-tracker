@@ -117,9 +117,10 @@ export function ProjectTable({ projects }: ProjectTableProps) {
                 onClick={() => router.push(`/projects/${p.id}`)}
                 className={`border-t border-border cursor-pointer hover:bg-accent/50 transition-colors ${
                   i % 2 === 1 ? 'bg-muted/40' : ''
-                }`}
+                } ${p.status === 'Hold' ? 'opacity-60' : ''}`}
               >
                 <td className="px-4 py-3 text-sm text-foreground font-medium">
+                  {p.status === 'Hold' && <span title="On hold">⏸ </span>}
                   {p.project_name}
                 </td>
                 <td className="px-4 py-3 text-sm text-muted-foreground">{p.client}</td>

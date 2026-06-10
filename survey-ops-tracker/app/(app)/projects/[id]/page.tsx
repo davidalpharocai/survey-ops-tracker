@@ -57,11 +57,8 @@ export default function ProjectDetailPage() {
     )
   }
 
-  function toggleClosed() {
-    updateProject.mutate({
-      id,
-      updates: { status: project!.status === 'Open' ? 'Closed' : 'Open' },
-    })
+  function setStatus(status: 'Open' | 'Closed' | 'Hold') {
+    updateProject.mutate({ id, updates: { status } })
   }
 
   return (
@@ -85,10 +82,12 @@ export default function ProjectDetailPage() {
           className={`text-xs px-2 py-1 rounded ${
             project.status === 'Open'
               ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400'
+              : project.status === 'Hold'
+              ? 'bg-muted text-muted-foreground'
               : 'bg-red-500/20 text-red-600 dark:text-red-400'
           }`}
         >
-          {project.status}
+          {project.status === 'Hold' ? '⏸ On Hold' : project.status}
         </span>
         {project.phase === 'Scoping' && (
           <span className="text-xs px-2 py-1 rounded bg-violet-500/20 text-violet-600 dark:text-violet-400">
@@ -101,17 +100,39 @@ export default function ProjectDetailPage() {
               Closed projects are hidden from Operations view — switch to Full View to find them.
             </span>
           )}
-          <button
-            onClick={toggleClosed}
-            title={
-              project.status === 'Open'
-                ? 'Marks the project Closed (done/archived). It stays visible in Full View and can be reopened anytime.'
-                : 'Reopen this project'
-            }
-            className="text-xs border border-border text-muted-foreground hover:text-foreground hover:border-ring px-3 py-1.5 rounded-lg transition-colors shrink-0"
-          >
-            {project.status === 'Open' ? '✕ Close Project' : '↺ Reopen Project'}
-          </button>
+          {project.status === 'Open' && (
+            <button
+              onClick={() => setStatus('Hold')}
+              title="Pause this project. It stays on the board, greyed out."
+              className="text-xs border border-border text-muted-foreground hover:text-foreground hover:border-ring px-3 py-1.5 rounded-lg transition-colors shrink-0"
+            >
+              ⏸ Hold
+            </button>
+          )}
+          {project.status === 'Hold' && (
+            <button
+              onClick={() => setStatus('Open')}
+              className="text-xs border border-border text-muted-foreground hover:text-foreground hover:border-ring px-3 py-1.5 rounded-lg transition-colors shrink-0"
+            >
+              ▶ Resume
+            </button>
+          )}
+          {project.status !== 'Closed' ? (
+            <button
+              onClick={() => setStatus('Closed')}
+              title="Marks the project Closed (done/archived). It stays visible in Full View and can be reopened anytime."
+              className="text-xs border border-border text-muted-foreground hover:text-foreground hover:border-ring px-3 py-1.5 rounded-lg transition-colors shrink-0"
+            >
+              ✕ Close Project
+            </button>
+          ) : (
+            <button
+              onClick={() => setStatus('Open')}
+              className="text-xs border border-border text-muted-foreground hover:text-foreground hover:border-ring px-3 py-1.5 rounded-lg transition-colors shrink-0"
+            >
+              ↺ Reopen Project
+            </button>
+          )}
         </div>
       </div>
 

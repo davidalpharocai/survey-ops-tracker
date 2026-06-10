@@ -20,6 +20,10 @@ export function ColorKey() {
           {item.label}
         </span>
       ))}
+      <span className="flex items-center gap-1.5">
+        <span className="inline-block w-3.5 h-3.5 rounded bg-background border-2 border-muted-foreground/40 opacity-60" />
+        On hold
+      </span>
       <span className="text-border">|</span>
       {TYPE_ITEMS.map(item => (
         <span key={item.label} className="flex items-center gap-1.5">

@@ -31,11 +31,15 @@ interface ProjectCardProps {
 }
 
 export function ProjectCard({ project, onClick }: ProjectCardProps) {
+  const onHold = project.status === 'Hold'
   const dueDateStatus = getDueDateStatus(project.due_date)
   const urgency = getDueUrgency(project.due_date)
   const urgencyBorder = urgency ? URGENCY_BORDER[urgency] : undefined
   const stageBorder = STAGE_BORDER[project.board_column] ?? 'border-l-muted-foreground'
-  const border = urgencyBorder
+  // Hold: greyed out, grey border, urgency colors suppressed (it's paused)
+  const border = onHold
+    ? 'border-2 border-muted-foreground/40 border-l-4 border-l-muted-foreground/50'
+    : urgencyBorder
     ? `border-l-4 ${urgencyBorder}`
     : `border border-border border-l-4 ${stageBorder}`
   const snippet = project.latest_next_steps
@@ -46,20 +50,29 @@ export function ProjectCard({ project, onClick }: ProjectCardProps) {
   return (
     <div
       onClick={onClick}
-      className={`bg-background rounded-lg p-3 ${border} cursor-pointer hover:ring-1 hover:ring-ring transition-all`}
+      className={`bg-background rounded-lg p-3 ${border} ${
+        onHold ? 'opacity-60' : ''
+      } cursor-pointer hover:ring-1 hover:ring-ring transition-all`}
     >
       {/* Title row */}
       <div className="flex items-start justify-between gap-2 mb-1">
         <span className="text-foreground text-sm font-semibold leading-tight">
           {project.project_name}
         </span>
-        {project.project_type && (
-          <span
-            className={`text-[11px] px-2 py-0.5 rounded shrink-0 ${TYPE_BADGE[project.project_type] ?? ''}`}
-          >
-            {project.project_type}
-          </span>
-        )}
+        <span className="flex items-center gap-1 shrink-0">
+          {onHold && (
+            <span className="text-[11px] px-2 py-0.5 rounded bg-muted text-muted-foreground">
+              ⏸ Hold
+            </span>
+          )}
+          {project.project_type && (
+            <span
+              className={`text-[11px] px-2 py-0.5 rounded ${TYPE_BADGE[project.project_type] ?? ''}`}
+            >
+              {project.project_type}
+            </span>
+          )}
+        </span>
       </div>
 
       {/* Client */}
