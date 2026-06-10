@@ -8,6 +8,7 @@ import { NProgressBar } from '@/components/shared/NProgressBar'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
 import { formatDate } from '@/lib/utils/date'
 import { BudgetWidget } from '@/components/project/BudgetWidget'
+import { CompliancePanel } from '@/components/compliance/CompliancePanel'
 
 const TOOLTIPS: Record<string, string> = {
   'N Target': "Total number of survey responses you're aiming to collect.",
@@ -103,6 +104,7 @@ export default function ProjectDetailPage() {
             projectId={project.id}
             documents={project.linked_documents ?? []}
           />
+          <CompliancePanel projectId={project.id} />
         </div>
 
         {/* Right sidebar */}
