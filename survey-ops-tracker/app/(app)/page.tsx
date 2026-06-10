@@ -17,7 +17,7 @@ export default function BoardPage() {
   )
 
   if (isLoading) {
-    return <div className="text-slate-400 text-sm">Loading projects...</div>
+    return <div className="text-muted-foreground text-sm">Loading projects...</div>
   }
 
   return (
@@ -26,13 +26,13 @@ export default function BoardPage() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
           {/* Board/List tabs */}
-          <div className="flex bg-slate-800 rounded-lg p-1 gap-1">
-            <span className="text-xs bg-slate-700 text-white px-3 py-1.5 rounded font-medium">
+          <div className="flex bg-muted rounded-lg p-1 gap-1">
+            <span className="text-xs bg-background text-foreground px-3 py-1.5 rounded font-medium">
               Board
             </span>
             <Link
               href="/list"
-              className="text-xs text-slate-400 hover:text-white px-3 py-1.5 rounded transition-colors"
+              className="text-xs text-muted-foreground hover:text-foreground px-3 py-1.5 rounded transition-colors"
             >
               List
             </Link>

@@ -72,8 +72,8 @@ describe('ProjectCard', () => {
   })
   it('does not show snippet when latest_next_steps is null', () => {
     render(<ProjectCard project={{ ...mockProject, latest_next_steps: null } as any} />)
-    // no snippet paragraph rendered — check there's no element with text-slate-500 snippet class
-    const snippets = document.querySelectorAll('p.text-slate-500')
+    // no snippet paragraph rendered — check there's no element with the snippet's line-clamp class
+    const snippets = document.querySelectorAll('p.line-clamp-2')
     expect(snippets.length).toBe(0)
   })
 })

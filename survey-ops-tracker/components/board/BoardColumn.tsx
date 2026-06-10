@@ -12,12 +12,12 @@ interface BoardColumnProps {
 
 export function BoardColumn({ id, title, projects, onCardClick }: BoardColumnProps) {
   return (
-    <div className="bg-slate-900 rounded-xl p-3 min-w-[200px] flex flex-col gap-3 flex-shrink-0">
+    <div className="bg-card rounded-xl p-3 min-w-[200px] flex flex-col gap-3 flex-shrink-0">
       <div className="flex items-center justify-between">
-        <span className="text-xs text-slate-400 uppercase tracking-widest font-medium">
+        <span className="text-xs text-muted-foreground uppercase tracking-widest font-medium">
           {title}
         </span>
-        <span className="text-xs bg-slate-800 text-slate-500 px-2 py-0.5 rounded-full">
+        <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full">
           {projects.length}
         </span>
       </div>
@@ -27,7 +27,7 @@ export function BoardColumn({ id, title, projects, onCardClick }: BoardColumnPro
             ref={provided.innerRef}
             {...provided.droppableProps}
             className={`flex flex-col gap-2 min-h-[80px] rounded-lg transition-colors ${
-              snapshot.isDraggingOver ? 'bg-slate-800/50' : ''
+              snapshot.isDraggingOver ? 'bg-accent/50' : ''
             }`}
           >
             {projects.map((project, index) => (

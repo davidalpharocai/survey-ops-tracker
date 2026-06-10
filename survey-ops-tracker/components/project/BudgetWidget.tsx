@@ -49,7 +49,7 @@ function EditableAmount({
           if (e.key === 'Escape') setEditing(false)
         }}
         placeholder={placeholder}
-        className="w-24 bg-slate-800 border border-slate-600 rounded px-2 py-0.5 text-xs text-slate-100 focus:outline-none focus:border-blue-500 text-right"
+        className="w-24 bg-muted border border-border rounded px-2 py-0.5 text-xs text-foreground focus:outline-none focus:border-blue-500 text-right"
       />
     )
   }
@@ -57,7 +57,7 @@ function EditableAmount({
   return (
     <button
       onClick={startEdit}
-      className="text-xs text-slate-200 hover:text-white hover:underline transition-colors cursor-pointer"
+      className="text-xs text-foreground hover:underline transition-colors cursor-pointer"
       title="Click to edit"
     >
       {formatCurrency(value)}
@@ -82,37 +82,37 @@ export function BudgetWidget({ projectId, budget, actualSpend }: BudgetWidgetPro
   const pct = hasBoth && budget > 0 ? Math.min((actualSpend / budget) * 100, 100) : 0
 
   return (
-    <div className="border-t border-slate-800 pt-3 mt-1">
-      <p className="text-xs text-slate-400 uppercase tracking-widest mb-3 font-medium">Budget</p>
+    <div className="border-t border-border pt-3 mt-1">
+      <p className="text-xs text-muted-foreground uppercase tracking-widest mb-3 font-medium">Budget</p>
       <div className="flex flex-col gap-2">
         <div className="flex justify-between items-center">
-          <span className="text-xs text-slate-500">Allocated</span>
+          <span className="text-xs text-muted-foreground">Allocated</span>
           <EditableAmount value={budget} onSave={saveBudget} placeholder="e.g. 5000" />
         </div>
         <div className="flex justify-between items-center">
-          <span className="text-xs text-slate-500">Actual Spend</span>
+          <span className="text-xs text-muted-foreground">Actual Spend</span>
           <EditableAmount value={actualSpend} onSave={saveActualSpend} placeholder="e.g. 3200" />
         </div>
         {hasBoth && (
           <>
-            <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden mt-1">
+            <div className="h-1.5 bg-muted rounded-full overflow-hidden mt-1">
               <div
                 className={`h-full rounded-full transition-all ${isOver ? 'bg-red-500' : 'bg-emerald-400'}`}
                 style={{ width: `${pct}%` }}
               />
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-xs text-slate-500">
+              <span className="text-xs text-muted-foreground">
                 {isOver ? '⚠ Over budget' : 'Remaining'}
               </span>
-              <span className={`text-xs font-medium ${isOver ? 'text-red-400' : 'text-emerald-400'}`}>
+              <span className={`text-xs font-medium ${isOver ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
                 {isOver ? '-' : ''}{formatCurrency(Math.abs(remaining!))}
               </span>
             </div>
           </>
         )}
         {!hasBoth && (
-          <p className="text-xs text-slate-600">Click values above to enter budget</p>
+          <p className="text-xs text-muted-foreground/50">Click values above to enter budget</p>
         )}
       </div>
     </div>

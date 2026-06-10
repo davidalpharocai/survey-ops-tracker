@@ -90,24 +90,24 @@ export function PipelineProgress({ project }: PipelineProgressProps) {
                 disabled={!isClickable}
                 className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium border transition-colors ${
                   isDone
-                    ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400'
+                    ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-600 dark:text-emerald-400'
                     : isCurrent
-                    ? 'bg-amber-500/15 border-amber-500/60 text-amber-400'
-                    : 'bg-slate-800 border-slate-700 text-slate-500'
-                } ${isClickable ? 'hover:border-slate-500 cursor-pointer' : 'cursor-default'}`}
+                    ? 'bg-amber-500/15 border-amber-500/60 text-amber-600 dark:text-amber-400'
+                    : 'bg-muted border-border text-muted-foreground'
+                } ${isClickable ? 'hover:border-ring cursor-pointer' : 'cursor-default'}`}
               >
                 <span>{isDone ? '✓' : isCurrent ? '▶' : '○'}</span>
                 <span>{stage}</span>
-                {isCurrent && <span className="text-slate-600 text-[10px]">(current)</span>}
+                {isCurrent && <span className="text-muted-foreground/50 text-[10px]">(current)</span>}
               </button>
               {i < STAGE_ORDER.length - 1 && (
-                <span className="text-slate-700 text-xs select-none">→</span>
+                <span className="text-muted-foreground/50 text-xs select-none">→</span>
               )}
             </div>
           )
         })}
       </div>
-      <p className="text-xs text-slate-600 mt-2">
+      <p className="text-xs text-muted-foreground/50 mt-2">
         Checking a stage advances the project card on the board. Uncheck to move it back.
       </p>
     </div>

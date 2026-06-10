@@ -24,7 +24,7 @@ export function BoardFilters({
       <select
         value={captainFilter ?? ''}
         onChange={e => onCaptainChange(e.target.value || null)}
-        className="bg-slate-800 border border-slate-700 text-slate-300 text-xs rounded-lg px-3 py-1.5 focus:outline-none focus:border-slate-500"
+        className="bg-muted border border-border text-foreground/80 text-xs rounded-lg px-3 py-1.5 focus:outline-none focus:border-ring"
       >
         <option value="">All Captains</option>
         {captains.map(c => (
@@ -36,14 +36,14 @@ export function BoardFilters({
       <select
         value={typeFilter ?? ''}
         onChange={e => onTypeChange(e.target.value || null)}
-        className="bg-slate-800 border border-slate-700 text-slate-300 text-xs rounded-lg px-3 py-1.5 focus:outline-none focus:border-slate-500"
+        className="bg-muted border border-border text-foreground/80 text-xs rounded-lg px-3 py-1.5 focus:outline-none focus:border-ring"
       >
         <option value="">All Types</option>
         <option value="PS">PS</option>
         <option value="B2B">B2B</option>
         <option value="Rerun">Rerun</option>
       </select>
-      <label className="flex items-center gap-2 text-xs text-slate-400 cursor-pointer select-none">
+      <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer select-none">
         <input
           type="checkbox"
           checked={overdueOnly}

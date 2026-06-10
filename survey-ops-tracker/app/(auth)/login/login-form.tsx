@@ -28,10 +28,10 @@ export default function LoginForm() {
   }
 
   return (
-    <div className="w-full max-w-sm p-8 bg-slate-900 rounded-xl border border-slate-800">
+    <div className="w-full max-w-sm p-8 bg-card rounded-xl border border-border">
       <div className="mb-6">
-        <h1 className="text-xl font-bold text-white">Survey Ops Tracker</h1>
-        <p className="text-sm text-slate-400 mt-1">Sign in to your workspace</p>
+        <h1 className="text-xl font-bold text-foreground">Survey Ops Tracker</h1>
+        <p className="text-sm text-muted-foreground mt-1">Sign in to your workspace</p>
       </div>
       <form onSubmit={handleLogin} className="flex flex-col gap-4">
         <Input
@@ -40,7 +40,7 @@ export default function LoginForm() {
           value={email}
           onChange={e => setEmail(e.target.value)}
           required
-          className="bg-slate-800 border-slate-700 text-white placeholder:text-slate-500"
+          className="bg-muted border-border text-foreground placeholder:text-muted-foreground"
         />
         <Input
           type="password"
@@ -48,10 +48,10 @@ export default function LoginForm() {
           value={password}
           onChange={e => setPassword(e.target.value)}
           required
-          className="bg-slate-800 border-slate-700 text-white placeholder:text-slate-500"
+          className="bg-muted border-border text-foreground placeholder:text-muted-foreground"
         />
         {error && (
-          <p className="text-red-400 text-sm bg-red-400/10 px-3 py-2 rounded-lg">{error}</p>
+          <p className="text-red-600 dark:text-red-400 text-sm bg-red-400/10 px-3 py-2 rounded-lg">{error}</p>
         )}
         <Button type="submit" disabled={loading} className="w-full">
           {loading ? 'Signing in...' : 'Sign in'}

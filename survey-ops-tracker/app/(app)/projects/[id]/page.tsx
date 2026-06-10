@@ -1,9 +1,11 @@
 'use client'
+import { useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useProjects, useUpdateProject } from '@/lib/hooks/useProjects'
 import { PipelineProgress } from '@/components/project/PipelineProgress'
 import { LatestNextSteps } from '@/components/project/LatestNextSteps'
 import { LinkedDocuments } from '@/components/project/LinkedDocuments'
+import { SlackChannel } from '@/components/project/SlackChannel'
 import { NProgressBar } from '@/components/shared/NProgressBar'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
 import { formatDate } from '@/lib/utils/date'
@@ -16,12 +18,18 @@ const TOOLTIPS: Record<string, string> = {
   'Row-Level Data': 'Whether individual respondent-level data is included in the deliverable.',
   'Terminations': 'Whether any survey participants have been terminated (screened out) from the study.',
   'Project Captain': 'The team member responsible for this project end-to-end.',
+  'Salesperson': 'The sales lead for this project.',
+  'N Actual': 'Final usable response count after cleaning N Collected.',
+  'Longitudinal': 'Whether this is a longitudinal study tracked across multiple waves.',
+  'Voter Survey QA': 'Voter surveys need an additional QA pass. Auto-set to Yes when the salesperson is Jenna or the project/client mentions "vote". Click to override.',
+  'Citation Language': 'Whether deliverables need citation language. Auto-set the same way as Voter Survey QA. Click to override.',
+  'Survey IDs': 'IDs of this project\'s surveys in the survey tool, comma separated. Used to sync N Collected.',
 }
 
 const TYPE_BADGE: Record<string, string> = {
-  'PS': 'bg-blue-500/20 text-blue-400',
-  'B2B': 'bg-violet-500/20 text-violet-400',
-  'Rerun': 'bg-emerald-500/20 text-emerald-400',
+  'PS': 'bg-blue-500/20 text-blue-600 dark:text-blue-400',
+  'B2B': 'bg-violet-500/20 text-violet-600 dark:text-violet-400',
+  'Rerun': 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400',
 }
 
 export default function ProjectDetailPage() {
@@ -34,13 +42,13 @@ export default function ProjectDetailPage() {
   const project = projects.find(p => p.id === id)
 
   if (isLoading) {
-    return <div className="text-slate-400 text-sm">Loading...</div>
+    return <div className="text-muted-foreground text-sm">Loading...</div>
   }
   if (!project) {
     return (
-      <div className="text-slate-400 text-sm">
+      <div className="text-muted-foreground text-sm">
         Project not found.{' '}
-        <button onClick={() => router.push('/')} className="text-blue-400 underline">
+        <button onClick={() => router.push('/')} className="text-blue-600 dark:text-blue-400 underline">
           Back to board
         </button>
       </div>
@@ -58,12 +66,12 @@ export default function ProjectDetailPage() {
       <div className="flex items-center gap-3 mb-6 flex-wrap">
         <button
           onClick={() => router.push('/')}
-          className="text-slate-400 hover:text-slate-200 text-sm transition-colors"
+          className="text-muted-foreground hover:text-foreground text-sm transition-colors"
         >
           ← Board
         </button>
-        <span className="text-slate-700">/</span>
-        <h1 className="text-xl font-bold text-white">{project.project_name}</h1>
+        <span className="text-muted-foreground/50">/</span>
+        <h1 className="text-xl font-bold text-foreground">{project.project_name}</h1>
         {project.project_type && (
           <span className={`text-xs px-2 py-1 rounded ${TYPE_BADGE[project.project_type] ?? ''}`}>
             {project.project_type}
@@ -72,8 +80,8 @@ export default function ProjectDetailPage() {
         <span
           className={`text-xs px-2 py-1 rounded ${
             project.status === 'Open'
-              ? 'bg-emerald-500/20 text-emerald-400'
-              : 'bg-red-500/20 text-red-400'
+              ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400'
+              : 'bg-red-500/20 text-red-600 dark:text-red-400'
           }`}
         >
           {project.status}
@@ -81,7 +89,7 @@ export default function ProjectDetailPage() {
         <div className="ml-auto">
           <button
             onClick={handleClose}
-            className="text-xs border border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-500 px-3 py-1.5 rounded-lg transition-colors"
+            className="text-xs border border-border text-muted-foreground hover:text-foreground hover:border-ring px-3 py-1.5 rounded-lg transition-colors"
           >
             ✕ Close Project
           </button>
@@ -92,8 +100,8 @@ export default function ProjectDetailPage() {
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6">
         {/* Left column */}
         <div className="flex flex-col gap-4">
-          <div className="bg-slate-900 rounded-xl p-4">
-            <h3 className="text-xs text-slate-400 uppercase tracking-widest mb-4 font-medium">
+          <div className="bg-card rounded-xl p-4">
+            <h3 className="text-xs text-muted-foreground uppercase tracking-widest mb-4 font-medium">
               Pipeline Progress
             </h3>
             <PipelineProgress project={project} />
@@ -103,12 +111,13 @@ export default function ProjectDetailPage() {
             projectId={project.id}
             documents={project.linked_documents ?? []}
           />
+          <SlackChannel projectId={project.id} url={project.slack_channel_url ?? null} />
         </div>
 
         {/* Right sidebar */}
         <div className="flex flex-col gap-4">
-          <div className="bg-slate-900 rounded-xl p-4">
-            <h3 className="text-xs text-slate-400 uppercase tracking-widest mb-4 font-medium">
+          <div className="bg-card rounded-xl p-4">
+            <h3 className="text-xs text-muted-foreground uppercase tracking-widest mb-4 font-medium">
               Project Details
             </h3>
             <div className="flex flex-col gap-3">
@@ -119,16 +128,21 @@ export default function ProjectDetailPage() {
                 value={project.captain?.initials ?? '—'}
                 tooltip={TOOLTIPS['Project Captain']}
               />
+              <DetailRow
+                label="Salesperson"
+                value={project.salesperson ?? '—'}
+                tooltip={TOOLTIPS['Salesperson']}
+              />
               <DetailRow label="Submitted" value={formatDate(project.submitted_date)} />
               <DetailRow label="Launch Date" value={formatDate(project.launch_date)} />
               <DetailRow
                 label="Due Date"
                 value={formatDate(project.due_date)}
-                valueClass="text-amber-400"
+                valueClass="text-amber-600 dark:text-amber-400"
               />
               <DetailRow label="Deliver Date" value={formatDate(project.deliver_date)} />
 
-              <div className="border-t border-slate-800 pt-3 mt-1">
+              <div className="border-t border-border pt-3 mt-1">
                 <DetailRow
                   label="N Target"
                   value={project.n_target?.toString() ?? '—'}
@@ -136,16 +150,23 @@ export default function ProjectDetailPage() {
                 />
                 <div className="mt-2">
                   <div className="flex justify-between items-center text-sm mb-1">
-                    <span className="text-slate-500 flex items-center text-xs">
+                    <span className="text-muted-foreground flex items-center text-xs">
                       N Collected
                       <InfoTooltip text={TOOLTIPS['N Collected']} />
                     </span>
-                    <span className="text-emerald-400 text-xs">{project.n_collected}</span>
+                    <span className="text-emerald-600 dark:text-emerald-400 text-xs">{project.n_collected}</span>
                   </div>
                   <NProgressBar
                     collected={project.n_collected}
                     target={project.n_target}
                     showLabel={false}
+                  />
+                </div>
+                <div className="mt-3">
+                  <DetailRow
+                    label="N Actual"
+                    value={project.n_actual?.toString() ?? '—'}
+                    tooltip={TOOLTIPS['N Actual']}
                   />
                 </div>
                 <div className="mt-3">
@@ -157,18 +178,46 @@ export default function ProjectDetailPage() {
                 </div>
               </div>
 
-              <div className="border-t border-slate-800 pt-3 mt-1">
+              <div className="border-t border-border pt-3 mt-1">
                 <DetailRow
                   label="Row-Level Data"
                   value={project.row_level_data ? '✓ Yes' : 'No'}
-                  valueClass={project.row_level_data ? 'text-emerald-400' : 'text-slate-500'}
+                  valueClass={project.row_level_data ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}
                   tooltip={TOOLTIPS['Row-Level Data']}
                 />
                 <DetailRow
                   label="Terminations"
                   value={project.terminations ? '⚠ Yes' : 'No'}
-                  valueClass={project.terminations ? 'text-red-400' : 'text-slate-500'}
+                  valueClass={project.terminations ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'}
                   tooltip={TOOLTIPS['Terminations']}
+                />
+                <FlagRow
+                  label="Longitudinal"
+                  value={project.longitudinal ?? false}
+                  tooltip={TOOLTIPS['Longitudinal']}
+                  onToggle={v => updateProject.mutate({ id, updates: { longitudinal: v } })}
+                />
+                <FlagRow
+                  label="Voter Survey QA"
+                  value={project.voter_survey_qa ?? false}
+                  tooltip={TOOLTIPS['Voter Survey QA']}
+                  onToggle={v => updateProject.mutate({ id, updates: { voter_survey_qa: v } })}
+                />
+                <FlagRow
+                  label="Citation Language"
+                  value={project.citation_language_needed ?? false}
+                  tooltip={TOOLTIPS['Citation Language']}
+                  onToggle={v => updateProject.mutate({ id, updates: { citation_language_needed: v } })}
+                />
+              </div>
+
+              <div className="border-t border-border pt-3 mt-1">
+                <EditableRow
+                  label="Survey IDs"
+                  value={project.survey_tool_id ?? ''}
+                  placeholder="e.g. SV-1042, SV-1043"
+                  tooltip={TOOLTIPS['Survey IDs']}
+                  onSave={v => updateProject.mutate({ id, updates: { survey_tool_id: v || null } })}
                 />
               </div>
 
@@ -180,8 +229,8 @@ export default function ProjectDetailPage() {
             </div>
           </div>
 
-          <div className="bg-slate-900 rounded-xl p-4 text-xs text-slate-500 leading-relaxed">
-            <p className="font-medium text-slate-400 mb-1 text-xs uppercase tracking-widest">
+          <div className="bg-card rounded-xl p-4 text-xs text-muted-foreground leading-relaxed">
+            <p className="font-medium text-muted-foreground mb-1 text-xs uppercase tracking-widest">
               Notifications
             </p>
             Slack alerts sent to #survey-ops when: stage advances, due date is tomorrow, N target is hit.
@@ -192,11 +241,114 @@ export default function ProjectDetailPage() {
   )
 }
 
+function EditableRow({
+  label,
+  value,
+  placeholder,
+  tooltip,
+  onSave,
+}: {
+  label: string
+  value: string
+  placeholder?: string
+  tooltip?: string
+  onSave: (next: string) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState('')
+
+  function save() {
+    onSave(draft.trim())
+    setEditing(false)
+  }
+
+  if (editing) {
+    return (
+      <div className="flex flex-col gap-1.5 text-sm">
+        <span className="text-muted-foreground flex items-center text-xs">
+          {label}
+          {tooltip && <InfoTooltip text={tooltip} />}
+        </span>
+        <div className="flex gap-1.5">
+          <input
+            autoFocus
+            value={draft}
+            onChange={e => setDraft(e.target.value)}
+            placeholder={placeholder}
+            className="flex-1 min-w-0 bg-muted border border-border rounded px-2 py-1 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring"
+            onKeyDown={e => {
+              if (e.key === 'Enter') save()
+              if (e.key === 'Escape') setEditing(false)
+            }}
+          />
+          <button
+            onClick={save}
+            className="text-xs bg-muted hover:bg-accent text-foreground px-2 py-1 rounded transition-colors"
+          >
+            Save
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex justify-between items-center text-sm gap-2">
+      <span className="text-muted-foreground flex items-center text-xs shrink-0">
+        {label}
+        {tooltip && <InfoTooltip text={tooltip} />}
+      </span>
+      <button
+        onClick={() => {
+          setDraft(value)
+          setEditing(true)
+        }}
+        className="text-xs text-foreground/80 hover:text-foreground truncate cursor-pointer"
+        title="Click to edit"
+      >
+        {value || <span className="text-muted-foreground/50">— click to add</span>}
+      </button>
+    </div>
+  )
+}
+
+function FlagRow({
+  label,
+  value,
+  tooltip,
+  onToggle,
+}: {
+  label: string
+  value: boolean
+  tooltip?: string
+  onToggle: (next: boolean) => void
+}) {
+  return (
+    <div className="flex justify-between items-center text-sm">
+      <span className="text-muted-foreground flex items-center text-xs">
+        {label}
+        {tooltip && <InfoTooltip text={tooltip} />}
+      </span>
+      <button
+        onClick={() => onToggle(!value)}
+        className={`text-xs px-1.5 py-0.5 rounded transition-colors cursor-pointer ${
+          value
+            ? 'text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10'
+            : 'text-muted-foreground hover:bg-accent'
+        }`}
+        title="Click to toggle"
+      >
+        {value ? '✓ Yes' : 'No'}
+      </button>
+    </div>
+  )
+}
+
 function DetailRow({
   label,
   value,
   tooltip,
-  valueClass = 'text-slate-200',
+  valueClass = 'text-foreground',
 }: {
   label: string
   value: string
@@ -205,7 +357,7 @@ function DetailRow({
 }) {
   return (
     <div className="flex justify-between items-center text-sm">
-      <span className="text-slate-500 flex items-center text-xs">
+      <span className="text-muted-foreground flex items-center text-xs">
         {label}
         {tooltip && <InfoTooltip text={tooltip} />}
       </span>

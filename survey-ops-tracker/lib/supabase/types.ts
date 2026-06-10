@@ -67,6 +67,12 @@ export type Database = {
           client_id: string | null
           budget: number | null
           actual_spend: number | null
+          longitudinal: boolean
+          salesperson: string | null
+          voter_survey_qa: boolean | null
+          citation_language_needed: boolean | null
+          n_actual: number | null
+          slack_channel_url: string | null
           created_at: string
           updated_at: string
         }
@@ -103,6 +109,12 @@ export type Database = {
           client_id?: string | null
           budget?: number | null
           actual_spend?: number | null
+          longitudinal?: boolean
+          salesperson?: string | null
+          voter_survey_qa?: boolean | null
+          citation_language_needed?: boolean | null
+          n_actual?: number | null
+          slack_channel_url?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -110,7 +122,6 @@ export type Database = {
           id?: string
           project_name?: string
           client?: string
-          client_id?: string | null
           project_type?: Database['public']['Enums']['project_type'] | null
           captain_id?: string | null
           phase?: Database['public']['Enums']['project_phase']
@@ -137,8 +148,15 @@ export type Database = {
           linked_documents?: string[]
           calendar_event_id?: string | null
           survey_tool_id?: string | null
+          client_id?: string | null
           budget?: number | null
           actual_spend?: number | null
+          longitudinal?: boolean
+          salesperson?: string | null
+          voter_survey_qa?: boolean | null
+          citation_language_needed?: boolean | null
+          n_actual?: number | null
+          slack_channel_url?: string | null
           created_at?: string
           updated_at?: string
         }
