@@ -24,9 +24,9 @@ export function submissionCreatedEmail(args: {
       <strong>${esc(args.projectName)}</strong>.</p>
       <p>${args.questionCount} questions total, including ${args.openTextCount} open-text.</p>
       <p style="margin: 28px 0;">
-        <a href="${args.reviewUrl}" style="background: #2563eb; color: #fff; padding: 12px 24px; border-radius: 8px; text-decoration: none;">Review questions</a>
+        <a href="${esc(args.reviewUrl)}" style="background: #2563eb; color: #fff; padding: 12px 24px; border-radius: 8px; text-decoration: none;">Review questions</a>
       </p>
-      <p style="font-size: 13px; color: #666;">Or copy this link: ${args.reviewUrl}</p>
+      <p style="font-size: 13px; color: #666;">Or copy this link: ${esc(args.reviewUrl)}</p>
     `),
   }
 }

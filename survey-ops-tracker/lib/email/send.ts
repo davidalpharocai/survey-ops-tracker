@@ -33,7 +33,7 @@ export async function sendAndLog(args: SendArgs): Promise<boolean> {
       await admin.from('notification_log').insert({
         submission_id: args.submissionId,
         recipient_email: args.to,
-        template: args.template,
+        template: error ? `${args.template}:failed` : args.template,
         resend_id: error ? null : data?.id ?? null,
       })
     } catch {
