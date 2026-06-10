@@ -73,6 +73,8 @@ export type Database = {
           citation_language_needed: boolean | null
           n_actual: number | null
           slack_channel_url: string | null
+          survey_ids_from_sheet: string | null
+          survey_ids_synced_at: string | null
           created_at: string
           updated_at: string
         }
@@ -115,6 +117,8 @@ export type Database = {
           citation_language_needed?: boolean | null
           n_actual?: number | null
           slack_channel_url?: string | null
+          survey_ids_from_sheet?: string | null
+          survey_ids_synced_at?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -157,6 +161,8 @@ export type Database = {
           citation_language_needed?: boolean | null
           n_actual?: number | null
           slack_channel_url?: string | null
+          survey_ids_from_sheet?: string | null
+          survey_ids_synced_at?: string | null
           created_at?: string
           updated_at?: string
         }

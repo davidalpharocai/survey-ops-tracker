@@ -25,7 +25,7 @@ const TOOLTIPS: Record<string, string> = {
   'Longitudinal': 'Whether this is a longitudinal study tracked across multiple waves.',
   'Voter Survey QA': 'Voter surveys need an additional QA pass. Auto-set to Yes when the salesperson is Jenna or the project/client mentions "vote". Click to override.',
   'Citation Language': 'Whether deliverables need citation language. Auto-set the same way as Voter Survey QA. Click to override.',
-  'Survey IDs': 'IDs of this project\'s surveys in the survey tool, comma separated. Used to sync N Collected.',
+  'Survey IDs': 'IDs of this project\'s surveys, comma separated. Auto-filled from the attached Google Sheet by the scheduled sync; manual edits stick unless the sheet changes.',
 }
 
 const TYPE_BADGE: Record<string, string> = {
