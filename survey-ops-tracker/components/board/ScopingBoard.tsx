@@ -45,7 +45,7 @@ export function ScopingBoard({ projects }: ScopingBoardProps) {
         </span>
       </div>
       <DragDropContext onDragEnd={handleDragEnd}>
-        <div className="flex gap-4 overflow-x-auto pb-2">
+        <div className="flex gap-2 overflow-x-auto pb-2">
           {SCOPING_STAGES.map(stage => (
             <BoardColumn
               key={stage}

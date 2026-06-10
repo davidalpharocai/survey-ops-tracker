@@ -50,7 +50,7 @@ export function ProjectCard({ project, onClick }: ProjectCardProps) {
   return (
     <div
       onClick={onClick}
-      className={`bg-background rounded-lg p-3 ${border} ${
+      className={`bg-background rounded-lg p-2.5 ${border} ${
         onHold ? 'opacity-60' : ''
       } cursor-pointer hover:ring-1 hover:ring-ring transition-all`}
     >
@@ -76,7 +76,7 @@ export function ProjectCard({ project, onClick }: ProjectCardProps) {
       </div>
 
       {/* Client */}
-      <p className="text-muted-foreground text-xs mb-3">{project.client}</p>
+      <p className="text-muted-foreground text-xs mb-2">{project.client}</p>
 
       {/* N Progress */}
       <NProgressBar collected={project.n_collected} target={project.n_target} />
@@ -89,7 +89,7 @@ export function ProjectCard({ project, onClick }: ProjectCardProps) {
       )}
 
       {/* Footer row */}
-      <div className="flex items-center justify-between mt-3">
+      <div className="flex items-center justify-between mt-2">
         {project.captain ? (
           <span className="text-xs bg-muted text-foreground/80 px-2 py-0.5 rounded-full">
             {project.captain.initials}

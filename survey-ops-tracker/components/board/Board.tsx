@@ -80,7 +80,7 @@ export function Board({ projects, teamMembers, onMoveProject }: BoardProps) {
         onOverdueOnly={setOverdueOnly}
       />
       <DragDropContext onDragEnd={handleDragEnd}>
-        <div className="flex gap-4 overflow-x-auto pb-4">
+        <div className="flex gap-2 overflow-x-auto pb-4">
           {STAGE_ORDER.map(stage => (
             <BoardColumn
               key={stage}
