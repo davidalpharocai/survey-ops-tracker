@@ -51,3 +51,13 @@ create table public.notification_log (
 
 create index questions_submission_idx on public.questions (submission_id, order_num);
 create index submissions_project_idx on public.question_submissions (project_id, version desc);
+
+-- Deny-by-default from birth: RLS on before any policies exist (policies land in 008)
+alter table public.question_submissions enable row level security;
+alter table public.questions enable row level security;
+alter table public.project_recipients enable row level security;
+alter table public.notification_log enable row level security;
+revoke all on public.question_submissions from anon;
+revoke all on public.questions from anon;
+revoke all on public.project_recipients from anon;
+revoke all on public.notification_log from anon;

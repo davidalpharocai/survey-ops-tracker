@@ -24,12 +24,24 @@ create policy "analysts update projects"
 
 -- ============ New tables ============
 
-alter table public.clients enable row level security;
-alter table public.profiles enable row level security;
-alter table public.question_submissions enable row level security;
-alter table public.questions enable row level security;
-alter table public.project_recipients enable row level security;
-alter table public.notification_log enable row level security;
+-- Submission -> client lookup for policies (security definer: avoids
+-- re-evaluating question_submissions RLS inside the questions policy)
+create or replace function public.submission_client_id(sid uuid)
+returns uuid language sql stable security definer set search_path = public as
+$$ select p.client_id from public.question_submissions qs
+   join public.survey_projects p on p.id = qs.project_id
+   where qs.id = sid $$;
+
+-- Storage-path -> client lookup. Compares id::text so malformed folder
+-- names return NULL (fail closed) instead of raising a uuid cast error.
+create or replace function public.path_project_client_id(folder text)
+returns uuid language sql stable security definer set search_path = public as
+$$ select client_id from public.survey_projects where id::text = folder $$;
+
+revoke execute on function public.submission_client_id(uuid) from anon, public;
+revoke execute on function public.path_project_client_id(text) from anon, public;
+grant execute on function public.submission_client_id(uuid) to authenticated;
+grant execute on function public.path_project_client_id(text) to authenticated;
 
 -- clients
 create policy "analysts full read clients" on public.clients for select to authenticated
@@ -56,7 +68,8 @@ create policy "compliance decides pending submissions" on public.question_submis
   using (public.my_role() = 'compliance'
          and status = 'pending_review'
          and public.project_client_id(project_id) = public.my_client_id())
-  with check (public.project_client_id(project_id) = public.my_client_id());
+  with check (public.project_client_id(project_id) = public.my_client_id()
+              and reviewed_by = auth.uid());
 
 -- Column-level safety: authenticated users may only update decision fields.
 -- (Analysts never update submissions; new versions are new rows via service role.)
@@ -69,9 +82,7 @@ create policy "analysts read questions" on public.questions for select to authen
   using (public.my_role() = 'analyst');
 create policy "compliance reads own questions" on public.questions for select to authenticated
   using (public.my_role() = 'compliance'
-         and public.project_client_id(
-           (select project_id from public.question_submissions qs where qs.id = submission_id)
-         ) = public.my_client_id());
+         and public.submission_client_id(submission_id) = public.my_client_id());
 
 -- project_recipients: analysts only (managed in internal app)
 create policy "analysts manage recipients" on public.project_recipients for all to authenticated
@@ -93,19 +104,25 @@ where public.my_role() = 'compliance'
   and client_id = public.my_client_id();
 
 grant select on public.portal_projects to authenticated;
+revoke all on public.portal_projects from anon;
 
 -- ============ Storage bucket for questionnaire files ============
 insert into storage.buckets (id, name, public) values ('questionnaires', 'questionnaires', false)
 on conflict (id) do nothing;
 
 -- Path convention: {project_id}/{timestamp}-{filename}
-create policy "analysts manage questionnaire files" on storage.objects
-  for all to authenticated
-  using (bucket_id = 'questionnaires' and public.my_role() = 'analyst')
+-- Analysts read and upload; deletes/updates stay with the service role so
+-- audit-referenced source files can't be removed from the client side
+create policy "analysts read questionnaire files" on storage.objects
+  for select to authenticated
+  using (bucket_id = 'questionnaires' and public.my_role() = 'analyst');
+
+create policy "analysts upload questionnaire files" on storage.objects
+  for insert to authenticated
   with check (bucket_id = 'questionnaires' and public.my_role() = 'analyst');
 
 create policy "compliance reads own client files" on storage.objects
   for select to authenticated
   using (bucket_id = 'questionnaires'
          and public.my_role() = 'compliance'
-         and public.project_client_id(((storage.foldername(name))[1])::uuid) = public.my_client_id());
+         and public.path_project_client_id((storage.foldername(name))[1]) = public.my_client_id());

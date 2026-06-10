@@ -10,9 +10,12 @@ create table public.profiles (
   constraint compliance_needs_client check (role <> 'compliance' or client_id is not null)
 );
 
+alter table public.profiles enable row level security;
+revoke all on public.profiles from anon;
+
 -- Backfill: every existing auth user is an internal analyst
 insert into public.profiles (id, email, role)
-select id, email, 'analyst' from auth.users
+select id, email, 'analyst' from auth.users where email is not null
 on conflict (id) do nothing;
 
 -- Security-definer helpers so RLS policies can check role/client
@@ -28,3 +31,11 @@ $$ select client_id from public.profiles where id = auth.uid() $$;
 create or replace function public.project_client_id(pid uuid)
 returns uuid language sql stable security definer set search_path = public as
 $$ select client_id from public.survey_projects where id = pid $$;
+
+-- Helpers are for authenticated policy evaluation only — not anon RPC
+revoke execute on function public.my_role() from anon, public;
+revoke execute on function public.my_client_id() from anon, public;
+revoke execute on function public.project_client_id(uuid) from anon, public;
+grant execute on function public.my_role() to authenticated;
+grant execute on function public.my_client_id() to authenticated;
+grant execute on function public.project_client_id(uuid) to authenticated;
