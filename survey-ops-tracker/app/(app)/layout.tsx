@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { ThemeToggle } from '@/components/shared/ThemeToggle'
+import { AssistantPanel } from '@/components/assistant/AssistantPanel'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,6 +21,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <main className="p-6">
         {children}
       </main>
+      <AssistantPanel />
     </div>
   )
 }
