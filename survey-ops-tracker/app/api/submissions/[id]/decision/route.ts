@@ -35,7 +35,10 @@ export async function POST(
     .select('id, project_id, version')
     .maybeSingle()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) {
+    console.error('decision update failed:', error)
+    return NextResponse.json({ error: 'Could not record your decision — please try again' }, { status: 500 })
+  }
   if (!updated) {
     return NextResponse.json(
       { error: 'Submission not found, already decided, or not yours to review' },

@@ -64,6 +64,7 @@ export async function POST(
         role: 'compliance', client_id: project.client_id,
       })
       if (profileError) {
+        await admin.auth.admin.deleteUser(created.user.id)
         return NextResponse.json({ error: profileError.message }, { status: 500 })
       }
     }

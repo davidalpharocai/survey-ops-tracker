@@ -54,6 +54,12 @@ export async function POST(request: Request) {
     .select()
     .single()
   if (subError || !submission) {
+    if (subError?.code === '23505') {
+      return NextResponse.json(
+        { error: 'Another submission was just created for this project — please retry' },
+        { status: 409 }
+      )
+    }
     return NextResponse.json({ error: subError?.message ?? 'Insert failed' }, { status: 500 })
   }
 
