@@ -15,7 +15,7 @@ Key concepts:
 - N Target = response goal; N Collected = responses so far; N Actual = usable responses after cleaning
 - Budget vs Actual Spend tracks internal cost; cost per N = spend ÷ responses
 - Voter surveys need extra QA and citation language
-- Project types: B2B = expert/business panel, Rerun = repeat wave of an earlier study, PS = professional services type
+- Project types: PS = PureSpectrum (consumer panel fielded via the PureSpectrum survey data tool), B2B = expert/business panel, Rerun = repeat wave of an earlier study
 - Survey ID format: [file owner's initials][client+project abbreviation][YYYYMMDD file created][country/region if any].
   Example: ALBNFOF20260529UK = Alden + Bain Future of Food + created 2026-05-29 + UK. You can decode IDs for users on request.
 
