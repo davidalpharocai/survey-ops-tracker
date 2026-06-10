@@ -35,7 +35,9 @@ export function ProjectCard({ project, onClick }: ProjectCardProps) {
   const urgency = getDueUrgency(project.due_date)
   const urgencyBorder = urgency ? URGENCY_BORDER[urgency] : undefined
   const stageBorder = STAGE_BORDER[project.board_column] ?? 'border-l-muted-foreground'
-  const border = urgencyBorder ? `border-l-4 ${urgencyBorder}` : `border-l-4 ${stageBorder}`
+  const border = urgencyBorder
+    ? `border-l-4 ${urgencyBorder}`
+    : `border border-border border-l-4 ${stageBorder}`
   const snippet = project.latest_next_steps
     ? project.latest_next_steps.slice(0, 100) +
       (project.latest_next_steps.length > 100 ? '…' : '')
