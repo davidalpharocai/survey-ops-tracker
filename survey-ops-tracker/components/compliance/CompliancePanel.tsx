@@ -55,7 +55,13 @@ export function CompliancePanel({ projectId }: { projectId: string }) {
       )}
 
       <Button
-        onClick={() => setModalOpen(true)}
+        onClick={() => {
+          if (latest?.status === 'approved' &&
+              !window.confirm('This project already has an approved question list. Submitting a new version will supersede the approval and require compliance to review again. Continue?')) {
+            return
+          }
+          setModalOpen(true)
+        }}
         disabled={latest?.status === 'pending_review'}
         className="w-full text-xs mb-4"
       >

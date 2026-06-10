@@ -39,11 +39,16 @@ export function RecipientsManager({ projectId }: { projectId: string }) {
 
   async function removeRecipient(r: Recipient) {
     try {
-      await fetch(`/api/projects/${projectId}/recipients`, {
+      const res = await fetch(`/api/projects/${projectId}/recipients`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ recipientId: r.id }),
       })
+      if (!res.ok) {
+        setError('Could not remove recipient — please try again.')
+      }
+    } catch {
+      setError('Could not remove recipient — please try again.')
     } finally {
       invalidate()
     }

@@ -97,7 +97,7 @@ export function SubmitQuestionsModal({
       <div role="dialog" aria-modal="true" aria-label="Submit questions for compliance review" className="bg-slate-900 border border-slate-700 rounded-xl p-5 w-full max-w-2xl">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-sm font-bold text-white">Submit questions for compliance review</h3>
-          <button onClick={onClose} className="text-slate-500 hover:text-slate-200" aria-label="Close">✕</button>
+          <button onClick={onClose} disabled={stage === 'submitting' || stage === 'parsing'} className="text-slate-500 hover:text-slate-200 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Close">✕</button>
         </div>
 
         {stage === 'upload' && (
@@ -107,7 +107,11 @@ export function SubmitQuestionsModal({
                 type="file"
                 accept=".docx,.xlsx,.xls,.csv,.pdf"
                 className="hidden"
-                onChange={e => e.target.files?.[0] && handleFile(e.target.files[0])}
+                onChange={e => {
+                  const file = e.target.files?.[0]
+                  e.target.value = ''
+                  if (file) handleFile(file)
+                }}
               />
               <p className="text-sm text-slate-300">Upload the questionnaire</p>
               <p className="text-xs text-slate-500 mt-1">.docx, .xlsx, .csv, or .pdf — Google Docs: export first; legacy .doc: re-save as .docx</p>
