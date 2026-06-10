@@ -25,3 +25,12 @@ Supabase dashboard → Authentication → Users → Add User:
 
 ## 6. Add team members
 After logging into the app, add team member records in the Team Members table via the Supabase Table Editor.
+
+## Adding a new internal analyst
+
+After creating the auth user (Dashboard → Authentication → Add user), run:
+
+```sql
+insert into public.profiles (id, email, role)
+select id, email, 'analyst' from auth.users where email = 'new.analyst@alpharoc.com';
+```
