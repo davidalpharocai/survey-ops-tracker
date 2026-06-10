@@ -4,6 +4,7 @@ import { Board } from '@/components/board/Board'
 import { ScopingBoard } from '@/components/board/ScopingBoard'
 import { NewProjectModal } from '@/components/board/NewProjectModal'
 import { ViewToggle } from '@/components/shared/ViewToggle'
+import { ColorKey } from '@/components/shared/ColorKey'
 import { useProjects, useMoveProjectToColumn } from '@/lib/hooks/useProjects'
 import { useTeamMembers } from '@/lib/hooks/useTeamMembers'
 import { useViewMode } from '@/lib/hooks/useViewMode'
@@ -19,6 +20,7 @@ export default function BoardPage() {
   const scopingProjects = projects.filter(
     p => p.phase === 'Scoping' && p.status === 'Open'
   )
+  const knownClients = [...new Set(projects.map(p => p.client))].sort()
   const activeProjects = projects.filter(p =>
     mode === 'full'
       ? p.phase === 'Active'
@@ -56,6 +58,9 @@ export default function BoardPage() {
         </button>
       </div>
 
+      {/* Color key */}
+      <ColorKey />
+
       {/* Scoping board (Full View only) */}
       {mode === 'full' && <ScopingBoard projects={scopingProjects} />}
 
@@ -74,6 +79,7 @@ export default function BoardPage() {
       {showNewProject && (
         <NewProjectModal
           teamMembers={teamMembers}
+          knownClients={knownClients}
           onClose={() => setShowNewProject(false)}
         />
       )}

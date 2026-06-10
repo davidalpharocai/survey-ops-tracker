@@ -11,10 +11,11 @@ const FORM_FIELDS = new Set(['project_name', 'client', 'project_type', 'captain_
 
 interface NewProjectModalProps {
   teamMembers: TeamMember[]
+  knownClients?: string[]
   onClose: () => void
 }
 
-export function NewProjectModal({ teamMembers, onClose }: NewProjectModalProps) {
+export function NewProjectModal({ teamMembers, knownClients = [], onClose }: NewProjectModalProps) {
   const router = useRouter()
   const createProject = useCreateProject()
   const [name, setName] = useState('')
@@ -159,8 +160,14 @@ export function NewProjectModal({ teamMembers, onClose }: NewProjectModalProps) 
             value={client}
             onChange={e => setClient(e.target.value)}
             placeholder="e.g. Meridian Capital"
+            list="known-clients"
             className={inputClass}
           />
+          <datalist id="known-clients">
+            {knownClients.map(c => (
+              <option key={c} value={c} />
+            ))}
+          </datalist>
         </label>
 
         <div className="grid grid-cols-2 gap-3">
