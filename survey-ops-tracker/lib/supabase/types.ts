@@ -64,6 +64,7 @@ export type Database = {
           linked_documents: string[]
           calendar_event_id: string | null
           survey_tool_id: string | null
+          client_id: string | null
           budget: number | null
           actual_spend: number | null
           created_at: string
@@ -99,6 +100,7 @@ export type Database = {
           linked_documents?: string[]
           calendar_event_id?: string | null
           survey_tool_id?: string | null
+          client_id?: string | null
           budget?: number | null
           actual_spend?: number | null
           created_at?: string
@@ -108,6 +110,7 @@ export type Database = {
           id?: string
           project_name?: string
           client?: string
+          client_id?: string | null
           project_type?: Database['public']['Enums']['project_type'] | null
           captain_id?: string | null
           phase?: Database['public']['Enums']['project_phase']
@@ -149,10 +152,207 @@ export type Database = {
           }
         ]
       }
+      clients: {
+        Row: {
+          id: string
+          name: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          id: string
+          email: string
+          full_name: string | null
+          role: Database['public']['Enums']['profile_role']
+          client_id: string | null
+          created_at: string
+        }
+        Insert: {
+          id: string
+          email: string
+          full_name?: string | null
+          role?: Database['public']['Enums']['profile_role']
+          client_id?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          email?: string
+          full_name?: string | null
+          role?: Database['public']['Enums']['profile_role']
+          client_id?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      question_submissions: {
+        Row: {
+          id: string
+          project_id: string
+          version: number
+          status: Database['public']['Enums']['submission_status']
+          source_file_name: string
+          source_file_path: string
+          submitted_by: string | null
+          submitted_at: string
+          reviewed_by: string | null
+          reviewed_at: string | null
+          review_note: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          project_id: string
+          version: number
+          status?: Database['public']['Enums']['submission_status']
+          source_file_name: string
+          source_file_path: string
+          submitted_by?: string | null
+          submitted_at?: string
+          reviewed_by?: string | null
+          reviewed_at?: string | null
+          review_note?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          project_id?: string
+          version?: number
+          status?: Database['public']['Enums']['submission_status']
+          source_file_name?: string
+          source_file_path?: string
+          submitted_by?: string | null
+          submitted_at?: string
+          reviewed_by?: string | null
+          reviewed_at?: string | null
+          review_note?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      questions: {
+        Row: {
+          id: string
+          submission_id: string
+          order_num: number
+          text: string
+          type: Database['public']['Enums']['question_type']
+          is_open_text: boolean
+          is_ai_followup: boolean
+          section: string | null
+          answer_options: Json
+        }
+        Insert: {
+          id?: string
+          submission_id: string
+          order_num: number
+          text: string
+          type?: Database['public']['Enums']['question_type']
+          is_open_text?: boolean
+          is_ai_followup?: boolean
+          section?: string | null
+          answer_options?: Json
+        }
+        Update: {
+          id?: string
+          submission_id?: string
+          order_num?: number
+          text?: string
+          type?: Database['public']['Enums']['question_type']
+          is_open_text?: boolean
+          is_ai_followup?: boolean
+          section?: string | null
+          answer_options?: Json
+        }
+        Relationships: []
+      }
+      project_recipients: {
+        Row: {
+          id: string
+          project_id: string
+          email: string
+          name: string | null
+          role: Database['public']['Enums']['recipient_role']
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          project_id: string
+          email: string
+          name?: string | null
+          role: Database['public']['Enums']['recipient_role']
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          project_id?: string
+          email?: string
+          name?: string | null
+          role?: Database['public']['Enums']['recipient_role']
+          created_at?: string
+        }
+        Relationships: []
+      }
+      notification_log: {
+        Row: {
+          id: string
+          submission_id: string | null
+          recipient_email: string
+          template: string
+          resend_id: string | null
+          sent_at: string
+        }
+        Insert: {
+          id?: string
+          submission_id?: string | null
+          recipient_email: string
+          template: string
+          resend_id?: string | null
+          sent_at?: string
+        }
+        Update: {
+          id?: string
+          submission_id?: string | null
+          recipient_email?: string
+          template?: string
+          resend_id?: string | null
+          sent_at?: string
+        }
+        Relationships: []
+      }
     }
-    Views: Record<string, never>
+    Views: {
+      portal_projects: {
+        Row: {
+          id: string
+          project_name: string
+          client_id: string
+          submitted_date: string | null
+          launch_date: string | null
+          due_date: string | null
+          created_at: string
+        }
+        Relationships: []
+      }
+    }
     Functions: Record<string, never>
     Enums: {
+      profile_role: 'analyst' | 'compliance'
+      submission_status: 'pending_review' | 'approved' | 'rejected'
+      question_type: 'open_text' | 'single_select' | 'multi_select' | 'scale' | 'other'
+      recipient_role: 'alpharoc' | 'compliance'
       project_type: 'PS' | 'B2B' | 'Rerun'
       project_status: 'Open' | 'Closed'
       project_phase: 'Scoping' | 'Active'
