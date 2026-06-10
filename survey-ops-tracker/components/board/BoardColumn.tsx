@@ -12,7 +12,7 @@ interface BoardColumnProps {
 
 export function BoardColumn({ id, title, projects, onCardClick }: BoardColumnProps) {
   return (
-    <div className="bg-card border border-border rounded-xl p-2 min-w-[158px] max-w-[230px] flex-1 basis-0 flex flex-col gap-2">
+    <div className="bg-card border border-border rounded-xl p-2 min-w-[158px] max-w-[253px] flex-1 basis-0 flex flex-col gap-2">
       <div className="flex items-center justify-between">
         <span className="text-xs text-muted-foreground uppercase tracking-widest font-medium">
           {title}
