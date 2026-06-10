@@ -4,6 +4,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { useProjects, useUpdateProject } from '@/lib/hooks/useProjects'
 import { PipelineProgress } from '@/components/project/PipelineProgress'
 import { ScopingProgress } from '@/components/project/ScopingProgress'
+import { QuickEdit } from '@/components/project/QuickEdit'
 import { LatestNextSteps } from '@/components/project/LatestNextSteps'
 import { LinkedDocuments } from '@/components/project/LinkedDocuments'
 import { SlackChannel } from '@/components/project/SlackChannel'
@@ -56,9 +57,11 @@ export default function ProjectDetailPage() {
     )
   }
 
-  function handleClose() {
-    updateProject.mutate({ id, updates: { status: 'Closed' } })
-    router.push('/')
+  function toggleClosed() {
+    updateProject.mutate({
+      id,
+      updates: { status: project!.status === 'Open' ? 'Closed' : 'Open' },
+    })
   }
 
   return (
@@ -92,12 +95,22 @@ export default function ProjectDetailPage() {
             Scoping
           </span>
         )}
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-2">
+          {project.status === 'Closed' && (
+            <span className="text-xs text-muted-foreground">
+              Closed projects are hidden from Operations view — switch to Full View to find them.
+            </span>
+          )}
           <button
-            onClick={handleClose}
-            className="text-xs border border-border text-muted-foreground hover:text-foreground hover:border-ring px-3 py-1.5 rounded-lg transition-colors"
+            onClick={toggleClosed}
+            title={
+              project.status === 'Open'
+                ? 'Marks the project Closed (done/archived). It stays visible in Full View and can be reopened anytime.'
+                : 'Reopen this project'
+            }
+            className="text-xs border border-border text-muted-foreground hover:text-foreground hover:border-ring px-3 py-1.5 rounded-lg transition-colors shrink-0"
           >
-            ✕ Close Project
+            {project.status === 'Open' ? '✕ Close Project' : '↺ Reopen Project'}
           </button>
         </div>
       </div>
@@ -106,6 +119,9 @@ export default function ProjectDetailPage() {
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6">
         {/* Left column */}
         <div className="flex flex-col gap-4">
+          <div className="flex">
+            <QuickEdit project={project} />
+          </div>
           <div className="bg-card rounded-xl p-4">
             <h3 className="text-xs text-muted-foreground uppercase tracking-widest mb-4 font-medium">
               {project.phase === 'Scoping' ? 'Scoping Stage' : 'Pipeline Progress'}

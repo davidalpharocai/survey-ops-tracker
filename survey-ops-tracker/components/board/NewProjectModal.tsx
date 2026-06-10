@@ -2,8 +2,12 @@
 import { useState } from 'react'
 import { useCreateProject } from '@/lib/hooks/useProjects'
 import { useRouter } from 'next/navigation'
+import { FIELD_LABELS, formatFieldValue, fieldsToUpdates } from '@/lib/utils/quickFields'
 import type { TeamMember } from '@/lib/hooks/useTeamMembers'
 import type { Database } from '@/lib/supabase/types'
+
+// Fields handled by the visible form inputs; everything else parsed by AI goes into "extras"
+const FORM_FIELDS = new Set(['project_name', 'client', 'project_type', 'captain_name', 'salesperson', 'note'])
 
 interface NewProjectModalProps {
   teamMembers: TeamMember[]
@@ -20,14 +24,57 @@ export function NewProjectModal({ teamMembers, onClose }: NewProjectModalProps) 
   const [salesperson, setSalesperson] = useState('')
   const [skipScoping, setSkipScoping] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [describe, setDescribe] = useState('')
+  const [parsing, setParsing] = useState(false)
+  const [extras, setExtras] = useState<Record<string, unknown>>({})
 
   const canSubmit = name.trim() && client.trim() && !createProject.isPending
+
+  async function parseDescription() {
+    if (!describe.trim() || parsing) return
+    setParsing(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/parse-project', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ description: describe, mode: 'create' }),
+      })
+      const body = await res.json().catch(() => null)
+      if (!res.ok || !body?.fields) {
+        setError(body?.error ?? 'Could not read that description. Try rephrasing.')
+        return
+      }
+      const f = body.fields as Record<string, unknown>
+      if (typeof f.project_name === 'string') setName(f.project_name)
+      if (typeof f.client === 'string') setClient(f.client)
+      if (typeof f.project_type === 'string') setProjectType(f.project_type)
+      if (typeof f.salesperson === 'string') setSalesperson(f.salesperson)
+      if (typeof f.captain_name === 'string') {
+        const m = teamMembers.find(
+          tm => tm.name.toLowerCase() === String(f.captain_name).toLowerCase()
+        )
+        if (m) setCaptainId(m.id)
+      }
+      const extraEntries = Object.entries(f).filter(
+        ([k, v]) => !FORM_FIELDS.has(k) && v != null
+      )
+      setExtras(Object.fromEntries(extraEntries))
+    } catch {
+      setError('Connection error. Please try again.')
+    } finally {
+      setParsing(false)
+    }
+  }
 
   async function handleCreate() {
     if (!canSubmit) return
     setError(null)
     const today = new Date().toISOString().split('T')[0]
     const project: Database['public']['Tables']['survey_projects']['Insert'] = {
+      ...(fieldsToUpdates(extras, teamMembers) as Partial<
+        Database['public']['Tables']['survey_projects']['Insert']
+      >),
       project_name: name.trim(),
       client: client.trim(),
       project_type: (projectType || null) as Database['public']['Enums']['project_type'] | null,
@@ -59,6 +106,41 @@ export function NewProjectModal({ teamMembers, onClose }: NewProjectModalProps) 
         onClick={e => e.stopPropagation()}
       >
         <h2 className="text-sm font-semibold text-foreground">New Project</h2>
+
+        {/* AI quick add */}
+        <div className="flex flex-col gap-2 bg-muted/50 border border-dashed border-border rounded-xl p-3">
+          <span className="text-xs text-muted-foreground">
+            ✦ Describe it and I&apos;ll fill out the form
+          </span>
+          <textarea
+            value={describe}
+            onChange={e => setDescribe(e.target.value)}
+            placeholder={'e.g. "New B2B project for Meridian, Tom sold it, Priya is captain, 200 responses, due July 15, budget 15k"'}
+            rows={2}
+            className="bg-muted border border-border rounded-lg px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring resize-none"
+          />
+          <div className="flex justify-end">
+            <button
+              onClick={parseDescription}
+              disabled={parsing || !describe.trim()}
+              className="text-xs bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white px-3 py-1.5 rounded-lg transition-colors"
+            >
+              {parsing ? 'Reading…' : 'Fill form'}
+            </button>
+          </div>
+          {Object.keys(extras).length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {Object.entries(extras).map(([k, v]) => (
+                <span
+                  key={k}
+                  className="text-[10px] bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 px-2 py-0.5 rounded-full"
+                >
+                  {FIELD_LABELS[k] ?? k}: {formatFieldValue(k, v)}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
 
         <label className="flex flex-col gap-1 text-xs text-muted-foreground">
           Project name *
