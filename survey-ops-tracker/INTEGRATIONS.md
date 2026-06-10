@@ -55,14 +55,28 @@ Updates one project. Body:
 
 ---
 
-## Make.com scenario: Survey IDs from Google Sheets (scheduled)
+## Make.com scenario: Survey IDs from the master Survey Ops sheet (scheduled)
 
-1. **Trigger**: Schedule (e.g. every 30 minutes)
-2. **HTTP module**: GET `/api/webhooks/sync` with the secret header → list of projects
-3. **Iterator**: loop over `projects`
-4. **Filter**: keep projects whose `linked_documents` contains a `docs.google.com/spreadsheets` URL
-5. **Google Sheets module**: "Get range values" — parse the spreadsheet ID out of the URL; read the cell/column where survey IDs live (agree on a convention, e.g. a tab named `Meta`, cell `B2`, comma separated)
+**Source of truth**: the "Surveys" tab of the master Survey Ops sheet
+(`https://docs.google.com/spreadsheets/d/1ZTTJ0PQZ7vj13tmZmsMvKAcEEf0Nc0s8dVbfaYJju7Q`).
+Its "Survey IDs" column is auto-filled daily at **6:15pm** by an existing process, so schedule
+this scenario shortly after (e.g. 6:30pm), plus optionally once mid-morning.
+
+Survey ID format: `[owner initials][client+project abbreviation][YYYYMMDD created][region]`
+e.g. `ALBNFOF20260529UK` = Alden + Bain Future of Food + 2026-05-29 + UK.
+
+1. **Trigger**: Schedule — daily 6:30pm (after the 6:15pm auto-fill)
+2. **HTTP module**: GET `/api/webhooks/sync` with the secret header → tracker projects
+3. **Google Sheets module**: "Search rows" on the Surveys tab — rows with Status = "In Progress" or blank
+   (note: the sheet is large; Make's Google Sheets module paginates properly, but plain
+   connector-style reads truncate around row 74 — don't use those)
+4. **Matching**: match sheet rows to tracker projects on Client (col B) + Project Name (col C)
+5. For each match, take the row's "Survey IDs" column. If empty, fall back to the row's
+   "GoogleSheet" column link (the IDs live in that linked SHEET, never the questionnaire Doc);
+   the "Edwin Link" `source=` URL parameter is a cross-check — it is also a survey ID.
 6. **HTTP module**: POST `/api/webhooks/sync` with `project_id` + `survey_ids_from_sheet`
+
+The tracker applies the blank-or-sheet-changed rule server-side (manual edits survive unless the sheet changes).
 
 ## Make.com scenario: N Collected from the survey tool (scheduled)
 

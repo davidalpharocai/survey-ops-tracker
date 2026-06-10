@@ -2,8 +2,9 @@
 import { DragDropContext, type DropResult } from '@hello-pangea/dnd'
 import { BoardColumn } from './BoardColumn'
 import { BoardFilters } from './BoardFilters'
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useCurrentMember } from '@/lib/hooks/useCurrentMember'
 import { STAGE_ORDER, type BoardColumn as BoardColumnType } from '@/lib/utils/stage'
 import { getDueDateStatus } from '@/lib/utils/date'
 import type { SurveyProject } from '@/lib/hooks/useProjects'
@@ -15,11 +16,39 @@ interface BoardProps {
   onMoveProject: (id: string, column: BoardColumnType) => void
 }
 
+const CAPTAIN_FILTER_KEY = 'sot.captainFilter'
+
 export function Board({ projects, teamMembers, onMoveProject }: BoardProps) {
   const router = useRouter()
+  const { data: currentMember, isLoading: memberLoading } = useCurrentMember()
   const [captainFilter, setCaptainFilter] = useState<string | null>(null)
+  const [filterReady, setFilterReady] = useState(false)
   const [typeFilter, setTypeFilter] = useState<string | null>(null)
   const [overdueOnly, setOverdueOnly] = useState(false)
+
+  // Default the board to "my projects": last choice wins, otherwise the
+  // logged-in user's own captain filter when they're a team member
+  useEffect(() => {
+    if (filterReady || memberLoading) return
+    const stored = localStorage.getItem(CAPTAIN_FILTER_KEY)
+    if (stored === 'all') setCaptainFilter(null)
+    else if (stored) setCaptainFilter(stored)
+    else if (currentMember?.id) setCaptainFilter(currentMember.id)
+    setFilterReady(true)
+  }, [filterReady, memberLoading, currentMember])
+
+  // If a remembered captain no longer exists, fall back to everyone
+  useEffect(() => {
+    if (filterReady && captainFilter && teamMembers.length > 0 &&
+        !teamMembers.some(m => m.id === captainFilter)) {
+      setCaptainFilter(null)
+    }
+  }, [filterReady, captainFilter, teamMembers])
+
+  function handleCaptainChange(id: string | null) {
+    setCaptainFilter(id)
+    localStorage.setItem(CAPTAIN_FILTER_KEY, id ?? 'all')
+  }
 
   const filtered = useMemo(() => {
     return projects.filter(p => {
@@ -43,9 +72,10 @@ export function Board({ projects, teamMembers, onMoveProject }: BoardProps) {
       <BoardFilters
         captains={teamMembers}
         captainFilter={captainFilter}
+        currentMemberId={currentMember?.id ?? null}
         typeFilter={typeFilter}
         overdueOnly={overdueOnly}
-        onCaptainChange={setCaptainFilter}
+        onCaptainChange={handleCaptainChange}
         onTypeChange={setTypeFilter}
         onOverdueOnly={setOverdueOnly}
       />

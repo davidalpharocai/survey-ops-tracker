@@ -3,6 +3,7 @@
 interface BoardFiltersProps {
   captains: { id: string; name: string; initials: string }[]
   captainFilter: string | null
+  currentMemberId?: string | null
   typeFilter: string | null
   overdueOnly: boolean
   onCaptainChange: (id: string | null) => void
@@ -13,6 +14,7 @@ interface BoardFiltersProps {
 export function BoardFilters({
   captains,
   captainFilter,
+  currentMemberId = null,
   typeFilter,
   overdueOnly,
   onCaptainChange,
@@ -29,7 +31,7 @@ export function BoardFilters({
         <option value="">All Captains</option>
         {captains.map(c => (
           <option key={c.id} value={c.id}>
-            {c.initials}
+            {c.id === currentMemberId ? `${c.initials} (me)` : c.initials}
           </option>
         ))}
       </select>
