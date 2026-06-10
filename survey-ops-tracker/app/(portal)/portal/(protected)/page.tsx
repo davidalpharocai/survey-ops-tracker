@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { requirePortalUser } from '@/lib/portal-auth'
 import Link from 'next/link'
 
 export const dynamic = 'force-dynamic'
@@ -15,12 +15,25 @@ const STATUS_LABEL: Record<string, string> = {
 }
 
 export default async function PortalQueuePage() {
-  const supabase = await createClient()
+  const supabase = await requirePortalUser('/portal')
 
   const { data: submissions } = await supabase
     .from('question_submissions')
     .select('id, project_id, version, status, submitted_at')
     .order('submitted_at', { ascending: false })
+
+  const submissionIds = (submissions ?? []).map(s => s.id)
+  let questionCounts = new Map<string, number>()
+  if (submissionIds.length) {
+    const { data: qRows } = await supabase
+      .from('questions')
+      .select('submission_id')
+      .in('submission_id', submissionIds)
+    questionCounts = new Map()
+    for (const q of qRows ?? []) {
+      questionCounts.set(q.submission_id, (questionCounts.get(q.submission_id) ?? 0) + 1)
+    }
+  }
 
   const projectIds = [...new Set((submissions ?? []).map(s => s.project_id))]
   let projects: { id: string; project_name: string }[] = []
@@ -45,7 +58,7 @@ export default async function PortalQueuePage() {
         <div>
           <p className="text-sm text-white font-medium">{nameById.get(s.project_id) ?? 'Survey project'}</p>
           <p className="text-xs text-slate-500 mt-0.5">
-            Version {s.version} · submitted {new Date(s.submitted_at).toLocaleDateString()}
+            Version {s.version} · submitted {new Date(s.submitted_at).toLocaleDateString()} · {questionCounts.get(s.id) ?? 0} questions
           </p>
         </div>
         <span className={`text-xs px-2 py-1 rounded ${STATUS_BADGE[s.status]}`}>

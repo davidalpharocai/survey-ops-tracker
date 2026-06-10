@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { requirePortalUser } from '@/lib/portal-auth'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ReviewClient } from '@/components/portal/ReviewClient'
@@ -12,7 +12,7 @@ export default async function ReviewPage({
   params: Promise<{ submissionId: string }>
 }) {
   const { submissionId } = await params
-  const supabase = await createClient()
+  const supabase = await requirePortalUser(`/portal/review/${submissionId}`)
 
   const { data: submission } = await supabase
     .from('question_submissions')

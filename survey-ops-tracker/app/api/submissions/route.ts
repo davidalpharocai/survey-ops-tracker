@@ -90,12 +90,13 @@ export async function POST(request: Request) {
     .eq('role', 'compliance')
 
   const openTextCount = result.questions.filter(q => q.is_open_text).length
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? new URL(request.url).origin
   const email = submissionCreatedEmail({
     projectName: project?.project_name ?? 'Survey project',
     version,
     questionCount: result.questions.length,
     openTextCount,
-    reviewUrl: `${process.env.NEXT_PUBLIC_APP_URL}/portal/review/${submission.id}`,
+    reviewUrl: `${appUrl}/portal/review/${submission.id}`,
   })
 
   let emailFailures = 0
