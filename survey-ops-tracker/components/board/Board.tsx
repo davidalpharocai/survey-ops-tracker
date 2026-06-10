@@ -86,7 +86,9 @@ export function Board({ projects, teamMembers, onMoveProject }: BoardProps) {
               key={stage}
               id={stage}
               title={stage}
-              projects={filtered.filter(p => p.board_column === stage)}
+              projects={filtered
+                .filter(p => p.board_column === stage)
+                .sort((a, b) => (a.status === 'Hold' ? 1 : 0) - (b.status === 'Hold' ? 1 : 0))}
               onCardClick={id => router.push(`/projects/${id}`)}
             />
           ))}
