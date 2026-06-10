@@ -20,25 +20,35 @@ export function ReviewClient({ submissionId, status, reviewNote, questions }: Pr
   const [busy, setBusy] = useState(false)
 
   async function submitDecision() {
-    if (!confirming) return
+    if (!confirming || busy) return
     if (confirming === 'rejected' && !note.trim()) {
       setError('Please explain why you are rejecting so AlphaRoc can revise.')
       return
     }
     setBusy(true)
     setError('')
-    const res = await fetch(`/api/submissions/${submissionId}/decision`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ decision: confirming, note: note.trim() || undefined }),
-    })
-    setBusy(false)
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}))
-      setError(body.error ?? 'Something went wrong — please try again.')
-      return
+    try {
+      const res = await fetch(`/api/submissions/${submissionId}/decision`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ decision: confirming, note: note.trim() || undefined }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        setError(body.error ?? 'Something went wrong — please try again.')
+        setBusy(false)
+        if (res.status === 403) {
+          // Decided elsewhere (or no longer reviewable) — refresh to show the recorded outcome
+          router.refresh()
+        }
+        return
+      }
+      // Success: keep the button disabled while the refresh re-renders into read-only state
+      router.refresh()
+    } catch {
+      setError('Network error — please check your connection and try again.')
+      setBusy(false)
     }
-    router.refresh()
   }
 
   if (status !== 'pending_review') {
@@ -70,12 +80,13 @@ export function ReviewClient({ submissionId, status, reviewNote, questions }: Pr
           </p>
           <Textarea
             placeholder={confirming === 'rejected' ? 'What needs to change? (required)' : 'Optional note'}
+            aria-label={confirming === 'rejected' ? 'Reason for rejection (required)' : 'Optional note'}
             value={note}
             onChange={e => setNote(e.target.value)}
             className="bg-slate-800 border-slate-700 text-white placeholder:text-slate-500 mb-3"
           />
           {error && (
-            <p className="text-red-400 text-sm bg-red-400/10 px-3 py-2 rounded-lg mb-3">{error}</p>
+            <p role="alert" className="text-red-400 text-sm bg-red-400/10 px-3 py-2 rounded-lg mb-3">{error}</p>
           )}
           <div className="flex gap-2 justify-end">
             <Button variant="outline" onClick={() => { setConfirming(null); setError('') }} disabled={busy}>

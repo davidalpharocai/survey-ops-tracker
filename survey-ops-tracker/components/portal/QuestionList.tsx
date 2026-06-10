@@ -37,10 +37,10 @@ export function QuestionList({ questions }: { questions: PortalQuestion[] }) {
   return (
     <div>
       <div className="flex gap-2 mb-4">
-        <button className={toggleClass(filter === 'all')} onClick={() => setFilter('all')}>
+        <button aria-pressed={filter === 'all'} className={toggleClass(filter === 'all')} onClick={() => setFilter('all')}>
           All questions ({questions.length})
         </button>
-        <button className={toggleClass(filter === 'open')} onClick={() => setFilter('open')}>
+        <button aria-pressed={filter === 'open'} className={toggleClass(filter === 'open')} onClick={() => setFilter('open')}>
           Open-text only ({openCount})
         </button>
       </div>
