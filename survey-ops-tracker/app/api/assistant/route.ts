@@ -88,8 +88,22 @@ export async function POST(req: NextRequest) {
     completed_at: s.completed_at,
   }))
 
+  // Manual data-change log entries (falls back to [] pre-migration)
+  const { data: dataChanges } = await supabase
+    .from('project_data_changes')
+    .select('project_id, text, created_by, created_at')
+    .order('created_at', { ascending: false })
+    .limit(100)
+
+  const dataChangesContext = (dataChanges ?? []).map(d => ({
+    project: nameById.get(d.project_id) ?? d.project_id,
+    change: d.text,
+    by: d.created_by,
+    when: d.created_at,
+  }))
+
   const today = new Date().toISOString().split('T')[0]
-  const system = `${SYSTEM_PROMPT}\n\nToday's date: ${today}\n\nCurrent project data (JSON):\n${JSON.stringify(projects)}\n\nRecent logged activity (emails etc., newest first; full bodies are viewable in the app's Activity section):\n${JSON.stringify(activityContext)}\n\nStructured next steps (open and recently completed):\n${JSON.stringify(stepsContext)}`
+  const system = `${SYSTEM_PROMPT}\n\nToday's date: ${today}\n\nCurrent project data (JSON):\n${JSON.stringify(projects)}\n\nRecent logged activity (emails etc., newest first; full bodies are viewable in the app's Activity section):\n${JSON.stringify(activityContext)}\n\nStructured next steps (open and recently completed):\n${JSON.stringify(stepsContext)}\n\nData change log (manual data edits by engineers, newest first):\n${JSON.stringify(dataChangesContext)}`
 
   const anthropic = new Anthropic({ apiKey })
 
