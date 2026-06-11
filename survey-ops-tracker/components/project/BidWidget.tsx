@@ -44,6 +44,40 @@ function useAddBid(projectId: string) {
   })
 }
 
+function useUpdateBid(projectId: string) {
+  const supabase = createClient()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      id,
+      updates,
+    }: {
+      id: string
+      updates: { amount: number; blasts: number | null; note: string | null }
+    }) => {
+      const { error } = await supabase.from('project_bids').update(updates).eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['bids', projectId] })
+    },
+  })
+}
+
+function useDeleteBid(projectId: string) {
+  const supabase = createClient()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('project_bids').delete().eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['bids', projectId] })
+    },
+  })
+}
+
 function formatAmount(value: number): string {
   return '$' + value.toLocaleString('en-US', { maximumFractionDigits: 2 })
 }
@@ -55,10 +89,39 @@ function formatBidDate(iso: string): string {
 export function BidWidget({ projectId }: { projectId: string }) {
   const { data: bids, isLoading, isError } = useBids(projectId)
   const addBid = useAddBid(projectId)
+  const updateBid = useUpdateBid(projectId)
+  const deleteBid = useDeleteBid(projectId)
   const [showAll, setShowAll] = useState(false)
   const [amount, setAmount] = useState('')
   const [blasts, setBlasts] = useState('')
   const [note, setNote] = useState('')
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editAmount, setEditAmount] = useState('')
+  const [editBlasts, setEditBlasts] = useState('')
+  const [editNote, setEditNote] = useState('')
+
+  function startEdit(b: Bid) {
+    setEditingId(b.id)
+    setEditAmount(String(b.amount))
+    setEditBlasts(b.blasts != null ? String(b.blasts) : '')
+    setEditNote(b.note ?? '')
+  }
+
+  function saveEdit() {
+    if (!editingId) return
+    const parsedAmount = parseFloat(editAmount)
+    if (isNaN(parsedAmount)) return
+    const parsedBlasts = parseInt(editBlasts, 10)
+    updateBid.mutate({
+      id: editingId,
+      updates: {
+        amount: parsedAmount,
+        blasts: isNaN(parsedBlasts) ? null : parsedBlasts,
+        note: editNote.trim() || null,
+      },
+    })
+    setEditingId(null)
+  }
 
   function save() {
     const parsedAmount = parseFloat(amount)
@@ -133,15 +196,69 @@ export function BidWidget({ projectId }: { projectId: string }) {
 
           {bids!.length > 0 && (
             <div className="flex flex-col gap-1 mt-1">
-              {visibleBids.map(b => (
-                <p key={b.id} className="text-xs text-muted-foreground truncate" title={b.note ?? undefined}>
-                  <span className="text-foreground/80">{formatAmount(b.amount)}</span>
-                  {b.blasts != null && <> · {b.blasts} blasts</>}
-                  {' · '}
-                  {formatBidDate(b.created_at)}
-                  {b.note && <> · {b.note}</>}
-                </p>
-              ))}
+              {visibleBids.map(b =>
+                editingId === b.id ? (
+                  <div
+                    key={b.id}
+                    className="flex gap-1.5 items-center"
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') saveEdit()
+                      if (e.key === 'Escape') setEditingId(null)
+                    }}
+                  >
+                    <input
+                      autoFocus
+                      type="number"
+                      value={editAmount}
+                      onChange={e => setEditAmount(e.target.value)}
+                      className="w-16 bg-muted border border-border rounded px-1.5 py-0.5 text-xs text-foreground focus:outline-none focus:border-ring"
+                    />
+                    <input
+                      type="number"
+                      value={editBlasts}
+                      onChange={e => setEditBlasts(e.target.value)}
+                      placeholder="blasts"
+                      className="w-14 bg-muted border border-border rounded px-1.5 py-0.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring"
+                    />
+                    <input
+                      value={editNote}
+                      onChange={e => setEditNote(e.target.value)}
+                      placeholder="note"
+                      className="w-0 flex-1 bg-muted border border-border rounded px-1.5 py-0.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring"
+                    />
+                    <button
+                      onClick={saveEdit}
+                      className="text-xs bg-muted hover:bg-accent text-foreground px-1.5 py-0.5 rounded transition-colors"
+                    >
+                      Save
+                    </button>
+                  </div>
+                ) : (
+                  <div key={b.id} className="group flex items-center gap-1">
+                    <p className="text-xs text-muted-foreground truncate flex-1" title={b.note ?? undefined}>
+                      <span className="text-foreground/80">{formatAmount(b.amount)}</span>
+                      {b.blasts != null && <> · {b.blasts} blasts</>}
+                      {' · '}
+                      {formatBidDate(b.created_at)}
+                      {b.note && <> · {b.note}</>}
+                    </p>
+                    <button
+                      onClick={() => startEdit(b)}
+                      title="Edit entry"
+                      className="text-muted-foreground/50 hover:text-foreground text-xs px-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      ✎
+                    </button>
+                    <button
+                      onClick={() => deleteBid.mutate(b.id)}
+                      title="Delete entry"
+                      className="text-muted-foreground/50 hover:text-red-600 dark:hover:text-red-400 text-xs px-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )
+              )}
               {bids!.length > DEFAULT_HISTORY_SHOWN && (
                 <button
                   onClick={() => setShowAll(s => !s)}
