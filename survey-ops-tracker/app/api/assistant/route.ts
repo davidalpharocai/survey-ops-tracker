@@ -100,9 +100,19 @@ export async function POST(req: NextRequest) {
           }
         }
       } catch (err) {
-        controller.enqueue(
-          encoder.encode('\n\n[Sorry, something went wrong. Please try again.]')
-        )
+        let msg = 'Sorry, something went wrong. Please try again.'
+        if (err instanceof Anthropic.AuthenticationError) {
+          msg =
+            'The Anthropic API key was rejected. Double-check the value of ANTHROPIC_API_KEY in Vercel (Settings → Environment Variables) — make sure the full key was pasted with no spaces — then redeploy.'
+        } else if (err instanceof Anthropic.PermissionDeniedError) {
+          msg =
+            "The API key works but doesn't have permission for this model. Ask your Anthropic admin to enable Claude model access for this key's workspace."
+        } else if (err instanceof Anthropic.RateLimitError) {
+          msg = 'Anthropic rate limit hit — wait a minute and try again.'
+        } else if (err instanceof Anthropic.APIError) {
+          msg = `Anthropic API error (${err.status}): ${err.message}`.slice(0, 300)
+        }
+        controller.enqueue(encoder.encode(`\n\n[${msg}]`))
         console.error('Assistant stream error:', err)
       } finally {
         controller.close()
