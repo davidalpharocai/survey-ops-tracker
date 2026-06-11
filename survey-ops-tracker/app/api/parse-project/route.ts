@@ -104,9 +104,18 @@ ${mode === 'edit'
     return Response.json({ fields: JSON.parse(text) })
   } catch (err) {
     console.error('parse-project error:', err)
-    return Response.json(
-      { error: 'Could not understand that description. Try rephrasing.' },
-      { status: 500 }
-    )
+    let msg = 'Could not understand that description. Try rephrasing.'
+    if (err instanceof Anthropic.AuthenticationError) {
+      msg =
+        'The Anthropic API key was rejected — check ANTHROPIC_API_KEY in Vercel and redeploy.'
+    } else if (err instanceof Anthropic.PermissionDeniedError) {
+      msg =
+        "The API key doesn't have model access — ask your Anthropic admin to enable it."
+    } else if (err instanceof Anthropic.RateLimitError) {
+      msg = 'Anthropic rate limit hit — wait a minute and try again.'
+    } else if (err instanceof Anthropic.APIError) {
+      msg = `Anthropic API error (${err.status}): ${err.message}`.slice(0, 300)
+    }
+    return Response.json({ error: msg }, { status: 500 })
   }
 }
