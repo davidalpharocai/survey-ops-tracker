@@ -63,24 +63,26 @@ export function ProjectCard({ project, onClick }: ProjectCardProps) {
   return (
     <div
       onClick={onClick}
-      className={`bg-background rounded-lg p-2.5 ${border} ${
+      className={`relative bg-background rounded-lg p-2.5 ${border} ${
         onHold ? 'opacity-60' : ''
       } cursor-pointer hover:ring-1 hover:ring-ring transition-all`}
     >
+      {/* Hold badge floats on the top-right corner, on purpose */}
+      {onHold && (
+        <span
+          className="absolute -top-2.5 right-2 text-[11px] px-2 py-0.5 rounded-full bg-muted border border-muted-foreground/40 text-muted-foreground"
+          title="On hold — paused; greyed out and sorted to the bottom of the column"
+        >
+          ⏸ Hold
+        </span>
+      )}
+
       {/* Title row */}
       <div className="flex items-start justify-between gap-2 mb-1">
-        <span className="text-foreground text-sm font-semibold leading-tight">
+        <span className="text-foreground text-sm font-semibold leading-tight min-w-0 break-words">
           {project.project_name}
         </span>
         <span className="flex items-center gap-1 shrink-0">
-          {onHold && (
-            <span
-              className="text-[11px] px-2 py-0.5 rounded bg-muted text-muted-foreground"
-              title="On hold — paused; greyed out and sorted to the bottom of the column"
-            >
-              ⏸ Hold
-            </span>
-          )}
           {priorityChip && (
             <span
               className={`text-[11px] px-1.5 py-0.5 rounded ${priorityChip.classes}`}
