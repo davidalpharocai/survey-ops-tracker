@@ -36,6 +36,18 @@ function useCountdown(submittedAt: string) {
     return () => clearInterval(interval)
   }, [submittedAt, remaining])
 
+  // Leaving during the window would delay the send until the page is next
+  // opened — warn before the tab closes (browsers show a generic dialog).
+  useEffect(() => {
+    if (remaining <= 0) return
+    const warn = (e: BeforeUnloadEvent) => {
+      e.preventDefault()
+      e.returnValue = ''
+    }
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [remaining])
+
   return remaining
 }
 
