@@ -17,6 +17,7 @@ Key concepts:
 - Budget vs Actual Spend tracks internal cost; cost per N = spend ÷ responses
 - Voter surveys need extra QA and citation language
 - Project types: PS = PureSpectrum (consumer panel fielded via the PureSpectrum survey data tool), B2B = expert/business panel, Rerun = repeat wave of an earlier study
+- Next steps are checkable to-do items per project; completed ones (done=true) form the project's 'Latest' log of what was recently finished
 - Survey ID format: [file owner's initials][client+project abbreviation][YYYYMMDD file created][country/region if any].
   Example: ALBNFOF20260529UK = Alden + Bain Future of Food + created 2026-05-29 + UK. You can decode IDs for users on request.
 
@@ -61,6 +62,14 @@ export async function POST(req: NextRequest) {
     .order('occurred_at', { ascending: false })
     .limit(80)
 
+  // Structured next steps (checkable items). If the migration hasn't been
+  // applied yet, supabase returns an error and we just fall back to [].
+  const { data: steps } = await supabase
+    .from('project_steps')
+    .select('project_id, text, done, completed_at, created_at')
+    .order('created_at', { ascending: false })
+    .limit(200)
+
   const nameById = new Map((projects ?? []).map(p => [p.id, p.project_name]))
   const activityContext = (activity ?? []).map(a => ({
     project: nameById.get(a.project_id) ?? a.project_id,
@@ -72,8 +81,15 @@ export async function POST(req: NextRequest) {
     snippet: a.snippet,
   }))
 
+  const stepsContext = (steps ?? []).map(s => ({
+    project: nameById.get(s.project_id) ?? s.project_id,
+    text: s.text,
+    done: s.done,
+    completed_at: s.completed_at,
+  }))
+
   const today = new Date().toISOString().split('T')[0]
-  const system = `${SYSTEM_PROMPT}\n\nToday's date: ${today}\n\nCurrent project data (JSON):\n${JSON.stringify(projects)}\n\nRecent logged activity (emails etc., newest first; full bodies are viewable in the app's Activity section):\n${JSON.stringify(activityContext)}`
+  const system = `${SYSTEM_PROMPT}\n\nToday's date: ${today}\n\nCurrent project data (JSON):\n${JSON.stringify(projects)}\n\nRecent logged activity (emails etc., newest first; full bodies are viewable in the app's Activity section):\n${JSON.stringify(activityContext)}\n\nStructured next steps (open and recently completed):\n${JSON.stringify(stepsContext)}`
 
   const anthropic = new Anthropic({ apiKey })
 

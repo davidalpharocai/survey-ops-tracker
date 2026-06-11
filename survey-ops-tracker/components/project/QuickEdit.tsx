@@ -1,7 +1,9 @@
 'use client'
 import { useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useUpdateProject } from '@/lib/hooks/useProjects'
 import { useTeamMembers } from '@/lib/hooks/useTeamMembers'
+import { createClient } from '@/lib/supabase/client'
 import { autoStamp } from '@/lib/utils/date'
 import { FIELD_LABELS, formatFieldValue, fieldsToUpdates } from '@/lib/utils/quickFields'
 import type { SurveyProject } from '@/lib/hooks/useProjects'
@@ -18,6 +20,8 @@ export function QuickEdit({ project }: QuickEditProps) {
   const [parsed, setParsed] = useState<Record<string, unknown> | null>(null)
   const { data: teamMembers = [] } = useTeamMembers()
   const updateProject = useUpdateProject()
+  const queryClient = useQueryClient()
+  const supabase = createClient()
 
   async function parse() {
     if (!text.trim() || busy) return
@@ -68,17 +72,30 @@ export function QuickEdit({ project }: QuickEditProps) {
     }
   }
 
-  function approve() {
+  async function approve() {
     if (!parsed) return
     const updates = fieldsToUpdates(parsed, teamMembers)
     if (typeof parsed.note === 'string' && parsed.note.trim()) {
-      updates.latest_next_steps = autoStamp(
-        'Quick edit',
-        project.latest_next_steps,
-        parsed.note.trim()
-      )
+      const { error } = await supabase.from('project_steps').insert({
+        project_id: project.id,
+        text: parsed.note.trim(),
+        created_by: 'Quick edit',
+      })
+      if (error) {
+        // Table missing (migration not applied yet) — fall back to the
+        // legacy freeform notes so the note isn't lost.
+        updates.latest_next_steps = autoStamp(
+          'Quick edit',
+          project.latest_next_steps,
+          parsed.note.trim()
+        )
+      } else {
+        queryClient.invalidateQueries({ queryKey: ['steps', project.id] })
+      }
     }
-    updateProject.mutate({ id: project.id, updates })
+    if (Object.keys(updates).length > 0) {
+      updateProject.mutate({ id: project.id, updates })
+    }
     reset()
   }
 

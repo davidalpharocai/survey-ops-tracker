@@ -421,6 +421,47 @@ export type Database = {
           }
         ]
       }
+      project_steps: {
+        Row: {
+          id: string
+          project_id: string
+          text: string
+          done: boolean
+          created_by: string | null
+          created_at: string
+          completed_at: string | null
+          completed_by: string | null
+        }
+        Insert: {
+          id?: string
+          project_id: string
+          text: string
+          done?: boolean
+          created_by?: string | null
+          created_at?: string
+          completed_at?: string | null
+          completed_by?: string | null
+        }
+        Update: {
+          id?: string
+          project_id?: string
+          text?: string
+          done?: boolean
+          created_by?: string | null
+          created_at?: string
+          completed_at?: string | null
+          completed_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'project_steps_project_id_fkey'
+            columns: ['project_id']
+            isOneToOne: false
+            referencedRelation: 'survey_projects'
+            referencedColumns: ['id']
+          }
+        ]
+      }
       notification_log: {
         Row: {
           id: string
