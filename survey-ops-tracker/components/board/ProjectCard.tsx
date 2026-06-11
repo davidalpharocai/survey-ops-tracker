@@ -30,7 +30,7 @@ export function ProjectCard({ project, onClick }: ProjectCardProps) {
     ? 'border-2 border-muted-foreground/40 border-l-4 border-l-muted-foreground/50'
     : urgencyBorder
     ? `border-l-4 ${urgencyBorder}`
-    : 'border border-border border-l-4 border-l-foreground/25'
+    : 'border border-border border-l-4 border-l-foreground/80'
   const snippet = project.latest_next_steps
     ? project.latest_next_steps.slice(0, 100) +
       (project.latest_next_steps.length > 100 ? '…' : '')
