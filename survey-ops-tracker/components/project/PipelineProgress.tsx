@@ -1,5 +1,5 @@
 'use client'
-import { STAGE_ORDER } from '@/lib/utils/stage'
+import { STAGE_ORDER, STAGE_DESCRIPTIONS } from '@/lib/utils/stage'
 import { useUpdateProject } from '@/lib/hooks/useProjects'
 import type { SurveyProject } from '@/lib/hooks/useProjects'
 import type { BoardColumn } from '@/lib/utils/stage'
@@ -88,6 +88,11 @@ export function PipelineProgress({ project }: PipelineProgressProps) {
               <button
                 onClick={() => isClickable && toggleStage(stage)}
                 disabled={!isClickable}
+                title={
+                  isClickable
+                    ? `${STAGE_DESCRIPTIONS[stage] ?? stage} Click to toggle this stage done/undone.`
+                    : STAGE_DESCRIPTIONS[stage]
+                }
                 className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium border transition-colors ${
                   isDone
                     ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-600 dark:text-emerald-400'

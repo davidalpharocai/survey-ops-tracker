@@ -18,6 +18,7 @@ import { BudgetWidget } from '@/components/project/BudgetWidget'
 import { BidWidget } from '@/components/project/BidWidget'
 
 const TOOLTIPS: Record<string, string> = {
+  'Client': 'The client this project is for.',
   'N Target': "Total number of survey responses you're aiming to collect.",
   'N Collected': 'Responses collected so far. Auto-synced every 15 minutes — manual edits may be overwritten by the next sync.',
   'Audience Size': 'Total size of the panel or population being surveyed. Different from N (target responses).',
@@ -204,7 +205,7 @@ export default function ProjectDetailPage() {
             </h3>
             <div className="flex flex-col gap-3">
               {/* Basic fields */}
-              <DetailRow label="Client" value={project.client} />
+              <DetailRow label="Client" value={project.client} tooltip={TOOLTIPS['Client']} />
               <WaitingOnRow
                 project={project}
                 onSetBlockedBy={v => updateProject.mutate({ id, updates: { blocked_by: v } })}

@@ -176,20 +176,29 @@ export function BidWidget({ projectId }: { projectId: string }) {
       ) : (
         <div className="flex flex-col gap-2">
           <div className="flex justify-between items-center">
-            <span className="text-xs text-muted-foreground">Current bid</span>
+            <span className="text-xs text-muted-foreground flex items-center">
+              Current bid
+              <InfoTooltip text="The most recent bid per response — the rate currently in effect." />
+            </span>
             <span className="text-sm font-semibold text-foreground">
               {current ? formatAmount(current.amount) : '—'}
             </span>
           </div>
           {avg != null && bids!.length > 1 && (
             <div className="flex justify-between items-center">
-              <span className="text-xs text-muted-foreground">Average</span>
+              <span className="text-xs text-muted-foreground flex items-center">
+                Average
+                <InfoTooltip text="Simple average of all bid entries, unweighted." />
+              </span>
               <span className="text-xs text-foreground">{formatAmount(avg)}</span>
             </div>
           )}
           {weightedAvg != null && bids!.length > 1 && (
             <div className="flex justify-between items-center">
-              <span className="text-xs text-muted-foreground">Weighted avg (by blasts)</span>
+              <span className="text-xs text-muted-foreground flex items-center">
+                Weighted avg (by blasts)
+                <InfoTooltip text="Average bid weighted by blasts — the number of sends at each rate." />
+              </span>
               <span className="text-xs text-foreground">{formatAmount(weightedAvg)}</span>
             </div>
           )}

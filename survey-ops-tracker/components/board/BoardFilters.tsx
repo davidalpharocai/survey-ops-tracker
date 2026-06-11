@@ -1,13 +1,25 @@
 'use client'
 import { STAGE_ORDER } from '@/lib/utils/stage'
+import { InfoTooltip } from '@/components/shared/InfoTooltip'
 
 const SELECT_CLASSES =
   'bg-muted border border-border text-foreground/80 text-xs rounded-lg px-3 py-1.5 focus:outline-none focus:border-ring'
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({
+  label,
+  tooltip,
+  children,
+}: {
+  label: string
+  tooltip?: string
+  children: React.ReactNode
+}) {
   return (
     <label className="flex flex-col gap-0.5">
-      <span className="text-[11px] text-muted-foreground uppercase tracking-wider">{label}</span>
+      <span className="flex items-center text-[11px] text-muted-foreground uppercase tracking-wider">
+        {label}
+        {tooltip && <InfoTooltip text={tooltip} />}
+      </span>
       {children}
     </label>
   )
@@ -44,7 +56,7 @@ export function BoardFilters({
 }: BoardFiltersProps) {
   return (
     <div className="flex items-end gap-3 flex-wrap">
-      <Field label="Captain">
+      <Field label="Captain" tooltip="Show only projects led by this captain — the team member responsible end-to-end.">
         <select
           value={captainFilter ?? ''}
           onChange={e => onCaptainChange(e.target.value || null)}
@@ -58,7 +70,7 @@ export function BoardFilters({
           ))}
         </select>
       </Field>
-      <Field label="Type">
+      <Field label="Type" tooltip="Filter by project type: PS (PureSpectrum consumer panel), B2B (expert/business panel), or Rerun (repeat wave of an earlier study).">
         <select
           value={typeFilter ?? ''}
           onChange={e => onTypeChange(e.target.value || null)}
@@ -70,7 +82,7 @@ export function BoardFilters({
           <option value="Rerun">Rerun</option>
         </select>
       </Field>
-      <Field label="Due">
+      <Field label="Due" tooltip="Filter by due-date urgency, e.g. only projects due today or overdue.">
         <select
           value={dueFilter ?? ''}
           onChange={e => onDueChange(e.target.value || null)}
@@ -82,7 +94,7 @@ export function BoardFilters({
           <option value="twodays">Due in 2 days</option>
         </select>
       </Field>
-      <Field label="Stage">
+      <Field label="Stage" tooltip="Filter by pipeline stage, from Submitted through Delivery (or Closed).">
         <select
           value={stageFilter ?? ''}
           onChange={e => onStageChange(e.target.value || null)}
@@ -97,7 +109,7 @@ export function BoardFilters({
           <option value="Closed">Closed</option>
         </select>
       </Field>
-      <Field label="Search">
+      <Field label="Search" tooltip="Match against project or client name.">
         <input
           type="text"
           value={search}

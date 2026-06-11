@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { useCreateProject } from '@/lib/hooks/useProjects'
 import { useRouter } from 'next/navigation'
 import { FIELD_LABELS, formatFieldValue, fieldsToUpdates } from '@/lib/utils/quickFields'
+import { InfoTooltip } from '@/components/shared/InfoTooltip'
 import type { TeamMember } from '@/lib/hooks/useTeamMembers'
 import type { Database } from '@/lib/supabase/types'
 
@@ -110,8 +111,9 @@ export function NewProjectModal({ teamMembers, knownClients = [], onClose }: New
 
         {/* AI quick add */}
         <div className="flex flex-col gap-2 bg-muted/50 border border-dashed border-border rounded-xl p-3">
-          <span className="text-xs text-muted-foreground">
+          <span className="text-xs text-muted-foreground flex items-center">
             ✦ Describe it and I&apos;ll fill out the form
+            <InfoTooltip text="Describe the project in plain English and AI fills the form for you to review before creating." />
           </span>
           <textarea
             value={describe}
@@ -172,7 +174,10 @@ export function NewProjectModal({ teamMembers, knownClients = [], onClose }: New
 
         <div className="grid grid-cols-2 gap-3">
           <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-            Type
+            <span className="flex items-center">
+              Type
+              <InfoTooltip text="PS = PureSpectrum consumer panel, B2B = expert/business panel, Rerun = repeat wave of an earlier study." />
+            </span>
             <select
               value={projectType}
               onChange={e => setProjectType(e.target.value)}
@@ -186,7 +191,10 @@ export function NewProjectModal({ teamMembers, knownClients = [], onClose }: New
           </label>
 
           <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-            Captain
+            <span className="flex items-center">
+              Captain
+              <InfoTooltip text="The team member responsible for this project end-to-end." />
+            </span>
             <select
               value={captainId}
               onChange={e => setCaptainId(e.target.value)}
@@ -203,7 +211,10 @@ export function NewProjectModal({ teamMembers, knownClients = [], onClose }: New
         </div>
 
         <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-          Salesperson
+          <span className="flex items-center">
+            Salesperson
+            <InfoTooltip text="The sales lead who sold this project." />
+          </span>
           <input
             value={salesperson}
             onChange={e => setSalesperson(e.target.value)}

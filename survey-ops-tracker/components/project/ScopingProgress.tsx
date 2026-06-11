@@ -1,6 +1,6 @@
 'use client'
 import { useUpdateProject } from '@/lib/hooks/useProjects'
-import { getCheckboxesForColumn } from '@/lib/utils/stage'
+import { getCheckboxesForColumn, STAGE_DESCRIPTIONS } from '@/lib/utils/stage'
 import { SCOPING_STAGES } from '@/components/board/ScopingBoard'
 import type { SurveyProject } from '@/lib/hooks/useProjects'
 
@@ -46,7 +46,11 @@ export function ScopingProgress({ project }: ScopingProgressProps) {
                   ? 'bg-muted border-border text-foreground/70'
                   : 'border-border text-muted-foreground hover:text-foreground hover:border-ring'
               }`}
-              title="Click to set stage"
+              title={
+                STAGE_DESCRIPTIONS[stage]
+                  ? `${STAGE_DESCRIPTIONS[stage]} Click to set this stage.`
+                  : 'Click to set stage'
+              }
             >
               {isPast ? '✓ ' : ''}
               {stage}

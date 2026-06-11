@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { useUpdateProject } from '@/lib/hooks/useProjects'
+import { InfoTooltip } from '@/components/shared/InfoTooltip'
 
 interface LinkedDocumentsProps {
   projectId: string
@@ -80,8 +81,9 @@ export function LinkedDocuments({ projectId, documents }: LinkedDocumentsProps) 
 
   return (
     <div className="bg-card rounded-xl p-4">
-      <h3 className="text-xs text-muted-foreground uppercase tracking-widest mb-3 font-medium">
+      <h3 className="text-xs text-muted-foreground uppercase tracking-widest mb-3 font-medium flex items-center">
         Linked Documents
+        <InfoTooltip text="Links to this project's docs (questionnaire, data files, etc.). Titles are fetched automatically when you add a link; hover a link to rename or remove it." />
       </h3>
       <div className="grid grid-cols-2 gap-2 mb-3">
         {documents.map((entry, i) => {

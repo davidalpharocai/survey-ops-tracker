@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { useUpdateProject } from '@/lib/hooks/useProjects'
+import { InfoTooltip } from '@/components/shared/InfoTooltip'
 
 interface BudgetWidgetProps {
   projectId: string
@@ -97,14 +98,23 @@ export function BudgetWidget({ projectId, budget, actualSpend, nTarget, nCollect
 
   return (
     <div className="border-t border-border pt-3 mt-1">
-      <p className="text-xs text-muted-foreground uppercase tracking-widest mb-3 font-medium">Budget</p>
+      <p className="text-xs text-muted-foreground uppercase tracking-widest mb-3 font-medium flex items-center">
+        Budget
+        <InfoTooltip text="Internal cost tracking for this project — not client-facing. Click a value to edit it." />
+      </p>
       <div className="flex flex-col gap-2">
         <div className="flex justify-between items-center">
-          <span className="text-xs text-muted-foreground">Allocated</span>
+          <span className="text-xs text-muted-foreground flex items-center">
+            Allocated
+            <InfoTooltip text="Budget allocated to this project." />
+          </span>
           <EditableAmount value={budget} onSave={saveBudget} placeholder="e.g. 5000" />
         </div>
         <div className="flex justify-between items-center">
-          <span className="text-xs text-muted-foreground">Actual Spend</span>
+          <span className="text-xs text-muted-foreground flex items-center">
+            Actual Spend
+            <InfoTooltip text="What has actually been spent so far." />
+          </span>
           <EditableAmount value={actualSpend} onSave={saveActualSpend} placeholder="e.g. 3200" />
         </div>
         {hasBoth && (
@@ -116,8 +126,9 @@ export function BudgetWidget({ projectId, budget, actualSpend, nTarget, nCollect
               />
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-xs text-muted-foreground">
+              <span className="text-xs text-muted-foreground flex items-center">
                 {isOver ? '⚠ Over budget' : 'Remaining'}
+                <InfoTooltip text="Allocated budget minus actual spend." />
               </span>
               <span className={`text-xs font-medium ${isOver ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
                 {isOver ? '-' : ''}{formatCurrency(Math.abs(remaining!))}
@@ -131,17 +142,16 @@ export function BudgetWidget({ projectId, budget, actualSpend, nTarget, nCollect
         {(targetCostPerN != null || actualCostPerN != null) && (
           <div className="border-t border-border pt-2 mt-1 flex flex-col gap-2">
             <div className="flex justify-between items-center">
-              <span className="text-xs text-muted-foreground" title="Allocated budget ÷ N Target">
+              <span className="text-xs text-muted-foreground flex items-center">
                 Target Cost / N
+                <InfoTooltip text="Allocated budget ÷ N Target." />
               </span>
               <span className="text-xs text-foreground">{formatCostPerN(targetCostPerN)}</span>
             </div>
             <div className="flex justify-between items-center">
-              <span
-                className="text-xs text-muted-foreground"
-                title="Actual spend ÷ N Actual (or N Collected until cleaning is done)"
-              >
+              <span className="text-xs text-muted-foreground flex items-center">
                 Actual Cost / N
+                <InfoTooltip text="Actual spend ÷ N Actual (or N Collected until cleaning is done)." />
               </span>
               <span
                 className={`text-xs font-medium ${

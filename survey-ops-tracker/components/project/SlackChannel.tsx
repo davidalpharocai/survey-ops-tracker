@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { useUpdateProject } from '@/lib/hooks/useProjects'
+import { InfoTooltip } from '@/components/shared/InfoTooltip'
 
 interface SlackChannelProps {
   projectId: string
@@ -26,8 +27,9 @@ export function SlackChannel({ projectId, url }: SlackChannelProps) {
 
   return (
     <div className="bg-card rounded-xl p-4">
-      <h3 className="text-xs text-muted-foreground uppercase tracking-widest mb-3 font-medium">
+      <h3 className="text-xs text-muted-foreground uppercase tracking-widest mb-3 font-medium flex items-center">
         Slack Channel
+        <InfoTooltip text="Quick link to this project's Slack channel. Paste the channel URL once and open it from here." />
       </h3>
       {url && !editing && (
         <div className="flex items-center gap-2">

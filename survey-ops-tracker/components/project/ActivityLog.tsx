@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
+import { InfoTooltip } from '@/components/shared/InfoTooltip'
 import type { Database } from '@/lib/supabase/types'
 
 type Activity = Database['public']['Tables']['project_activity']['Row']
@@ -45,8 +46,9 @@ export function ActivityLog({ projectId }: { projectId: string }) {
 
   return (
     <div className="bg-card rounded-xl p-4">
-      <h3 className="text-xs text-muted-foreground uppercase tracking-widest mb-3 font-medium">
+      <h3 className="text-xs text-muted-foreground uppercase tracking-widest mb-3 font-medium flex items-center">
         Activity
+        <InfoTooltip text="Logged emails and events for this project — click an entry to expand it." />
       </h3>
 
       {isLoading && <p className="text-xs text-muted-foreground/50">Loading…</p>}

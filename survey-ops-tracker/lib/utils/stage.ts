@@ -17,6 +17,23 @@ export const STAGE_ORDER: BoardColumn[] = [
   'Delivery',
 ]
 
+/** One-line hover descriptions for pipeline and scoping stages (used for title= tooltips). */
+export const STAGE_DESCRIPTIONS: Record<string, string> = {
+  // Pipeline stages
+  'Submitted': 'Accepted into operations — work not started yet.',
+  'Doc Programming': 'The questionnaire document is being programmed.',
+  'Survey Programming': 'The survey is being built in the survey tool.',
+  'EdWin QA': 'Internal QA pass in Edwin before fielding.',
+  'Fielding': 'Live and collecting responses.',
+  'Data QA': 'Cleaning and validating the collected data.',
+  'Delivery': 'Preparing and sending the deliverable.',
+  // Scoping (pre-sale) stages
+  'New Inquiry': 'New pre-sale inquiry — scoping just started.',
+  'Proposal Sent': 'A proposal has been sent to the client.',
+  'Pricing Discussion': 'Pricing is being discussed with the client.',
+  'Awaiting Approval': 'Waiting on client approval — approval moves the project into operations at Submitted.',
+}
+
 export type StageFields = {
   stage_doc_programming: boolean
   stage_survey_programming: boolean

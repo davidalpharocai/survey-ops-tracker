@@ -1,6 +1,7 @@
 'use client'
 import { Droppable, Draggable } from '@hello-pangea/dnd'
 import { ProjectCard } from './ProjectCard'
+import { STAGE_DESCRIPTIONS } from '@/lib/utils/stage'
 import type { SurveyProject } from '@/lib/hooks/useProjects'
 
 interface BoardColumnProps {
@@ -14,10 +15,16 @@ export function BoardColumn({ id, title, projects, onCardClick }: BoardColumnPro
   return (
     <div className="bg-card border border-border rounded-xl p-2 min-w-[158px] max-w-[253px] flex-1 basis-0 flex flex-col gap-2">
       <div className="flex items-center justify-between">
-        <span className="text-xs text-muted-foreground uppercase tracking-widest font-medium">
+        <span
+          className="text-xs text-muted-foreground uppercase tracking-widest font-medium"
+          title={STAGE_DESCRIPTIONS[title]}
+        >
           {title}
         </span>
-        <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full">
+        <span
+          className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full"
+          title="Number of projects in this column"
+        >
           {projects.length}
         </span>
       </div>

@@ -16,16 +16,22 @@ const TYPE_BADGE: Record<string, string> = {
   'Rerun': 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400',
 }
 
+const TYPE_TITLE: Record<string, string> = {
+  'PS': 'PureSpectrum — consumer panel via the PureSpectrum tool',
+  'B2B': 'B2B — expert/business panel',
+  'Rerun': 'Rerun — repeat wave of an earlier study',
+}
+
 const PRIORITY_CHIP: Record<string, { symbol: string; classes: string; label: string }> = {
   high: {
     symbol: '⚑',
     classes: 'bg-amber-500/15 text-amber-600 dark:text-amber-400',
-    label: 'High priority',
+    label: 'High priority — sorts to the top of its column',
   },
   urgent: {
     symbol: '‼',
     classes: 'bg-red-500/15 text-red-600 dark:text-red-400',
-    label: 'Urgent priority',
+    label: 'Urgent priority — sorts to the top of its column',
   },
 }
 
@@ -68,7 +74,10 @@ export function ProjectCard({ project, onClick }: ProjectCardProps) {
         </span>
         <span className="flex items-center gap-1 shrink-0">
           {onHold && (
-            <span className="text-[11px] px-2 py-0.5 rounded bg-muted text-muted-foreground">
+            <span
+              className="text-[11px] px-2 py-0.5 rounded bg-muted text-muted-foreground"
+              title="On hold — paused; greyed out and sorted to the bottom of the column"
+            >
               ⏸ Hold
             </span>
           )}
@@ -83,6 +92,7 @@ export function ProjectCard({ project, onClick }: ProjectCardProps) {
           {project.project_type && (
             <span
               className={`text-[11px] px-2 py-0.5 rounded ${TYPE_BADGE[project.project_type] ?? ''}`}
+              title={TYPE_TITLE[project.project_type]}
             >
               {project.project_type}
             </span>
@@ -94,7 +104,9 @@ export function ProjectCard({ project, onClick }: ProjectCardProps) {
       <p className="text-muted-foreground text-xs mb-2">{project.client}</p>
 
       {/* N Progress */}
-      <NProgressBar collected={project.n_collected} target={project.n_target} />
+      <div title="Responses collected so far vs the response goal (N Target)">
+        <NProgressBar collected={project.n_collected} target={project.n_target} />
+      </div>
 
       {/* Latest/Next Steps snippet */}
       {snippet && (
@@ -107,11 +119,17 @@ export function ProjectCard({ project, onClick }: ProjectCardProps) {
       <div className="flex items-center justify-between gap-2 mt-2">
         <span className="flex items-center gap-1.5 min-w-0">
           {project.captain ? (
-            <span className="text-xs bg-muted text-foreground/80 px-2 py-0.5 rounded-full shrink-0">
+            <span
+              className="text-xs bg-muted text-foreground/80 px-2 py-0.5 rounded-full shrink-0"
+              title={`Project captain: ${project.captain.name}`}
+            >
               {project.captain.initials}
             </span>
           ) : (
-            <span className="text-xs bg-red-500/20 text-red-600 dark:text-red-400 px-2 py-0.5 rounded-full shrink-0">
+            <span
+              className="text-xs bg-red-500/20 text-red-600 dark:text-red-400 px-2 py-0.5 rounded-full shrink-0"
+              title="No project captain assigned yet"
+            >
               Unassigned !
             </span>
           )}

@@ -67,18 +67,18 @@ export function ProjectTable({ projects }: ProjectTableProps) {
     return <span className="text-foreground/80 ml-1">{sortDir === 'asc' ? '↑' : '↓'}</span>
   }
 
-  const headers: { field: SortField | null; label: string }[] = [
-    { field: 'project_name', label: 'Project' },
-    { field: 'client', label: 'Client' },
-    { field: null, label: 'Type' },
-    { field: 'board_column', label: 'Stage' },
-    { field: null, label: 'Captain' },
-    { field: null, label: 'N / Target' },
-    { field: null, label: 'N Actual' },
-    { field: null, label: 'Long.' },
-    { field: null, label: 'Voter QA' },
-    { field: null, label: 'Citation' },
-    { field: 'due_date', label: 'Due' },
+  const headers: { field: SortField | null; label: string; title: string }[] = [
+    { field: 'project_name', label: 'Project', title: 'Project name. ⏸ marks projects on hold.' },
+    { field: 'client', label: 'Client', title: 'The client this project is for.' },
+    { field: null, label: 'Type', title: 'PS = PureSpectrum consumer panel, B2B = expert/business panel, Rerun = repeat wave of an earlier study.' },
+    { field: 'board_column', label: 'Stage', title: 'Current pipeline stage, from Submitted through Delivery.' },
+    { field: null, label: 'Captain', title: 'Team member responsible for the project end-to-end. ! = unassigned.' },
+    { field: null, label: 'N / Target', title: 'Responses collected so far (auto-synced) vs the response goal.' },
+    { field: null, label: 'N Actual', title: 'Usable responses after data cleaning.' },
+    { field: null, label: 'Long.', title: 'Longitudinal — study tracked across multiple waves.' },
+    { field: null, label: 'Voter QA', title: 'Whether the project needs the extra voter-survey QA pass.' },
+    { field: null, label: 'Citation', title: 'Whether deliverables need citation language.' },
+    { field: 'due_date', label: 'Due', title: 'Date the deliverable is due to the client.' },
   ]
 
   return (
@@ -86,9 +86,10 @@ export function ProjectTable({ projects }: ProjectTableProps) {
       <table className="w-full">
         <thead>
           <tr className="bg-background border-b border-border">
-            {headers.map(({ field, label }) => (
+            {headers.map(({ field, label, title }) => (
               <th
                 key={label}
+                title={field ? `${title} Click to sort.` : title}
                 onClick={() => field && handleSort(field)}
                 className={`px-4 py-3 text-left text-xs text-muted-foreground uppercase tracking-wider font-medium ${
                   field ? 'cursor-pointer hover:text-foreground' : ''
