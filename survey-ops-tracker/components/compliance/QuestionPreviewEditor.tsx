@@ -99,6 +99,28 @@ export function QuestionPreviewEditor({ questions, onChange }: Props) {
               AI follow-up
             </label>
           </div>
+          {q.type !== 'open_text' && (
+            <div className="pl-9">
+              {/* Uncontrolled + commit on blur: live parsing would eat commas as
+                  the user types them. Remount key keeps rows in sync on add/remove. */}
+              <input
+                key={`opts-${i}-${questions.length}`}
+                type="text"
+                defaultValue={q.answer_options.join(', ')}
+                onBlur={e =>
+                  update(i, {
+                    answer_options: e.target.value
+                      .split(',')
+                      .map(o => o.trim())
+                      .filter(Boolean),
+                  })
+                }
+                aria-label={`Question ${q.order_num} answer options`}
+                placeholder="Answer options, comma-separated (e.g. Yes, No)"
+                className="w-full bg-slate-800 border border-slate-700 text-slate-300 text-xs rounded-md px-2 py-1.5 placeholder:text-slate-600"
+              />
+            </div>
+          )}
         </div>
       ))}
       <button

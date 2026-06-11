@@ -59,6 +59,12 @@ export function QuestionList({ questions }: { questions: PortalQuestion[] }) {
                 <span className="text-xs text-slate-500 min-w-8 pt-0.5">Q{q.order_num}</span>
                 <div className="flex-1">
                   <p className="text-sm text-slate-200">{q.text}</p>
+                  {q.answer_options.length > 0 && (
+                    <p className="text-xs text-slate-500 mt-1">
+                      <span className="text-slate-600">Options:</span>{' '}
+                      {q.answer_options.join(' · ')}
+                    </p>
+                  )}
                   <div className="flex gap-2 mt-1.5 flex-wrap">
                     <span
                       className={`text-xs px-2 py-0.5 rounded ${
@@ -72,11 +78,6 @@ export function QuestionList({ questions }: { questions: PortalQuestion[] }) {
                     {q.is_ai_followup && (
                       <span className="text-xs px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400">
                         AI follow-up
-                      </span>
-                    )}
-                    {q.answer_options.length > 0 && (
-                      <span className="text-xs text-slate-500 pt-0.5">
-                        {q.answer_options.join(' · ')}
                       </span>
                     )}
                   </div>
