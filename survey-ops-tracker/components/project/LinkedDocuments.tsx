@@ -37,20 +37,27 @@ function fallbackName(url: string): string {
 
 export function LinkedDocuments({ projectId, documents }: LinkedDocumentsProps) {
   const [newUrl, setNewUrl] = useState('')
-  const [newName, setNewName] = useState('')
+  const [adding, setAdding] = useState(false)
+  const [renaming, setRenaming] = useState<number | null>(null)
+  const [renameDraft, setRenameDraft] = useState('')
   const updateProject = useUpdateProject()
 
-  function handleAdd() {
+  async function handleAdd() {
     const url = newUrl.trim()
-    if (!url) return
-    const name = newName.trim()
+    if (!url || adding) return
+    setAdding(true)
+    let name: string | null = null
+    try {
+      const res = await fetch(`/api/doc-title?url=${encodeURIComponent(url)}`)
+      if (res.ok) name = (await res.json()).title ?? null
+    } catch { /* title lookup is best-effort */ }
     const entry = name ? JSON.stringify({ name, url }) : url
     updateProject.mutate({
       id: projectId,
       updates: { linked_documents: [...documents, entry] },
     })
     setNewUrl('')
-    setNewName('')
+    setAdding(false)
   }
 
   function handleRemove(index: number) {
@@ -58,6 +65,17 @@ export function LinkedDocuments({ projectId, documents }: LinkedDocumentsProps) 
       id: projectId,
       updates: { linked_documents: documents.filter((_, i) => i !== index) },
     })
+  }
+
+  function saveRename(index: number) {
+    const { url } = parseDoc(documents[index])
+    const name = renameDraft.trim()
+    const entry = name ? JSON.stringify({ name, url }) : url
+    updateProject.mutate({
+      id: projectId,
+      updates: { linked_documents: documents.map((d, i) => (i === index ? entry : d)) },
+    })
+    setRenaming(null)
   }
 
   return (
@@ -68,6 +86,29 @@ export function LinkedDocuments({ projectId, documents }: LinkedDocumentsProps) 
       <div className="flex flex-col gap-2 mb-3">
         {documents.map((entry, i) => {
           const { name, url } = parseDoc(entry)
+          if (renaming === i) {
+            return (
+              <div key={i} className="flex items-center gap-2">
+                <input
+                  autoFocus
+                  value={renameDraft}
+                  onChange={e => setRenameDraft(e.target.value)}
+                  placeholder="Document name"
+                  className="flex-1 bg-muted border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:border-ring"
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') saveRename(i)
+                    if (e.key === 'Escape') setRenaming(null)
+                  }}
+                />
+                <button
+                  onClick={() => saveRename(i)}
+                  className="text-xs bg-muted hover:bg-accent text-foreground px-3 py-2 rounded-lg transition-colors"
+                >
+                  Save
+                </button>
+              </div>
+            )
+          }
           return (
             <div key={i} className="flex items-center gap-1 group">
               <a
@@ -80,9 +121,19 @@ export function LinkedDocuments({ projectId, documents }: LinkedDocumentsProps) 
                 <span className="truncate">{name ?? fallbackName(url)}</span>
               </a>
               <button
+                onClick={() => {
+                  setRenameDraft(name ?? '')
+                  setRenaming(i)
+                }}
+                title="Rename"
+                className="text-muted-foreground/50 hover:text-foreground text-xs px-1 py-2 opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                ✎
+              </button>
+              <button
                 onClick={() => handleRemove(i)}
                 title="Remove link"
-                className="text-muted-foreground/50 hover:text-red-600 dark:hover:text-red-400 text-xs px-1.5 py-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                className="text-muted-foreground/50 hover:text-red-600 dark:hover:text-red-400 text-xs px-1 py-2 opacity-0 group-hover:opacity-100 transition-opacity"
               >
                 ✕
               </button>
@@ -93,30 +144,21 @@ export function LinkedDocuments({ projectId, documents }: LinkedDocumentsProps) 
           <p className="text-muted-foreground/50 text-xs">No documents linked yet</p>
         )}
       </div>
-      <div className="flex flex-col gap-2">
-        <div className="flex gap-2">
-          <input
-            value={newName}
-            onChange={e => setNewName(e.target.value)}
-            placeholder="Name (e.g. Questionnaire v2)"
-            className="w-2/5 bg-muted border border-dashed border-border rounded-lg px-3 py-2 text-sm text-foreground/80 placeholder:text-muted-foreground focus:outline-none focus:border-ring transition-colors"
-            onKeyDown={e => e.key === 'Enter' && handleAdd()}
-          />
-          <input
-            value={newUrl}
-            onChange={e => setNewUrl(e.target.value)}
-            placeholder="Paste URL"
-            className="flex-1 bg-muted border border-dashed border-border rounded-lg px-3 py-2 text-sm text-foreground/80 placeholder:text-muted-foreground focus:outline-none focus:border-ring transition-colors"
-            onKeyDown={e => e.key === 'Enter' && handleAdd()}
-          />
-          <button
-            onClick={handleAdd}
-            disabled={!newUrl.trim()}
-            className="bg-muted hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed text-foreground text-xs px-3 py-2 rounded-lg transition-colors"
-          >
-            Add
-          </button>
-        </div>
+      <div className="flex gap-2">
+        <input
+          value={newUrl}
+          onChange={e => setNewUrl(e.target.value)}
+          placeholder="Paste Google Doc URL"
+          className="flex-1 bg-muted border border-dashed border-border rounded-lg px-3 py-2 text-sm text-foreground/80 placeholder:text-muted-foreground focus:outline-none focus:border-ring transition-colors"
+          onKeyDown={e => e.key === 'Enter' && handleAdd()}
+        />
+        <button
+          onClick={handleAdd}
+          disabled={!newUrl.trim() || adding}
+          className="bg-muted hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed text-foreground text-xs px-3 py-2 rounded-lg transition-colors"
+        >
+          {adding ? 'Adding…' : 'Add'}
+        </button>
       </div>
     </div>
   )
