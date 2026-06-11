@@ -54,33 +54,45 @@ export default function PortalLoginForm() {
     <div className="w-full max-w-sm p-8 bg-slate-900 rounded-xl border border-slate-800">
       <div className="mb-6">
         <h1 className="text-xl font-bold text-white">Compliance Portal</h1>
-        <p className="text-sm text-slate-400 mt-1">
-          Enter your email and we&apos;ll send you a sign-in link.
-        </p>
+        {linkError !== 'link' && (
+          <p className="text-sm text-slate-400 mt-1">
+            Enter your email and we&apos;ll send you a sign-in link.
+          </p>
+        )}
       </div>
-      {linkError && (
+      {linkError === 'profile' && (
         <p className="text-amber-400 text-sm bg-amber-400/10 px-3 py-2 rounded-lg mb-4">
-          {linkError === 'profile'
-            ? 'We could not load your portal profile. Try signing in again, or contact your AlphaRoc representative.'
-            : 'That sign-in link expired or was already used. Request a new one below.'}
+          We could not load your portal profile. Try signing in again, or contact your
+          AlphaRoc representative.
         </p>
       )}
-      <form onSubmit={handleSendLink} className="flex flex-col gap-4">
-        <Input
-          type="email"
-          placeholder="you@company.com"
-          value={email}
-          onChange={e => setEmail(e.target.value)}
-          required
-          className="bg-slate-800 border-slate-700 text-white placeholder:text-slate-500"
-        />
-        {error && (
-          <p className="text-red-400 text-sm bg-red-400/10 px-3 py-2 rounded-lg">{error}</p>
-        )}
-        <Button type="submit" disabled={loading} className="w-full">
-          {loading ? 'Sending...' : 'Send sign-in link'}
-        </Button>
-      </form>
+      {linkError === 'link' ? (
+        <p className="text-amber-400 text-sm bg-amber-400/10 px-3 py-2 rounded-lg leading-relaxed">
+          This sign-in link is no longer valid — it may have already been used, or the
+          review it points to may already be completed. If you need access, please email{' '}
+          <a href="mailto:info@alpharoc.ai?subject=Survey%20Compliance%20Link" className="underline text-amber-300">
+            info@alpharoc.ai
+          </a>{' '}
+          with the subject &ldquo;Survey Compliance Link&rdquo;.
+        </p>
+      ) : (
+        <form onSubmit={handleSendLink} className="flex flex-col gap-4">
+          <Input
+            type="email"
+            placeholder="you@company.com"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            required
+            className="bg-slate-800 border-slate-700 text-white placeholder:text-slate-500"
+          />
+          {error && (
+            <p className="text-red-400 text-sm bg-red-400/10 px-3 py-2 rounded-lg">{error}</p>
+          )}
+          <Button type="submit" disabled={loading} className="w-full">
+            {loading ? 'Sending...' : 'Send sign-in link'}
+          </Button>
+        </form>
+      )}
     </div>
   )
 }
