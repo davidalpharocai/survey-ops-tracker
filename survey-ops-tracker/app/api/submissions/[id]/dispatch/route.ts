@@ -23,32 +23,23 @@ export async function POST(
   const { id } = await params
   const admin = createAdminClient()
 
-  const { data: submission, error: fetchError } = await admin
-    .from('question_submissions')
-    .select('id, project_id, version, submitted_by, dispatched_at')
-    .eq('id', id)
-    .maybeSingle()
-
-  if (fetchError) {
-    return NextResponse.json({ error: fetchError.message }, { status: 500 })
-  }
-  if (!submission) {
-    return NextResponse.json({ error: 'Submission not found' }, { status: 404 })
-  }
-
-  // Idempotent — if already dispatched, return success without re-emailing
-  if (submission.dispatched_at !== null) {
-    return NextResponse.json({ ok: true, alreadyDispatched: true })
-  }
-
-  // Mark as dispatched
-  const { error: updateError } = await admin
+  const { data: claimed, error: claimError } = await admin
     .from('question_submissions')
     .update({ dispatched_at: new Date().toISOString() })
     .eq('id', id)
+    .is('dispatched_at', null)
+    .select('id, project_id, version')
+    .maybeSingle()
 
-  if (updateError) {
-    return NextResponse.json({ error: updateError.message }, { status: 500 })
+  if (claimError) {
+    return NextResponse.json({ error: claimError.message }, { status: 500 })
+  }
+  if (!claimed) {
+    // Either nonexistent or already dispatched (or recalled): check which for the response
+    const { data: existing } = await admin
+      .from('question_submissions').select('id').eq('id', id).maybeSingle()
+    if (!existing) return NextResponse.json({ error: 'Submission not found' }, { status: 404 })
+    return NextResponse.json({ ok: true, alreadyDispatched: true })
   }
 
   // Fetch question counts for the email
@@ -62,13 +53,13 @@ export async function POST(
 
   // Fetch project name
   const { data: project } = await admin
-    .from('survey_projects').select('project_name').eq('id', submission.project_id).single()
+    .from('survey_projects').select('project_name').eq('id', claimed.project_id).single()
 
   // Fetch compliance recipients for this project
   const { data: recipients } = await admin
     .from('project_recipients')
     .select('email')
-    .eq('project_id', submission.project_id)
+    .eq('project_id', claimed.project_id)
     .eq('role', 'compliance')
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? new URL(request.url).origin
@@ -93,7 +84,7 @@ export async function POST(
 
     const email = submissionCreatedEmail({
       projectName: project?.project_name ?? 'Survey project',
-      version: submission.version,
+      version: claimed.version,
       questionCount,
       openTextCount,
       reviewUrl,

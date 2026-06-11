@@ -15,7 +15,7 @@ export async function getAlphaRocNotifyList(
 ): Promise<string[]> {
   const override = process.env.ALPHAROC_NOTIFY_OVERRIDE
   if (override) {
-    return override.split(',').map(s => s.trim().toLowerCase()).filter(Boolean)
+    return [...new Set(override.split(',').map(s => s.trim().toLowerCase()).filter(Boolean))]
   }
 
   const emails = new Set<string>(DEFAULT_OPS_NOTIFY)

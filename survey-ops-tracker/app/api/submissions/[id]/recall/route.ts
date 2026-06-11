@@ -35,14 +35,6 @@ export async function POST(
     return NextResponse.json({ error: 'Submission not found' }, { status: 404 })
   }
 
-  // Cannot recall once dispatched to compliance
-  if (submission.dispatched_at !== null) {
-    return NextResponse.json(
-      { error: 'Already sent to compliance — it can no longer be recalled' },
-      { status: 409 }
-    )
-  }
-
   // Fetch questions before deleting
   const { data: rows, error: qError } = await admin
     .from('questions')
@@ -64,14 +56,25 @@ export async function POST(
     answer_options: (q.answer_options as string[]) ?? [],
   }))
 
-  // Delete submission (questions cascade)
-  const { error: deleteError } = await admin
+  // Atomic recall: only delete if dispatched_at is still null.
+  // If another request dispatched between our fetch and now, the conditional
+  // delete will match zero rows and we return 409.
+  const { data: deleted, error: deleteError } = await admin
     .from('question_submissions')
     .delete()
     .eq('id', id)
+    .is('dispatched_at', null)
+    .select('id')
+    .maybeSingle()
 
   if (deleteError) {
     return NextResponse.json({ error: deleteError.message }, { status: 500 })
+  }
+  if (!deleted) {
+    return NextResponse.json(
+      { error: 'Already sent to compliance — it can no longer be recalled' },
+      { status: 409 }
+    )
   }
 
   return NextResponse.json({
