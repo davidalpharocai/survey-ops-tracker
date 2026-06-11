@@ -14,5 +14,8 @@ export async function GET(request: Request) {
     const { error } = await supabase.auth.verifyOtp({ type, token_hash })
     if (!error) return NextResponse.redirect(`${origin}${safeNext}`)
   }
-  return NextResponse.redirect(`${origin}/portal/login?error=link`)
+  // Expired/used link: fall back to the login flow, preserving the destination
+  return NextResponse.redirect(
+    `${origin}/portal/login?error=link&next=${encodeURIComponent(safeNext)}`
+  )
 }

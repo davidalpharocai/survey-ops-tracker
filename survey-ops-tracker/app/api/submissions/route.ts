@@ -91,16 +91,30 @@ export async function POST(request: Request) {
 
   const openTextCount = result.questions.filter(q => q.is_open_text).length
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? new URL(request.url).origin
-  const email = submissionCreatedEmail({
-    projectName: project?.project_name ?? 'Survey project',
-    version,
-    questionCount: result.questions.length,
-    openTextCount,
-    reviewUrl: `${appUrl}/portal/review/${submission.id}`,
-  })
+  const reviewPath = `/portal/review/${submission.id}`
 
   let emailFailures = 0
   for (const r of recipients ?? []) {
+    // Personal one-click sign-in link: opening it authenticates the reviewer
+    // (single-use, expiring token) and lands them on the review page. Falls
+    // back to the plain URL (login-page flow) if link generation fails.
+    let reviewUrl = `${appUrl}${reviewPath}`
+    const { data: linkData } = await admin.auth.admin.generateLink({
+      type: 'magiclink',
+      email: r.email,
+    })
+    const tokenHash = linkData?.properties?.hashed_token
+    if (tokenHash) {
+      reviewUrl = `${appUrl}/auth/confirm?token_hash=${tokenHash}&type=magiclink&next=${encodeURIComponent(reviewPath)}`
+    }
+
+    const email = submissionCreatedEmail({
+      projectName: project?.project_name ?? 'Survey project',
+      version,
+      questionCount: result.questions.length,
+      openTextCount,
+      reviewUrl,
+    })
     const ok = await sendAndLog({
       to: r.email, subject: email.subject, html: email.html,
       template: 'submission_created', submissionId: submission.id,
