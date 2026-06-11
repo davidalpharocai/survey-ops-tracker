@@ -10,14 +10,23 @@ type Stage = 'upload' | 'parsing' | 'preview' | 'submitting'
 export function SubmitQuestionsModal({
   projectId,
   onClose,
+  initialQuestions,
+  initialSourceFileName,
+  initialSourceFilePath,
 }: {
   projectId: string
   onClose: () => void
+  initialQuestions?: DraftQuestion[]
+  initialSourceFileName?: string
+  initialSourceFilePath?: string
 }) {
-  const [stage, setStage] = useState<Stage>('upload')
-  const [questions, setQuestions] = useState<DraftQuestion[]>([])
-  const [sourceFileName, setSourceFileName] = useState('')
-  const [sourceFilePath, setSourceFilePath] = useState('')
+  // If initial data provided (e.g. from recall), start in preview with that state
+  const [stage, setStage] = useState<Stage>(() =>
+    initialQuestions && initialQuestions.length > 0 ? 'preview' : 'upload'
+  )
+  const [questions, setQuestions] = useState<DraftQuestion[]>(() => initialQuestions ?? [])
+  const [sourceFileName, setSourceFileName] = useState(() => initialSourceFileName ?? '')
+  const [sourceFilePath, setSourceFilePath] = useState(() => initialSourceFilePath ?? '')
   const [error, setError] = useState('')
   const invalidate = useInvalidateCompliance(projectId)
 
@@ -76,12 +85,7 @@ export function SubmitQuestionsModal({
         setStage('preview')
         return
       }
-      if (body.emailFailures > 0) {
-        alert(
-          `Submission created, but ${body.emailFailures} notification email(s) failed to send. ` +
-          'Check the recipient addresses and notification log.'
-        )
-      }
+      // Submission created — close and let the panel countdown row appear
       invalidate()
       onClose()
     } catch {

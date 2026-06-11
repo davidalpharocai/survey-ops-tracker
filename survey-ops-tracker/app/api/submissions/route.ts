@@ -2,8 +2,6 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { normalizeQuestions, type DraftQuestion } from '@/lib/parsing/validate'
-import { submissionCreatedEmail } from '@/lib/email/templates'
-import { sendAndLog } from '@/lib/email/send'
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -80,52 +78,5 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: qError.message }, { status: 500 })
   }
 
-  // Notify compliance recipients
-  const { data: project } = await admin
-    .from('survey_projects').select('project_name').eq('id', body.projectId).single()
-  const { data: recipients } = await admin
-    .from('project_recipients')
-    .select('email')
-    .eq('project_id', body.projectId)
-    .eq('role', 'compliance')
-
-  const openTextCount = result.questions.filter(q => q.is_open_text).length
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? new URL(request.url).origin
-  const reviewPath = `/portal/review/${submission.id}`
-
-  let emailFailures = 0
-  for (const r of recipients ?? []) {
-    // Personal one-click sign-in link: opening it authenticates the reviewer
-    // (single-use, expiring token) and lands them on the review page. Falls
-    // back to the plain URL (login-page flow) if link generation fails.
-    let reviewUrl = `${appUrl}${reviewPath}`
-    const { data: linkData } = await admin.auth.admin.generateLink({
-      type: 'magiclink',
-      email: r.email,
-    })
-    const tokenHash = linkData?.properties?.hashed_token
-    if (tokenHash) {
-      reviewUrl = `${appUrl}/auth/confirm?token_hash=${tokenHash}&type=magiclink&next=${encodeURIComponent(reviewPath)}`
-    }
-
-    const email = submissionCreatedEmail({
-      projectName: project?.project_name ?? 'Survey project',
-      version,
-      questionCount: result.questions.length,
-      openTextCount,
-      reviewUrl,
-    })
-    const ok = await sendAndLog({
-      to: r.email, subject: email.subject, html: email.html,
-      template: 'submission_created', submissionId: submission.id,
-    })
-    if (!ok) emailFailures++
-  }
-
-  return NextResponse.json({
-    submissionId: submission.id,
-    version,
-    notified: (recipients?.length ?? 0) - emailFailures,
-    emailFailures,
-  })
+  return NextResponse.json({ submissionId: submission.id, version })
 }
