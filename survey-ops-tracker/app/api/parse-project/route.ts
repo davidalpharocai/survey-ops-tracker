@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@/lib/supabase/server'
+import { isAllowedEmail } from '@/lib/utils/allowedDomain'
 import { NextRequest } from 'next/server'
 
 export const dynamic = 'force-dynamic'
@@ -57,7 +58,7 @@ const FIELDS_SCHEMA = {
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return new Response('Unauthorized', { status: 401 })
+  if (!user || !isAllowedEmail(user.email)) return new Response('Unauthorized', { status: 401 })
 
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey || apiKey.startsWith('your-')) {

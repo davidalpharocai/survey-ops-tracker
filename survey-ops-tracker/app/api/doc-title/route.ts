@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { isAllowedEmail } from '@/lib/utils/allowedDomain'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,7 +19,7 @@ const TITLE_SUFFIX = / - Google (Docs|Sheets|Slides|Forms|Drive)\s*$/i
 export async function GET(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return new Response('Unauthorized', { status: 401 })
+  if (!user || !isAllowedEmail(user.email)) return new Response('Unauthorized', { status: 401 })
 
   const url = req.nextUrl.searchParams.get('url')
   if (!url) return new Response('url required', { status: 400 })

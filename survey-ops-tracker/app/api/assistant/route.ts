@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@/lib/supabase/server'
+import { isAllowedEmail } from '@/lib/utils/allowedDomain'
 import { NextRequest } from 'next/server'
 
 export const dynamic = 'force-dynamic'
@@ -26,7 +27,7 @@ If asked something unrelated to survey operations or the project data, politely 
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
+  if (!user || !isAllowedEmail(user.email)) {
     return new Response('Unauthorized', { status: 401 })
   }
 

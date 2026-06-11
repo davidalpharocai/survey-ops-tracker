@@ -1,9 +1,10 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { isAllowedEmail, ALLOWED_EMAIL_DOMAIN } from '@/lib/utils/allowedDomain'
 
 export default function LoginForm() {
   const [email, setEmail] = useState('')
@@ -11,12 +12,26 @@ export default function LoginForm() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient()
+
+  // Kicked out by the server for a non-company account: end the session
+  useEffect(() => {
+    if (searchParams.get('unauthorized')) {
+      supabase.auth.signOut()
+      setError(`Only @${ALLOWED_EMAIL_DOMAIN} accounts can access this app.`)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
-    setLoading(true)
     setError('')
+    if (!isAllowedEmail(email)) {
+      setError(`Only @${ALLOWED_EMAIL_DOMAIN} accounts can access this app.`)
+      return
+    }
+    setLoading(true)
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) {
       setError(error.message)
