@@ -198,13 +198,15 @@ export function DataChangeLog({ projectId }: { projectId: string }) {
               </div>
             ) : (
               <div key={c.id} className="flex items-start gap-2">
+                <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0 w-28 pt-0.5">
+                  {formatWhen(c.created_at)}
+                  {c.created_by ? ` · ${c.created_by}` : ''}
+                </span>
                 <span className="flex-1 text-sm text-foreground/90 leading-snug min-w-0">
-                  {c.text}{' '}
-                  <span className="text-xs text-muted-foreground whitespace-nowrap">
-                    · {formatWhen(c.created_at)}
-                    {c.created_by ? ` · ${c.created_by}` : ''}
-                    {c.edited_at ? ' · edited' : ''}
-                  </span>
+                  {c.text}
+                  {c.edited_at ? (
+                    <span className="text-xs text-muted-foreground"> · edited</span>
+                  ) : null}
                 </span>
                 <button
                   onClick={() => {
