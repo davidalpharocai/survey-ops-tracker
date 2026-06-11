@@ -111,10 +111,11 @@ export function BoardFilters({
       </Field>
       <Field label="Search" tooltip="Match against project or client name.">
         <input
+          id="board-search"
           type="text"
           value={search}
           onChange={e => onSearchChange(e.target.value)}
-          placeholder="Project or client…"
+          placeholder="Project or client…  ( / )"
           className={`${SELECT_CLASSES} placeholder:text-muted-foreground w-44`}
         />
       </Field>

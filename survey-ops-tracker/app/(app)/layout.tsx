@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { ThemeToggle } from '@/components/shared/ThemeToggle'
+import { RealtimeSync } from '@/components/shared/RealtimeSync'
 import { AssistantPanel } from '@/components/assistant/AssistantPanel'
 import { isAllowedEmail } from '@/lib/utils/allowedDomain'
 
@@ -14,6 +15,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="min-h-screen bg-background text-foreground">
+      <RealtimeSync />
       <nav className="border-b border-border px-6 py-1.5 flex items-center gap-4">
         <span className="font-bold text-foreground text-sm">Survey Ops Command Center</span>
         <div className="ml-auto">

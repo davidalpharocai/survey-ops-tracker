@@ -1,5 +1,6 @@
 import { getDueDateStatus, getDueUrgency, formatDate } from '@/lib/utils/date'
 import { deriveWaitingOn } from '@/lib/utils/waitingOn'
+import { isStale } from '@/lib/utils/stale'
 import { NProgressBar } from '@/components/shared/NProgressBar'
 import type { SurveyProject } from '@/lib/hooks/useProjects'
 
@@ -56,6 +57,7 @@ export function ProjectCard({ project, onClick }: ProjectCardProps) {
       (project.latest_next_steps.length > 100 ? '…' : '')
     : null
   const priorityChip = PRIORITY_CHIP[project.priority ?? '']
+  const stale = isStale(project)
   const waitingOn = deriveWaitingOn(project)
   // Only surface external waits — "Us — x" is already implied by the column
   const showWaitingOn = waitingOn === 'Client' || waitingOn.startsWith('Field')
@@ -83,6 +85,14 @@ export function ProjectCard({ project, onClick }: ProjectCardProps) {
           {project.project_name}
         </span>
         <span className="flex items-center gap-1 shrink-0">
+          {stale && (
+            <span
+              className="text-[11px] px-1.5 py-0.5 rounded-full bg-muted border border-muted-foreground/40 text-muted-foreground whitespace-nowrap"
+              title="No dates set and no updates in 30+ days — review whether this project is still real."
+            >
+              💤 Stale?
+            </span>
+          )}
           {priorityChip && (
             <span
               className={`text-[11px] px-1.5 py-0.5 rounded ${priorityChip.classes}`}

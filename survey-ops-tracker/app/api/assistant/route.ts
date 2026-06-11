@@ -21,9 +21,82 @@ Key concepts:
 - Survey ID format: [file owner's initials][client+project abbreviation][YYYYMMDD file created][country/region if any].
   Example: ALBNFOF20260529UK = Alden + Bain Future of Food + created 2026-05-29 + UK. You can decode IDs for users on request.
 
+Data notes: Open and Hold projects include full current data. Closed projects are provided as one-line summaries only (final numbers: dates, N, budget/spend, salesperson, captain) — full detail for closed projects lives in the app, so point users there if they need more.
+
 Answer style for status questions: LEAD with deadline and collection risk (overdue or behind-pace projects first), and always show N collected vs target (e.g. "142/250").
 
 If asked something unrelated to survey operations or the project data, politely steer back to the tracker. Never invent project data that isn't in the list below.`
+
+// Noisy/internal columns stripped from the context for open projects.
+// board_column already encodes the stage, so the stage_* booleans are redundant.
+const STRIPPED_PROJECT_FIELDS = [
+  'created_at',
+  'updated_at',
+  'calendar_event_id',
+  'client_id',
+  'survey_ids_from_sheet',
+  'survey_ids_synced_at',
+  'stage_doc_programming',
+  'stage_survey_programming',
+  'stage_edwin_qa',
+  'stage_fielding',
+  'stage_data_qa',
+  'stage_delivery',
+]
+
+const NEXT_STEPS_MAX_CHARS = 300
+
+type ProjectRow = Record<string, unknown> & {
+  project_name: string
+  status: string
+  latest_next_steps: string | null
+  linked_documents: string[] | null
+  captain: { name: string; initials: string } | null
+}
+
+function serializeProjects(projects: ProjectRow[]) {
+  // Deterministic order (byte-stable across requests) so identical data
+  // serializes to identical bytes — keeps any downstream caching effective.
+  const sorted = [...projects].sort((a, b) =>
+    a.project_name < b.project_name ? -1 : a.project_name > b.project_name ? 1 : 0
+  )
+
+  const openProjects: Record<string, unknown>[] = []
+  const closedProjects: Record<string, unknown>[] = []
+
+  for (const p of sorted) {
+    if (p.status === 'Closed') {
+      closedProjects.push({
+        project_name: p.project_name,
+        client: p.client,
+        project_type: p.project_type,
+        status: 'Closed',
+        submitted_date: p.submitted_date,
+        deliver_date: p.deliver_date,
+        n_target: p.n_target,
+        n_actual: p.n_actual,
+        budget: p.budget,
+        actual_spend: p.actual_spend,
+        salesperson: p.salesperson,
+        captain: p.captain?.initials ?? null,
+      })
+    } else {
+      const slim: Record<string, unknown> = { ...p }
+      for (const field of STRIPPED_PROJECT_FIELDS) delete slim[field]
+      slim.linked_docs_count = Array.isArray(p.linked_documents)
+        ? p.linked_documents.length
+        : 0
+      delete slim.linked_documents
+      slim.latest_next_steps =
+        p.latest_next_steps && p.latest_next_steps.length > NEXT_STEPS_MAX_CHARS
+          ? p.latest_next_steps.slice(0, NEXT_STEPS_MAX_CHARS) + '…'
+          : p.latest_next_steps
+      openProjects.push(slim)
+    }
+  }
+
+  return { openProjects, closedProjects }
+}
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
@@ -103,7 +176,10 @@ export async function POST(req: NextRequest) {
   }))
 
   const today = new Date().toISOString().split('T')[0]
-  const system = `${SYSTEM_PROMPT}\n\nToday's date: ${today}\n\nCurrent project data (JSON):\n${JSON.stringify(projects)}\n\nRecent logged activity (emails etc., newest first; full bodies are viewable in the app's Activity section):\n${JSON.stringify(activityContext)}\n\nStructured next steps (open and recently completed):\n${JSON.stringify(stepsContext)}\n\nData change log (manual data edits by engineers, newest first):\n${JSON.stringify(dataChangesContext)}`
+  const { openProjects, closedProjects } = serializeProjects(
+    (projects ?? []) as ProjectRow[]
+  )
+  const dynamicContext = `Today's date: ${today}\n\nOpen and Hold projects (full data, JSON):\n${JSON.stringify(openProjects)}\n\nClosed projects (one-line summaries, JSON):\n${JSON.stringify(closedProjects)}\n\nRecent logged activity (emails etc., newest first; full bodies are viewable in the app's Activity section):\n${JSON.stringify(activityContext)}\n\nStructured next steps (open and recently completed):\n${JSON.stringify(stepsContext)}\n\nData change log (manual data edits by engineers, newest first):\n${JSON.stringify(dataChangesContext)}`
 
   const anthropic = new Anthropic({ apiKey })
 
@@ -111,7 +187,22 @@ export async function POST(req: NextRequest) {
     model: 'claude-opus-4-8',
     max_tokens: 16000,
     thinking: { type: 'adaptive' },
-    system,
+    // Static instructions first, then the data block — both carry cache
+    // breakpoints. The data block is byte-stable between requests (deterministic
+    // sort), so follow-up questions within ~5 minutes hit the cache; the
+    // instructions-only breakpoint covers the case where data changed.
+    system: [
+      {
+        type: 'text',
+        text: SYSTEM_PROMPT,
+        cache_control: { type: 'ephemeral' },
+      },
+      {
+        type: 'text',
+        text: dynamicContext,
+        cache_control: { type: 'ephemeral' },
+      },
+    ],
     messages: messages.map((m: { role: string; content: string }) => ({
       role: m.role === 'assistant' ? ('assistant' as const) : ('user' as const),
       content: String(m.content),

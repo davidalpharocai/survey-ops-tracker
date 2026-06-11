@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Board } from '@/components/board/Board'
 import { ScopingBoard } from '@/components/board/ScopingBoard'
@@ -11,6 +11,7 @@ import { useProjects, useMoveProjectToColumn } from '@/lib/hooks/useProjects'
 import { useTeamMembers } from '@/lib/hooks/useTeamMembers'
 import { useViewMode } from '@/lib/hooks/useViewMode'
 import { exportProjectsCsv } from '@/lib/utils/exportCsv'
+import { isTypingTarget } from '@/lib/utils/keyboard'
 import Link from 'next/link'
 
 export default function BoardPage() {
@@ -21,6 +22,23 @@ export default function BoardPage() {
   const { mode, setMode } = useViewMode()
   const [showNewProject, setShowNewProject] = useState(false)
   const [showClosed, setShowClosed] = useState(false)
+
+  // Keyboard shortcuts: "/" focuses search, "n" opens New Project
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.metaKey || e.ctrlKey || e.altKey) return
+      if (isTypingTarget(e.target)) return
+      if (e.key === '/') {
+        e.preventDefault()
+        document.getElementById('board-search')?.focus()
+      } else if (e.key === 'n') {
+        e.preventDefault()
+        setShowNewProject(true)
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
 
   const scopingProjects = projects.filter(
     p => p.phase === 'Scoping' && p.status === 'Open'
@@ -72,6 +90,7 @@ export default function BoardPage() {
           </button>
           <button
             onClick={() => setShowNewProject(true)}
+            title="Create a new project — or press N anywhere on the board"
             className="text-xs bg-blue-600 hover:bg-blue-500 text-white px-3 py-2 rounded-lg transition-colors"
           >
             + New Project

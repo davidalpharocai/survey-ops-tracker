@@ -1,16 +1,32 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ProjectTable } from '@/components/list/ProjectTable'
 import { ViewToggle } from '@/components/shared/ViewToggle'
 import { useProjects } from '@/lib/hooks/useProjects'
 import { useViewMode } from '@/lib/hooks/useViewMode'
 import { exportProjectsCsv } from '@/lib/utils/exportCsv'
+import { isTypingTarget } from '@/lib/utils/keyboard'
 import Link from 'next/link'
 
 export default function ListView() {
   const { data: projects = [], isLoading } = useProjects()
   const { mode, setMode } = useViewMode()
   const [search, setSearch] = useState('')
+  const searchRef = useRef<HTMLInputElement>(null)
+
+  // Keyboard shortcut: "/" focuses search
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.metaKey || e.ctrlKey || e.altKey) return
+      if (isTypingTarget(e.target)) return
+      if (e.key === '/') {
+        e.preventDefault()
+        searchRef.current?.focus()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
 
   const q = search.trim().toLowerCase()
   const visibleProjects = projects.filter(p => {
@@ -42,10 +58,11 @@ export default function ListView() {
         </div>
         <ViewToggle mode={mode} onChange={setMode} />
         <input
+          ref={searchRef}
           type="text"
           value={search}
           onChange={e => setSearch(e.target.value)}
-          placeholder="Search projects…"
+          placeholder="Search projects…  ( / )"
           className="bg-muted border border-border text-foreground/80 text-xs rounded-lg px-3 py-1.5 placeholder:text-muted-foreground focus:outline-none focus:border-ring w-44"
         />
         <button
