@@ -462,6 +462,33 @@ export type Database = {
           }
         ]
       }
+      project_data_changes: {
+        Row: {
+          id: string
+          project_id: string
+          text: string
+          created_by: string | null
+          created_at: string
+          edited_at: string | null
+        }
+        Insert: {
+          id?: string
+          project_id: string
+          text: string
+          created_by?: string | null
+          created_at?: string
+          edited_at?: string | null
+        }
+        Update: {
+          id?: string
+          project_id?: string
+          text?: string
+          created_by?: string | null
+          created_at?: string
+          edited_at?: string | null
+        }
+        Relationships: []
+      }
       notification_log: {
         Row: {
           id: string
