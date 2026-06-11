@@ -19,8 +19,10 @@ export function QuestionPreviewEditor({ questions, onChange }: Props) {
     const next = questions.map((q, idx) => {
       if (idx !== i) return q
       const merged = { ...q, ...patch }
-      // Keep domain rules live in the editor too
-      if (merged.is_ai_followup || merged.type === 'open_text') merged.is_open_text = true
+      // Derive is_open_text when type or is_ai_followup changes
+      if ('type' in patch || 'is_ai_followup' in patch) {
+        merged.is_open_text = merged.type === 'open_text' || merged.is_ai_followup
+      }
       return merged
     })
     onChange(next)
@@ -80,13 +82,12 @@ export function QuestionPreviewEditor({ questions, onChange }: Props) {
             </select>
             <label
               className="flex items-center gap-1.5 text-xs text-slate-400"
-              title="Check when the question captures any free-text answer — including closed questions with an 'Other (please specify)' box. This flag drives compliance's open-text filter. Locked on automatically for Open-text and AI follow-up questions."
+              title="Set automatically: open-text questions and AI follow-ups capture free-text answers. This drives compliance's open-text filter."
             >
               <input
                 type="checkbox"
                 checked={q.is_open_text}
-                disabled={q.is_ai_followup || q.type === 'open_text'}
-                onChange={e => update(i, { is_open_text: e.target.checked })}
+                disabled
               />
               Contains open text
             </label>

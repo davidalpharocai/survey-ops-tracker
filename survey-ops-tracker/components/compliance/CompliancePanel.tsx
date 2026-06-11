@@ -66,6 +66,7 @@ function CountdownRow({
   const invalidate = useInvalidateCompliance(projectId)
   const dispatchFiredRef = useRef(false)
   const [dispatchError, setDispatchError] = useState('')
+  const [dispatching, setDispatching] = useState(false)
   const [recalling, setRecalling] = useState(false)
   const [recallError, setRecallError] = useState('')
 
@@ -80,6 +81,7 @@ function CountdownRow({
 
   async function dispatch() {
     setDispatchError('')
+    setDispatching(true)
     try {
       const res = await fetch(`/api/submissions/${submissionId}/dispatch`, { method: 'POST' })
       if (!res.ok) {
@@ -90,6 +92,8 @@ function CountdownRow({
       invalidate()
     } catch {
       setDispatchError('Network error — click "Send now" to retry')
+    } finally {
+      setDispatching(false)
     }
   }
 
@@ -131,13 +135,22 @@ function CountdownRow({
           <span className="text-amber-400">Sending to compliance…</span>
         )}
         {remaining > 0 && (
-          <button
-            onClick={handleRecall}
-            disabled={recalling}
-            className="text-xs border border-red-500/40 text-red-400 hover:bg-red-500/10 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            {recalling ? 'Recalling…' : 'Recall'}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => { dispatchFiredRef.current = true; dispatch() }}
+              disabled={recalling || dispatching}
+              className="text-xs border border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {dispatching ? 'Sending…' : 'Send now'}
+            </button>
+            <button
+              onClick={handleRecall}
+              disabled={recalling || dispatching}
+              className="text-xs border border-red-500/40 text-red-400 hover:bg-red-500/10 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {recalling ? 'Recalling…' : 'Recall'}
+            </button>
+          </div>
         )}
       </div>
       {dispatchError && (
@@ -170,6 +183,11 @@ export function CompliancePanel({ projectId }: { projectId: string }) {
 
   const latest = submissions[0]
   const latestIsUndispatched = latest?.dispatched_at === null
+
+  // Auto-expand the latest row when it's rejected so the note is visible
+  const defaultExpanded =
+    latest && !latestIsUndispatched && latest.status === 'rejected' ? latest.id : null
+  const [expandedId, setExpandedId] = useState<string | null>(defaultExpanded)
 
   function handleRecalled(questions: DraftQuestion[], sourceFileName: string, sourceFilePath: string) {
     setRecallData({ questions, sourceFileName, sourceFilePath })
@@ -207,23 +225,52 @@ export function CompliancePanel({ projectId }: { projectId: string }) {
           {submissions.map(s => {
             // Skip the undispatched latest from the history list — it's shown above
             if (s.id === latest?.id && latestIsUndispatched) return null
+            const isExpanded = expandedId === s.id
+            const noteStyle = s.status === 'rejected'
+              ? 'text-red-400/80 bg-red-400/10'
+              : 'text-slate-400 bg-slate-800/50'
             return (
-              <div key={s.id} className="flex items-center justify-between text-xs bg-slate-800/50 rounded-lg px-3 py-2">
-                <span className="text-slate-300">
-                  Version {s.version} · {formatDate(s.submitted_at)}
-                  {s.submitter_name && <span className="text-slate-500"> · {s.submitter_name}</span>}
-                </span>
-                <span className={`px-2 py-0.5 rounded ${STATUS_BADGE[s.status]}`}>
-                  {STATUS_LABEL[s.status]}
-                </span>
+              <div key={s.id} className="rounded-lg overflow-hidden">
+                <button
+                  type="button"
+                  aria-expanded={isExpanded}
+                  onClick={() => setExpandedId(isExpanded ? null : s.id)}
+                  className="w-full flex items-center justify-between text-xs bg-slate-800/50 hover:bg-slate-800/80 transition-colors px-3 py-2 cursor-pointer"
+                >
+                  <span className="text-slate-300">
+                    Version {s.version} · {formatDate(s.submitted_at)}
+                    {s.submitter_name && <span className="text-slate-500"> · {s.submitter_name}</span>}
+                    <span className="text-slate-600 italic ml-2 text-[11px]">click for details</span>
+                  </span>
+                  <span className={`px-2 py-0.5 rounded ${STATUS_BADGE[s.status]}`}>
+                    {STATUS_LABEL[s.status]}
+                  </span>
+                </button>
+                {isExpanded && (
+                  <div className="bg-slate-900/60 border-t border-slate-800/60 px-3 py-2.5 flex flex-col gap-1 text-xs">
+                    <p className="text-slate-400">
+                      <span className="text-slate-500">Submitted:</span>{' '}
+                      {formatDate(s.submitted_at)}{s.submitter_name ? ` by ${s.submitter_name}` : ''}
+                    </p>
+                    <p className="text-slate-400">
+                      <span className="text-slate-500">Sent to compliance:</span>{' '}
+                      {s.dispatched_at ? formatDate(s.dispatched_at) : 'not yet sent'}
+                    </p>
+                    <p className="text-slate-400">
+                      <span className="text-slate-500">Decision:</span>{' '}
+                      {STATUS_LABEL[s.status]}
+                      {s.reviewed_at && <span> · {formatDate(s.reviewed_at)}</span>}
+                    </p>
+                    {s.review_note && (
+                      <p className={`mt-1 rounded px-2 py-1.5 ${noteStyle}`}>
+                        Reviewer note: &ldquo;{s.review_note}&rdquo;
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
             )
           })}
-          {latest?.status === 'rejected' && latest.review_note && !latestIsUndispatched && (
-            <p className="text-xs text-red-400/80 bg-red-400/10 rounded-lg px-3 py-2">
-              Reviewer note: {latest.review_note}
-            </p>
-          )}
         </div>
       )}
 
