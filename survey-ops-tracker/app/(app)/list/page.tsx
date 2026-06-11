@@ -3,6 +3,7 @@ import { ProjectTable } from '@/components/list/ProjectTable'
 import { ViewToggle } from '@/components/shared/ViewToggle'
 import { useProjects } from '@/lib/hooks/useProjects'
 import { useViewMode } from '@/lib/hooks/useViewMode'
+import { exportProjectsCsv } from '@/lib/utils/exportCsv'
 import Link from 'next/link'
 
 export default function ListView() {
@@ -29,6 +30,14 @@ export default function ListView() {
           </span>
         </div>
         <ViewToggle mode={mode} onChange={setMode} />
+        <button
+          onClick={() => exportProjectsCsv(visibleProjects)}
+          disabled={isLoading || visibleProjects.length === 0}
+          title="Downloads the projects currently shown (respects the Operations/Full View toggle)"
+          className="ml-auto text-xs border border-border text-muted-foreground hover:text-foreground hover:border-ring px-3 py-1.5 rounded-lg transition-colors disabled:opacity-40"
+        >
+          ⬇ Export CSV
+        </button>
       </div>
 
       {isLoading ? (
