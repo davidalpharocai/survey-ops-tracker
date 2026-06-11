@@ -22,60 +22,82 @@ function useSteps(projectId: string) {
       if (error) throw error
       return data as Step[]
     },
+    staleTime: 30_000,
     // If the migration hasn't been applied the table doesn't exist —
     // fail once and show the fallback note instead of hammering retries.
     retry: false,
   })
 }
 
-function useAddStep(projectId: string) {
+// All step mutations update the UI instantly (optimistic) and reconcile
+// with the database in the background; on failure the change rolls back.
+function useStepMutations(projectId: string) {
   const supabase = createClient()
   const queryClient = useQueryClient()
-  return useMutation({
+  const key = ['steps', projectId]
+
+  function optimistic(mutate: (steps: Step[]) => Step[]) {
+    const previous = queryClient.getQueryData<Step[]>(key)
+    queryClient.setQueryData<Step[]>(key, old => mutate(old ?? []))
+    return previous
+  }
+
+  const add = useMutation({
     mutationFn: async ({ text, createdBy }: { text: string; createdBy: string }) => {
       const { error } = await supabase
         .from('project_steps')
         .insert({ project_id: projectId, text, created_by: createdBy })
       if (error) throw error
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['steps', projectId] })
+    onMutate: async ({ text, createdBy }) => {
+      await queryClient.cancelQueries({ queryKey: key })
+      return optimistic(steps => [
+        ...steps,
+        {
+          id: `optimistic-${Math.random().toString(36).slice(2)}`,
+          project_id: projectId,
+          text,
+          done: false,
+          created_by: createdBy,
+          created_at: new Date().toISOString(),
+          completed_at: null,
+          completed_by: null,
+        } as Step,
+      ])
     },
+    onError: (_e, _v, previous) => queryClient.setQueryData(key, previous),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: key }),
   })
-}
 
-function useUpdateStep(projectId: string) {
-  const supabase = createClient()
-  const queryClient = useQueryClient()
-  return useMutation({
+  const update = useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: TablesUpdate<'project_steps'> }) => {
-      const { error } = await supabase
-        .from('project_steps')
-        .update(updates)
-        .eq('id', id)
+      const { error } = await supabase.from('project_steps').update(updates).eq('id', id)
       if (error) throw error
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['steps', projectId] })
+    onMutate: async ({ id, updates }) => {
+      await queryClient.cancelQueries({ queryKey: key })
+      return optimistic(steps =>
+        steps.map(s => (s.id === id ? ({ ...s, ...updates } as Step) : s))
+      )
     },
+    onError: (_e, _v, previous) => queryClient.setQueryData(key, previous),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: key }),
   })
-}
 
-function useDeleteStep(projectId: string) {
-  const supabase = createClient()
-  const queryClient = useQueryClient()
-  return useMutation({
+  const remove = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('project_steps')
-        .delete()
-        .eq('id', id)
+      const { error } = await supabase.from('project_steps').delete().eq('id', id)
       if (error) throw error
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['steps', projectId] })
+    onMutate: async id => {
+      await queryClient.cancelQueries({ queryKey: key })
+      return optimistic(steps => steps.filter(s => s.id !== id))
     },
+    onError: (_e, _v, previous) => queryClient.setQueryData(key, previous),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: key }),
   })
+
+  return { add, update, remove }
 }
 
 function formatStepDate(iso: string): string {
@@ -90,9 +112,7 @@ interface LatestNextStepsProps {
 export function LatestNextSteps({ projectId, notes }: LatestNextStepsProps) {
   const supabase = createClient()
   const { data: steps, isError } = useSteps(projectId)
-  const addStep = useAddStep(projectId)
-  const updateStep = useUpdateStep(projectId)
-  const deleteStep = useDeleteStep(projectId)
+  const { add: addStep, update: updateStep, remove: deleteStep } = useStepMutations(projectId)
   const updateProject = useUpdateProject()
 
   const [newText, setNewText] = useState('')
@@ -124,10 +144,9 @@ export function LatestNextSteps({ projectId, notes }: LatestNextStepsProps) {
 
   function handleAdd() {
     if (!newText.trim() || !user) return
-    addStep.mutate(
-      { text: newText.trim(), createdBy: userName },
-      { onSuccess: () => setNewText('') }
-    )
+    // optimistic — the item appears instantly, so clear the box right away
+    addStep.mutate({ text: newText.trim(), createdBy: userName })
+    setNewText('')
   }
 
   function toggleStep(step: Step) {
