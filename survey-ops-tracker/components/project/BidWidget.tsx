@@ -254,14 +254,14 @@ export function BidWidget({ projectId }: { projectId: string }) {
                     <button
                       onClick={() => startEdit(b)}
                       title="Edit entry"
-                      className="text-muted-foreground/50 hover:text-foreground text-xs px-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="text-muted-foreground/50 hover:text-foreground text-xs px-0.5"
                     >
                       ✎
                     </button>
                     <button
                       onClick={() => deleteBid.mutate(b.id)}
                       title="Delete entry"
-                      className="text-muted-foreground/50 hover:text-red-600 dark:hover:text-red-400 text-xs px-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="text-muted-foreground/50 hover:text-red-600 dark:hover:text-red-400 text-xs px-0.5"
                     >
                       ✕
                     </button>
