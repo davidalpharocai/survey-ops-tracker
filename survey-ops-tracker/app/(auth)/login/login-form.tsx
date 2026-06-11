@@ -45,7 +45,7 @@ export default function LoginForm() {
   return (
     <div className="w-full max-w-sm p-8 bg-card rounded-xl border border-border">
       <div className="mb-6">
-        <h1 className="text-xl font-bold text-foreground">Survey Ops Tracker</h1>
+        <h1 className="text-xl font-bold text-foreground">Survey Ops Command Center</h1>
         <p className="text-sm text-muted-foreground mt-1">Sign in to your workspace</p>
       </div>
       <form onSubmit={handleLogin} className="flex flex-col gap-4">

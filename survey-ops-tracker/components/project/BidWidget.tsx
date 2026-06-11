@@ -99,6 +99,25 @@ export function BidWidget({ projectId }: { projectId: string }) {
   const [editAmount, setEditAmount] = useState('')
   const [editBlasts, setEditBlasts] = useState('')
   const [editNote, setEditNote] = useState('')
+  const [lastDeleted, setLastDeleted] = useState<Bid | null>(null)
+
+  function handleDelete(b: Bid) {
+    setLastDeleted(b)
+    deleteBid.mutate(b.id)
+  }
+
+  function undoDelete() {
+    if (!lastDeleted) return
+    // re-insert with the original id and date so history order is preserved
+    addBid.mutate({
+      id: lastDeleted.id,
+      amount: lastDeleted.amount,
+      blasts: lastDeleted.blasts,
+      note: lastDeleted.note,
+      created_at: lastDeleted.created_at,
+    })
+    setLastDeleted(null)
+  }
 
   function startEdit(b: Bid) {
     setEditingId(b.id)
@@ -259,7 +278,7 @@ export function BidWidget({ projectId }: { projectId: string }) {
                       ✎
                     </button>
                     <button
-                      onClick={() => deleteBid.mutate(b.id)}
+                      onClick={() => handleDelete(b)}
                       title="Delete entry"
                       className="text-muted-foreground/50 hover:text-red-600 dark:hover:text-red-400 text-xs px-0.5"
                     >
@@ -276,6 +295,19 @@ export function BidWidget({ projectId }: { projectId: string }) {
                   {showAll ? 'Show less' : `Show all (${bids!.length})`}
                 </button>
               )}
+            </div>
+          )}
+
+          {lastDeleted && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span>Deleted {formatAmount(lastDeleted.amount)} entry.</span>
+              <button
+                onClick={undoDelete}
+                title="Restore the deleted bid entry"
+                className="text-blue-600 dark:text-blue-400 hover:underline"
+              >
+                ↺ Undo
+              </button>
             </div>
           )}
 
