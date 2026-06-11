@@ -329,6 +329,54 @@ export type Database = {
         }
         Relationships: []
       }
+      project_activity: {
+        Row: {
+          id: string
+          project_id: string
+          type: string
+          direction: string | null
+          sender: string | null
+          recipients: string | null
+          subject: string | null
+          snippet: string | null
+          body: string | null
+          occurred_at: string
+          source: string | null
+          external_id: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          project_id: string
+          type?: string
+          direction?: string | null
+          sender?: string | null
+          recipients?: string | null
+          subject?: string | null
+          snippet?: string | null
+          body?: string | null
+          occurred_at?: string
+          source?: string | null
+          external_id?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          project_id?: string
+          type?: string
+          direction?: string | null
+          sender?: string | null
+          recipients?: string | null
+          subject?: string | null
+          snippet?: string | null
+          body?: string | null
+          occurred_at?: string
+          source?: string | null
+          external_id?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
       notification_log: {
         Row: {
           id: string

@@ -52,8 +52,27 @@ export async function POST(req: NextRequest) {
     return new Response('Failed to load project data', { status: 500 })
   }
 
+  // Recent logged activity (emails etc.) so the assistant can answer
+  // "what's the latest with the client" without anyone opening Gmail
+  const { data: activity } = await supabase
+    .from('project_activity')
+    .select('project_id, type, direction, sender, subject, snippet, occurred_at')
+    .order('occurred_at', { ascending: false })
+    .limit(80)
+
+  const nameById = new Map((projects ?? []).map(p => [p.id, p.project_name]))
+  const activityContext = (activity ?? []).map(a => ({
+    project: nameById.get(a.project_id) ?? a.project_id,
+    when: a.occurred_at,
+    type: a.type,
+    direction: a.direction,
+    from: a.sender,
+    subject: a.subject,
+    snippet: a.snippet,
+  }))
+
   const today = new Date().toISOString().split('T')[0]
-  const system = `${SYSTEM_PROMPT}\n\nToday's date: ${today}\n\nCurrent project data (JSON):\n${JSON.stringify(projects)}`
+  const system = `${SYSTEM_PROMPT}\n\nToday's date: ${today}\n\nCurrent project data (JSON):\n${JSON.stringify(projects)}\n\nRecent logged activity (emails etc., newest first; full bodies are viewable in the app's Activity section):\n${JSON.stringify(activityContext)}`
 
   const anthropic = new Anthropic({ apiKey })
 

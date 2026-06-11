@@ -5,6 +5,7 @@ import { useProjects, useUpdateProject } from '@/lib/hooks/useProjects'
 import { PipelineProgress } from '@/components/project/PipelineProgress'
 import { ScopingProgress } from '@/components/project/ScopingProgress'
 import { QuickEdit } from '@/components/project/QuickEdit'
+import { ActivityLog } from '@/components/project/ActivityLog'
 import { LatestNextSteps } from '@/components/project/LatestNextSteps'
 import { LinkedDocuments } from '@/components/project/LinkedDocuments'
 import { SlackChannel } from '@/components/project/SlackChannel'
@@ -159,6 +160,7 @@ export default function ProjectDetailPage() {
             documents={project.linked_documents ?? []}
           />
           <SlackChannel projectId={project.id} url={project.slack_channel_url ?? null} />
+          <ActivityLog projectId={project.id} />
         </div>
 
         {/* Right sidebar */}
