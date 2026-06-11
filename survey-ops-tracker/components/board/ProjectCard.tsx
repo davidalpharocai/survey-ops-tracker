@@ -2,21 +2,11 @@ import { getDueDateStatus, getDueUrgency, formatDate } from '@/lib/utils/date'
 import { NProgressBar } from '@/components/shared/NProgressBar'
 import type { SurveyProject } from '@/lib/hooks/useProjects'
 
-// Full-card border by due-date urgency; overrides the stage color on the left edge
+// Full-card border by due-date urgency; overrides the neutral left edge
 const URGENCY_BORDER: Record<string, string> = {
   overdue: 'border-2 border-red-500',
   tomorrow: 'border-2 border-orange-500',
   twodays: 'border-2 border-amber-300 dark:border-amber-400/70',
-}
-
-const STAGE_BORDER: Record<string, string> = {
-  'Submitted': 'border-l-blue-500',
-  'Doc Programming': 'border-l-amber-500',
-  'Survey Programming': 'border-l-amber-500',
-  'EdWin QA': 'border-l-cyan-500',
-  'Fielding': 'border-l-emerald-500',
-  'Data QA': 'border-l-violet-500',
-  'Delivery': 'border-l-muted-foreground',
 }
 
 const TYPE_BADGE: Record<string, string> = {
@@ -35,13 +25,12 @@ export function ProjectCard({ project, onClick }: ProjectCardProps) {
   const dueDateStatus = getDueDateStatus(project.due_date)
   const urgency = getDueUrgency(project.due_date)
   const urgencyBorder = urgency ? URGENCY_BORDER[urgency] : undefined
-  const stageBorder = STAGE_BORDER[project.board_column] ?? 'border-l-muted-foreground'
   // Hold: greyed out, grey border, urgency colors suppressed (it's paused)
   const border = onHold
     ? 'border-2 border-muted-foreground/40 border-l-4 border-l-muted-foreground/50'
     : urgencyBorder
     ? `border-l-4 ${urgencyBorder}`
-    : `border border-border border-l-4 ${stageBorder}`
+    : 'border border-border border-l-4 border-l-foreground/25'
   const snippet = project.latest_next_steps
     ? project.latest_next_steps.slice(0, 100) +
       (project.latest_next_steps.length > 100 ? '…' : '')

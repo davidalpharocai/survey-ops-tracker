@@ -50,6 +50,23 @@ export function useUpdateProject() {
   })
 }
 
+export function useDeleteProject() {
+  const supabase = createClient()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('survey_projects')
+        .delete()
+        .eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] })
+    },
+  })
+}
+
 export function useMoveProjectToColumn() {
   const updateProject = useUpdateProject()
   return (id: string, column: BoardColumn) => {

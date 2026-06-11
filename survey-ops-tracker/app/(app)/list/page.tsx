@@ -1,4 +1,5 @@
 'use client'
+import { useState } from 'react'
 import { ProjectTable } from '@/components/list/ProjectTable'
 import { ViewToggle } from '@/components/shared/ViewToggle'
 import { useProjects } from '@/lib/hooks/useProjects'
@@ -9,10 +10,20 @@ import Link from 'next/link'
 export default function ListView() {
   const { data: projects = [], isLoading } = useProjects()
   const { mode, setMode } = useViewMode()
+  const [search, setSearch] = useState('')
 
-  const visibleProjects = projects.filter(p =>
-    mode === 'full' ? true : p.phase === 'Active' && p.status === 'Open'
-  )
+  const q = search.trim().toLowerCase()
+  const visibleProjects = projects.filter(p => {
+    if (!(mode === 'full' ? true : p.phase === 'Active' && p.status === 'Open')) return false
+    if (
+      q &&
+      !p.project_name.toLowerCase().includes(q) &&
+      !p.client.toLowerCase().includes(q)
+    ) {
+      return false
+    }
+    return true
+  })
 
   return (
     <div className="flex flex-col gap-4">
@@ -30,6 +41,13 @@ export default function ListView() {
           </span>
         </div>
         <ViewToggle mode={mode} onChange={setMode} />
+        <input
+          type="text"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search projects…"
+          className="bg-muted border border-border text-foreground/80 text-xs rounded-lg px-3 py-1.5 placeholder:text-muted-foreground focus:outline-none focus:border-ring w-44"
+        />
         <button
           onClick={() => exportProjectsCsv(visibleProjects)}
           disabled={isLoading || visibleProjects.length === 0}

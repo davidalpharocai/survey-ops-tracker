@@ -83,12 +83,12 @@ export function LinkedDocuments({ projectId, documents }: LinkedDocumentsProps) 
       <h3 className="text-xs text-muted-foreground uppercase tracking-widest mb-3 font-medium">
         Linked Documents
       </h3>
-      <div className="flex flex-col gap-2 mb-3">
+      <div className="grid grid-cols-2 gap-2 mb-3">
         {documents.map((entry, i) => {
           const { name, url } = parseDoc(entry)
           if (renaming === i) {
             return (
-              <div key={i} className="flex items-center gap-2">
+              <div key={i} className="col-span-2 flex items-center gap-2">
                 <input
                   autoFocus
                   value={renameDraft}
@@ -110,38 +110,40 @@ export function LinkedDocuments({ projectId, documents }: LinkedDocumentsProps) 
             )
           }
           return (
-            <div key={i} className="flex items-center gap-1 group">
+            <div key={i} className="relative group min-w-0">
               <a
                 href={url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex flex-1 items-center gap-2 bg-muted rounded-lg px-3 py-2 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-accent transition-colors min-w-0"
+                className="flex items-center gap-2 bg-muted rounded-lg px-3 py-2 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-accent transition-colors min-w-0"
               >
                 <span>📄</span>
                 <span className="truncate">{name ?? fallbackName(url)}</span>
               </a>
-              <button
-                onClick={() => {
-                  setRenameDraft(name ?? '')
-                  setRenaming(i)
-                }}
-                title="Rename"
-                className="text-muted-foreground/50 hover:text-foreground text-xs px-1 py-2 opacity-0 group-hover:opacity-100 transition-opacity"
-              >
-                ✎
-              </button>
-              <button
-                onClick={() => handleRemove(i)}
-                title="Remove link"
-                className="text-muted-foreground/50 hover:text-red-600 dark:hover:text-red-400 text-xs px-1 py-2 opacity-0 group-hover:opacity-100 transition-opacity"
-              >
-                ✕
-              </button>
+              <span className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center bg-muted rounded opacity-0 group-hover:opacity-100 transition-opacity">
+                <button
+                  onClick={() => {
+                    setRenameDraft(name ?? '')
+                    setRenaming(i)
+                  }}
+                  title="Rename"
+                  className="text-muted-foreground/50 hover:text-foreground text-xs px-1 py-1"
+                >
+                  ✎
+                </button>
+                <button
+                  onClick={() => handleRemove(i)}
+                  title="Remove link"
+                  className="text-muted-foreground/50 hover:text-red-600 dark:hover:text-red-400 text-xs px-1 py-1"
+                >
+                  ✕
+                </button>
+              </span>
             </div>
           )
         })}
         {documents.length === 0 && (
-          <p className="text-muted-foreground/50 text-xs">No documents linked yet</p>
+          <p className="col-span-2 text-muted-foreground/50 text-xs">No documents linked yet</p>
         )}
       </div>
       <div className="flex gap-2">

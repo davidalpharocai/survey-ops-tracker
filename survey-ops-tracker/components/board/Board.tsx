@@ -6,7 +6,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useCurrentMember } from '@/lib/hooks/useCurrentMember'
 import { STAGE_ORDER, type BoardColumn as BoardColumnType } from '@/lib/utils/stage'
-import { getDueDateStatus } from '@/lib/utils/date'
+import { getDueUrgency } from '@/lib/utils/date'
 import type { SurveyProject } from '@/lib/hooks/useProjects'
 import type { TeamMember } from '@/lib/hooks/useTeamMembers'
 
@@ -24,7 +24,9 @@ export function Board({ projects, teamMembers, onMoveProject }: BoardProps) {
   const [captainFilter, setCaptainFilter] = useState<string | null>(null)
   const [filterReady, setFilterReady] = useState(false)
   const [typeFilter, setTypeFilter] = useState<string | null>(null)
-  const [overdueOnly, setOverdueOnly] = useState(false)
+  const [dueFilter, setDueFilter] = useState<string | null>(null)
+  const [stageFilter, setStageFilter] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
 
   // Default the board to "my projects": last choice wins, otherwise the
   // logged-in user's own captain filter when they're a team member
@@ -51,13 +53,28 @@ export function Board({ projects, teamMembers, onMoveProject }: BoardProps) {
   }
 
   const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase()
     return projects.filter(p => {
       if (captainFilter && p.captain?.id !== captainFilter) return false
       if (typeFilter && p.project_type !== typeFilter) return false
-      if (overdueOnly && getDueDateStatus(p.due_date) !== 'overdue') return false
+      if (dueFilter && getDueUrgency(p.due_date) !== dueFilter) return false
+      if (stageFilter) {
+        if (stageFilter === 'Closed') {
+          if (p.status !== 'Closed') return false
+        } else if (p.board_column !== stageFilter || p.status === 'Closed') {
+          return false
+        }
+      }
+      if (
+        q &&
+        !p.project_name.toLowerCase().includes(q) &&
+        !p.client.toLowerCase().includes(q)
+      ) {
+        return false
+      }
       return true
     })
-  }, [projects, captainFilter, typeFilter, overdueOnly])
+  }, [projects, captainFilter, typeFilter, dueFilter, stageFilter, search])
 
   function handleDragEnd(result: DropResult) {
     if (!result.destination) return
@@ -74,10 +91,14 @@ export function Board({ projects, teamMembers, onMoveProject }: BoardProps) {
         captainFilter={captainFilter}
         currentMemberId={currentMember?.id ?? null}
         typeFilter={typeFilter}
-        overdueOnly={overdueOnly}
+        dueFilter={dueFilter}
+        stageFilter={stageFilter}
+        search={search}
         onCaptainChange={handleCaptainChange}
         onTypeChange={setTypeFilter}
-        onOverdueOnly={setOverdueOnly}
+        onDueChange={setDueFilter}
+        onStageChange={setStageFilter}
+        onSearchChange={setSearch}
       />
       <DragDropContext onDragEnd={handleDragEnd}>
         <div className="flex gap-2 overflow-x-auto pb-4">
