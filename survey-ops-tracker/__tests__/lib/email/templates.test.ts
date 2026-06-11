@@ -16,6 +16,33 @@ describe('submissionCreatedEmail', () => {
     expect(email.html).toContain('https://app.example.com/portal/review/abc')
     expect(email.html).toContain('Version 2')
   })
+
+  it('renders the analyst message block and HTML-escapes it', () => {
+    const email = submissionCreatedEmail({
+      projectName: 'Cruise Study',
+      version: 3,
+      questionCount: 10,
+      openTextCount: 2,
+      reviewUrl: 'https://app.example.com/portal/review/xyz',
+      message: 'Wave 3 — two new questions <check> & confirm.',
+    })
+    expect(email.html).toContain('Message from AlphaRoc')
+    expect(email.html).toContain('Wave 3')
+    expect(email.html).not.toContain('<check>')
+    expect(email.html).toContain('&lt;check&gt;')
+    expect(email.html).toContain('&amp;')
+  })
+
+  it('omits the message block when no message is provided', () => {
+    const email = submissionCreatedEmail({
+      projectName: 'Cruise Study',
+      version: 3,
+      questionCount: 10,
+      openTextCount: 2,
+      reviewUrl: 'https://app.example.com/portal/review/xyz',
+    })
+    expect(email.html).not.toContain('Message from AlphaRoc')
+  })
 })
 
 describe('decisionEmail', () => {

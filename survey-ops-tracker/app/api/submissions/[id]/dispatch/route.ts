@@ -28,7 +28,7 @@ export async function POST(
     .update({ dispatched_at: new Date().toISOString() })
     .eq('id', id)
     .is('dispatched_at', null)
-    .select('id, project_id, version')
+    .select('id, project_id, version, analyst_message')
     .maybeSingle()
 
   if (claimError) {
@@ -88,6 +88,7 @@ export async function POST(
       questionCount,
       openTextCount,
       reviewUrl,
+      message: claimed.analyst_message,
     })
     const ok = await sendAndLog({
       to: r.email, subject: email.subject, html: email.html,

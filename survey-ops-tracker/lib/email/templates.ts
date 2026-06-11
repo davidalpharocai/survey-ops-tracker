@@ -15,7 +15,11 @@ export function submissionCreatedEmail(args: {
   questionCount: number
   openTextCount: number
   reviewUrl: string
+  message?: string | null
 }): { subject: string; html: string } {
+  const messageBlock = args.message
+    ? `<p style="background: #f4f4f5; padding: 12px 16px; border-radius: 8px; color: #333;"><strong>Message from AlphaRoc:</strong><br/>${esc(args.message)}</p>`
+    : ''
   return {
     subject: `Questions ready for compliance review — ${args.projectName}`,
     html: wrap(`
@@ -23,6 +27,7 @@ export function submissionCreatedEmail(args: {
       <p>AlphaRoc has submitted <strong>Version ${args.version}</strong> of the question list for
       <strong>${esc(args.projectName)}</strong>.</p>
       <p>${args.questionCount} questions total, including ${args.openTextCount} open-text.</p>
+      ${messageBlock}
       <p style="margin: 28px 0;">
         <a href="${esc(args.reviewUrl)}" style="background: #2563eb; color: #fff; padding: 12px 24px; border-radius: 8px; text-decoration: none;">Review questions</a>
       </p>

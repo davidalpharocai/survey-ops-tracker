@@ -13,12 +13,14 @@ export function SubmitQuestionsModal({
   initialQuestions,
   initialSourceFileName,
   initialSourceFilePath,
+  initialMessage,
 }: {
   projectId: string
   onClose: () => void
   initialQuestions?: DraftQuestion[]
   initialSourceFileName?: string
   initialSourceFilePath?: string
+  initialMessage?: string
 }) {
   // If initial data provided (e.g. from recall), start in preview with that state
   const [stage, setStage] = useState<Stage>(() =>
@@ -27,6 +29,7 @@ export function SubmitQuestionsModal({
   const [questions, setQuestions] = useState<DraftQuestion[]>(() => initialQuestions ?? [])
   const [sourceFileName, setSourceFileName] = useState(() => initialSourceFileName ?? '')
   const [sourceFilePath, setSourceFilePath] = useState(() => initialSourceFilePath ?? '')
+  const [message, setMessage] = useState(() => initialMessage ?? '')
   const [error, setError] = useState('')
   const invalidate = useInvalidateCompliance(projectId)
 
@@ -77,7 +80,7 @@ export function SubmitQuestionsModal({
       const res = await fetch('/api/submissions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId, sourceFileName, sourceFilePath, questions }),
+        body: JSON.stringify({ projectId, sourceFileName, sourceFilePath, questions, message: message.trim() || undefined }),
       })
       const body = await res.json().catch(() => ({}))
       if (!res.ok) {
@@ -137,6 +140,20 @@ export function SubmitQuestionsModal({
               open-text flags, then send to compliance.
             </p>
             <QuestionPreviewEditor questions={questions} onChange={setQuestions} />
+            <div className="mt-4">
+              <label className="block text-xs text-slate-400 mb-1.5">
+                Message to compliance <span className="text-slate-600">(optional)</span>
+              </label>
+              <textarea
+                value={message}
+                onChange={e => setMessage(e.target.value)}
+                placeholder="e.g. Hi team — wave 3 of the cruise study, two new questions since the approved wave 2 list."
+                maxLength={2000}
+                rows={2}
+                disabled={stage === 'submitting'}
+                className="w-full bg-slate-800 border border-slate-700 text-slate-200 text-sm rounded-md px-3 py-2 resize-y placeholder:text-slate-600 focus:outline-none focus:border-slate-500 disabled:opacity-50"
+              />
+            </div>
             {error && <p role="alert" className="text-amber-400 text-sm mt-3">{error}</p>}
             <div className="flex justify-end gap-2 mt-4">
               <Button variant="outline" className="border-slate-700 bg-transparent text-slate-300 hover:bg-slate-800 hover:text-white" onClick={onClose} disabled={stage === 'submitting'}>

@@ -210,6 +210,7 @@ export type Database = {
           reviewed_by: string | null
           reviewed_at: string | null
           review_note: string | null
+          analyst_message: string | null
           dispatched_at: string | null
           created_at: string
         }
@@ -225,6 +226,7 @@ export type Database = {
           reviewed_by?: string | null
           reviewed_at?: string | null
           review_note?: string | null
+          analyst_message?: string | null
           dispatched_at?: string | null
           created_at?: string
         }
@@ -240,6 +242,7 @@ export type Database = {
           reviewed_by?: string | null
           reviewed_at?: string | null
           review_note?: string | null
+          analyst_message?: string | null
           dispatched_at?: string | null
           created_at?: string
         }

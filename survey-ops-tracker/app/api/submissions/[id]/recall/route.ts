@@ -24,7 +24,7 @@ export async function POST(
 
   const { data: submission, error: fetchError } = await admin
     .from('question_submissions')
-    .select('id, project_id, version, dispatched_at, source_file_name, source_file_path')
+    .select('id, project_id, version, dispatched_at, source_file_name, source_file_path, analyst_message')
     .eq('id', id)
     .maybeSingle()
 
@@ -82,5 +82,6 @@ export async function POST(
     questions,
     sourceFileName: submission.source_file_name,
     sourceFilePath: submission.source_file_path,
+    message: submission.analyst_message,
   })
 }

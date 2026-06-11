@@ -66,6 +66,12 @@ export default async function ReviewPage({
           )}
         </div>
       </div>
+      {submission.analyst_message && (
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 mb-6 text-sm text-slate-700 dark:text-slate-300">
+          <p className="text-xs text-slate-500 mb-1">Message from AlphaRoc</p>
+          <p className="whitespace-pre-line">{submission.analyst_message}</p>
+        </div>
+      )}
       <ReviewClient
         submissionId={submission.id}
         status={submission.status}

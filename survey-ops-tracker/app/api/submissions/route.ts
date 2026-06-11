@@ -18,9 +18,13 @@ export async function POST(request: Request) {
     sourceFileName: string
     sourceFilePath: string
     questions: DraftQuestion[]
+    message?: string
   }
   if (!body.projectId || !body.sourceFileName || !body.sourceFilePath) {
     return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
+  }
+  if (body.message && body.message.length > 2000) {
+    return NextResponse.json({ error: 'Message is too long (2000 character max)' }, { status: 400 })
   }
 
   const result = normalizeQuestions(body.questions)
@@ -48,6 +52,7 @@ export async function POST(request: Request) {
       source_file_name: body.sourceFileName,
       source_file_path: body.sourceFilePath,
       submitted_by: user.id,
+      analyst_message: body.message?.trim() || null,
     })
     .select()
     .single()

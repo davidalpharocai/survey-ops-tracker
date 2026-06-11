@@ -60,7 +60,7 @@ function CountdownRow({
   submissionId: string
   submittedAt: string
   projectId: string
-  onRecalled: (questions: DraftQuestion[], sourceFileName: string, sourceFilePath: string) => void
+  onRecalled: (questions: DraftQuestion[], sourceFileName: string, sourceFilePath: string, message: string | null) => void
 }) {
   const remaining = useCountdown(submittedAt)
   const invalidate = useInvalidateCompliance(projectId)
@@ -115,7 +115,7 @@ function CountdownRow({
         return
       }
       // Pass recalled data back up so parent can open the modal pre-filled
-      onRecalled(body.questions, body.sourceFileName, body.sourceFilePath)
+      onRecalled(body.questions, body.sourceFileName, body.sourceFilePath, body.message ?? null)
       invalidate()
     } catch {
       setRecallError('Network error during recall')
@@ -179,6 +179,7 @@ export function CompliancePanel({ projectId }: { projectId: string }) {
     questions: DraftQuestion[]
     sourceFileName: string
     sourceFilePath: string
+    message: string | null
   } | null>(null)
 
   const latest = submissions[0]
@@ -189,8 +190,8 @@ export function CompliancePanel({ projectId }: { projectId: string }) {
     latest && !latestIsUndispatched && latest.status === 'rejected' ? latest.id : null
   const [expandedId, setExpandedId] = useState<string | null>(defaultExpanded)
 
-  function handleRecalled(questions: DraftQuestion[], sourceFileName: string, sourceFilePath: string) {
-    setRecallData({ questions, sourceFileName, sourceFilePath })
+  function handleRecalled(questions: DraftQuestion[], sourceFileName: string, sourceFilePath: string, message: string | null) {
+    setRecallData({ questions, sourceFileName, sourceFilePath, message })
     setModalOpen(true)
     invalidate()
   }
@@ -261,6 +262,11 @@ export function CompliancePanel({ projectId }: { projectId: string }) {
                       {STATUS_LABEL[s.status]}
                       {s.reviewed_at && <span> · {formatDate(s.reviewed_at)}</span>}
                     </p>
+                    {s.analyst_message && (
+                      <p className="text-slate-400 bg-slate-800/50 mt-1 rounded px-2 py-1.5">
+                        Message: &ldquo;{s.analyst_message}&rdquo;
+                      </p>
+                    )}
                     {s.review_note && (
                       <p className={`mt-1 rounded px-2 py-1.5 ${noteStyle}`}>
                         Reviewer note: &ldquo;{s.review_note}&rdquo;
@@ -306,6 +312,7 @@ export function CompliancePanel({ projectId }: { projectId: string }) {
           initialQuestions={recallData?.questions}
           initialSourceFileName={recallData?.sourceFileName}
           initialSourceFilePath={recallData?.sourceFilePath}
+          initialMessage={recallData?.message ?? undefined}
         />
       )}
     </div>
