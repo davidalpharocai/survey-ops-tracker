@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { decisionEmail } from '@/lib/email/templates'
 import { sendAndLog } from '@/lib/email/send'
+import { getAlphaRocNotifyList } from '@/lib/email/alpharoc-recipients'
 
 export async function POST(
   request: Request,
@@ -32,7 +33,7 @@ export async function POST(
       review_note: body.note?.trim() || null,
     })
     .eq('id', id)
-    .select('id, project_id, version')
+    .select('id, project_id, version, submitted_by')
     .maybeSingle()
 
   if (error) {
@@ -50,11 +51,8 @@ export async function POST(
   const admin = createAdminClient()
   const { data: project } = await admin
     .from('survey_projects').select('project_name').eq('id', updated.project_id).single()
-  const { data: recipients } = await admin
-    .from('project_recipients')
-    .select('email')
-    .eq('project_id', updated.project_id)
-    .eq('role', 'alpharoc')
+
+  const recipients = await getAlphaRocNotifyList(admin, updated.project_id, updated.submitted_by)
 
   const email = decisionEmail({
     projectName: project?.project_name ?? 'Survey project',
@@ -62,9 +60,9 @@ export async function POST(
     decision: body.decision,
     note: body.note?.trim() || null,
   })
-  for (const r of recipients ?? []) {
+  for (const recipientEmail of recipients) {
     await sendAndLog({
-      to: r.email, subject: email.subject, html: email.html,
+      to: recipientEmail, subject: email.subject, html: email.html,
       template: `decision_${body.decision}`, submissionId: id,
     })
   }
