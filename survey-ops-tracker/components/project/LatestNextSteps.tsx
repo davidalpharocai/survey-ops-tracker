@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useUpdateProject } from '@/lib/hooks/useProjects'
+import { InfoTooltip } from '@/components/shared/InfoTooltip'
 import { createClient } from '@/lib/supabase/client'
 import type { Tables, TablesUpdate } from '@/lib/supabase/types'
 
@@ -208,7 +209,10 @@ export function LatestNextSteps({ projectId, notes }: LatestNextStepsProps) {
           {/* Open items */}
           {openSteps.length > 0 && (
             <div className="mb-4">
-              <p className="text-xs text-muted-foreground/70 mb-1.5">Next Steps</p>
+              <p className="text-xs text-muted-foreground/70 mb-1.5 flex items-center">
+                Next Steps
+                <InfoTooltip text="Open to-dos. The date shows when the item was added, and by whom." />
+              </p>
               <div className="flex flex-col gap-1">
                 {openSteps.map(step => (
                   <div key={step.id} className="group flex items-start gap-2">
@@ -265,7 +269,10 @@ export function LatestNextSteps({ projectId, notes }: LatestNextStepsProps) {
           {/* Completed log */}
           {completedSteps.length > 0 && (
             <div className="mb-4">
-              <p className="text-xs text-muted-foreground/70 mb-1.5">Latest</p>
+              <p className="text-xs text-muted-foreground/70 mb-1.5 flex items-center">
+                Latest
+                <InfoTooltip text="Completed items. The date shows when the item was checked off, and by whom." />
+              </p>
               <div className="flex flex-col gap-1">
                 {visibleCompleted.map(step => (
                   <div key={step.id} className="group flex items-start gap-2">
