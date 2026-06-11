@@ -57,12 +57,12 @@ export function ReviewClient({ submissionId, status, reviewNote, questions }: Pr
         <div
           className={`rounded-xl border px-4 py-3 mb-6 text-sm ${
             status === 'approved'
-              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-              : 'bg-red-500/10 border-red-500/30 text-red-400'
+              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
+              : 'bg-red-500/10 border-red-500/30 text-red-600 dark:text-red-400'
           }`}
         >
           You {status === 'approved' ? 'approved' : 'rejected'} this question list.
-          {reviewNote && <span className="block mt-1 text-slate-400">Note: {reviewNote}</span>}
+          {reviewNote && <span className="block mt-1 text-slate-600 dark:text-slate-400">Note: {reviewNote}</span>}
         </div>
         <QuestionList questions={questions} />
       </div>
@@ -74,8 +74,8 @@ export function ReviewClient({ submissionId, status, reviewNote, questions }: Pr
       <QuestionList questions={questions} />
 
       {confirming ? (
-        <div className="sticky bottom-4 mt-6 bg-slate-900 border border-slate-700 rounded-xl p-4">
-          <p className="text-sm text-white mb-2">
+        <div className="sticky bottom-4 mt-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-4 shadow-md dark:shadow-none">
+          <p className="text-sm text-slate-900 dark:text-white mb-2">
             {confirming === 'approved' ? 'Approve' : 'Reject'} all {questions.length} questions?
           </p>
           <Textarea
@@ -83,13 +83,13 @@ export function ReviewClient({ submissionId, status, reviewNote, questions }: Pr
             aria-label={confirming === 'rejected' ? 'Reason for rejection (required)' : 'Optional note'}
             value={note}
             onChange={e => setNote(e.target.value)}
-            className="bg-slate-800 border-slate-700 text-white placeholder:text-slate-500 mb-3"
+            className="bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 mb-3"
           />
           {error && (
-            <p role="alert" className="text-red-400 text-sm bg-red-400/10 px-3 py-2 rounded-lg mb-3">{error}</p>
+            <p role="alert" className="text-red-600 dark:text-red-400 text-sm bg-red-400/10 px-3 py-2 rounded-lg mb-3">{error}</p>
           )}
           <div className="flex gap-2 justify-end">
-            <Button variant="outline" className="border-slate-700 bg-transparent text-slate-300 hover:bg-slate-800 hover:text-white" onClick={() => { setConfirming(null); setError('') }} disabled={busy}>
+            <Button variant="outline" className="border-slate-300 dark:border-slate-700 bg-transparent text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white" onClick={() => { setConfirming(null); setError('') }} disabled={busy}>
               Cancel
             </Button>
             <Button onClick={submitDecision} disabled={busy}>
@@ -98,18 +98,18 @@ export function ReviewClient({ submissionId, status, reviewNote, questions }: Pr
           </div>
         </div>
       ) : (
-        <div className="sticky bottom-4 mt-6 bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 flex items-center justify-between">
+        <div className="sticky bottom-4 mt-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 flex items-center justify-between shadow-md dark:shadow-none">
           <p className="text-xs text-slate-500">Your decision applies to all {questions.length} questions</p>
           <div className="flex gap-2">
             <button
               onClick={() => setConfirming('rejected')}
-              className="text-xs border border-red-500/40 text-red-400 hover:bg-red-500/10 px-3 py-1.5 rounded-lg transition-colors"
+              className="text-xs border border-red-500/40 text-red-500 dark:text-red-400 hover:bg-red-500/10 px-3 py-1.5 rounded-lg transition-colors"
             >
               ✕ Reject
             </button>
             <button
               onClick={() => setConfirming('approved')}
-              className="text-xs border border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 px-3 py-1.5 rounded-lg transition-colors"
+              className="text-xs border border-emerald-500/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 px-3 py-1.5 rounded-lg transition-colors"
             >
               ✓ Approve
             </button>

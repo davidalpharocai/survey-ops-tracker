@@ -40,10 +40,10 @@ export default function PortalLoginForm() {
 
   if (sent) {
     return (
-      <div className="w-full max-w-sm p-8 bg-slate-900 rounded-xl border border-slate-800 text-center">
-        <h1 className="text-lg font-bold text-white mb-2">Check your email</h1>
-        <p className="text-sm text-slate-400">
-          We sent a sign-in link to <span className="text-slate-200">{email}</span>.
+      <div className="w-full max-w-sm p-8 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm dark:shadow-none text-center">
+        <h1 className="text-lg font-bold text-slate-900 dark:text-white mb-2">Check your email</h1>
+        <p className="text-sm text-slate-500 dark:text-slate-400">
+          We sent a sign-in link to <span className="text-slate-800 dark:text-slate-200">{email}</span>.
           Click it to access the compliance portal.
         </p>
       </div>
@@ -51,26 +51,26 @@ export default function PortalLoginForm() {
   }
 
   return (
-    <div className="w-full max-w-sm p-8 bg-slate-900 rounded-xl border border-slate-800">
+    <div className="w-full max-w-sm p-8 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm dark:shadow-none">
       <div className="mb-6">
-        <h1 className="text-xl font-bold text-white">Compliance Portal</h1>
+        <h1 className="text-xl font-bold text-slate-900 dark:text-white">Compliance Portal</h1>
         {linkError !== 'link' && (
-          <p className="text-sm text-slate-400 mt-1">
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
             Enter your email and we&apos;ll send you a sign-in link.
           </p>
         )}
       </div>
       {linkError === 'profile' && (
-        <p className="text-amber-400 text-sm bg-amber-400/10 px-3 py-2 rounded-lg mb-4">
+        <p className="text-amber-600 dark:text-amber-400 text-sm bg-amber-400/10 px-3 py-2 rounded-lg mb-4">
           We could not load your portal profile. Try signing in again, or contact your
           AlphaRoc representative.
         </p>
       )}
       {linkError === 'link' ? (
-        <p className="text-amber-400 text-sm bg-amber-400/10 px-3 py-2 rounded-lg leading-relaxed">
+        <p className="text-amber-600 dark:text-amber-400 text-sm bg-amber-400/10 px-3 py-2 rounded-lg leading-relaxed">
           This sign-in link is no longer valid — it may have already been used, or the
           review it points to may already be completed. If you need access, please email{' '}
-          <a href="mailto:info@alpharoc.ai?subject=Survey%20Compliance%20Link" className="underline text-amber-300">
+          <a href="mailto:info@alpharoc.ai?subject=Survey%20Compliance%20Link" className="underline text-amber-500 dark:text-amber-300">
             info@alpharoc.ai
           </a>{' '}
           with the subject &ldquo;Survey Compliance Link&rdquo;.
@@ -83,10 +83,10 @@ export default function PortalLoginForm() {
             value={email}
             onChange={e => setEmail(e.target.value)}
             required
-            className="bg-slate-800 border-slate-700 text-white placeholder:text-slate-500"
+            className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
           />
           {error && (
-            <p className="text-red-400 text-sm bg-red-400/10 px-3 py-2 rounded-lg">{error}</p>
+            <p className="text-red-600 dark:text-red-400 text-sm bg-red-400/10 px-3 py-2 rounded-lg">{error}</p>
           )}
           <Button type="submit" disabled={loading} className="w-full">
             {loading ? 'Sending...' : 'Send sign-in link'}

@@ -54,10 +54,10 @@ export default async function PortalQueuePage() {
     return (
       <Link
         href={`/portal/review/${s.id}`}
-        className="flex items-center justify-between bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 hover:border-slate-600 transition-colors"
+        className="flex items-center justify-between bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 hover:border-slate-400 dark:hover:border-slate-600 shadow-sm dark:shadow-none transition-colors"
       >
         <div>
-          <p className="text-sm text-white font-medium">{nameById.get(s.project_id) ?? 'Survey project'}</p>
+          <p className="text-sm text-slate-900 dark:text-white font-medium">{nameById.get(s.project_id) ?? 'Survey project'}</p>
           <p className="text-xs text-slate-500 mt-0.5">
             Version {s.version} · submitted {formatDate(s.submitted_at)} · {questionCounts.get(s.id) ?? 0} questions
           </p>
@@ -72,7 +72,7 @@ export default async function PortalQueuePage() {
   return (
     <div className="flex flex-col gap-8">
       <section>
-        <h2 className="text-xs text-slate-400 uppercase tracking-widest mb-3 font-medium">
+        <h2 className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-3 font-medium">
           Awaiting your review
         </h2>
         {pending.length === 0 ? (
@@ -82,7 +82,7 @@ export default async function PortalQueuePage() {
         )}
       </section>
       <section>
-        <h2 className="text-xs text-slate-400 uppercase tracking-widest mb-3 font-medium">
+        <h2 className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-3 font-medium">
           History
         </h2>
         {decided.length === 0 ? (

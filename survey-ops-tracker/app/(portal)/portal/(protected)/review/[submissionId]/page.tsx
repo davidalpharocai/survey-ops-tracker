@@ -43,13 +43,13 @@ export default async function ReviewPage({
   return (
     <div>
       <div className="mb-6">
-        <Link href="/portal" className="text-slate-400 hover:text-slate-200 text-sm transition-colors">
+        <Link href="/portal" className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 text-sm transition-colors">
           ← Back to queue
         </Link>
         <div className="flex items-start justify-between mt-3 flex-wrap gap-2">
           <div>
-            <h1 className="text-xl font-bold text-white">{project?.project_name ?? 'Survey project'}</h1>
-            <p className="text-sm text-slate-400 mt-1">
+            <h1 className="text-xl font-bold text-slate-900 dark:text-white">{project?.project_name ?? 'Survey project'}</h1>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
               Version {submission.version}
               {submission.version > 1 && ' — resubmitted after feedback'} · submitted{' '}
               {formatDate(submission.submitted_at)} · {portalQuestions.length} questions
@@ -59,7 +59,7 @@ export default async function ReviewPage({
           {fileUrl?.signedUrl && (
             <a
               href={fileUrl.signedUrl}
-              className="text-xs border border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-500 px-3 py-1.5 rounded-lg transition-colors"
+              className="text-xs border border-slate-300 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:border-slate-400 dark:hover:border-slate-500 px-3 py-1.5 rounded-lg transition-colors"
             >
               ↓ Source file
             </a>
