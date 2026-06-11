@@ -1,4 +1,5 @@
 import { getDueDateStatus, getDueUrgency, formatDate } from '@/lib/utils/date'
+import { deriveWaitingOn } from '@/lib/utils/waitingOn'
 import { NProgressBar } from '@/components/shared/NProgressBar'
 import type { SurveyProject } from '@/lib/hooks/useProjects'
 
@@ -13,6 +14,19 @@ const TYPE_BADGE: Record<string, string> = {
   'PS': 'bg-blue-500/20 text-blue-600 dark:text-blue-400',
   'B2B': 'bg-violet-500/20 text-violet-600 dark:text-violet-400',
   'Rerun': 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400',
+}
+
+const PRIORITY_CHIP: Record<string, { symbol: string; classes: string; label: string }> = {
+  high: {
+    symbol: '⚑',
+    classes: 'bg-amber-500/15 text-amber-600 dark:text-amber-400',
+    label: 'High priority',
+  },
+  urgent: {
+    symbol: '‼',
+    classes: 'bg-red-500/15 text-red-600 dark:text-red-400',
+    label: 'Urgent priority',
+  },
 }
 
 interface ProjectCardProps {
@@ -35,6 +49,10 @@ export function ProjectCard({ project, onClick }: ProjectCardProps) {
     ? project.latest_next_steps.slice(0, 100) +
       (project.latest_next_steps.length > 100 ? '…' : '')
     : null
+  const priorityChip = PRIORITY_CHIP[project.priority ?? '']
+  const waitingOn = deriveWaitingOn(project)
+  // Only surface external waits — "Us — x" is already implied by the column
+  const showWaitingOn = waitingOn === 'Client' || waitingOn.startsWith('Field')
 
   return (
     <div
@@ -52,6 +70,14 @@ export function ProjectCard({ project, onClick }: ProjectCardProps) {
           {onHold && (
             <span className="text-[11px] px-2 py-0.5 rounded bg-muted text-muted-foreground">
               ⏸ Hold
+            </span>
+          )}
+          {priorityChip && (
+            <span
+              className={`text-[11px] px-1.5 py-0.5 rounded ${priorityChip.classes}`}
+              title={priorityChip.label}
+            >
+              {priorityChip.symbol}
             </span>
           )}
           {project.project_type && (
@@ -78,16 +104,23 @@ export function ProjectCard({ project, onClick }: ProjectCardProps) {
       )}
 
       {/* Footer row */}
-      <div className="flex items-center justify-between mt-2">
-        {project.captain ? (
-          <span className="text-xs bg-muted text-foreground/80 px-2 py-0.5 rounded-full">
-            {project.captain.initials}
-          </span>
-        ) : (
-          <span className="text-xs bg-red-500/20 text-red-600 dark:text-red-400 px-2 py-0.5 rounded-full">
-            Unassigned !
-          </span>
-        )}
+      <div className="flex items-center justify-between gap-2 mt-2">
+        <span className="flex items-center gap-1.5 min-w-0">
+          {project.captain ? (
+            <span className="text-xs bg-muted text-foreground/80 px-2 py-0.5 rounded-full shrink-0">
+              {project.captain.initials}
+            </span>
+          ) : (
+            <span className="text-xs bg-red-500/20 text-red-600 dark:text-red-400 px-2 py-0.5 rounded-full shrink-0">
+              Unassigned !
+            </span>
+          )}
+          {showWaitingOn && (
+            <span className="text-[10px] text-muted-foreground truncate" title={`Waiting on: ${waitingOn}`}>
+              ⏳ {waitingOn}
+            </span>
+          )}
+        </span>
         {project.due_date && (
           <span
             className={`text-xs ${

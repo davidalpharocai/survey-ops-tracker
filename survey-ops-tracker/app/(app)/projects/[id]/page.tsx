@@ -13,7 +13,9 @@ import { SlackChannel } from '@/components/project/SlackChannel'
 import { NProgressBar } from '@/components/shared/NProgressBar'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
 import { formatDate } from '@/lib/utils/date'
+import { deriveWaitingOn } from '@/lib/utils/waitingOn'
 import { BudgetWidget } from '@/components/project/BudgetWidget'
+import { BidWidget } from '@/components/project/BidWidget'
 
 const TOOLTIPS: Record<string, string> = {
   'N Target': "Total number of survey responses you're aiming to collect.",
@@ -104,6 +106,10 @@ export default function ProjectDetailPage() {
           </span>
         )}
         <div className="ml-auto flex items-center gap-2">
+          <PriorityButton
+            priority={project.priority ?? 'none'}
+            onCycle={next => updateProject.mutate({ id, updates: { priority: next } })}
+          />
           {project.status === 'Closed' && (
             <span className="text-xs text-muted-foreground">
               Closed projects are hidden from Operations view — switch to Full View to find them.
@@ -199,6 +205,10 @@ export default function ProjectDetailPage() {
             <div className="flex flex-col gap-3">
               {/* Basic fields */}
               <DetailRow label="Client" value={project.client} />
+              <WaitingOnRow
+                project={project}
+                onSetBlockedBy={v => updateProject.mutate({ id, updates: { blocked_by: v } })}
+              />
               <CaptainRow
                 label="Project Captain"
                 captain={project.captain}
@@ -332,6 +342,8 @@ export default function ProjectDetailPage() {
                 nCollected={project.n_collected}
                 nActual={project.n_actual ?? null}
               />
+
+              <BidWidget projectId={project.id} />
             </div>
           </div>
 
@@ -342,6 +354,86 @@ export default function ProjectDetailPage() {
             Slack alerts sent to #survey-ops when: stage advances, due date is tomorrow, N target is hit.
           </div>
         </div>
+      </div>
+    </div>
+  )
+}
+
+const PRIORITY_NEXT: Record<string, string> = {
+  none: 'high',
+  high: 'urgent',
+  urgent: 'none',
+}
+
+function PriorityButton({
+  priority,
+  onCycle,
+}: {
+  priority: string
+  onCycle: (next: string) => void
+}) {
+  const next = PRIORITY_NEXT[priority] ?? 'high'
+  const title = 'Click to cycle priority: none → high → urgent. High and urgent projects sort to the top of their board column.'
+  const base = 'text-xs px-3 py-1.5 rounded-lg transition-colors shrink-0 cursor-pointer'
+
+  if (priority === 'high') {
+    return (
+      <button onClick={() => onCycle(next)} title={title}
+        className={`${base} bg-amber-500/15 text-amber-600 dark:text-amber-400 hover:bg-amber-500/25`}>
+        ⚑ High
+      </button>
+    )
+  }
+  if (priority === 'urgent') {
+    return (
+      <button onClick={() => onCycle(next)} title={title}
+        className={`${base} bg-red-500/15 text-red-600 dark:text-red-400 hover:bg-red-500/25`}>
+        ‼ Urgent
+      </button>
+    )
+  }
+  return (
+    <button onClick={() => onCycle(next)} title={title}
+      className={`${base} border border-border text-muted-foreground hover:text-foreground hover:border-ring`}>
+      ⚑ Priority
+    </button>
+  )
+}
+
+function WaitingOnRow({
+  project,
+  onSetBlockedBy,
+}: {
+  project: Parameters<typeof deriveWaitingOn>[0] & { blocked_by?: string | null }
+  onSetBlockedBy: (next: string) => void
+}) {
+  const derived = deriveWaitingOn(project)
+  return (
+    <div className="flex justify-between items-center text-sm gap-2">
+      <span className="text-muted-foreground flex items-center text-xs shrink-0">
+        Waiting On
+        <InfoTooltip text="Auto-derived from status, phase, stage checkboxes, and fielding progress. Set the dropdown when the project is blocked to force it to Client or Us." />
+      </span>
+      <div className="flex items-center gap-1.5 min-w-0">
+        <span
+          className={`text-xs truncate ${
+            derived === 'Client'
+              ? 'text-amber-600 dark:text-amber-400'
+              : 'text-foreground/80'
+          }`}
+        >
+          {derived}
+        </span>
+        <select
+          value={project.blocked_by ?? 'none'}
+          onChange={e => onSetBlockedBy(e.target.value)}
+          className="bg-muted border border-border rounded px-1 py-0.5 text-[11px] text-muted-foreground focus:outline-none focus:border-ring cursor-pointer"
+          title="Force the Waiting On value when the project is blocked"
+        >
+          <option value="none">None</option>
+          <option value="client">Blocked — client</option>
+          <option value="internal">Blocked — us</option>
+        </select>
       </div>
     </div>
   )

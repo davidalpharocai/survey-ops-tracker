@@ -31,6 +31,15 @@ export function ColorKey() {
           type
         </span>
       ))}
+      <span className="text-border">|</span>
+      <span className="flex items-center gap-1.5">
+        <span className="text-[11px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400">⚑</span>
+        High
+      </span>
+      <span className="flex items-center gap-1.5">
+        <span className="text-[11px] px-1.5 py-0.5 rounded bg-red-500/15 text-red-600 dark:text-red-400">‼</span>
+        Urgent
+      </span>
     </div>
   )
 }

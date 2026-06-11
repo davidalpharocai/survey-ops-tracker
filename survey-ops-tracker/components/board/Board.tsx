@@ -18,6 +18,14 @@ interface BoardProps {
 
 const CAPTAIN_FILTER_KEY = 'sot.captainFilter'
 
+// Column order: urgent first, then high, then normal — Hold always sinks to the bottom
+const PRIORITY_RANK: Record<string, number> = { urgent: 0, high: 1 }
+
+function columnSortRank(p: SurveyProject): number {
+  if (p.status === 'Hold') return 100
+  return PRIORITY_RANK[p.priority ?? ''] ?? 2
+}
+
 export function Board({ projects, teamMembers, onMoveProject }: BoardProps) {
   const router = useRouter()
   const { data: currentMember, isLoading: memberLoading } = useCurrentMember()
@@ -109,7 +117,7 @@ export function Board({ projects, teamMembers, onMoveProject }: BoardProps) {
               title={stage}
               projects={filtered
                 .filter(p => p.board_column === stage)
-                .sort((a, b) => (a.status === 'Hold' ? 1 : 0) - (b.status === 'Hold' ? 1 : 0))}
+                .sort((a, b) => columnSortRank(a) - columnSortRank(b))}
               onCardClick={id => router.push(`/projects/${id}`)}
             />
           ))}

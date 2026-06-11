@@ -75,6 +75,8 @@ export type Database = {
           slack_channel_url: string | null
           survey_ids_from_sheet: string | null
           survey_ids_synced_at: string | null
+          priority: string
+          blocked_by: string
           created_at: string
           updated_at: string
         }
@@ -119,6 +121,8 @@ export type Database = {
           slack_channel_url?: string | null
           survey_ids_from_sheet?: string | null
           survey_ids_synced_at?: string | null
+          priority?: string
+          blocked_by?: string
           created_at?: string
           updated_at?: string
         }
@@ -163,6 +167,8 @@ export type Database = {
           slack_channel_url?: string | null
           survey_ids_from_sheet?: string | null
           survey_ids_synced_at?: string | null
+          priority?: string
+          blocked_by?: string
           created_at?: string
           updated_at?: string
         }
@@ -376,6 +382,41 @@ export type Database = {
           created_at?: string
         }
         Relationships: []
+      }
+      project_bids: {
+        Row: {
+          id: string
+          project_id: string
+          amount: number
+          blasts: number | null
+          note: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          project_id: string
+          amount: number
+          blasts?: number | null
+          note?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          project_id?: string
+          amount?: number
+          blasts?: number | null
+          note?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'project_bids_project_id_fkey'
+            columns: ['project_id']
+            isOneToOne: false
+            referencedRelation: 'survey_projects'
+            referencedColumns: ['id']
+          }
+        ]
       }
       notification_log: {
         Row: {
