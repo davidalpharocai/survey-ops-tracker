@@ -234,7 +234,11 @@ export function LatestNextSteps({ projectId, notes }: LatestNextStepsProps) {
                     ) : (
                       <>
                         <span className="flex-1 text-sm text-foreground/90 leading-snug">
-                          {step.text}
+                          {step.text}{' '}
+                          <span className="text-xs text-muted-foreground whitespace-nowrap">
+                            · {formatStepDate(step.created_at)}
+                            {step.created_by ? ` · ${step.created_by}` : ''}
+                          </span>
                         </span>
                         <button
                           onClick={() => startStepEdit(step)}
