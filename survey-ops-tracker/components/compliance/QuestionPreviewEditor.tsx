@@ -100,6 +100,12 @@ export function QuestionPreviewEditor({ questions, onChange }: Props) {
               AI follow-up
             </label>
           </div>
+          {q.type !== 'open_text' && q.text.includes('\n') && q.answer_options.length === 0 && (
+            <p className="pl-9 text-xs text-amber-400/90">
+              Tip: it looks like answer options may be pasted inside the question text —
+              move them to the options field below so compliance sees them formatted properly.
+            </p>
+          )}
           {q.type !== 'open_text' && (
             <div className="pl-9">
               {/* Uncontrolled + commit on blur: live parsing would eat commas as
