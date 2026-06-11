@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/sync-survey-ids",
+      "schedule": "45 22 * * *"
+    }
+  ]
+}

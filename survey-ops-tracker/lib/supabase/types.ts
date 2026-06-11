@@ -77,6 +77,7 @@ export type Database = {
           survey_ids_synced_at: string | null
           priority: string
           blocked_by: string
+          survey_id_discrepancy: string | null
           created_at: string
           updated_at: string
         }
@@ -123,6 +124,7 @@ export type Database = {
           survey_ids_synced_at?: string | null
           priority?: string
           blocked_by?: string
+          survey_id_discrepancy?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -169,6 +171,7 @@ export type Database = {
           survey_ids_synced_at?: string | null
           priority?: string
           blocked_by?: string
+          survey_id_discrepancy?: string | null
           created_at?: string
           updated_at?: string
         }

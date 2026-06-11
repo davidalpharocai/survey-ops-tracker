@@ -332,6 +332,38 @@ export default function ProjectDetailPage() {
                   tooltip={TOOLTIPS['Survey IDs']}
                   onSave={v => updateProject.mutate({ id, updates: { survey_tool_id: v || null } })}
                 />
+                {project.survey_id_discrepancy && (
+                  <div className="mt-2 bg-amber-500/10 border border-amber-500/40 rounded-lg p-2 flex flex-col gap-1.5">
+                    <p className="text-xs text-amber-700 dark:text-amber-400">
+                      ⚠ {project.survey_id_discrepancy}
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          const m = project.survey_id_discrepancy?.match(/"([^"]+)"/)
+                          updateProject.mutate({
+                            id,
+                            updates: {
+                              survey_tool_id: m?.[1] ?? project.survey_tool_id,
+                              survey_id_discrepancy: null,
+                            },
+                          })
+                        }}
+                        className="text-[11px] bg-amber-500/20 hover:bg-amber-500/30 text-amber-700 dark:text-amber-300 px-2 py-1 rounded transition-colors"
+                      >
+                        Use Edwin ID
+                      </button>
+                      <button
+                        onClick={() =>
+                          updateProject.mutate({ id, updates: { survey_id_discrepancy: null } })
+                        }
+                        className="text-[11px] text-muted-foreground hover:text-foreground px-2 py-1 transition-colors"
+                      >
+                        Keep current — dismiss
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <BudgetWidget
