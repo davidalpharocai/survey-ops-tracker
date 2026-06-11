@@ -53,6 +53,7 @@ export default function ProjectDetailPage() {
   const updateProject = useUpdateProject()
   const deleteProject = useDeleteProject()
   const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [activeTab, setActiveTab] = useState<'overview' | 'datalog'>('overview')
 
   const project = projects.find(p => p.id === id)
 
@@ -172,8 +173,39 @@ export default function ProjectDetailPage() {
         />
       )}
 
+      {/* Tabs */}
+      <div className="flex bg-muted rounded-lg p-1 gap-1 w-fit mb-4">
+        <button
+          onClick={() => setActiveTab('overview')}
+          className={`text-xs px-3 py-1.5 rounded font-medium transition-colors ${
+            activeTab === 'overview'
+              ? 'bg-background text-foreground'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          Overview
+        </button>
+        <button
+          onClick={() => setActiveTab('datalog')}
+          title="Engineer log of manual data changes for this project"
+          className={`text-xs px-3 py-1.5 rounded font-medium transition-colors ${
+            activeTab === 'datalog'
+              ? 'bg-background text-foreground'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          Data Change Log
+        </button>
+      </div>
+
+      {activeTab === 'datalog' && (
+        <div className="max-w-3xl">
+          <DataChangeLog projectId={project.id} />
+        </div>
+      )}
+
       {/* Two-column layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6">
+      <div className={activeTab === 'overview' ? 'grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6' : 'hidden'}>
         {/* Left column */}
         <div className="flex flex-col gap-4">
           <div className="flex">
@@ -195,7 +227,6 @@ export default function ProjectDetailPage() {
             documents={project.linked_documents ?? []}
           />
           <SlackChannel projectId={project.id} url={project.slack_channel_url ?? null} />
-          <DataChangeLog projectId={project.id} />
           <ActivityLog projectId={project.id} />
         </div>
 
