@@ -1,6 +1,7 @@
 import { requirePortalUser } from '@/lib/portal-auth'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
+import { formatDate } from '@/lib/utils/date'
 import { ReviewClient } from '@/components/portal/ReviewClient'
 import type { PortalQuestion } from '@/components/portal/QuestionList'
 
@@ -51,7 +52,7 @@ export default async function ReviewPage({
             <p className="text-sm text-slate-400 mt-1">
               Version {submission.version}
               {submission.version > 1 && ' — resubmitted after feedback'} · submitted{' '}
-              {new Date(submission.submitted_at).toLocaleDateString()} · {portalQuestions.length} questions
+              {formatDate(submission.submitted_at)} · {portalQuestions.length} questions
               · {openTextCount} open-text
             </p>
           </div>

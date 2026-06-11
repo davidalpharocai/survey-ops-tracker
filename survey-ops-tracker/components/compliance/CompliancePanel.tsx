@@ -4,6 +4,7 @@ import { useSubmissions } from '@/lib/hooks/useSubmissions'
 import { RecipientsManager } from './RecipientsManager'
 import { SubmitQuestionsModal } from './SubmitQuestionsModal'
 import { Button } from '@/components/ui/button'
+import { formatDate } from '@/lib/utils/date'
 
 const STATUS_BADGE: Record<string, string> = {
   pending_review: 'bg-amber-500/20 text-amber-400',
@@ -39,7 +40,8 @@ export function CompliancePanel({ projectId }: { projectId: string }) {
           {submissions.map(s => (
             <div key={s.id} className="flex items-center justify-between text-xs bg-slate-800/50 rounded-lg px-3 py-2">
               <span className="text-slate-300">
-                Version {s.version} · {new Date(s.submitted_at).toLocaleDateString()}
+                Version {s.version} · {formatDate(s.submitted_at)}
+                {s.submitter_name && <span className="text-slate-500"> · {s.submitter_name}</span>}
               </span>
               <span className={`px-2 py-0.5 rounded ${STATUS_BADGE[s.status]}`}>
                 {STATUS_LABEL[s.status]}

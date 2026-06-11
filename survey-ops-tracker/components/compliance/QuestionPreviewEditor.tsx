@@ -78,14 +78,17 @@ export function QuestionPreviewEditor({ questions, onChange }: Props) {
                 <option key={t.value} value={t.value}>{t.label}</option>
               ))}
             </select>
-            <label className="flex items-center gap-1.5 text-xs text-slate-400">
+            <label
+              className="flex items-center gap-1.5 text-xs text-slate-400"
+              title="Check when the question captures any free-text answer — including closed questions with an 'Other (please specify)' box. This flag drives compliance's open-text filter. Locked on automatically for Open-text and AI follow-up questions."
+            >
               <input
                 type="checkbox"
                 checked={q.is_open_text}
                 disabled={q.is_ai_followup || q.type === 'open_text'}
                 onChange={e => update(i, { is_open_text: e.target.checked })}
               />
-              Open-text
+              Contains open text
             </label>
             <label className="flex items-center gap-1.5 text-xs text-slate-400">
               <input

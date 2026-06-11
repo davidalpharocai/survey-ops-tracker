@@ -4,19 +4,33 @@ import type { Database } from '@/lib/supabase/types'
 
 export type Submission = Database['public']['Tables']['question_submissions']['Row']
 export type Recipient = Database['public']['Tables']['project_recipients']['Row']
+export type SubmissionWithSubmitter = Submission & { submitter_name: string | null }
 
 export function useSubmissions(projectId: string) {
   const supabase = createClient()
   return useQuery({
     queryKey: ['submissions', projectId],
-    queryFn: async () => {
+    queryFn: async (): Promise<SubmissionWithSubmitter[]> => {
       const { data, error } = await supabase
         .from('question_submissions')
         .select('*')
         .eq('project_id', projectId)
         .order('version', { ascending: false })
       if (error) throw error
-      return data
+
+      const submitterIds = [...new Set(data.map(s => s.submitted_by).filter((id): id is string => !!id))]
+      const names = new Map<string, string>()
+      if (submitterIds.length) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, full_name, email')
+          .in('id', submitterIds)
+        for (const p of profiles ?? []) names.set(p.id, p.full_name ?? p.email)
+      }
+      return data.map(s => ({
+        ...s,
+        submitter_name: s.submitted_by ? names.get(s.submitted_by) ?? null : null,
+      }))
     },
   })
 }

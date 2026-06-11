@@ -89,7 +89,7 @@ export function ReviewClient({ submissionId, status, reviewNote, questions }: Pr
             <p role="alert" className="text-red-400 text-sm bg-red-400/10 px-3 py-2 rounded-lg mb-3">{error}</p>
           )}
           <div className="flex gap-2 justify-end">
-            <Button variant="outline" onClick={() => { setConfirming(null); setError('') }} disabled={busy}>
+            <Button variant="outline" className="border-slate-700 bg-transparent text-slate-300 hover:bg-slate-800 hover:text-white" onClick={() => { setConfirming(null); setError('') }} disabled={busy}>
               Cancel
             </Button>
             <Button onClick={submitDecision} disabled={busy}>

@@ -135,7 +135,7 @@ export function SubmitQuestionsModal({
             <QuestionPreviewEditor questions={questions} onChange={setQuestions} />
             {error && <p role="alert" className="text-amber-400 text-sm mt-3">{error}</p>}
             <div className="flex justify-end gap-2 mt-4">
-              <Button variant="outline" onClick={onClose} disabled={stage === 'submitting'}>
+              <Button variant="outline" className="border-slate-700 bg-transparent text-slate-300 hover:bg-slate-800 hover:text-white" onClick={onClose} disabled={stage === 'submitting'}>
                 Cancel
               </Button>
               <Button onClick={handleSubmit} disabled={stage === 'submitting'}>

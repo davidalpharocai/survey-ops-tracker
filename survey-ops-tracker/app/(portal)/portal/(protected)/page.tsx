@@ -1,5 +1,6 @@
 import { requirePortalUser } from '@/lib/portal-auth'
 import Link from 'next/link'
+import { formatDate } from '@/lib/utils/date'
 
 export const dynamic = 'force-dynamic'
 
@@ -58,7 +59,7 @@ export default async function PortalQueuePage() {
         <div>
           <p className="text-sm text-white font-medium">{nameById.get(s.project_id) ?? 'Survey project'}</p>
           <p className="text-xs text-slate-500 mt-0.5">
-            Version {s.version} · submitted {new Date(s.submitted_at).toLocaleDateString()} · {questionCounts.get(s.id) ?? 0} questions
+            Version {s.version} · submitted {formatDate(s.submitted_at)} · {questionCounts.get(s.id) ?? 0} questions
           </p>
         </div>
         <span className={`text-xs px-2 py-1 rounded ${STATUS_BADGE[s.status]}`}>
