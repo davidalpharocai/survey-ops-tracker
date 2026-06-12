@@ -91,7 +91,7 @@ export default function ListView() {
       </div>
 
       {isLoading ? (
-        <div className="bg-card rounded-xl py-2 divide-y divide-border/50">
+        <div className="bg-card border border-border shadow-sm rounded-xl py-2 divide-y divide-border/50">
           {Array.from({ length: 10 }).map((_, i) => (
             <SkeletonRow key={i} />
           ))}

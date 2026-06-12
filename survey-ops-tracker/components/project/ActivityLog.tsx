@@ -45,7 +45,7 @@ export function ActivityLog({ projectId }: { projectId: string }) {
   const visible = showAll ? activity : activity.slice(0, 5)
 
   return (
-    <div className="bg-card rounded-xl p-4">
+    <div className="bg-card border border-border shadow-sm rounded-xl p-4">
       <h3 className="text-xs text-muted-foreground uppercase tracking-widest mb-3 font-medium flex items-center">
         Activity
         <InfoTooltip text="Logged emails and events for this project — click an entry to expand it." />

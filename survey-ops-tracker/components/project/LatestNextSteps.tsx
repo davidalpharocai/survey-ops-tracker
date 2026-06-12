@@ -203,7 +203,7 @@ export function LatestNextSteps({ projectId, notes }: LatestNextStepsProps) {
   const historyLines = notes ? notes.split('\n').length : 0
 
   return (
-    <div className="bg-card rounded-xl p-4">
+    <div className="bg-card border border-border shadow-sm rounded-xl p-4">
       <div className="mb-3">
         <h3 className="text-xs text-muted-foreground uppercase tracking-widest font-medium">
           Latest / Next Steps

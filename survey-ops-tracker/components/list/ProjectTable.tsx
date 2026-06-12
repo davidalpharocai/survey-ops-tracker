@@ -82,7 +82,7 @@ export function ProjectTable({ projects }: ProjectTableProps) {
   ]
 
   return (
-    <div className="bg-card rounded-xl overflow-hidden">
+    <div className="bg-card border border-border shadow-sm rounded-xl overflow-hidden">
       <table className="w-full">
         <thead>
           <tr className="bg-background border-b border-border">

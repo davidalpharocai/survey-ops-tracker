@@ -80,7 +80,7 @@ export function LinkedDocuments({ projectId, documents }: LinkedDocumentsProps) 
   }
 
   return (
-    <div className="bg-card rounded-xl p-4">
+    <div className="bg-card border border-border shadow-sm rounded-xl p-4">
       <h3 className="text-xs text-muted-foreground uppercase tracking-widest mb-3 font-medium flex items-center">
         Linked Documents
         <InfoTooltip text="Links to this project's docs (questionnaire, data files, etc.). Titles are fetched automatically when you add a link; hover a link to rename or remove it." />

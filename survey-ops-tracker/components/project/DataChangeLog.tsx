@@ -150,7 +150,7 @@ export function DataChangeLog({ projectId }: { projectId: string }) {
   const changes = query.data ?? []
 
   return (
-    <div className="bg-card rounded-xl p-4">
+    <div className="bg-card border border-border shadow-sm rounded-xl p-4">
       <h3 className="text-xs text-muted-foreground uppercase tracking-widest mb-3 font-medium flex items-center">
         Data Change Log
         <InfoTooltip text="A record of manual data changes made to this project's survey data — log what you changed so the team has a paper trail. Stamped with date and author." />
