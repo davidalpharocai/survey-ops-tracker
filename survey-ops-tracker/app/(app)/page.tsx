@@ -8,6 +8,7 @@ import { NewProjectModal } from '@/components/board/NewProjectModal'
 import { ProjectCard } from '@/components/board/ProjectCard'
 import { ViewToggle } from '@/components/shared/ViewToggle'
 import { ColorKey } from '@/components/shared/ColorKey'
+import { Skeleton, SkeletonCard } from '@/components/shared/Skeleton'
 import { useProjects, useMoveProjectToColumn, useUpdateProject, fetchFullProjects, type SlimProject } from '@/lib/hooks/useProjects'
 import { useTeamMembers } from '@/lib/hooks/useTeamMembers'
 import { useQueryClient } from '@tanstack/react-query'
@@ -32,6 +33,23 @@ export default function BoardPage() {
   const [showNewProject, setShowNewProject] = useState(false)
   const [showClosed, setShowClosed] = useState(false)
   const [exporting, setExporting] = useState(false)
+
+  // The command palette's "New project" action lands here as /?new=1 —
+  // open the modal and clean the URL. window.location.search (not
+  // useSearchParams) keeps this page out of a Suspense boundary.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('new') === '1') {
+      setShowNewProject(true)
+      router.replace('/')
+    }
+    // ...and when the palette is invoked while already on the board, it
+    // signals via event instead of a no-op same-page navigation.
+    function onOpenNew() {
+      setShowNewProject(true)
+    }
+    window.addEventListener('sot:open-new-project', onOpenNew)
+    return () => window.removeEventListener('sot:open-new-project', onOpenNew)
+  }, [router])
 
   // Keyboard shortcuts: "/" focuses search, "n" opens New Project
   useEffect(() => {
@@ -147,7 +165,32 @@ export default function BoardPage() {
   }
 
   if (isLoading) {
-    return <div className="text-muted-foreground text-sm">Loading projects...</div>
+    // Skeleton board: filter pill bar + 7 column-shaped containers of cards,
+    // sized like the real thing so the layout doesn't jump when data lands
+    return (
+      <div className="flex flex-col gap-4">
+        <div className="flex items-end gap-3 flex-wrap">
+          <Skeleton className="h-8 w-24 rounded-lg" />
+          <Skeleton className="h-8 w-32 rounded-lg" />
+          <Skeleton className="h-8 w-28 rounded-lg" />
+          <Skeleton className="h-8 w-28 rounded-lg" />
+          <Skeleton className="h-8 w-44 rounded-lg" />
+        </div>
+        <div className="flex gap-2 overflow-x-hidden pb-4">
+          {Array.from({ length: 7 }).map((_, col) => (
+            <div
+              key={col}
+              className="bg-card border border-border rounded-xl p-2 min-w-[158px] max-w-[253px] flex-1 basis-0 flex flex-col gap-2"
+            >
+              <Skeleton className="h-4 w-2/3" />
+              {Array.from({ length: col % 2 === 0 ? 3 : 2 }).map((_, i) => (
+                <SkeletonCard key={i} />
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+    )
   }
 
   return (

@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { ProjectTable } from '@/components/list/ProjectTable'
 import { ViewToggle } from '@/components/shared/ViewToggle'
+import { SkeletonRow } from '@/components/shared/Skeleton'
 import { useProjects, fetchFullProjects } from '@/lib/hooks/useProjects'
 import { useViewMode } from '@/lib/hooks/useViewMode'
 import { exportProjectsCsv } from '@/lib/utils/exportCsv'
@@ -90,7 +91,11 @@ export default function ListView() {
       </div>
 
       {isLoading ? (
-        <div className="text-muted-foreground text-sm">Loading projects...</div>
+        <div className="bg-card rounded-xl py-2 divide-y divide-border/50">
+          {Array.from({ length: 10 }).map((_, i) => (
+            <SkeletonRow key={i} />
+          ))}
+        </div>
       ) : (
         <ProjectTable projects={visibleProjects} />
       )}

@@ -15,6 +15,7 @@ import { LinkedDocuments } from '@/components/project/LinkedDocuments'
 import { SlackChannel } from '@/components/project/SlackChannel'
 import { NProgressBar } from '@/components/shared/NProgressBar'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
+import { Skeleton } from '@/components/shared/Skeleton'
 import { formatDate, getDueUrgency } from '@/lib/utils/date'
 import { differenceInCalendarDays, parseISO, startOfDay } from 'date-fns'
 import { deriveWaitingOn } from '@/lib/utils/waitingOn'
@@ -89,7 +90,47 @@ export default function ProjectDetailPage() {
   }, [id, projectLoaded, queryClient])
 
   if (isLoading) {
-    return <div className="text-muted-foreground text-sm">Loading...</div>
+    // Skeleton mirrors the real layout: header row, tab pills, hero stat
+    // strip, then the two-column body — so nothing jumps when data lands
+    return (
+      <div className="max-w-6xl mx-auto">
+        <div className="flex items-center gap-3 mb-6">
+          <Skeleton className="h-5 w-16" />
+          <Skeleton className="h-6 w-64" />
+          <Skeleton className="h-6 w-14 rounded" />
+        </div>
+        <Skeleton className="h-9 w-72 rounded-lg mb-4" />
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="bg-card rounded-xl p-3 flex flex-col gap-2">
+              <Skeleton className="h-3 w-20" />
+              <Skeleton className="h-7 w-24" />
+              <Skeleton className="h-3 w-16" />
+            </div>
+          ))}
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6">
+          <div className="flex flex-col gap-4">
+            {['h-28', 'h-40', 'h-36'].map((h, i) => (
+              <div key={i} className="bg-card rounded-xl p-4 flex flex-col gap-3">
+                <Skeleton className="h-3 w-32" />
+                <Skeleton className={`w-full ${h}`} />
+              </div>
+            ))}
+          </div>
+          <div className="flex flex-col gap-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="bg-card rounded-xl p-4 flex flex-col gap-3">
+                <Skeleton className="h-3 w-20" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-4 w-2/3" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    )
   }
   if (!project) {
     return (

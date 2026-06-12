@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useUpdateProject } from '@/lib/hooks/useProjects'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
 import { createClient } from '@/lib/supabase/client'
+import { toast } from '@/lib/utils/toast'
 import type { Tables, TablesUpdate } from '@/lib/supabase/types'
 
 type Step = Tables<'project_steps'>
@@ -66,7 +67,10 @@ function useStepMutations(projectId: string) {
         } as Step,
       ])
     },
-    onError: (_e, _v, previous) => queryClient.setQueryData(key, previous),
+    onError: (_e, _v, previous) => {
+      queryClient.setQueryData(key, previous)
+      toast("Couldn't add that step — it was removed.")
+    },
     onSettled: () => queryClient.invalidateQueries({ queryKey: key }),
   })
 
@@ -81,7 +85,10 @@ function useStepMutations(projectId: string) {
         steps.map(s => (s.id === id ? ({ ...s, ...updates } as Step) : s))
       )
     },
-    onError: (_e, _v, previous) => queryClient.setQueryData(key, previous),
+    onError: (_e, _v, previous) => {
+      queryClient.setQueryData(key, previous)
+      toast("Couldn't save that step — it was reverted.")
+    },
     onSettled: () => queryClient.invalidateQueries({ queryKey: key }),
   })
 
@@ -94,7 +101,10 @@ function useStepMutations(projectId: string) {
       await queryClient.cancelQueries({ queryKey: key })
       return optimistic(steps => steps.filter(s => s.id !== id))
     },
-    onError: (_e, _v, previous) => queryClient.setQueryData(key, previous),
+    onError: (_e, _v, previous) => {
+      queryClient.setQueryData(key, previous)
+      toast("Couldn't delete that step — it was restored.")
+    },
     onSettled: () => queryClient.invalidateQueries({ queryKey: key }),
   })
 

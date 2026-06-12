@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { getCheckboxesForColumn, type BoardColumn } from '@/lib/utils/stage'
 import { autoStamp } from '@/lib/utils/date'
+import { toast } from '@/lib/utils/toast'
 import type { Database } from '@/lib/supabase/types'
 
 type ProjectRow = Database['public']['Tables']['survey_projects']['Row']
@@ -164,6 +165,7 @@ export function useUpdateProject() {
       if (context && context.previousDetail !== undefined) {
         queryClient.setQueryData(['project', id], context.previousDetail)
       }
+      toast("Couldn't save that change — it was reverted.")
     },
     onSettled: (_data, _err, { id }) => {
       queryClient.invalidateQueries({ queryKey: ['projects'] })
@@ -197,6 +199,7 @@ export function useDeleteProject() {
       for (const [key, data] of context?.previousLists ?? []) {
         queryClient.setQueryData(key, data)
       }
+      toast("Couldn't delete the project — it was restored.")
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['projects'] })

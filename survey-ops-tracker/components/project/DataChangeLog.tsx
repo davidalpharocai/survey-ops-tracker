@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
+import { toast } from '@/lib/utils/toast'
 
 interface DataChange {
   id: string
@@ -66,7 +67,10 @@ function useDataChanges(projectId: string) {
         ...rows,
       ])
     },
-    onError: (_e, _v, prev) => queryClient.setQueryData(key, prev),
+    onError: (_e, _v, prev) => {
+      queryClient.setQueryData(key, prev)
+      toast("Couldn't log that change — it was removed.")
+    },
     onSettled: () => queryClient.invalidateQueries({ queryKey: key }),
   })
 
@@ -84,7 +88,10 @@ function useDataChanges(projectId: string) {
         rows.map(r => (r.id === id ? { ...r, text, edited_at: new Date().toISOString() } : r))
       )
     },
-    onError: (_e, _v, prev) => queryClient.setQueryData(key, prev),
+    onError: (_e, _v, prev) => {
+      queryClient.setQueryData(key, prev)
+      toast("Couldn't save that edit — it was reverted.")
+    },
     onSettled: () => queryClient.invalidateQueries({ queryKey: key }),
   })
 
@@ -97,7 +104,10 @@ function useDataChanges(projectId: string) {
       await queryClient.cancelQueries({ queryKey: key })
       return optimistic(rows => rows.filter(r => r.id !== id))
     },
-    onError: (_e, _v, prev) => queryClient.setQueryData(key, prev),
+    onError: (_e, _v, prev) => {
+      queryClient.setQueryData(key, prev)
+      toast("Couldn't delete that entry — it was restored.")
+    },
     onSettled: () => queryClient.invalidateQueries({ queryKey: key }),
   })
 

@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
+import { toast } from '@/lib/utils/toast'
 import type { Tables, TablesInsert } from '@/lib/supabase/types'
 
 type Bid = Tables<'project_bids'>
@@ -41,6 +42,9 @@ function useAddBid(projectId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bids', projectId] })
     },
+    onError: () => {
+      toast("Couldn't save the bid — please try again.")
+    },
   })
 }
 
@@ -61,6 +65,9 @@ function useUpdateBid(projectId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bids', projectId] })
     },
+    onError: () => {
+      toast("Couldn't update the bid entry — please try again.")
+    },
   })
 }
 
@@ -74,6 +81,9 @@ function useDeleteBid(projectId: string) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bids', projectId] })
+    },
+    onError: () => {
+      toast("Couldn't delete the bid entry — please try again.")
     },
   })
 }
