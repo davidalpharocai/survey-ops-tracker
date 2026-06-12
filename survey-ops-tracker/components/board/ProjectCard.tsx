@@ -1,8 +1,10 @@
+'use client'
 import { getDueDateStatus, getDueUrgency, formatDate } from '@/lib/utils/date'
 import { deriveWaitingOn } from '@/lib/utils/waitingOn'
 import { isStale } from '@/lib/utils/stale'
 import { NProgressBar } from '@/components/shared/NProgressBar'
 import type { SlimProject } from '@/lib/hooks/useProjects'
+import { useLatestSubmissionStatuses } from '@/lib/hooks/useSubmissions'
 
 // Full-card border by due-date urgency; overrides the neutral left edge
 const URGENCY_BORDER: Record<string, string> = {
@@ -59,6 +61,8 @@ export function ProjectCard({ project, onClick, isNew }: ProjectCardProps) {
     : urgencyBorder
     ? `border-l-4 ${urgencyBorder}`
     : 'border border-border border-l-4 border-l-foreground/80'
+  const { data: complianceStatuses } = useLatestSubmissionStatuses()
+  const complianceStatus = complianceStatuses?.get(project.id)
   const snippet = project.latest_next_steps
     ? project.latest_next_steps.slice(0, 100) +
       (project.latest_next_steps.length > 100 ? '…' : '')
@@ -124,6 +128,20 @@ export function ProjectCard({ project, onClick, isNew }: ProjectCardProps) {
               title={TYPE_TITLE[project.project_type]}
             >
               {project.project_type}
+            </span>
+          )}
+          {complianceStatus && (
+            <span
+              title={`Compliance: ${complianceStatus.replace('_', ' ')}`}
+              className={`text-[11px] px-1.5 py-0.5 rounded whitespace-nowrap ${
+                complianceStatus === 'approved'
+                  ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400'
+                  : complianceStatus === 'rejected'
+                    ? 'bg-red-500/20 text-red-600 dark:text-red-400'
+                    : 'bg-amber-500/20 text-amber-600 dark:text-amber-400'
+              }`}
+            >
+              {complianceStatus === 'pending_review' ? 'Compliance ⏳' : complianceStatus === 'approved' ? 'Compliance ✓' : 'Compliance ✕'}
             </span>
           )}
         </span>

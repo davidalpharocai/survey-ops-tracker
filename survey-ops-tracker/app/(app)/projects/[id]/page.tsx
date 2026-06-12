@@ -21,6 +21,7 @@ import { differenceInCalendarDays, parseISO, startOfDay } from 'date-fns'
 import { deriveWaitingOn } from '@/lib/utils/waitingOn'
 import { BudgetWidget } from '@/components/project/BudgetWidget'
 import { BidWidget } from '@/components/project/BidWidget'
+import { CompliancePanel } from '@/components/compliance/CompliancePanel'
 
 const TOOLTIPS: Record<string, string> = {
   'Client': 'The client this project is for.',
@@ -394,6 +395,7 @@ export default function ProjectDetailPage() {
               projectId={project.id}
               documents={project.linked_documents ?? []}
             />
+            <CompliancePanel projectId={project.id} />
             <ActivityLog projectId={project.id} />
           </div>
 

@@ -3,6 +3,7 @@ import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { formatDate, getDueDateStatus } from '@/lib/utils/date'
 import type { SlimProject } from '@/lib/hooks/useProjects'
+import { useLatestSubmissionStatuses } from '@/lib/hooks/useSubmissions'
 
 type SortField = 'project_name' | 'client' | 'board_column' | 'due_date'
 type SortDir = 'asc' | 'desc'
@@ -43,6 +44,7 @@ export function ProjectTable({ projects }: ProjectTableProps) {
   const router = useRouter()
   const [sortField, setSortField] = useState<SortField>('due_date')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
+  const { data: complianceStatuses } = useLatestSubmissionStatuses()
 
   function handleSort(field: SortField) {
     if (sortField === field) {
@@ -112,6 +114,7 @@ export function ProjectTable({ projects }: ProjectTableProps) {
           {sorted.map((p, i) => {
             const dueDateStatus = getDueDateStatus(p.due_date)
             const nMet = p.n_target != null && p.n_collected >= p.n_target
+            const complianceStatus = complianceStatuses?.get(p.id)
             return (
               <tr
                 key={p.id}
@@ -121,8 +124,26 @@ export function ProjectTable({ projects }: ProjectTableProps) {
                 } ${p.status === 'Hold' ? 'opacity-60' : ''}`}
               >
                 <td className="px-4 py-3 text-sm text-foreground font-medium">
-                  {p.status === 'Hold' && <span title="On hold">⏸ </span>}
-                  {p.project_name}
+                  <div className="flex items-center gap-2">
+                    <span>
+                      {p.status === 'Hold' && <span title="On hold">⏸ </span>}
+                      {p.project_name}
+                    </span>
+                    {complianceStatus && (
+                      <span
+                        title={`Compliance: ${complianceStatus.replace('_', ' ')}`}
+                        className={`text-xs px-1.5 py-0.5 rounded whitespace-nowrap ${
+                          complianceStatus === 'approved'
+                            ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400'
+                            : complianceStatus === 'rejected'
+                              ? 'bg-red-500/20 text-red-600 dark:text-red-400'
+                              : 'bg-amber-500/20 text-amber-600 dark:text-amber-400'
+                        }`}
+                      >
+                        {complianceStatus === 'pending_review' ? 'Compliance ⏳' : complianceStatus === 'approved' ? 'Compliance ✓' : 'Compliance ✕'}
+                      </span>
+                    )}
+                  </div>
                 </td>
                 <td className="px-4 py-3 text-sm text-muted-foreground">{p.client}</td>
                 <td className="px-4 py-3">

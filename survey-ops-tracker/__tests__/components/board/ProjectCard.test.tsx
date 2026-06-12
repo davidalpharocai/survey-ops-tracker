@@ -1,6 +1,20 @@
 import { render, screen } from '@testing-library/react'
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ProjectCard } from '@/components/board/ProjectCard'
+import type { SlimProject } from '@/lib/hooks/useProjects'
+
+const asProject = (p: object) => p as SlimProject
+
+// Mock the submissions hook so tests don't need a real Supabase client
+vi.mock('@/lib/hooks/useSubmissions', () => ({
+  useLatestSubmissionStatuses: () => ({ data: undefined }),
+}))
+
+function wrapper({ children }: { children: React.ReactNode }) {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  return <QueryClientProvider client={qc}>{children}</QueryClientProvider>
+}
 
 const mockProject = {
   id: '1',
@@ -41,37 +55,37 @@ const mockProject = {
 
 describe('ProjectCard', () => {
   it('renders project name', () => {
-    render(<ProjectCard project={mockProject as any} />)
+    render(<ProjectCard project={asProject(mockProject)} />, { wrapper })
     expect(screen.getByText('AARP Membership')).toBeInTheDocument()
   })
   it('renders client name', () => {
-    render(<ProjectCard project={mockProject as any} />)
+    render(<ProjectCard project={asProject(mockProject)} />, { wrapper })
     expect(screen.getByText('AARP')).toBeInTheDocument()
   })
   it('renders type badge', () => {
-    render(<ProjectCard project={mockProject as any} />)
+    render(<ProjectCard project={asProject(mockProject)} />, { wrapper })
     expect(screen.getByText('PS')).toBeInTheDocument()
   })
   it('renders captain initials', () => {
-    render(<ProjectCard project={mockProject as any} />)
+    render(<ProjectCard project={asProject(mockProject)} />, { wrapper })
     expect(screen.getByText('AW')).toBeInTheDocument()
   })
   it('shows unassigned warning when no captain', () => {
-    render(<ProjectCard project={{ ...mockProject, captain: null } as any} />)
+    render(<ProjectCard project={asProject({ ...mockProject, captain: null })} />, { wrapper })
     expect(screen.getByText(/Unassigned/)).toBeInTheDocument()
   })
   it('shows overdue warning for past due date', () => {
-    render(<ProjectCard project={{ ...mockProject, due_date: '2020-01-01' } as any} />)
+    render(<ProjectCard project={asProject({ ...mockProject, due_date: '2020-01-01' })} />, { wrapper })
     expect(screen.getByText(/⚠/)).toBeInTheDocument()
   })
   it('truncates latest next steps at 100 chars', () => {
     const longText = 'A'.repeat(150)
-    render(<ProjectCard project={{ ...mockProject, latest_next_steps: longText } as any} />)
+    render(<ProjectCard project={asProject({ ...mockProject, latest_next_steps: longText })} />, { wrapper })
     const snippet = screen.getByText(/A+…/)
     expect(snippet.textContent!.length).toBeLessThanOrEqual(104) // 100 + '…'
   })
   it('does not show snippet when latest_next_steps is null', () => {
-    render(<ProjectCard project={{ ...mockProject, latest_next_steps: null } as any} />)
+    render(<ProjectCard project={asProject({ ...mockProject, latest_next_steps: null })} />, { wrapper })
     // no snippet paragraph rendered — check there's no element with the snippet's line-clamp class
     const snippets = document.querySelectorAll('p.line-clamp-2')
     expect(snippets.length).toBe(0)
