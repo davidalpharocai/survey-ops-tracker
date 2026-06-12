@@ -50,17 +50,25 @@ console.log(`sheet has ${sheetCodes.size} named client ids`)
 const clients = await rest('GET', 'clients?select=id,name,code&order=name')
 let matched = 0
 const unmatched = []
+const dupes = []
+const used = new Set(clients.map(c => c.code).filter(Boolean))
 for (const c of clients) {
   if (c.code) continue
   const code = sheetCodes.get(c.name.trim().toLowerCase())
-  if (code) {
-    await rest('PATCH', `clients?id=eq.${c.id}`, { code })
-    matched++
-  } else {
+  if (!code) {
     unmatched.push(c.name)
+  } else if (used.has(code)) {
+    // two DB clients resolve to the same sheet entry — near-duplicate names,
+    // left for David's client cleanup rather than guessed at here
+    dupes.push(`"${c.name}" also matches ${code}`)
+  } else {
+    await rest('PATCH', `clients?id=eq.${c.id}`, { code })
+    used.add(code)
+    matched++
   }
 }
 console.log(`client codes set: ${matched}; already had codes: ${clients.filter(c => c.code).length}`)
+if (dupes.length) console.log('DUPLICATE NAMES (code left blank, needs cleanup):', dupes.join(' | '))
 if (unmatched.length) console.log('NO MATCH in sheet (left blank):', unmatched.join(' | '))
 
 // --- 2. Project id mapping export ---

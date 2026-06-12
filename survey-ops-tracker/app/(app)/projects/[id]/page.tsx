@@ -14,7 +14,7 @@ import { LatestNextSteps } from '@/components/project/LatestNextSteps'
 import { LinkedDocuments } from '@/components/project/LinkedDocuments'
 import { SlackChannel } from '@/components/project/SlackChannel'
 import { NProgressBar } from '@/components/shared/NProgressBar'
-import { InfoTooltip } from '@/components/shared/InfoTooltip'
+import { InfoTooltip, HelpTip } from '@/components/shared/InfoTooltip'
 import { Skeleton } from '@/components/shared/Skeleton'
 import { formatDate, getDueUrgency } from '@/lib/utils/date'
 import { differenceInCalendarDays, parseISO, startOfDay } from 'date-fns'
@@ -202,45 +202,52 @@ export default function ProjectDetailPage() {
             </span>
           )}
           {project.status === 'Open' && (
-            <button
-              onClick={() => setStatus('Hold')}
-              title="Pause this project. It stays on the board, greyed out."
-              className="text-sm border border-border text-muted-foreground hover:text-foreground hover:border-ring px-3 py-1.5 rounded-lg transition-colors shrink-0"
-            >
-              ⏸ Hold
-            </button>
+            <HelpTip text="Pauses the project. The card stays on the board but greys out and sinks to the bottom of its column. Resume brings it right back — nothing is lost.">
+              <button
+                onClick={() => setStatus('Hold')}
+                className="text-sm border border-border text-muted-foreground hover:text-foreground hover:border-ring px-3 py-1.5 rounded-lg transition-colors shrink-0"
+              >
+                ⏸ Hold
+              </button>
+            </HelpTip>
           )}
           {project.status === 'Hold' && (
-            <button
-              onClick={() => setStatus('Open')}
-              className="text-sm border border-border text-muted-foreground hover:text-foreground hover:border-ring px-3 py-1.5 rounded-lg transition-colors shrink-0"
-            >
-              ▶ Resume
-            </button>
+            <HelpTip text="Takes the project off hold — the card returns to normal in its column.">
+              <button
+                onClick={() => setStatus('Open')}
+                className="text-sm border border-border text-muted-foreground hover:text-foreground hover:border-ring px-3 py-1.5 rounded-lg transition-colors shrink-0"
+              >
+                ▶ Resume
+              </button>
+            </HelpTip>
           )}
           {project.status !== 'Closed' ? (
-            <button
-              onClick={() => setStatus('Closed')}
-              title="Marks the project Closed (done/archived). It stays visible in Full View and can be reopened anytime."
-              className="text-sm border border-border text-muted-foreground hover:text-foreground hover:border-ring px-3 py-1.5 rounded-lg transition-colors shrink-0"
-            >
-              ✕ Close Project
-            </button>
+            <HelpTip text="Marks the project done (or archived). It leaves Operations view but stays in Full View's Closed section, and can be reopened anytime.">
+              <button
+                onClick={() => setStatus('Closed')}
+                className="text-sm border border-border text-muted-foreground hover:text-foreground hover:border-ring px-3 py-1.5 rounded-lg transition-colors shrink-0"
+              >
+                ✕ Close Project
+              </button>
+            </HelpTip>
           ) : (
-            <button
-              onClick={() => setStatus('Open')}
-              className="text-sm border border-border text-muted-foreground hover:text-foreground hover:border-ring px-3 py-1.5 rounded-lg transition-colors shrink-0"
-            >
-              ↺ Reopen Project
-            </button>
+            <HelpTip text="Brings this closed project back to the open board.">
+              <button
+                onClick={() => setStatus('Open')}
+                className="text-sm border border-border text-muted-foreground hover:text-foreground hover:border-ring px-3 py-1.5 rounded-lg transition-colors shrink-0"
+              >
+                ↺ Reopen Project
+              </button>
+            </HelpTip>
           )}
-          <button
-            onClick={() => setConfirmingDelete(true)}
-            title="Permanently delete this project and its activity log."
-            className="text-sm border border-border text-muted-foreground hover:text-red-600 dark:hover:text-red-400 hover:border-red-500/50 px-3 py-1.5 rounded-lg transition-colors shrink-0"
-          >
-            🗑 Delete
-          </button>
+          <HelpTip text="Permanently deletes the project and its full history — no undo (it asks you to type 'delete' first). If you just want it off the board, use Close Project instead.">
+            <button
+              onClick={() => setConfirmingDelete(true)}
+              className="text-sm border border-border text-muted-foreground hover:text-red-600 dark:hover:text-red-400 hover:border-red-500/50 px-3 py-1.5 rounded-lg transition-colors shrink-0"
+            >
+              🗑 Delete
+            </button>
+          </HelpTip>
         </div>
       </div>
 
@@ -796,30 +803,41 @@ function PriorityButton({
   onCycle: (next: string) => void
 }) {
   const next = PRIORITY_NEXT[priority] ?? 'high'
-  const title = 'Click to cycle priority: none → high → urgent. High and urgent projects sort to the top of their board column.'
+  const help: Record<string, string> = {
+    none: 'Sets this project\'s priority. Each click cycles: none → ⚑ High → ‼ Urgent → back to none. High and urgent cards float to the top of their board column.',
+    high: 'Priority is ⚑ High — the card floats to the top of its board column. Click again for ‼ Urgent; one more click clears it back to none.',
+    urgent: 'Priority is ‼ Urgent — the very top of the board column. Click again to clear priority back to none.',
+  }
+  const text = help[priority] ?? help.none
   const base = 'text-sm px-3 py-1.5 rounded-lg transition-colors shrink-0 cursor-pointer'
 
   if (priority === 'high') {
     return (
-      <button onClick={() => onCycle(next)} title={title}
-        className={`${base} bg-amber-500/15 text-amber-600 dark:text-amber-400 hover:bg-amber-500/25`}>
-        ⚑ High
-      </button>
+      <HelpTip text={text}>
+        <button onClick={() => onCycle(next)}
+          className={`${base} bg-amber-500/15 text-amber-600 dark:text-amber-400 hover:bg-amber-500/25`}>
+          ⚑ High
+        </button>
+      </HelpTip>
     )
   }
   if (priority === 'urgent') {
     return (
-      <button onClick={() => onCycle(next)} title={title}
-        className={`${base} bg-red-500/15 text-red-600 dark:text-red-400 hover:bg-red-500/25`}>
-        ‼ Urgent
-      </button>
+      <HelpTip text={text}>
+        <button onClick={() => onCycle(next)}
+          className={`${base} bg-red-500/15 text-red-600 dark:text-red-400 hover:bg-red-500/25`}>
+          ‼ Urgent
+        </button>
+      </HelpTip>
     )
   }
   return (
-    <button onClick={() => onCycle(next)} title={title}
-      className={`${base} border border-border text-muted-foreground hover:text-foreground hover:border-ring`}>
-      ⚑ Priority
-    </button>
+    <HelpTip text={text}>
+      <button onClick={() => onCycle(next)}
+        className={`${base} border border-border text-muted-foreground hover:text-foreground hover:border-ring`}>
+        ⚑ Priority
+      </button>
+    </HelpTip>
   )
 }
 
