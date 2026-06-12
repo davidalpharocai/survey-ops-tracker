@@ -56,6 +56,18 @@ export function QuestionPreviewEditor({ questions, onChange }: Props) {
             <textarea
               value={q.text}
               onChange={e => update(i, { text: e.target.value })}
+              onBlur={() => {
+                // Analysts often paste the question with its options on the
+                // lines below — split them into the options field on click-out
+                // so the preview matches what compliance will see. (The server
+                // applies the same rule at submit as a backstop.)
+                if (q.type !== 'open_text' && q.answer_options.length === 0 && q.text.includes('\n')) {
+                  const lines = q.text.split('\n').map(l => l.trim()).filter(Boolean)
+                  if (lines.length >= 2) {
+                    update(i, { text: lines[0], answer_options: lines.slice(1) })
+                  }
+                }
+              }}
               rows={2}
               aria-label={`Question ${q.order_num} text`}
               className="flex-1 bg-slate-800 border border-slate-700 text-slate-200 text-sm rounded-md px-2 py-1.5 resize-y"
@@ -100,18 +112,13 @@ export function QuestionPreviewEditor({ questions, onChange }: Props) {
               AI follow-up
             </label>
           </div>
-          {q.type !== 'open_text' && q.text.includes('\n') && q.answer_options.length === 0 && (
-            <p className="pl-9 text-xs text-amber-400/90">
-              Tip: it looks like answer options may be pasted inside the question text —
-              move them to the options field below so compliance sees them formatted properly.
-            </p>
-          )}
           {q.type !== 'open_text' && (
             <div className="pl-9">
               {/* Uncontrolled + commit on blur: live parsing would eat commas as
-                  the user types them. Remount key keeps rows in sync on add/remove. */}
+                  the user types them. Key includes the options so the field
+                  refreshes when a blur-split moves options out of the text. */}
               <input
-                key={`opts-${i}-${questions.length}`}
+                key={`opts-${i}-${questions.length}-${q.answer_options.join('|')}`}
                 type="text"
                 defaultValue={q.answer_options.join(', ')}
                 onBlur={e =>
