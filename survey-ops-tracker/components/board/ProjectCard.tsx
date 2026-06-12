@@ -74,7 +74,7 @@ export function ProjectCard({ project, onClick, isNew }: ProjectCardProps) {
       onClick={onClick}
       className={`relative bg-background rounded-lg p-2.5 ${border} ${
         onHold ? 'opacity-60' : ''
-      } cursor-pointer hover:ring-1 hover:ring-ring transition-all`}
+      } cursor-pointer hover:ring-1 hover:ring-ring transition-colors`}
     >
       {/* Hold badge floats on the top-right corner, on purpose */}
       {onHold && (
