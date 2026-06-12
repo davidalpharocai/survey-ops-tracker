@@ -14,6 +14,7 @@ import { useTeamMembers } from '@/lib/hooks/useTeamMembers'
 import { useQueryClient } from '@tanstack/react-query'
 import { useIsNewForMe } from '@/lib/hooks/useSeenProjects'
 import { useViewMode } from '@/lib/hooks/useViewMode'
+import { useStoredFlag } from '@/lib/hooks/useStoredFlag'
 import { exportProjectsCsv } from '@/lib/utils/exportCsv'
 import { isTypingTarget } from '@/lib/utils/keyboard'
 import { boardOrder, sortOrderBetween } from '@/lib/utils/ordering'
@@ -32,6 +33,7 @@ export default function BoardPage() {
   const { mode, setMode } = useViewMode()
   const [showNewProject, setShowNewProject] = useState(false)
   const [showClosed, setShowClosed] = useState(false)
+  const [pipelineCollapsed, setPipelineCollapsed] = useStoredFlag('sot.collapse.pipeline', false)
   const [exporting, setExporting] = useState(false)
 
   // The command palette's "New project" action lands here as /?new=1 —
@@ -160,8 +162,23 @@ export default function BoardPage() {
         ...getCheckboxesForColumn(to as BoardColumnType),
       })
       moveProject(id, to as BoardColumnType, sortOrder)
+    } else if (toScoping) {
+      // Demote: pipeline card dragged back up to a scoping column — the deal
+      // reopened. Stage checkboxes are kept so a re-promotion resumes intact.
+      applyNow({
+        phase: 'Scoping',
+        scoping_stage: to as Database['public']['Enums']['scoping_stage'],
+        sort_order: sortOrder,
+      })
+      updateProject.mutate({
+        id,
+        updates: {
+          phase: 'Scoping',
+          scoping_stage: to as Database['public']['Enums']['scoping_stage'],
+          sort_order: sortOrder,
+        },
+      })
     }
-    // pipeline -> scoping drags are ignored (demote via the project page if ever needed)
   }
 
   if (isLoading) {
@@ -240,15 +257,27 @@ export default function BoardPage() {
       {mode === 'full' ? (
         <DragDropContext onDragStart={() => { window.__sotDragging = true }} onDragEnd={handleFullViewDragEnd}>
           <ScopingBoard projects={scopingProjects} wrapInContext={false} />
-          <h2 className="text-xs text-muted-foreground uppercase tracking-widest font-semibold -mb-1">
+          <button
+            onClick={() => setPipelineCollapsed(!pipelineCollapsed)}
+            title={pipelineCollapsed ? 'Expand the pipeline' : 'Collapse the pipeline (your choice is remembered)'}
+            className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground uppercase tracking-widest font-semibold transition-colors self-start -mb-1"
+          >
+            <span>{pipelineCollapsed ? '▸' : '▾'}</span>
             Operations Pipeline
-          </h2>
-          <Board
-            projects={activeProjects}
-            teamMembers={teamMembers}
-            onMoveProject={moveProject}
-            wrapInContext={false}
-          />
+            {pipelineCollapsed && (
+              <span className="bg-muted text-muted-foreground px-2 py-0.5 rounded-full normal-case tracking-normal">
+                {activeProjects.length}
+              </span>
+            )}
+          </button>
+          {!pipelineCollapsed && (
+            <Board
+              projects={activeProjects}
+              teamMembers={teamMembers}
+              onMoveProject={moveProject}
+              wrapInContext={false}
+            />
+          )}
         </DragDropContext>
       ) : (
         <Board

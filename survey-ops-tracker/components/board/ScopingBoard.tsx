@@ -4,6 +4,7 @@ import { BoardColumn } from './BoardColumn'
 import { useRouter } from 'next/navigation'
 import { useUpdateProject } from '@/lib/hooks/useProjects'
 import { useIsNewForMe } from '@/lib/hooks/useSeenProjects'
+import { useStoredFlag } from '@/lib/hooks/useStoredFlag'
 import { boardOrder } from '@/lib/utils/ordering'
 import type { SlimProject } from '@/lib/hooks/useProjects'
 import type { Database } from '@/lib/supabase/types'
@@ -28,6 +29,7 @@ export function ScopingBoard({ projects, wrapInContext = true }: ScopingBoardPro
   const router = useRouter()
   const updateProject = useUpdateProject()
   const isNewForMe = useIsNewForMe()
+  const [collapsed, setCollapsed] = useStoredFlag('sot.collapse.scoping', false)
 
   function handleDragEnd(result: DropResult) {
     if (!result.destination) return
@@ -60,21 +62,31 @@ export function ScopingBoard({ projects, wrapInContext = true }: ScopingBoardPro
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-2">
-        <h2 className="text-xs text-muted-foreground uppercase tracking-widest font-semibold">
+        <button
+          onClick={() => setCollapsed(!collapsed)}
+          title={collapsed ? 'Expand the scoping board' : 'Collapse the scoping board (your choice is remembered)'}
+          className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground uppercase tracking-widest font-semibold transition-colors"
+        >
+          <span>{collapsed ? '▸' : '▾'}</span>
           Scoping
-        </h2>
+        </button>
         <span className="text-xs bg-violet-500/15 text-violet-600 dark:text-violet-400 px-2 py-0.5 rounded-full">
           {projects.length}
         </span>
         <span className="text-xs text-muted-foreground/60">
-          drag a card into the pipeline below to approve it
+          {collapsed
+            ? projects.length > 0
+              ? `${projects.length} deal${projects.length > 1 ? 's' : ''} hidden — click to expand`
+              : 'collapsed'
+            : 'drag a card into the pipeline below to approve it'}
         </span>
       </div>
-      {wrapInContext ? (
-        <DragDropContext onDragEnd={handleDragEnd}>{columns}</DragDropContext>
-      ) : (
-        columns
-      )}
+      {!collapsed &&
+        (wrapInContext ? (
+          <DragDropContext onDragEnd={handleDragEnd}>{columns}</DragDropContext>
+        ) : (
+          columns
+        ))}
     </div>
   )
 }

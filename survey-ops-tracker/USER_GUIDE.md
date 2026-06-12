@@ -36,6 +36,8 @@ The board shows every active project as a card moving left-to-right through the 
 ### Filters & search
 Captain, Type, Due (today/tomorrow/2 days), Stage (including Closed), and a search box (project or client name). Hover any filter label's (i) for what it does.
 
+**Saved views**: set the filters how you like, hit ★ Save, name it ("My urgent", "Jenna's PS work") — then jump back to it from the Views dropdown anytime. Views are personal (saved in your browser). In Full View, the Scoping and Operations Pipeline sections collapse with the ▾ next to their titles — also remembered per person.
+
 ### Shortcuts
 - **Ctrl+K** (or Cmd+K) — command palette: type a few letters of any project and jump straight to it; type `>` for actions
 - **/** — jump to the search box
@@ -45,14 +47,14 @@ Captain, Type, Due (today/tomorrow/2 days), Stage (including Closed), and a sear
 
 Click **+ New Project** (or press N). Fill the form — or use the **✦ Describe it** box: type something like *"New B2B for Meridian, Tom sold it, Priya captain, 200 responses, due July 15, budget 15k"* and AI fills the form for your review. Check "Already approved" to skip scoping and land straight in the pipeline.
 
-New projects normally start in **Scoping** (New Inquiry → Proposal Sent → Pricing Discussion → Awaiting Approval). Approve a deal by dragging its card into the pipeline, or with the green button on its project page.
+New projects normally start in **Scoping** (New Inquiry → Proposal Sent → Pricing Discussion → Awaiting Approval). Approve a deal by dragging its card into the pipeline, or with the green button on its project page. It works in reverse too — if a deal reopens, drag the card back onto a scoping column (Full View), or use "↩ Back to Scoping" on the project page; pipeline progress is kept in case it gets re-approved.
 
 ## 3. The project page
 
 [screenshot: project page Overview]
 
 ### Hero stats (top)
-Four big numbers: **N collected** (click to edit), **Due date** (click to change), **Budget left** (with cost per response), and **Waiting On** (computes itself from the stage checkboxes — use "Blocked by" to override when stuck on the client or on us).
+Four big tiles: **N collected** (click to edit), **Timing** — Due (internal: when our work must be done) and Deliver (client: when they need it in hand) side by side, with the buffer between them spelled out ("same day as due", "2d buffer", or a ⚠ if delivery is set before the internal due date; both dates click-to-edit) — **Budget left** (with cost per response), and **Waiting On** (computes itself from the stage checkboxes — use "Blocked by" to override when stuck on the client or on us).
 
 ### Tabs
 - **Overview** — everything below
@@ -74,7 +76,7 @@ Titled groups: **People** (client, captain + optional co-captains, salesperson f
 
 ## 4. The List view
 
-A sortable table of all projects (click column headers to sort). Same search and view toggle as the board. **⬇ Export CSV** downloads whatever is currently shown, with every field.
+A sortable table of all projects (click column headers to sort). Same search and view toggle as the board. **⚙ Columns** lets you hide columns you don't use — your choice is personal (saved in your browser) and doesn't affect teammates. **⬇ Export CSV** downloads whatever is currently shown, with every field regardless of hidden columns.
 
 ## 5. The AI Assistant
 
