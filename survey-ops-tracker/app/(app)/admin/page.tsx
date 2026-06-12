@@ -71,20 +71,12 @@ export default function AdminPage() {
   const { data: clients = [], isLoading: clientsLoading } = useClients()
   const { data: teamMembers = [] } = useTeamMembers()
 
-  const projectCountByClientId = useMemo(() => {
-    const counts = new Map<string, number>()
-    for (const p of projects) {
-      const cid = (p as { client_id?: string | null }).client_id
-      if (cid) counts.set(cid, (counts.get(cid) ?? 0) + 1)
-    }
-    return counts
-  }, [projects])
-
-  // Slim projects don't carry client_id — fall back to name matching for counts
+  // Slim projects carry the contact-level text ("BAM - Jeff Cummings");
+  // clients are firm-level, so count by the firm prefix before " - ".
   const projectCountByClientName = useMemo(() => {
     const counts = new Map<string, number>()
     for (const p of projects) {
-      const key = p.client.trim().toLowerCase()
+      const key = p.client.split(' - ')[0].trim().toLowerCase()
       counts.set(key, (counts.get(key) ?? 0) + 1)
     }
     return counts
@@ -157,16 +149,17 @@ export default function AdminPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
             {clients.map(c => {
-              const count =
-                projectCountByClientId.get(c.id) ??
-                projectCountByClientName.get(c.name.trim().toLowerCase()) ??
-                0
+              const count = projectCountByClientName.get(c.name.trim().toLowerCase()) ?? 0
               return (
-                <div
+                <Link
                   key={c.id}
-                  className="flex items-center justify-between gap-2 py-1 border-b border-border/40 last:border-0"
+                  href={`/clients/${c.id}`}
+                  title={`Open ${c.name}'s client page — projects, spend, and history`}
+                  className="flex items-center justify-between gap-2 py-1 border-b border-border/40 last:border-0 hover:bg-accent/50 rounded px-1 -mx-1 transition-colors group"
                 >
-                  <span className="text-sm text-foreground truncate">{c.name}</span>
+                  <span className="text-sm text-foreground group-hover:text-blue-600 dark:group-hover:text-blue-400 truncate transition-colors">
+                    {c.name}
+                  </span>
                   <span className="flex items-center gap-2 shrink-0">
                     {count > 0 && (
                       <span className="text-xs text-muted-foreground">{count} project{count > 1 ? 's' : ''}</span>
@@ -175,7 +168,7 @@ export default function AdminPage() {
                       {c.code ?? '—'}
                     </span>
                   </span>
-                </div>
+                </Link>
               )
             })}
           </div>

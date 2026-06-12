@@ -97,6 +97,7 @@ The **✦ Assistant** button (bottom-right) answers questions from live project 
 
 - Every project has a permanent **Project ID** like `PR00042` — shown next to the project title and in the list view, included in CSV exports, and assigned automatically to new projects. It never changes, so use it when referencing a project in email or Slack. Clients have matching `Cl#####` ids.
 - The **☰ menu → Admin** page has: links to every system behind the tracker (including Supabase Users for password resets), the client list with their ids, the team roster, and a data-health checklist (open projects missing a captain or due date).
+- **Client pages**: click any client on the Admin page — or the client name on a project page — to see that client's full picture: client since, open/closed project counts, average spend per project, how often they come back, the contacts who've brought us work, and every project (click one to open it).
 
 ## 8. Tips
 

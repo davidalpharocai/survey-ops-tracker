@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
@@ -419,7 +420,23 @@ export default function ProjectDetailPage() {
           {/* Right sidebar */}
           <div className="flex flex-col gap-4">
             <SidebarCard title="People">
-              <DetailRow label="Client" value={project.client} tooltip={TOOLTIPS['Client']} />
+              {project.client_id ? (
+                <div className="flex justify-between items-center text-sm gap-2">
+                  <span className="text-muted-foreground flex items-center text-xs shrink-0">
+                    Client
+                    <InfoTooltip text="The client this project is for. Click the name to open their client page — all their projects, spend, and history." />
+                  </span>
+                  <Link
+                    href={`/clients/${project.client_id}`}
+                    className="text-sm text-blue-600 dark:text-blue-400 hover:underline truncate"
+                    title="Open this client's page"
+                  >
+                    {project.client}
+                  </Link>
+                </div>
+              ) : (
+                <DetailRow label="Client" value={project.client} tooltip={TOOLTIPS['Client']} />
+              )}
               <CaptainRow
                 label="Project Captain"
                 captain={project.captain}
