@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
@@ -14,7 +15,7 @@ import { LatestNextSteps } from '@/components/project/LatestNextSteps'
 import { LinkedDocuments } from '@/components/project/LinkedDocuments'
 import { SlackChannel } from '@/components/project/SlackChannel'
 import { NProgressBar } from '@/components/shared/NProgressBar'
-import { InfoTooltip } from '@/components/shared/InfoTooltip'
+import { InfoTooltip, HelpTip } from '@/components/shared/InfoTooltip'
 import { Skeleton } from '@/components/shared/Skeleton'
 import { formatDate, getDueUrgency } from '@/lib/utils/date'
 import { differenceInCalendarDays, parseISO, startOfDay } from 'date-fns'
@@ -162,6 +163,14 @@ export default function ProjectDetailPage() {
         </button>
         <span className="text-muted-foreground/50">/</span>
         <h1 className="text-2xl font-bold text-foreground">{project.project_name}</h1>
+        {project.project_code && (
+          <span
+            className="text-xs font-mono text-muted-foreground border border-border rounded px-1.5 py-0.5"
+            title="Project ID — a permanent reference that never changes; also recorded in the Survey Ops sheet"
+          >
+            {project.project_code}
+          </span>
+        )}
         {project.project_type && (
           <span className={`text-xs px-2 py-1 rounded ${TYPE_BADGE[project.project_type] ?? ''}`}>
             {project.project_type}
@@ -194,45 +203,52 @@ export default function ProjectDetailPage() {
             </span>
           )}
           {project.status === 'Open' && (
-            <button
-              onClick={() => setStatus('Hold')}
-              title="Pause this project. It stays on the board, greyed out."
-              className="text-sm border border-border text-muted-foreground hover:text-foreground hover:border-ring px-3 py-1.5 rounded-lg transition-colors shrink-0"
-            >
-              ⏸ Hold
-            </button>
+            <HelpTip text="Pauses the project. The card stays on the board but greys out and sinks to the bottom of its column. Resume brings it right back — nothing is lost.">
+              <button
+                onClick={() => setStatus('Hold')}
+                className="text-sm border border-border text-muted-foreground hover:text-foreground hover:border-ring px-3 py-1.5 rounded-lg transition-colors shrink-0"
+              >
+                ⏸ Hold
+              </button>
+            </HelpTip>
           )}
           {project.status === 'Hold' && (
-            <button
-              onClick={() => setStatus('Open')}
-              className="text-sm border border-border text-muted-foreground hover:text-foreground hover:border-ring px-3 py-1.5 rounded-lg transition-colors shrink-0"
-            >
-              ▶ Resume
-            </button>
+            <HelpTip text="Takes the project off hold — the card returns to normal in its column.">
+              <button
+                onClick={() => setStatus('Open')}
+                className="text-sm border border-border text-muted-foreground hover:text-foreground hover:border-ring px-3 py-1.5 rounded-lg transition-colors shrink-0"
+              >
+                ▶ Resume
+              </button>
+            </HelpTip>
           )}
           {project.status !== 'Closed' ? (
-            <button
-              onClick={() => setStatus('Closed')}
-              title="Marks the project Closed (done/archived). It stays visible in Full View and can be reopened anytime."
-              className="text-sm border border-border text-muted-foreground hover:text-foreground hover:border-ring px-3 py-1.5 rounded-lg transition-colors shrink-0"
-            >
-              ✕ Close Project
-            </button>
+            <HelpTip text="Marks the project done (or archived). It leaves Operations view but stays in Full View's Closed section, and can be reopened anytime.">
+              <button
+                onClick={() => setStatus('Closed')}
+                className="text-sm border border-border text-muted-foreground hover:text-foreground hover:border-ring px-3 py-1.5 rounded-lg transition-colors shrink-0"
+              >
+                ✕ Close Project
+              </button>
+            </HelpTip>
           ) : (
-            <button
-              onClick={() => setStatus('Open')}
-              className="text-sm border border-border text-muted-foreground hover:text-foreground hover:border-ring px-3 py-1.5 rounded-lg transition-colors shrink-0"
-            >
-              ↺ Reopen Project
-            </button>
+            <HelpTip text="Brings this closed project back to the open board.">
+              <button
+                onClick={() => setStatus('Open')}
+                className="text-sm border border-border text-muted-foreground hover:text-foreground hover:border-ring px-3 py-1.5 rounded-lg transition-colors shrink-0"
+              >
+                ↺ Reopen Project
+              </button>
+            </HelpTip>
           )}
-          <button
-            onClick={() => setConfirmingDelete(true)}
-            title="Permanently delete this project and its activity log."
-            className="text-sm border border-border text-muted-foreground hover:text-red-600 dark:hover:text-red-400 hover:border-red-500/50 px-3 py-1.5 rounded-lg transition-colors shrink-0"
-          >
-            🗑 Delete
-          </button>
+          <HelpTip text="Permanently deletes the project and its full history — no undo (it asks you to type 'delete' first). If you just want it off the board, use Close Project instead.">
+            <button
+              onClick={() => setConfirmingDelete(true)}
+              className="text-sm border border-border text-muted-foreground hover:text-red-600 dark:hover:text-red-400 hover:border-red-500/50 px-3 py-1.5 rounded-lg transition-colors shrink-0"
+            >
+              🗑 Delete
+            </button>
+          </HelpTip>
         </div>
       </div>
 
@@ -404,7 +420,23 @@ export default function ProjectDetailPage() {
           {/* Right sidebar */}
           <div className="flex flex-col gap-4">
             <SidebarCard title="People">
-              <DetailRow label="Client" value={project.client} tooltip={TOOLTIPS['Client']} />
+              {project.client_id ? (
+                <div className="flex justify-between items-center text-sm gap-2">
+                  <span className="text-muted-foreground flex items-center text-xs shrink-0">
+                    Client
+                    <InfoTooltip text="The client this project is for. Click the name to open their client page — all their projects, spend, and history." />
+                  </span>
+                  <Link
+                    href={`/clients/${project.client_id}`}
+                    className="text-sm text-blue-600 dark:text-blue-400 hover:underline truncate"
+                    title="Open this client's page"
+                  >
+                    {project.client}
+                  </Link>
+                </div>
+              ) : (
+                <DetailRow label="Client" value={project.client} tooltip={TOOLTIPS['Client']} />
+              )}
               <CaptainRow
                 label="Project Captain"
                 captain={project.captain}
@@ -788,30 +820,41 @@ function PriorityButton({
   onCycle: (next: string) => void
 }) {
   const next = PRIORITY_NEXT[priority] ?? 'high'
-  const title = 'Click to cycle priority: none → high → urgent. High and urgent projects sort to the top of their board column.'
+  const help: Record<string, string> = {
+    none: 'Sets this project\'s priority. Each click cycles: none → ⚑ High → ‼ Urgent → back to none. High and urgent cards float to the top of their board column.',
+    high: 'Priority is ⚑ High — the card floats to the top of its board column. Click again for ‼ Urgent; one more click clears it back to none.',
+    urgent: 'Priority is ‼ Urgent — the very top of the board column. Click again to clear priority back to none.',
+  }
+  const text = help[priority] ?? help.none
   const base = 'text-sm px-3 py-1.5 rounded-lg transition-colors shrink-0 cursor-pointer'
 
   if (priority === 'high') {
     return (
-      <button onClick={() => onCycle(next)} title={title}
-        className={`${base} bg-amber-500/15 text-amber-600 dark:text-amber-400 hover:bg-amber-500/25`}>
-        ⚑ High
-      </button>
+      <HelpTip text={text}>
+        <button onClick={() => onCycle(next)}
+          className={`${base} bg-amber-500/15 text-amber-600 dark:text-amber-400 hover:bg-amber-500/25`}>
+          ⚑ High
+        </button>
+      </HelpTip>
     )
   }
   if (priority === 'urgent') {
     return (
-      <button onClick={() => onCycle(next)} title={title}
-        className={`${base} bg-red-500/15 text-red-600 dark:text-red-400 hover:bg-red-500/25`}>
-        ‼ Urgent
-      </button>
+      <HelpTip text={text}>
+        <button onClick={() => onCycle(next)}
+          className={`${base} bg-red-500/15 text-red-600 dark:text-red-400 hover:bg-red-500/25`}>
+          ‼ Urgent
+        </button>
+      </HelpTip>
     )
   }
   return (
-    <button onClick={() => onCycle(next)} title={title}
-      className={`${base} border border-border text-muted-foreground hover:text-foreground hover:border-ring`}>
-      ⚑ Priority
-    </button>
+    <HelpTip text={text}>
+      <button onClick={() => onCycle(next)}
+        className={`${base} border border-border text-muted-foreground hover:text-foreground hover:border-ring`}>
+        ⚑ Priority
+      </button>
+    </HelpTip>
   )
 }
 

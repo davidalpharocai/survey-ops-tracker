@@ -2,6 +2,7 @@ import type { SurveyProject } from '@/lib/hooks/useProjects'
 
 // Column order mirrors the original Survey Ops sheet where possible
 const COLUMNS: { header: string; value: (p: SurveyProject) => unknown }[] = [
+  { header: 'Project ID', value: p => p.project_code },
   { header: 'Project Name', value: p => p.project_name },
   { header: 'Client', value: p => p.client },
   { header: 'Type', value: p => p.project_type },

@@ -129,6 +129,14 @@ export function ProjectTable({ projects }: ProjectTableProps) {
                       {p.status === 'Hold' && <span title="On hold">⏸ </span>}
                       {p.project_name}
                     </span>
+                    {p.project_code && (
+                      <span
+                        className="text-xs font-mono text-muted-foreground shrink-0"
+                        title="Project ID — permanent reference"
+                      >
+                        {p.project_code}
+                      </span>
+                    )}
                     {complianceStatus && (
                       <span
                         title={`Compliance: ${complianceStatus.replace('_', ' ')}`}
