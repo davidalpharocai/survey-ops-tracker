@@ -199,7 +199,7 @@ export default function BoardPage() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
           {/* Board/List tabs */}
-          <div className="flex bg-muted rounded-lg p-1 gap-1">
+          <div className="flex bg-muted border border-border rounded-lg p-1 gap-1">
             <span title="Kanban view — drag cards between pipeline stages" className="text-xs bg-background text-foreground px-3 py-1.5 rounded font-medium">
               Board
             </span>

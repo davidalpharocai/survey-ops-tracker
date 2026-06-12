@@ -59,7 +59,7 @@ export default function ListView() {
     <div className="flex flex-col gap-4">
       {/* Top bar */}
       <div className="flex items-center gap-3 flex-wrap">
-        <div className="flex bg-muted rounded-lg p-1 gap-1">
+        <div className="flex bg-muted border border-border rounded-lg p-1 gap-1">
           <Link
             href="/"
             title="Kanban view — drag cards between pipeline stages"

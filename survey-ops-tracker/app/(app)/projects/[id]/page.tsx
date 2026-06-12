@@ -247,7 +247,7 @@ export default function ProjectDetailPage() {
       )}
 
       {/* Tabs */}
-      <div className="flex bg-muted rounded-lg p-1 gap-1 w-fit mb-4">
+      <div className="flex bg-muted border border-border rounded-lg p-1 gap-1 w-fit mb-4">
         <button
           onClick={() => setActiveTab('overview')}
           title='The full project view — stats, pipeline, next steps, documents, and details'
