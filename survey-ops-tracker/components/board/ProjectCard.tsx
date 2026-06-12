@@ -39,16 +39,23 @@ const PRIORITY_CHIP: Record<string, { symbol: string; classes: string; label: st
 interface ProjectCardProps {
   project: SlimProject
   onClick?: () => void
+  /** Newly assigned to the viewer and not yet opened — green border + NEW! badge */
+  isNew?: boolean
 }
 
-export function ProjectCard({ project, onClick }: ProjectCardProps) {
+export function ProjectCard({ project, onClick, isNew }: ProjectCardProps) {
   const onHold = project.status === 'Hold'
+  // Hold takes precedence over NEW if both somehow apply
+  const showNew = !!isNew && !onHold
   const dueDateStatus = getDueDateStatus(project.due_date)
   const urgency = getDueUrgency(project.due_date)
   const urgencyBorder = urgency ? URGENCY_BORDER[urgency] : undefined
   // Hold: greyed out, grey border, urgency colors suppressed (it's paused)
+  // NEW: green border overrides urgency until the assignee opens the project
   const border = onHold
     ? 'border-2 border-muted-foreground/40 border-l-4 border-l-muted-foreground/50'
+    : showNew
+    ? 'border-2 border-emerald-500 border-l-4 border-l-emerald-500'
     : urgencyBorder
     ? `border-l-4 ${urgencyBorder}`
     : 'border border-border border-l-4 border-l-foreground/80'
@@ -76,6 +83,16 @@ export function ProjectCard({ project, onClick }: ProjectCardProps) {
           title="On hold — paused; greyed out and sorted to the bottom of the column"
         >
           ⏸ Hold
+        </span>
+      )}
+
+      {/* NEW! badge floats on the top-right corner, like Hold */}
+      {showNew && (
+        <span
+          className="absolute -top-2.5 right-2 rounded-full bg-emerald-500/15 border border-emerald-500 text-emerald-700 dark:text-emerald-300 px-2 text-[11px] font-medium"
+          title="Newly assigned to you — opens the project to dismiss"
+        >
+          NEW!
         </span>
       )}
 

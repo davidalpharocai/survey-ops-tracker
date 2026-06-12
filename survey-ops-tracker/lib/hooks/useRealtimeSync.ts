@@ -19,7 +19,11 @@ const PROJECT_SCOPED_TABLES: Record<string, string> = {
   project_data_changes: 'data-changes',
 }
 
-const WATCHED_TABLES = ['survey_projects', ...Object.keys(PROJECT_SCOPED_TABLES)]
+const WATCHED_TABLES = [
+  'survey_projects',
+  'project_seen',
+  ...Object.keys(PROJECT_SCOPED_TABLES),
+]
 
 type ChangePayload = RealtimePostgresChangesPayload<Record<string, unknown>>
 
@@ -69,6 +73,11 @@ export function useRealtimeSync() {
         const rowId = newRow?.id ?? oldRow?.id
         if (rowId) queue(['project', rowId])
         else queue(['project'])
+        return
+      }
+      if (payload.table === 'project_seen') {
+        // Seen rows are keyed ['seen', email]; prefix invalidation covers all users.
+        queue(['seen'])
         return
       }
       const prefix = PROJECT_SCOPED_TABLES[payload.table]

@@ -1,6 +1,8 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import { useQueryClient } from '@tanstack/react-query'
+import { createClient } from '@/lib/supabase/client'
 import { useProject, useUpdateProject, useDeleteProject } from '@/lib/hooks/useProjects'
 import { useTeamMembers, type TeamMember } from '@/lib/hooks/useTeamMembers'
 import { PipelineProgress } from '@/components/project/PipelineProgress'
@@ -54,6 +56,36 @@ export default function ProjectDetailPage() {
   const deleteProject = useDeleteProject()
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [activeTab, setActiveTab] = useState<'overview' | 'datalog'>('overview')
+  const queryClient = useQueryClient()
+  const projectLoaded = !!project
+
+  // Mark the project as seen by the current user on every visit — this is
+  // what dismisses the green NEW! badge on the board. Errors are swallowed
+  // on purpose: a missing project_seen table must never break the page.
+  useEffect(() => {
+    if (!projectLoaded || !id) return
+    let cancelled = false
+    const supabase = createClient()
+    ;(async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        const email = user?.email
+        if (!email || cancelled) return
+        const { error } = await supabase.from('project_seen').upsert(
+          { project_id: id, user_email: email, seen_at: new Date().toISOString() },
+          { onConflict: 'project_id,user_email' }
+        )
+        if (!error && !cancelled) {
+          queryClient.invalidateQueries({ queryKey: ['seen', email] })
+        }
+      } catch {
+        // ignore — seen tracking is best-effort
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [id, projectLoaded, queryClient])
 
   if (isLoading) {
     return <div className="text-muted-foreground text-sm">Loading...</div>

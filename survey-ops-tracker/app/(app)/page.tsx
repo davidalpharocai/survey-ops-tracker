@@ -9,6 +9,7 @@ import { ViewToggle } from '@/components/shared/ViewToggle'
 import { ColorKey } from '@/components/shared/ColorKey'
 import { useProjects, useMoveProjectToColumn, fetchFullProjects } from '@/lib/hooks/useProjects'
 import { useTeamMembers } from '@/lib/hooks/useTeamMembers'
+import { useIsNewForMe } from '@/lib/hooks/useSeenProjects'
 import { useViewMode } from '@/lib/hooks/useViewMode'
 import { exportProjectsCsv } from '@/lib/utils/exportCsv'
 import { isTypingTarget } from '@/lib/utils/keyboard'
@@ -19,6 +20,7 @@ export default function BoardPage() {
   const { data: projects = [], isLoading } = useProjects()
   const { data: teamMembers = [] } = useTeamMembers()
   const moveProject = useMoveProjectToColumn()
+  const isNewForMe = useIsNewForMe()
   const { mode, setMode } = useViewMode()
   const [showNewProject, setShowNewProject] = useState(false)
   const [showClosed, setShowClosed] = useState(false)
@@ -152,6 +154,7 @@ export default function BoardPage() {
                     key={p.id}
                     project={p}
                     onClick={() => router.push(`/projects/${p.id}`)}
+                    isNew={isNewForMe(p)}
                   />
                 ))}
               </div>

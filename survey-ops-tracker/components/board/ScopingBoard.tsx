@@ -3,6 +3,7 @@ import { DragDropContext, type DropResult } from '@hello-pangea/dnd'
 import { BoardColumn } from './BoardColumn'
 import { useRouter } from 'next/navigation'
 import { useUpdateProject } from '@/lib/hooks/useProjects'
+import { useIsNewForMe } from '@/lib/hooks/useSeenProjects'
 import type { SlimProject } from '@/lib/hooks/useProjects'
 import type { Database } from '@/lib/supabase/types'
 
@@ -22,6 +23,7 @@ interface ScopingBoardProps {
 export function ScopingBoard({ projects }: ScopingBoardProps) {
   const router = useRouter()
   const updateProject = useUpdateProject()
+  const isNewForMe = useIsNewForMe()
 
   function handleDragEnd(result: DropResult) {
     if (!result.destination) return
@@ -55,6 +57,7 @@ export function ScopingBoard({ projects }: ScopingBoardProps) {
                 p => (p.scoping_stage ?? 'New Inquiry') === stage
               )}
               onCardClick={id => router.push(`/projects/${id}`)}
+              isNewFor={isNewForMe}
             />
           ))}
         </div>

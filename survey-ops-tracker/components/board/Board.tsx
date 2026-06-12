@@ -5,6 +5,7 @@ import { BoardFilters } from './BoardFilters'
 import { useState, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useCurrentMember } from '@/lib/hooks/useCurrentMember'
+import { useIsNewForMe } from '@/lib/hooks/useSeenProjects'
 import { STAGE_ORDER, type BoardColumn as BoardColumnType } from '@/lib/utils/stage'
 import { getDueUrgency } from '@/lib/utils/date'
 import type { SlimProject } from '@/lib/hooks/useProjects'
@@ -29,6 +30,7 @@ function columnSortRank(p: SlimProject): number {
 export function Board({ projects, teamMembers, onMoveProject }: BoardProps) {
   const router = useRouter()
   const { data: currentMember, isLoading: memberLoading } = useCurrentMember()
+  const isNewForMe = useIsNewForMe()
   const [captainFilter, setCaptainFilter] = useState<string | null>(null)
   const [filterReady, setFilterReady] = useState(false)
   const [typeFilter, setTypeFilter] = useState<string | null>(null)
@@ -119,6 +121,7 @@ export function Board({ projects, teamMembers, onMoveProject }: BoardProps) {
                 .filter(p => p.board_column === stage)
                 .sort((a, b) => columnSortRank(a) - columnSortRank(b))}
               onCardClick={id => router.push(`/projects/${id}`)}
+              isNewFor={isNewForMe}
             />
           ))}
         </div>

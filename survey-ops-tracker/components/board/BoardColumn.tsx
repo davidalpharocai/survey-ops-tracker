@@ -9,9 +9,11 @@ interface BoardColumnProps {
   title: string
   projects: SlimProject[]
   onCardClick: (id: string) => void
+  /** Predicate from useIsNewForMe — marks cards newly assigned to the viewer */
+  isNewFor?: (p: SlimProject) => boolean
 }
 
-export function BoardColumn({ id, title, projects, onCardClick }: BoardColumnProps) {
+export function BoardColumn({ id, title, projects, onCardClick, isNewFor }: BoardColumnProps) {
   return (
     <div className="bg-card border border-border rounded-xl p-2 min-w-[158px] max-w-[253px] flex-1 basis-0 flex flex-col gap-2">
       <div className="flex items-center justify-between">
@@ -48,6 +50,7 @@ export function BoardColumn({ id, title, projects, onCardClick }: BoardColumnPro
                     <ProjectCard
                       project={project}
                       onClick={() => onCardClick(project.id)}
+                      isNew={isNewFor?.(project)}
                     />
                   </div>
                 )}

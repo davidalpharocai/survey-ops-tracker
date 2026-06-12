@@ -78,6 +78,7 @@ export type Database = {
           priority: string
           blocked_by: string
           survey_id_discrepancy: string | null
+          captain_assigned_at: string | null
           created_at: string
           updated_at: string
         }
@@ -125,6 +126,7 @@ export type Database = {
           priority?: string
           blocked_by?: string
           survey_id_discrepancy?: string | null
+          captain_assigned_at?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -172,6 +174,7 @@ export type Database = {
           priority?: string
           blocked_by?: string
           survey_id_discrepancy?: string | null
+          captain_assigned_at?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -486,6 +489,24 @@ export type Database = {
           created_by?: string | null
           created_at?: string
           edited_at?: string | null
+        }
+        Relationships: []
+      }
+      project_seen: {
+        Row: {
+          project_id: string
+          user_email: string
+          seen_at: string
+        }
+        Insert: {
+          project_id: string
+          user_email: string
+          seen_at?: string
+        }
+        Update: {
+          project_id?: string
+          user_email?: string
+          seen_at?: string
         }
         Relationships: []
       }

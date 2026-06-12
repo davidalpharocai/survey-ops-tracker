@@ -48,6 +48,7 @@ const SLIM_PROJECT_COLUMNS = [
   'stage_fielding',
   'stage_data_qa',
   'stage_delivery',
+  'captain_assigned_at',
   'created_at',
   'updated_at',
 ] as const
@@ -133,9 +134,10 @@ export function useUpdateProject() {
         .eq('id', id)
       if (error) throw error
     },
-    onMutate: async ({ id, updates }) => {
-      await queryClient.cancelQueries({ queryKey: ['projects'] })
-      await queryClient.cancelQueries({ queryKey: ['project', id] })
+    onMutate: ({ id, updates }) => {
+      // Cache writes happen SYNCHRONOUSLY (no await first) so the board
+      // re-renders in the same tick as the drop — an await here lets the
+      // drag library animate the card back to its source column first.
       const previousLists = queryClient.getQueriesData<SlimProject[]>({
         queryKey: ['projects'],
       })
@@ -149,6 +151,8 @@ export function useUpdateProject() {
       queryClient.setQueryData<SurveyProject | null>(['project', id], old =>
         old ? ({ ...old, ...updates } as SurveyProject) : old
       )
+      void queryClient.cancelQueries({ queryKey: ['projects'] })
+      void queryClient.cancelQueries({ queryKey: ['project', id] })
       return { previousLists, previousDetail }
     },
     onError: (_err, { id }, context) => {
@@ -177,14 +181,14 @@ export function useDeleteProject() {
         .eq('id', id)
       if (error) throw error
     },
-    onMutate: async id => {
-      await queryClient.cancelQueries({ queryKey: ['projects'] })
+    onMutate: id => {
       const previousLists = queryClient.getQueriesData<SlimProject[]>({
         queryKey: ['projects'],
       })
       queryClient.setQueriesData<SlimProject[]>({ queryKey: ['projects'] }, old =>
         old?.filter(p => p.id !== id)
       )
+      void queryClient.cancelQueries({ queryKey: ['projects'] })
       return { previousLists }
     },
     onError: (_err, _id, context) => {
