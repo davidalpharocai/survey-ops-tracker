@@ -42,8 +42,8 @@ const TOOLTIPS: Record<string, string> = {
   'Survey IDs': 'IDs of this project\'s surveys, comma separated. Auto-filled from the attached Google Sheet by the scheduled sync; manual edits stick unless the sheet changes.',
   'Submitted': 'Date the project was submitted into the pipeline.',
   'Launch Date': 'Date the survey went (or goes) live in the field.',
-  'Due Date': 'Date the deliverable is due to the client.',
-  'Deliver Date': 'Date the deliverable was actually sent to the client.',
+  'Due Date': 'Internal deadline — when everything needs to be finished on our side.',
+  'Deliver Date': 'Client-facing deadline — when the client needs the project in hand. Often the same day as the internal due date.',
 }
 
 const TYPE_BADGE: Record<string, string> = {
@@ -374,10 +374,11 @@ export default function ProjectDetailPage() {
             tooltip={TOOLTIPS['N Collected']}
             onSave={v => updateProject.mutate({ id, updates: { n_collected: v ?? 0 } })}
           />
-          <HeroDue
-            value={project.due_date}
-            tooltip={TOOLTIPS['Due Date']}
-            onSave={v => updateProject.mutate({ id, updates: { due_date: v } })}
+          <HeroTiming
+            due={project.due_date}
+            deliver={project.deliver_date}
+            onSaveDue={v => updateProject.mutate({ id, updates: { due_date: v } })}
+            onSaveDeliver={v => updateProject.mutate({ id, updates: { deliver_date: v } })}
           />
           <HeroBudgetLeft
             budget={project.budget ?? null}
@@ -639,13 +640,88 @@ function HeroNCollected({
   )
 }
 
-function HeroDue({
-  value,
+function HeroTiming({
+  due,
+  deliver,
+  onSaveDue,
+  onSaveDeliver,
+}: {
+  due: string | null
+  deliver: string | null
+  onSaveDue: (next: string | null) => void
+  onSaveDeliver: (next: string | null) => void
+}) {
+  const urgency = getDueUrgency(due)
+  const dueColor =
+    urgency === 'overdue'
+      ? 'text-red-600 dark:text-red-400'
+      : urgency === 'tomorrow'
+      ? 'text-orange-600 dark:text-orange-400'
+      : urgency === 'twodays'
+      ? 'text-amber-600 dark:text-amber-400'
+      : 'text-foreground'
+
+  let duePhrase = ' '
+  if (due) {
+    const days = differenceInCalendarDays(startOfDay(parseISO(due)), startOfDay(new Date()))
+    duePhrase =
+      days < 0 ? 'overdue' : days === 0 ? 'today' : days === 1 ? 'tomorrow' : `in ${days} days`
+  }
+
+  // The useful number: how much buffer between internally-done and client delivery
+  let deliverPhrase = ' '
+  let deliverWarn = false
+  if (deliver && due) {
+    const gap = differenceInCalendarDays(startOfDay(parseISO(deliver)), startOfDay(parseISO(due)))
+    if (gap === 0) deliverPhrase = 'same day as due'
+    else if (gap > 0) deliverPhrase = `${gap}d buffer after due`
+    else {
+      deliverPhrase = `⚠ ${-gap}d before due`
+      deliverWarn = true
+    }
+  } else if (deliver) {
+    deliverPhrase = 'no internal due set'
+  }
+
+  return (
+    <div className="bg-card border border-border shadow-sm rounded-xl p-3 grid grid-cols-2 gap-2">
+      <TimingHalf
+        label="Due"
+        hint="internal"
+        tooltip="Internal deadline — when everything needs to be finished on our side. Click the date to change it."
+        value={due}
+        valueColor={dueColor}
+        subtitle={duePhrase}
+        onSave={onSaveDue}
+      />
+      <TimingHalf
+        label="Deliver"
+        hint="client"
+        tooltip="Client-facing deadline — when the client needs the project in hand. Often the same day as the internal due date; the note below shows the buffer between the two."
+        value={deliver}
+        valueColor={deliverWarn ? 'text-amber-600 dark:text-amber-400' : 'text-foreground'}
+        subtitle={deliverPhrase}
+        onSave={onSaveDeliver}
+      />
+    </div>
+  )
+}
+
+function TimingHalf({
+  label,
+  hint,
   tooltip,
+  value,
+  valueColor,
+  subtitle,
   onSave,
 }: {
-  value: string | null
+  label: string
+  hint: string
   tooltip: string
+  value: string | null
+  valueColor: string
+  subtitle: string
   onSave: (next: string | null) => void
 }) {
   const [editing, setEditing] = useState(false)
@@ -656,62 +732,38 @@ function HeroDue({
     setEditing(false)
   }
 
-  const urgency = getDueUrgency(value)
-  const valueColor =
-    urgency === 'overdue'
-      ? 'text-red-600 dark:text-red-400'
-      : urgency === 'tomorrow'
-      ? 'text-orange-600 dark:text-orange-400'
-      : urgency === 'twodays'
-      ? 'text-amber-600 dark:text-amber-400'
-      : 'text-foreground'
-
-  let phrase = '—'
-  if (value) {
-    const days = differenceInCalendarDays(startOfDay(parseISO(value)), startOfDay(new Date()))
-    phrase =
-      days < 0 ? 'overdue' : days === 0 ? 'today' : days === 1 ? 'tomorrow' : `in ${days} days`
-  }
-
   return (
-    <div className="bg-card border border-border shadow-sm rounded-xl p-3 flex flex-col gap-1">
-      <span className="text-xs text-muted-foreground flex items-center">
-        Due
+    <div className="flex flex-col gap-1 min-w-0">
+      <span className="text-xs text-muted-foreground flex items-center whitespace-nowrap">
+        {label} <span className="text-muted-foreground/60 ml-1">({hint})</span>
         <InfoTooltip text={tooltip} />
       </span>
       {editing ? (
-        <div className="flex gap-1.5 items-center">
-          <input
-            autoFocus
-            type="date"
-            value={draft}
-            onChange={e => setDraft(e.target.value)}
-            className="min-w-0 bg-muted border border-border rounded px-2 py-1 text-sm text-foreground focus:outline-none focus:border-ring"
-            onKeyDown={e => {
-              if (e.key === 'Enter') save()
-              if (e.key === 'Escape') setEditing(false)
-            }}
-          />
-          <button
-            onClick={save}
-            className="text-xs bg-muted hover:bg-accent text-foreground px-2 py-1 rounded transition-colors"
-          >
-            Save
-          </button>
-        </div>
+        <input
+          autoFocus
+          type="date"
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
+          onBlur={save}
+          className="min-w-0 w-full bg-muted border border-border rounded px-1.5 py-1 text-sm text-foreground focus:outline-none focus:border-ring"
+          onKeyDown={e => {
+            if (e.key === 'Enter') save()
+            if (e.key === 'Escape') setEditing(false)
+          }}
+        />
       ) : (
         <button
           onClick={() => {
             setDraft(value ? value.slice(0, 10) : '')
             setEditing(true)
           }}
-          className={`text-2xl font-semibold leading-tight text-left cursor-pointer ${valueColor}`}
+          className={`text-xl font-semibold leading-tight text-left cursor-pointer truncate ${valueColor}`}
           title="Click to edit"
         >
           {formatDate(value)}
         </button>
       )}
-      <span className="text-xs text-muted-foreground">{phrase}</span>
+      <span className="text-xs text-muted-foreground truncate">{subtitle}</span>
     </div>
   )
 }

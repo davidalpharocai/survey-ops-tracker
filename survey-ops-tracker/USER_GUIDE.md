@@ -52,7 +52,7 @@ New projects normally start in **Scoping** (New Inquiry → Proposal Sent → Pr
 [screenshot: project page Overview]
 
 ### Hero stats (top)
-Four big numbers: **N collected** (click to edit), **Due date** (click to change), **Budget left** (with cost per response), and **Waiting On** (computes itself from the stage checkboxes — use "Blocked by" to override when stuck on the client or on us).
+Four big tiles: **N collected** (click to edit), **Timing** — Due (internal: when our work must be done) and Deliver (client: when they need it in hand) side by side, with the buffer between them spelled out ("same day as due", "2d buffer", or a ⚠ if delivery is set before the internal due date; both dates click-to-edit) — **Budget left** (with cost per response), and **Waiting On** (computes itself from the stage checkboxes — use "Blocked by" to override when stuck on the client or on us).
 
 ### Tabs
 - **Overview** — everything below
