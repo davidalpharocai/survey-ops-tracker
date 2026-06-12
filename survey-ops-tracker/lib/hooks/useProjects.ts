@@ -50,6 +50,7 @@ const SLIM_PROJECT_COLUMNS = [
   'stage_delivery',
   'captain_assigned_at',
   'captain_assigned_by',
+  'sort_order',
   'created_at',
   'updated_at',
 ] as const
@@ -128,9 +129,6 @@ export function useUpdateProject() {
     }: {
       id: string
       updates: ProjectUpdate
-      // optimistic-only: keep the dropped card at the position the user chose
-      // (insert before this project id in the cached list; null = end)
-      placeBeforeId?: string | null
     }) => {
       const { error } = await supabase
         .from('survey_projects')
@@ -138,7 +136,7 @@ export function useUpdateProject() {
         .eq('id', id)
       if (error) throw error
     },
-    onMutate: ({ id, updates, placeBeforeId }) => {
+    onMutate: ({ id, updates }) => {
       // Cache writes happen SYNCHRONOUSLY (no await first) so the board
       // re-renders in the same tick as the drop — an await here lets the
       // drag library animate the card back to its source column first.
@@ -149,20 +147,9 @@ export function useUpdateProject() {
         'project',
         id,
       ])
-      queryClient.setQueriesData<SlimProject[]>({ queryKey: ['projects'] }, old => {
-        if (!old) return old
-        const updated = old.map(p =>
-          p.id === id ? ({ ...p, ...updates } as SlimProject) : p
-        )
-        if (placeBeforeId === undefined) return updated
-        // reposition so the card stays where it was dropped
-        const moved = updated.find(p => p.id === id)
-        if (!moved) return updated
-        const rest = updated.filter(p => p.id !== id)
-        const at = placeBeforeId === null ? rest.length : rest.findIndex(p => p.id === placeBeforeId)
-        rest.splice(at === -1 ? rest.length : at, 0, moved)
-        return rest
-      })
+      queryClient.setQueriesData<SlimProject[]>({ queryKey: ['projects'] }, old =>
+        old?.map(p => (p.id === id ? ({ ...p, ...updates } as SlimProject) : p))
+      )
       queryClient.setQueryData<SurveyProject | null>(['project', id], old =>
         old ? ({ ...old, ...updates } as SurveyProject) : old
       )
@@ -219,15 +206,15 @@ export function useDeleteProject() {
 
 export function useMoveProjectToColumn() {
   const updateProject = useUpdateProject()
-  return (id: string, column: BoardColumn, placeBeforeId?: string | null) => {
+  return (id: string, column: BoardColumn, sortOrder?: number) => {
     const checkboxes = getCheckboxesForColumn(column)
     updateProject.mutate({
       id,
       updates: {
         board_column: column as Database['public']['Enums']['board_column'],
         ...checkboxes,
+        ...(sortOrder !== undefined ? { sort_order: sortOrder } : {}),
       },
-      placeBeforeId,
     })
   }
 }

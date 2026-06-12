@@ -8,13 +8,14 @@ import { useCurrentMember } from '@/lib/hooks/useCurrentMember'
 import { useIsNewForMe } from '@/lib/hooks/useSeenProjects'
 import { STAGE_ORDER, type BoardColumn as BoardColumnType } from '@/lib/utils/stage'
 import { getDueUrgency } from '@/lib/utils/date'
+import { boardOrder, sortOrderBetween } from '@/lib/utils/ordering'
 import type { SlimProject } from '@/lib/hooks/useProjects'
 import type { TeamMember } from '@/lib/hooks/useTeamMembers'
 
 interface BoardProps {
   projects: SlimProject[]
   teamMembers: TeamMember[]
-  onMoveProject: (id: string, column: BoardColumnType, placeBeforeId?: string | null) => void
+  onMoveProject: (id: string, column: BoardColumnType, sortOrder?: number) => void
   // Full View provides a page-level DragDropContext (so cards can be dragged
   // from scoping into the pipeline); the board then skips its own context
   wrapInContext?: boolean
@@ -90,16 +91,22 @@ export function Board({ projects, teamMembers, onMoveProject, wrapInContext = tr
   }, [projects, captainFilter, typeFilter, dueFilter, stageFilter, search])
 
   function handleDragEnd(result: DropResult) {
+    window.__sotDragging = false
     if (!result.destination) return
     const newColumn = result.destination.droppableId as BoardColumnType
-    if (newColumn === result.source.droppableId) return
-    // Keep the card at the exact spot it was dropped: find which card
-    // currently sits at that index in the destination column
+    const sameColumn = newColumn === result.source.droppableId
+    // The dropped card takes a persisted position between its new neighbors
     const destCards = filtered
       .filter(p => p.board_column === newColumn && p.id !== result.draggableId)
-      .sort((a, b) => columnSortRank(a) - columnSortRank(b))
-    const beforeId = destCards[result.destination.index]?.id ?? null
-    onMoveProject(result.draggableId, newColumn, beforeId)
+      .sort((a, b) => columnSortRank(a) - columnSortRank(b) || boardOrder(a, b))
+    const i = result.destination.index
+    const sortOrder = sortOrderBetween(destCards[i - 1]?.sort_order, destCards[i]?.sort_order)
+    if (sameColumn && result.destination.index === result.source.index) return
+    onMoveProject(result.draggableId, newColumn, sortOrder)
+  }
+
+  function handleDragStart() {
+    window.__sotDragging = true
   }
 
   const columns = (
@@ -111,7 +118,7 @@ export function Board({ projects, teamMembers, onMoveProject, wrapInContext = tr
           title={stage}
           projects={filtered
             .filter(p => p.board_column === stage)
-            .sort((a, b) => columnSortRank(a) - columnSortRank(b))}
+            .sort((a, b) => columnSortRank(a) - columnSortRank(b) || boardOrder(a, b))}
           isNewFor={isNewForMe}
           onCardClick={id => router.push(`/projects/${id}`)}
         />
@@ -136,7 +143,7 @@ export function Board({ projects, teamMembers, onMoveProject, wrapInContext = tr
         onSearchChange={setSearch}
       />
       {wrapInContext ? (
-        <DragDropContext onDragEnd={handleDragEnd}>{columns}</DragDropContext>
+        <DragDropContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>{columns}</DragDropContext>
       ) : (
         columns
       )}

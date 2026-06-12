@@ -14,6 +14,7 @@ import { useIsNewForMe } from '@/lib/hooks/useSeenProjects'
 import { useViewMode } from '@/lib/hooks/useViewMode'
 import { exportProjectsCsv } from '@/lib/utils/exportCsv'
 import { isTypingTarget } from '@/lib/utils/keyboard'
+import { boardOrder, sortOrderBetween } from '@/lib/utils/ordering'
 import { STAGE_ORDER, getCheckboxesForColumn, type BoardColumn as BoardColumnType } from '@/lib/utils/stage'
 import type { Database } from '@/lib/supabase/types'
 import Link from 'next/link'
@@ -78,28 +79,33 @@ export default function BoardPage() {
   // Full View drag handler: routes drops to the right action depending on
   // where the card came from and where it landed
   function handleFullViewDragEnd(result: DropResult) {
+    window.__sotDragging = false
     if (!result.destination) return
     const from = result.source.droppableId
     const to = result.destination.droppableId
-    if (from === to) return
     const id = result.draggableId
+    if (from === to && result.destination.index === result.source.index) return
     const toScoping = (SCOPING_STAGES as string[]).includes(to)
     const fromScoping = (SCOPING_STAGES as string[]).includes(from)
     const toPipeline = (STAGE_ORDER as string[]).includes(to)
 
-    // Which card currently sits at the drop index, so the moved card stays put
-    const beforeId = toPipeline
-      ? activeProjects
-          .filter(p => p.board_column === to && p.id !== id)
-          .sort((a, b) => columnSortRank(a) - columnSortRank(b))[
-          result.destination.index
-        ]?.id ?? null
-      : undefined
+    // Persisted position: the dropped card lands between its new neighbors
+    const destList = toPipeline
+      ? activeProjects.filter(p => p.board_column === to && p.id !== id)
+      : scopingProjects.filter(p => (p.scoping_stage ?? 'New Inquiry') === to && p.id !== id)
+    const destSorted = destList.sort(
+      (a, b) => columnSortRank(a) - columnSortRank(b) || boardOrder(a, b)
+    )
+    const i = result.destination.index
+    const sortOrder = sortOrderBetween(destSorted[i - 1]?.sort_order, destSorted[i]?.sort_order)
 
     if (fromScoping && toScoping) {
       updateProject.mutate({
         id,
-        updates: { scoping_stage: to as Database['public']['Enums']['scoping_stage'] },
+        updates: {
+          scoping_stage: to as Database['public']['Enums']['scoping_stage'],
+          sort_order: sortOrder,
+        },
       })
     } else if (fromScoping && toPipeline) {
       // Approve: promote into the pipeline at the column it was dropped on
@@ -110,11 +116,11 @@ export default function BoardPage() {
           board_column: to as Database['public']['Enums']['board_column'],
           submitted_date: new Date().toISOString().split('T')[0],
           ...getCheckboxesForColumn(to as BoardColumnType),
+          sort_order: sortOrder,
         },
-        placeBeforeId: beforeId,
       })
     } else if (toPipeline) {
-      moveProject(id, to as BoardColumnType, beforeId)
+      moveProject(id, to as BoardColumnType, sortOrder)
     }
     // pipeline -> scoping drags are ignored (demote via the project page if ever needed)
   }
@@ -168,7 +174,7 @@ export default function BoardPage() {
       {/* Full View: one shared drag context spanning scoping + pipeline, so a
           scoping card dropped on a pipeline column gets promoted on the spot */}
       {mode === 'full' ? (
-        <DragDropContext onDragEnd={handleFullViewDragEnd}>
+        <DragDropContext onDragStart={() => { window.__sotDragging = true }} onDragEnd={handleFullViewDragEnd}>
           <ScopingBoard projects={scopingProjects} wrapInContext={false} />
           <h2 className="text-xs text-muted-foreground uppercase tracking-widest font-semibold -mb-1">
             Operations Pipeline

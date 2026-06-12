@@ -50,6 +50,12 @@ export function useRealtimeSync() {
     function flush() {
       timer = null
       if (unmounted) return
+      // Never refetch mid-drag — a list change while a card is held makes the
+      // drag library stutter. Re-check shortly until the drag finishes.
+      if (window.__sotDragging) {
+        timer = setTimeout(flush, DEBOUNCE_MS)
+        return
+      }
       const keys = [...pending.values()]
       pending.clear()
       for (const queryKey of keys) {

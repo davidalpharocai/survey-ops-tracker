@@ -4,6 +4,7 @@ import { BoardColumn } from './BoardColumn'
 import { useRouter } from 'next/navigation'
 import { useUpdateProject } from '@/lib/hooks/useProjects'
 import { useIsNewForMe } from '@/lib/hooks/useSeenProjects'
+import { boardOrder } from '@/lib/utils/ordering'
 import type { SlimProject } from '@/lib/hooks/useProjects'
 import type { Database } from '@/lib/supabase/types'
 
@@ -46,9 +47,9 @@ export function ScopingBoard({ projects, wrapInContext = true }: ScopingBoardPro
           key={stage}
           id={stage}
           title={stage}
-          projects={projects.filter(
-            p => (p.scoping_stage ?? 'New Inquiry') === stage
-          )}
+          projects={projects
+            .filter(p => (p.scoping_stage ?? 'New Inquiry') === stage)
+            .sort(boardOrder)}
           onCardClick={id => router.push(`/projects/${id}`)}
           isNewFor={isNewForMe}
         />

@@ -80,6 +80,7 @@ export type Database = {
           survey_id_discrepancy: string | null
           captain_assigned_at: string | null
           captain_assigned_by: string | null
+          sort_order: number | null
           created_at: string
           updated_at: string
         }
@@ -129,6 +130,7 @@ export type Database = {
           survey_id_discrepancy?: string | null
           captain_assigned_at?: string | null
           captain_assigned_by?: string | null
+          sort_order?: number | null
           created_at?: string
           updated_at?: string
         }
@@ -178,6 +180,7 @@ export type Database = {
           survey_id_discrepancy?: string | null
           captain_assigned_at?: string | null
           captain_assigned_by?: string | null
+          sort_order?: number | null
           created_at?: string
           updated_at?: string
         }
