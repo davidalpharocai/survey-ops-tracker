@@ -26,7 +26,7 @@ export function SlackChannel({ projectId, url }: SlackChannelProps) {
   const showInput = editing || !url
 
   return (
-    <div className="bg-card rounded-xl p-4">
+    <div className="bg-card border border-border shadow-sm rounded-xl p-4">
       <h3 className="text-xs text-muted-foreground uppercase tracking-widest mb-3 font-medium flex items-center">
         Slack Channel
         <InfoTooltip text="Quick link to this project's Slack channel. Paste the channel URL once and open it from here." />

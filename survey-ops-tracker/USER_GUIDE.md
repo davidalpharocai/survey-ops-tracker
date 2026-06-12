@@ -2,6 +2,8 @@
 
 *Last updated: June 11, 2026. The team's tracker for survey projects from first inquiry through delivery.*
 
+**Finding this guide later:** the ☰ menu in the app's top-left corner links straight here, along with the Systems & Handover doc.
+
 **App:** https://survey-ops-tracker.vercel.app
 **Sign in:** your @alpharoc.ai email + password (only company accounts can get in). Forgot your password? Ask David to reset it in Supabase.
 

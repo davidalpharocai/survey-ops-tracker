@@ -22,6 +22,7 @@ import { deriveWaitingOn } from '@/lib/utils/waitingOn'
 import { BudgetWidget } from '@/components/project/BudgetWidget'
 import { BidWidget } from '@/components/project/BidWidget'
 import { CompliancePanel } from '@/components/compliance/CompliancePanel'
+import { salespersonOptions } from '@/lib/utils/salespeople'
 
 const TOOLTIPS: Record<string, string> = {
   'Client': 'The client this project is for.',
@@ -103,7 +104,7 @@ export default function ProjectDetailPage() {
         <Skeleton className="h-9 w-72 rounded-lg mb-4" />
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="bg-card rounded-xl p-3 flex flex-col gap-2">
+            <div key={i} className="bg-card border border-border shadow-sm rounded-xl p-3 flex flex-col gap-2">
               <Skeleton className="h-3 w-20" />
               <Skeleton className="h-7 w-24" />
               <Skeleton className="h-3 w-16" />
@@ -113,7 +114,7 @@ export default function ProjectDetailPage() {
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
           <div className="flex flex-col gap-4">
             {['h-28', 'h-40', 'h-36'].map((h, i) => (
-              <div key={i} className="bg-card rounded-xl p-4 flex flex-col gap-3">
+              <div key={i} className="bg-card border border-border shadow-sm rounded-xl p-4 flex flex-col gap-3">
                 <Skeleton className="h-3 w-32" />
                 <Skeleton className={`w-full ${h}`} />
               </div>
@@ -121,7 +122,7 @@ export default function ProjectDetailPage() {
           </div>
           <div className="flex flex-col gap-4">
             {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="bg-card rounded-xl p-4 flex flex-col gap-3">
+              <div key={i} className="bg-card border border-border shadow-sm rounded-xl p-4 flex flex-col gap-3">
                 <Skeleton className="h-3 w-20" />
                 <Skeleton className="h-4 w-full" />
                 <Skeleton className="h-4 w-3/4" />
@@ -247,7 +248,7 @@ export default function ProjectDetailPage() {
       )}
 
       {/* Tabs */}
-      <div className="flex bg-muted rounded-lg p-1 gap-1 w-fit mb-4">
+      <div className="flex bg-muted border border-border rounded-lg p-1 gap-1 w-fit mb-4">
         <button
           onClick={() => setActiveTab('overview')}
           title='The full project view — stats, pipeline, next steps, documents, and details'
@@ -291,7 +292,7 @@ export default function ProjectDetailPage() {
 
       {activeTab === 'links' && (
         <div className="max-w-3xl flex flex-col gap-4">
-          <div className="bg-card rounded-xl p-4">
+          <div className="bg-card border border-border shadow-sm rounded-xl p-4">
             <div className="flex flex-col gap-3">
               <EditableRow
                 label="Survey IDs"
@@ -337,7 +338,7 @@ export default function ProjectDetailPage() {
 
           <SlackChannel projectId={project.id} url={project.slack_channel_url ?? null} />
 
-          <div className="bg-card rounded-xl p-4 text-sm text-muted-foreground leading-relaxed">
+          <div className="bg-card border border-border shadow-sm rounded-xl p-4 text-sm text-muted-foreground leading-relaxed">
             <p className="font-medium text-muted-foreground mb-1 text-xs uppercase tracking-widest">
               Notifications
             </p>
@@ -380,7 +381,7 @@ export default function ProjectDetailPage() {
             <div className="flex">
               <QuickEdit project={project} />
             </div>
-            <div className="bg-card rounded-xl p-4">
+            <div className="bg-card border border-border shadow-sm rounded-xl p-4">
               <h3 className="text-xs text-muted-foreground uppercase tracking-widest mb-4 font-medium">
                 {project.phase === 'Scoping' ? 'Scoping Stage' : 'Pipeline Progress'}
               </h3>
@@ -410,12 +411,10 @@ export default function ProjectDetailPage() {
                 tooltip={TOOLTIPS['Project Captain']}
                 onSave={v => updateProject.mutate({ id, updates: { captain_id: v } })}
               />
-              <EditableRow
-                label="Salesperson"
+              <SalespersonRow
                 value={project.salesperson ?? ''}
-                placeholder="e.g. Jenna Kessler"
                 tooltip={TOOLTIPS['Salesperson']}
-                onSave={v => updateProject.mutate({ id, updates: { salesperson: v || null } })}
+                onSave={v => updateProject.mutate({ id, updates: { salesperson: v } })}
               />
             </SidebarCard>
 
@@ -521,7 +520,7 @@ export default function ProjectDetailPage() {
 
 function SidebarCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="bg-card rounded-xl p-4">
+    <div className="bg-card border border-border shadow-sm rounded-xl p-4">
       <h3 className="text-xs text-muted-foreground uppercase tracking-widest mb-4 font-medium">
         {title}
       </h3>
@@ -553,7 +552,7 @@ function HeroNCollected({
   }
 
   return (
-    <div className="bg-card rounded-xl p-3 flex flex-col gap-1">
+    <div className="bg-card border border-border shadow-sm rounded-xl p-3 flex flex-col gap-1">
       <span className="text-xs text-muted-foreground flex items-center">
         N collected
         <InfoTooltip text={tooltip} />
@@ -633,7 +632,7 @@ function HeroDue({
   }
 
   return (
-    <div className="bg-card rounded-xl p-3 flex flex-col gap-1">
+    <div className="bg-card border border-border shadow-sm rounded-xl p-3 flex flex-col gap-1">
       <span className="text-xs text-muted-foreground flex items-center">
         Due
         <InfoTooltip text={tooltip} />
@@ -700,7 +699,7 @@ function HeroBudgetLeft({
     actualSpend != null && effectiveN != null ? actualSpend / effectiveN : null
 
   return (
-    <div className="bg-card rounded-xl p-3 flex flex-col gap-1">
+    <div className="bg-card border border-border shadow-sm rounded-xl p-3 flex flex-col gap-1">
       <span className="text-xs text-muted-foreground flex items-center">
         Budget left
         <InfoTooltip text="Allocated budget minus actual spend. Edit the amounts in the Money card." />
@@ -737,7 +736,7 @@ function HeroWaitingOn({
   const derived = deriveWaitingOn(project)
   const [main, sub] = derived.split(' — ')
   return (
-    <div className="bg-card rounded-xl p-3 flex flex-col gap-1">
+    <div className="bg-card border border-border shadow-sm rounded-xl p-3 flex flex-col gap-1">
       <span className="text-xs text-muted-foreground flex items-center">
         Waiting on
         <InfoTooltip text="Auto-derived from status, phase, stage checkboxes, and fielding progress. Set the dropdown when the project is blocked to force it to Client or Us." />
@@ -1071,6 +1070,65 @@ function EditableDateRow({
         title="Click to edit"
       >
         {formatDate(value)}
+      </button>
+    </div>
+  )
+}
+
+function SalespersonRow({
+  value,
+  tooltip,
+  onSave,
+}: {
+  value: string
+  tooltip?: string
+  onSave: (next: string | null) => void
+}) {
+  const [editing, setEditing] = useState(false)
+
+  if (editing) {
+    return (
+      <div className="flex justify-between items-center text-sm gap-2">
+        <span className="text-muted-foreground flex items-center text-xs shrink-0">
+          Salesperson
+          {tooltip && <InfoTooltip text={tooltip} />}
+        </span>
+        <select
+          autoFocus
+          value={value}
+          onChange={e => {
+            onSave(e.target.value || null)
+            setEditing(false)
+          }}
+          onBlur={() => setEditing(false)}
+          onKeyDown={e => {
+            if (e.key === 'Escape') setEditing(false)
+          }}
+          className="min-w-0 bg-muted border border-border rounded px-2 py-1 text-sm text-foreground focus:outline-none focus:border-ring"
+        >
+          <option value="">—</option>
+          {salespersonOptions(value).map(name => (
+            <option key={name} value={name}>
+              {name}
+            </option>
+          ))}
+        </select>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex justify-between items-center text-sm gap-2">
+      <span className="text-muted-foreground flex items-center text-xs shrink-0">
+        Salesperson
+        {tooltip && <InfoTooltip text={tooltip} />}
+      </span>
+      <button
+        onClick={() => setEditing(true)}
+        className="text-sm text-foreground hover:text-foreground/70 cursor-pointer truncate"
+        title="Click to change"
+      >
+        {value || <span className="text-muted-foreground/50">— click to set</span>}
       </button>
     </div>
   )

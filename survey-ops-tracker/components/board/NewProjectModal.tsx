@@ -4,6 +4,7 @@ import { useCreateProject } from '@/lib/hooks/useProjects'
 import { useRouter } from 'next/navigation'
 import { FIELD_LABELS, formatFieldValue, fieldsToUpdates } from '@/lib/utils/quickFields'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
+import { salespersonOptions } from '@/lib/utils/salespeople'
 import type { TeamMember } from '@/lib/hooks/useTeamMembers'
 import type { Database } from '@/lib/supabase/types'
 
@@ -215,12 +216,18 @@ export function NewProjectModal({ teamMembers, knownClients = [], onClose }: New
             Salesperson
             <InfoTooltip text="The sales lead who sold this project." />
           </span>
-          <input
+          <select
             value={salesperson}
             onChange={e => setSalesperson(e.target.value)}
-            placeholder="e.g. Jenna Kessler"
             className={inputClass}
-          />
+          >
+            <option value="">—</option>
+            {salespersonOptions(salesperson).map(name => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
         </label>
 
         <label className="flex items-center gap-2 text-xs text-muted-foreground mt-1 cursor-pointer">
