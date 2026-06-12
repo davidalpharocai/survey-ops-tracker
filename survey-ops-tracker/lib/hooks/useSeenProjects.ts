@@ -5,14 +5,15 @@ import { useCurrentMember } from './useCurrentMember'
 
 type SeenRow = { project_id: string; seen_at: string }
 
-// The logged-in user's auth email — the identity key for project_seen rows.
-function useAuthEmail() {
+// The logged-in user's auth identity — email keys project_seen rows,
+// uid identifies who made assignments (captain_assigned_by).
+function useAuthIdentity() {
   const supabase = createClient()
   return useQuery({
-    queryKey: ['auth-email'],
+    queryKey: ['auth-identity'],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser()
-      return user?.email ?? null
+      return user ? { email: user.email ?? null, uid: user.id } : null
     },
     staleTime: 5 * 60_000,
   })
@@ -26,7 +27,8 @@ function useAuthEmail() {
  */
 export function useSeenProjects() {
   const supabase = createClient()
-  const { data: email } = useAuthEmail()
+  const { data: identity } = useAuthIdentity()
+  const email = identity?.email ?? null
   return useQuery({
     queryKey: ['seen', email],
     queryFn: async () => {
@@ -45,11 +47,13 @@ export function useSeenProjects() {
 
 /**
  * Returns a predicate: is this project "new for me"? True when the project
- * is captained by the current user, the assignment is stamped, and the user
- * hasn't opened the project since that assignment.
+ * is captained by the current user, the assignment is stamped, was made by
+ * someone ELSE (self-assignments don't count), and the user hasn't opened
+ * the project since that assignment.
  */
 export function useIsNewForMe() {
   const { data: currentMember } = useCurrentMember()
+  const { data: identity } = useAuthIdentity()
   const { data: seenRows } = useSeenProjects()
 
   const seenAtById = useMemo(() => {
@@ -63,14 +67,19 @@ export function useIsNewForMe() {
       id: string
       captain?: { id: string } | null
       captain_assigned_at?: string | null
+      captain_assigned_by?: string | null
     }): boolean => {
       if (!currentMember) return false
       if (p.captain?.id !== currentMember.id) return false
       if (!p.captain_assigned_at) return false
+      // You assigned it to yourself — nothing to announce
+      if (p.captain_assigned_by && identity?.uid && p.captain_assigned_by === identity.uid) {
+        return false
+      }
       const seenAt = seenAtById.get(p.id)
       if (!seenAt) return true
       return new Date(seenAt).getTime() < new Date(p.captain_assigned_at).getTime()
     },
-    [currentMember, seenAtById]
+    [currentMember, identity, seenAtById]
   )
 }

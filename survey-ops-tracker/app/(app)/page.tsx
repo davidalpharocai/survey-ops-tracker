@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { DragDropContext, type DropResult } from '@hello-pangea/dnd'
-import { Board } from '@/components/board/Board'
+import { Board, columnSortRank } from '@/components/board/Board'
 import { ScopingBoard, SCOPING_STAGES } from '@/components/board/ScopingBoard'
 import { NewProjectModal } from '@/components/board/NewProjectModal'
 import { ProjectCard } from '@/components/board/ProjectCard'
@@ -87,6 +87,15 @@ export default function BoardPage() {
     const fromScoping = (SCOPING_STAGES as string[]).includes(from)
     const toPipeline = (STAGE_ORDER as string[]).includes(to)
 
+    // Which card currently sits at the drop index, so the moved card stays put
+    const beforeId = toPipeline
+      ? activeProjects
+          .filter(p => p.board_column === to && p.id !== id)
+          .sort((a, b) => columnSortRank(a) - columnSortRank(b))[
+          result.destination.index
+        ]?.id ?? null
+      : undefined
+
     if (fromScoping && toScoping) {
       updateProject.mutate({
         id,
@@ -102,9 +111,10 @@ export default function BoardPage() {
           submitted_date: new Date().toISOString().split('T')[0],
           ...getCheckboxesForColumn(to as BoardColumnType),
         },
+        placeBeforeId: beforeId,
       })
     } else if (toPipeline) {
-      moveProject(id, to as BoardColumnType)
+      moveProject(id, to as BoardColumnType, beforeId)
     }
     // pipeline -> scoping drags are ignored (demote via the project page if ever needed)
   }

@@ -14,7 +14,7 @@ import type { TeamMember } from '@/lib/hooks/useTeamMembers'
 interface BoardProps {
   projects: SlimProject[]
   teamMembers: TeamMember[]
-  onMoveProject: (id: string, column: BoardColumnType) => void
+  onMoveProject: (id: string, column: BoardColumnType, placeBeforeId?: string | null) => void
   // Full View provides a page-level DragDropContext (so cards can be dragged
   // from scoping into the pipeline); the board then skips its own context
   wrapInContext?: boolean
@@ -25,7 +25,7 @@ const CAPTAIN_FILTER_KEY = 'sot.captainFilter'
 // Column order: urgent first, then high, then normal — Hold always sinks to the bottom
 const PRIORITY_RANK: Record<string, number> = { urgent: 0, high: 1 }
 
-function columnSortRank(p: SlimProject): number {
+export function columnSortRank(p: SlimProject): number {
   if (p.status === 'Hold') return 100
   return PRIORITY_RANK[p.priority ?? ''] ?? 2
 }
@@ -92,9 +92,14 @@ export function Board({ projects, teamMembers, onMoveProject, wrapInContext = tr
   function handleDragEnd(result: DropResult) {
     if (!result.destination) return
     const newColumn = result.destination.droppableId as BoardColumnType
-    if (newColumn !== result.source.droppableId) {
-      onMoveProject(result.draggableId, newColumn)
-    }
+    if (newColumn === result.source.droppableId) return
+    // Keep the card at the exact spot it was dropped: find which card
+    // currently sits at that index in the destination column
+    const destCards = filtered
+      .filter(p => p.board_column === newColumn && p.id !== result.draggableId)
+      .sort((a, b) => columnSortRank(a) - columnSortRank(b))
+    const beforeId = destCards[result.destination.index]?.id ?? null
+    onMoveProject(result.draggableId, newColumn, beforeId)
   }
 
   const columns = (
