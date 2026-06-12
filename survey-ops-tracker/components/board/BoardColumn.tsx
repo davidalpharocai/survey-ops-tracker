@@ -2,12 +2,12 @@
 import { Droppable, Draggable } from '@hello-pangea/dnd'
 import { ProjectCard } from './ProjectCard'
 import { STAGE_DESCRIPTIONS } from '@/lib/utils/stage'
-import type { SurveyProject } from '@/lib/hooks/useProjects'
+import type { SlimProject } from '@/lib/hooks/useProjects'
 
 interface BoardColumnProps {
   id: string
   title: string
-  projects: SurveyProject[]
+  projects: SlimProject[]
   onCardClick: (id: string) => void
 }
 

@@ -2,7 +2,7 @@ import { getDueDateStatus, getDueUrgency, formatDate } from '@/lib/utils/date'
 import { deriveWaitingOn } from '@/lib/utils/waitingOn'
 import { isStale } from '@/lib/utils/stale'
 import { NProgressBar } from '@/components/shared/NProgressBar'
-import type { SurveyProject } from '@/lib/hooks/useProjects'
+import type { SlimProject } from '@/lib/hooks/useProjects'
 
 // Full-card border by due-date urgency; overrides the neutral left edge
 const URGENCY_BORDER: Record<string, string> = {
@@ -37,7 +37,7 @@ const PRIORITY_CHIP: Record<string, { symbol: string; classes: string; label: st
 }
 
 interface ProjectCardProps {
-  project: SurveyProject
+  project: SlimProject
   onClick?: () => void
 }
 

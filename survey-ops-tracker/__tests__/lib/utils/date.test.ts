@@ -1,10 +1,14 @@
 import { describe, it, expect } from 'vitest'
 import { getDueDateStatus, getDueUrgency, formatDate, autoStamp } from '@/lib/utils/date'
 
+// Format in *local* time — toISOString() shifts to UTC, which is a different
+// calendar day in the evening/morning depending on the machine's timezone,
+// while the code under test does local-day math.
 function daysFromNow(n: number): string {
   const d = new Date()
   d.setDate(d.getDate() + n)
-  return d.toISOString().split('T')[0]
+  const pad = (x: number) => String(x).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
 
 describe('getDueUrgency', () => {
@@ -36,14 +40,10 @@ describe('getDueDateStatus', () => {
     expect(getDueDateStatus('2020-01-01')).toBe('overdue')
   })
   it('returns soon for date 2 days from now', () => {
-    const d = new Date()
-    d.setDate(d.getDate() + 2)
-    expect(getDueDateStatus(d.toISOString().split('T')[0])).toBe('soon')
+    expect(getDueDateStatus(daysFromNow(2))).toBe('soon')
   })
   it('returns normal for date 10 days from now', () => {
-    const d = new Date()
-    d.setDate(d.getDate() + 10)
-    expect(getDueDateStatus(d.toISOString().split('T')[0])).toBe('normal')
+    expect(getDueDateStatus(daysFromNow(10))).toBe('normal')
   })
 })
 

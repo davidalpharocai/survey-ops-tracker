@@ -2,7 +2,7 @@
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { formatDate, getDueDateStatus } from '@/lib/utils/date'
-import type { SurveyProject } from '@/lib/hooks/useProjects'
+import type { SlimProject } from '@/lib/hooks/useProjects'
 
 type SortField = 'project_name' | 'client' | 'board_column' | 'due_date'
 type SortDir = 'asc' | 'desc'
@@ -24,7 +24,7 @@ const TYPE_BADGE: Record<string, string> = {
 }
 
 interface ProjectTableProps {
-  projects: SurveyProject[]
+  projects: SlimProject[]
 }
 
 function FlagCell({ value, warn = false }: { value: boolean; warn?: boolean }) {

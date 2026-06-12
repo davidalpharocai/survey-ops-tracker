@@ -7,11 +7,11 @@ import { useRouter } from 'next/navigation'
 import { useCurrentMember } from '@/lib/hooks/useCurrentMember'
 import { STAGE_ORDER, type BoardColumn as BoardColumnType } from '@/lib/utils/stage'
 import { getDueUrgency } from '@/lib/utils/date'
-import type { SurveyProject } from '@/lib/hooks/useProjects'
+import type { SlimProject } from '@/lib/hooks/useProjects'
 import type { TeamMember } from '@/lib/hooks/useTeamMembers'
 
 interface BoardProps {
-  projects: SurveyProject[]
+  projects: SlimProject[]
   teamMembers: TeamMember[]
   onMoveProject: (id: string, column: BoardColumnType) => void
 }
@@ -21,7 +21,7 @@ const CAPTAIN_FILTER_KEY = 'sot.captainFilter'
 // Column order: urgent first, then high, then normal — Hold always sinks to the bottom
 const PRIORITY_RANK: Record<string, number> = { urgent: 0, high: 1 }
 
-function columnSortRank(p: SurveyProject): number {
+function columnSortRank(p: SlimProject): number {
   if (p.status === 'Hold') return 100
   return PRIORITY_RANK[p.priority ?? ''] ?? 2
 }

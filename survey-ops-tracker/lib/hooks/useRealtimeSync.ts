@@ -63,6 +63,12 @@ export function useRealtimeSync() {
     function handleChange(payload: ChangePayload) {
       if (payload.table === 'survey_projects') {
         queue(['projects'])
+        // Also refresh the full-row detail cache for the changed project.
+        const newRow = payload.new as { id?: string } | null
+        const oldRow = payload.old as { id?: string } | null
+        const rowId = newRow?.id ?? oldRow?.id
+        if (rowId) queue(['project', rowId])
+        else queue(['project'])
         return
       }
       const prefix = PROJECT_SCOPED_TABLES[payload.table]

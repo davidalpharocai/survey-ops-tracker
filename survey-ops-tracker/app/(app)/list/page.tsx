@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { ProjectTable } from '@/components/list/ProjectTable'
 import { ViewToggle } from '@/components/shared/ViewToggle'
-import { useProjects } from '@/lib/hooks/useProjects'
+import { useProjects, fetchFullProjects } from '@/lib/hooks/useProjects'
 import { useViewMode } from '@/lib/hooks/useViewMode'
 import { exportProjectsCsv } from '@/lib/utils/exportCsv'
 import { isTypingTarget } from '@/lib/utils/keyboard'
@@ -12,6 +12,7 @@ export default function ListView() {
   const { data: projects = [], isLoading } = useProjects()
   const { mode, setMode } = useViewMode()
   const [search, setSearch] = useState('')
+  const [exporting, setExporting] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
 
   // Keyboard shortcut: "/" focuses search
@@ -41,6 +42,18 @@ export default function ListView() {
     return true
   })
 
+  // The list runs on a slim fetch — pull the full rows on demand so the
+  // CSV gets every column (budget, slack channel, linked docs, ...).
+  async function handleExport() {
+    if (exporting) return
+    setExporting(true)
+    try {
+      exportProjectsCsv(await fetchFullProjects(visibleProjects.map(p => p.id)))
+    } finally {
+      setExporting(false)
+    }
+  }
+
   return (
     <div className="flex flex-col gap-4">
       {/* Top bar */}
@@ -66,12 +79,12 @@ export default function ListView() {
           className="bg-muted border border-border text-foreground/80 text-xs rounded-lg px-3 py-1.5 placeholder:text-muted-foreground focus:outline-none focus:border-ring w-44"
         />
         <button
-          onClick={() => exportProjectsCsv(visibleProjects)}
-          disabled={isLoading || visibleProjects.length === 0}
+          onClick={handleExport}
+          disabled={isLoading || exporting || visibleProjects.length === 0}
           title="Downloads the projects currently shown (respects the Operations/Full View toggle)"
           className="ml-auto text-xs border border-border text-muted-foreground hover:text-foreground hover:border-ring px-3 py-1.5 rounded-lg transition-colors disabled:opacity-40"
         >
-          ⬇ Export CSV
+          {exporting ? 'Exporting…' : '⬇ Export CSV'}
         </button>
       </div>
 

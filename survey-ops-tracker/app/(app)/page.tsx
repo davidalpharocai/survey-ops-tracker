@@ -7,7 +7,7 @@ import { NewProjectModal } from '@/components/board/NewProjectModal'
 import { ProjectCard } from '@/components/board/ProjectCard'
 import { ViewToggle } from '@/components/shared/ViewToggle'
 import { ColorKey } from '@/components/shared/ColorKey'
-import { useProjects, useMoveProjectToColumn } from '@/lib/hooks/useProjects'
+import { useProjects, useMoveProjectToColumn, fetchFullProjects } from '@/lib/hooks/useProjects'
 import { useTeamMembers } from '@/lib/hooks/useTeamMembers'
 import { useViewMode } from '@/lib/hooks/useViewMode'
 import { exportProjectsCsv } from '@/lib/utils/exportCsv'
@@ -22,6 +22,7 @@ export default function BoardPage() {
   const { mode, setMode } = useViewMode()
   const [showNewProject, setShowNewProject] = useState(false)
   const [showClosed, setShowClosed] = useState(false)
+  const [exporting, setExporting] = useState(false)
 
   // Keyboard shortcuts: "/" focuses search, "n" opens New Project
   useEffect(() => {
@@ -56,6 +57,18 @@ export default function BoardPage() {
       ? [...scopingProjects, ...activeProjects, ...closedProjects]
       : activeProjects
 
+  // The board runs on a slim fetch — pull the full rows on demand so the
+  // CSV gets every column (budget, slack channel, linked docs, ...).
+  async function handleExport() {
+    if (exporting) return
+    setExporting(true)
+    try {
+      exportProjectsCsv(await fetchFullProjects(exportableProjects.map(p => p.id)))
+    } finally {
+      setExporting(false)
+    }
+  }
+
   if (isLoading) {
     return <div className="text-muted-foreground text-sm">Loading projects...</div>
   }
@@ -81,12 +94,12 @@ export default function BoardPage() {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => exportProjectsCsv(exportableProjects)}
-            disabled={exportableProjects.length === 0}
+            onClick={handleExport}
+            disabled={exporting || exportableProjects.length === 0}
             title="Downloads the projects currently shown (respects the Operations/Full View toggle)"
             className="text-xs border border-border text-muted-foreground hover:text-foreground hover:border-ring px-3 py-2 rounded-lg transition-colors disabled:opacity-40"
           >
-            ⬇ Export CSV
+            {exporting ? 'Exporting…' : '⬇ Export CSV'}
           </button>
           <button
             onClick={() => setShowNewProject(true)}

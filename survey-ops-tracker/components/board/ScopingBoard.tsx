@@ -3,7 +3,7 @@ import { DragDropContext, type DropResult } from '@hello-pangea/dnd'
 import { BoardColumn } from './BoardColumn'
 import { useRouter } from 'next/navigation'
 import { useUpdateProject } from '@/lib/hooks/useProjects'
-import type { SurveyProject } from '@/lib/hooks/useProjects'
+import type { SlimProject } from '@/lib/hooks/useProjects'
 import type { Database } from '@/lib/supabase/types'
 
 type ScopingStage = Database['public']['Enums']['scoping_stage']
@@ -16,7 +16,7 @@ export const SCOPING_STAGES: ScopingStage[] = [
 ]
 
 interface ScopingBoardProps {
-  projects: SurveyProject[]
+  projects: SlimProject[]
 }
 
 export function ScopingBoard({ projects }: ScopingBoardProps) {

@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { useProjects, useUpdateProject, useDeleteProject } from '@/lib/hooks/useProjects'
+import { useProject, useUpdateProject, useDeleteProject } from '@/lib/hooks/useProjects'
 import { useTeamMembers, type TeamMember } from '@/lib/hooks/useTeamMembers'
 import { PipelineProgress } from '@/components/project/PipelineProgress'
 import { ScopingProgress } from '@/components/project/ScopingProgress'
@@ -48,14 +48,12 @@ export default function ProjectDetailPage() {
   const params = useParams()
   const router = useRouter()
   const id = params.id as string
-  const { data: projects = [], isLoading } = useProjects()
+  const { data: project, isLoading } = useProject(id)
   const { data: teamMembers = [] } = useTeamMembers()
   const updateProject = useUpdateProject()
   const deleteProject = useDeleteProject()
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [activeTab, setActiveTab] = useState<'overview' | 'datalog'>('overview')
-
-  const project = projects.find(p => p.id === id)
 
   if (isLoading) {
     return <div className="text-muted-foreground text-sm">Loading...</div>
