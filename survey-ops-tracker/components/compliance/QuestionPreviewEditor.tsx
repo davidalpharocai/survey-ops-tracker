@@ -50,9 +50,9 @@ export function QuestionPreviewEditor({ questions, onChange }: Props) {
   return (
     <div className="flex flex-col gap-2 max-h-96 overflow-y-auto pr-1">
       {questions.map((q, i) => (
-        <div key={i} className="bg-slate-800/60 rounded-lg p-3 flex flex-col gap-2">
+        <div key={i} className="bg-muted/50 rounded-lg p-3 flex flex-col gap-2">
           <div className="flex items-start gap-2">
-            <span className="text-xs text-slate-500 pt-2 min-w-7">Q{q.order_num}</span>
+            <span className="text-xs text-muted-foreground pt-2 min-w-7">Q{q.order_num}</span>
             <textarea
               value={q.text}
               onChange={e => update(i, { text: e.target.value })}
@@ -70,12 +70,12 @@ export function QuestionPreviewEditor({ questions, onChange }: Props) {
               }}
               rows={2}
               aria-label={`Question ${q.order_num} text`}
-              className="flex-1 bg-slate-800 border border-slate-700 text-slate-200 text-sm rounded-md px-2 py-1.5 resize-y"
+              className="flex-1 bg-background border border-input text-foreground text-sm rounded-md px-2 py-1.5 resize-y"
               placeholder="Question text"
             />
             <button
               onClick={() => remove(i)}
-              className="text-slate-600 hover:text-red-400 transition-colors pt-2"
+              className="text-muted-foreground/50 hover:text-red-600 dark:hover:text-red-400 transition-colors pt-2"
               aria-label={`Remove question ${q.order_num}`}
             >
               ✕
@@ -86,14 +86,14 @@ export function QuestionPreviewEditor({ questions, onChange }: Props) {
               value={q.type}
               onChange={e => update(i, { type: e.target.value as QuestionType })}
               aria-label={`Question ${q.order_num} type`}
-              className="bg-slate-800 border border-slate-700 text-slate-300 text-xs rounded-md px-2 py-1"
+              className="bg-background border border-input text-foreground text-xs rounded-md px-2 py-1"
             >
               {TYPES.map(t => (
                 <option key={t.value} value={t.value}>{t.label}</option>
               ))}
             </select>
             <label
-              className="flex items-center gap-1.5 text-xs text-slate-400"
+              className="flex items-center gap-1.5 text-xs text-muted-foreground"
               title="Set automatically: open-text questions and AI follow-ups capture free-text answers. This drives compliance's open-text filter."
             >
               <input
@@ -103,7 +103,7 @@ export function QuestionPreviewEditor({ questions, onChange }: Props) {
               />
               Contains open text
             </label>
-            <label className="flex items-center gap-1.5 text-xs text-slate-400">
+            <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <input
                 type="checkbox"
                 checked={q.is_ai_followup}
@@ -131,7 +131,7 @@ export function QuestionPreviewEditor({ questions, onChange }: Props) {
                 }
                 aria-label={`Question ${q.order_num} answer options`}
                 placeholder="Answer options, comma-separated (e.g. Yes, No)"
-                className="w-full bg-slate-800 border border-slate-700 text-slate-300 text-xs rounded-md px-2 py-1.5 placeholder:text-slate-600"
+                className="w-full bg-background border border-input text-foreground text-xs rounded-md px-2 py-1.5 placeholder:text-muted-foreground/60"
               />
             </div>
           )}
@@ -139,7 +139,7 @@ export function QuestionPreviewEditor({ questions, onChange }: Props) {
       ))}
       <button
         onClick={add}
-        className="text-xs border border-dashed border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-500 rounded-lg py-2 transition-colors"
+        className="text-xs border border-dashed border-border text-muted-foreground hover:text-foreground hover:border-muted-foreground/50 rounded-lg py-2 transition-colors"
       >
         + Add question
       </button>

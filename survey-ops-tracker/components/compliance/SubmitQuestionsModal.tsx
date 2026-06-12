@@ -101,15 +101,15 @@ export function SubmitQuestionsModal({
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-      <div role="dialog" aria-modal="true" aria-label="Submit questions for compliance review" className="bg-slate-900 border border-slate-700 rounded-xl p-5 w-full max-w-2xl">
+      <div role="dialog" aria-modal="true" aria-label="Submit questions for compliance review" className="bg-card border border-border rounded-xl p-5 w-full max-w-2xl">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-bold text-white">Submit questions for compliance review</h3>
-          <button onClick={onClose} disabled={stage === 'submitting' || stage === 'parsing'} className="text-slate-500 hover:text-slate-200 disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Close">✕</button>
+          <h3 className="text-sm font-bold text-foreground">Submit questions for compliance review</h3>
+          <button onClick={onClose} disabled={stage === 'submitting' || stage === 'parsing'} className="text-muted-foreground hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Close">✕</button>
         </div>
 
         {stage === 'upload' && (
           <div>
-            <label className="block border border-dashed border-slate-700 rounded-xl p-10 text-center cursor-pointer hover:border-slate-500 transition-colors">
+            <label className="block border border-dashed border-border rounded-xl p-10 text-center cursor-pointer hover:border-muted-foreground/50 transition-colors">
               <input
                 type="file"
                 accept=".docx,.xlsx,.xls,.csv,.pdf"
@@ -120,29 +120,29 @@ export function SubmitQuestionsModal({
                   if (file) handleFile(file)
                 }}
               />
-              <p className="text-sm text-slate-300">Upload the questionnaire</p>
-              <p className="text-xs text-slate-500 mt-1">.docx, .xlsx, .csv, or .pdf — Google Docs: export first; legacy .doc: re-save as .docx</p>
+              <p className="text-sm text-foreground">Upload the questionnaire</p>
+              <p className="text-xs text-muted-foreground mt-1">.docx, .xlsx, .csv, or .pdf — Google Docs: export first; legacy .doc: re-save as .docx</p>
             </label>
-            {error && <p role="alert" className="text-red-400 text-sm mt-3">{error}</p>}
+            {error && <p role="alert" className="text-red-600 dark:text-red-400 text-sm mt-3">{error}</p>}
           </div>
         )}
 
         {stage === 'parsing' && (
-          <p className="text-sm text-slate-400 py-10 text-center">
+          <p className="text-sm text-muted-foreground py-10 text-center">
             Extracting questions with AI… this can take up to a minute for long questionnaires.
           </p>
         )}
 
         {(stage === 'preview' || stage === 'submitting') && (
           <div>
-            <p className="text-xs text-slate-400 mb-3">
+            <p className="text-xs text-muted-foreground mb-3">
               {questions.length} questions · {openCount} open-text — check the AI&apos;s work, especially
               open-text flags, then send to compliance.
             </p>
             <QuestionPreviewEditor questions={questions} onChange={setQuestions} />
             <div className="mt-4">
-              <label className="block text-xs text-slate-400 mb-1.5">
-                Message to compliance <span className="text-slate-600">(optional)</span>
+              <label className="block text-xs text-muted-foreground mb-1.5">
+                Message to compliance <span className="text-muted-foreground/70">(optional)</span>
               </label>
               <textarea
                 value={message}
@@ -151,12 +151,12 @@ export function SubmitQuestionsModal({
                 maxLength={2000}
                 rows={2}
                 disabled={stage === 'submitting'}
-                className="w-full bg-slate-800 border border-slate-700 text-slate-200 text-sm rounded-md px-3 py-2 resize-y placeholder:text-slate-600 focus:outline-none focus:border-slate-500 disabled:opacity-50"
+                className="w-full bg-background border border-input text-foreground text-sm rounded-md px-3 py-2 resize-y placeholder:text-muted-foreground/60 focus:outline-none focus:border-blue-500 disabled:opacity-50"
               />
             </div>
-            {error && <p role="alert" className="text-amber-400 text-sm mt-3">{error}</p>}
+            {error && <p role="alert" className="text-amber-600 dark:text-amber-400 text-sm mt-3">{error}</p>}
             <div className="flex justify-end gap-2 mt-4">
-              <Button variant="outline" className="border-slate-700 bg-transparent text-slate-300 hover:bg-slate-800 hover:text-white" onClick={onClose} disabled={stage === 'submitting'}>
+              <Button variant="outline" onClick={onClose} disabled={stage === 'submitting'}>
                 Cancel
               </Button>
               <Button onClick={handleSubmit} disabled={stage === 'submitting'}>
