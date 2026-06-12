@@ -1,3 +1,8 @@
+// Escape then preserve line breaks for multi-paragraph user messages
+function escMultiline(s: string): string {
+  return esc(s).replace(/\n/g, '<br/>')
+}
+
 function esc(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
@@ -18,7 +23,7 @@ export function submissionCreatedEmail(args: {
   message?: string | null
 }): { subject: string; html: string } {
   const messageBlock = args.message
-    ? `<p style="background: #f4f4f5; padding: 12px 16px; border-radius: 8px; color: #333;"><strong>Message from AlphaRoc:</strong><br/>${esc(args.message)}</p>`
+    ? `<p style="background: #f4f4f5; padding: 12px 16px; border-radius: 8px; color: #333;"><strong>Message from AlphaRoc:</strong><br/>${escMultiline(args.message)}</p>`
     : ''
   return {
     subject: `Questions ready for compliance review — ${args.projectName}`,
@@ -44,7 +49,7 @@ export function decisionEmail(args: {
 }): { subject: string; html: string } {
   const verb = args.decision === 'approved' ? 'approved' : 'rejected'
   const noteBlock = args.note
-    ? `<p style="background: #f4f4f5; padding: 12px 16px; border-radius: 8px;"><strong>Reviewer note:</strong><br/>${esc(args.note)}</p>`
+    ? `<p style="background: #f4f4f5; padding: 12px 16px; border-radius: 8px;"><strong>Reviewer note:</strong><br/>${escMultiline(args.note)}</p>`
     : ''
   return {
     subject: `Compliance ${verb}: ${args.projectName} (v${args.version})`,
