@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { getCheckboxesForColumn, type BoardColumn } from '@/lib/utils/stage'
 import { autoStamp } from '@/lib/utils/date'
+import { normalizeClientText } from '@/lib/utils/clientName'
 import { toast } from '@/lib/utils/toast'
 import type { Database } from '@/lib/supabase/types'
 
@@ -258,7 +259,7 @@ export function useCreateProject() {
     ) => {
       const { data, error } = await supabase
         .from('survey_projects')
-        .insert(project)
+        .insert({ ...project, client: normalizeClientText(project.client) })
         .select()
         .single()
       if (error) throw error
