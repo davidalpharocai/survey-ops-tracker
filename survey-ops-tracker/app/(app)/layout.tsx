@@ -4,6 +4,7 @@ import { ThemeToggle } from '@/components/shared/ThemeToggle'
 import { RealtimeSync } from '@/components/shared/RealtimeSync'
 import { AssistantPanel } from '@/components/assistant/AssistantPanel'
 import { CommandPalette } from '@/components/shared/CommandPalette'
+import { AppMenu } from '@/components/shared/AppMenu'
 import { isAllowedEmail } from '@/lib/utils/allowedDomain'
 
 export const dynamic = 'force-dynamic'
@@ -17,7 +18,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div className="min-h-screen bg-background text-foreground">
       <RealtimeSync />
-      <nav className="border-b border-border px-6 py-1.5 flex items-center gap-4">
+      <nav className="border-b border-border px-6 py-1.5 flex items-center gap-3">
+        <AppMenu />
         <span className="font-bold text-foreground text-sm">Survey Ops Command Center</span>
         <div className="ml-auto flex items-center gap-3">
           <span
