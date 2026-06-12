@@ -400,9 +400,29 @@ export default function ProjectDetailPage() {
               <QuickEdit project={project} />
             </div>
             <div className="bg-card border border-border shadow-sm rounded-xl p-4">
-              <h3 className="text-xs text-muted-foreground uppercase tracking-widest mb-4 font-medium">
-                {project.phase === 'Scoping' ? 'Scoping Stage' : 'Pipeline Progress'}
-              </h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xs text-muted-foreground uppercase tracking-widest font-medium">
+                  {project.phase === 'Scoping' ? 'Scoping Stage' : 'Pipeline Progress'}
+                </h3>
+                {project.phase !== 'Scoping' && project.status !== 'Closed' && (
+                  <HelpTip text="Moves this project back to the Scoping board — for deals that reopened (pricing changed, approval fell through). Stage checkboxes are kept, so promoting it again picks up right where it left off. You can also drag the card onto a scoping column in Full View.">
+                    <button
+                      onClick={() =>
+                        updateProject.mutate({
+                          id,
+                          updates: {
+                            phase: 'Scoping',
+                            scoping_stage: project.scoping_stage ?? 'Awaiting Approval',
+                          },
+                        })
+                      }
+                      className="text-xs text-muted-foreground hover:text-violet-600 dark:hover:text-violet-400 transition-colors cursor-pointer"
+                    >
+                      ↩ Back to Scoping
+                    </button>
+                  </HelpTip>
+                )}
+              </div>
               {project.phase === 'Scoping' ? (
                 <ScopingProgress project={project} />
               ) : (

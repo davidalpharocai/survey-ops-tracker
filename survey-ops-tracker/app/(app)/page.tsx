@@ -160,8 +160,23 @@ export default function BoardPage() {
         ...getCheckboxesForColumn(to as BoardColumnType),
       })
       moveProject(id, to as BoardColumnType, sortOrder)
+    } else if (toScoping) {
+      // Demote: pipeline card dragged back up to a scoping column — the deal
+      // reopened. Stage checkboxes are kept so a re-promotion resumes intact.
+      applyNow({
+        phase: 'Scoping',
+        scoping_stage: to as Database['public']['Enums']['scoping_stage'],
+        sort_order: sortOrder,
+      })
+      updateProject.mutate({
+        id,
+        updates: {
+          phase: 'Scoping',
+          scoping_stage: to as Database['public']['Enums']['scoping_stage'],
+          sort_order: sortOrder,
+        },
+      })
     }
-    // pipeline -> scoping drags are ignored (demote via the project page if ever needed)
   }
 
   if (isLoading) {
