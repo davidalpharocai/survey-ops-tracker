@@ -17,7 +17,11 @@ const FIELDS_SCHEMA = {
       type: 'string',
       description: 'Must exactly match one of the provided team member names',
     },
-    salesperson: { type: 'string' },
+    salesperson: {
+      type: 'string',
+      description:
+        'Full name. Map first names to: Alex Pinsky, Jenna Strova, Steven Stubbs, Vineet Kapur. Use "Internal" when there is no external sales lead.',
+    },
     n_target: { type: 'integer' },
     n_collected: { type: 'integer' },
     n_actual: { type: 'integer' },

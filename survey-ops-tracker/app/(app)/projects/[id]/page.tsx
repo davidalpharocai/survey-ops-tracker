@@ -21,6 +21,7 @@ import { differenceInCalendarDays, parseISO, startOfDay } from 'date-fns'
 import { deriveWaitingOn } from '@/lib/utils/waitingOn'
 import { BudgetWidget } from '@/components/project/BudgetWidget'
 import { BidWidget } from '@/components/project/BidWidget'
+import { salespersonOptions } from '@/lib/utils/salespeople'
 
 const TOOLTIPS: Record<string, string> = {
   'Client': 'The client this project is for.',
@@ -408,12 +409,10 @@ export default function ProjectDetailPage() {
                 tooltip={TOOLTIPS['Project Captain']}
                 onSave={v => updateProject.mutate({ id, updates: { captain_id: v } })}
               />
-              <EditableRow
-                label="Salesperson"
+              <SalespersonRow
                 value={project.salesperson ?? ''}
-                placeholder="e.g. Jenna Kessler"
                 tooltip={TOOLTIPS['Salesperson']}
-                onSave={v => updateProject.mutate({ id, updates: { salesperson: v || null } })}
+                onSave={v => updateProject.mutate({ id, updates: { salesperson: v } })}
               />
             </SidebarCard>
 
@@ -1069,6 +1068,65 @@ function EditableDateRow({
         title="Click to edit"
       >
         {formatDate(value)}
+      </button>
+    </div>
+  )
+}
+
+function SalespersonRow({
+  value,
+  tooltip,
+  onSave,
+}: {
+  value: string
+  tooltip?: string
+  onSave: (next: string | null) => void
+}) {
+  const [editing, setEditing] = useState(false)
+
+  if (editing) {
+    return (
+      <div className="flex justify-between items-center text-sm gap-2">
+        <span className="text-muted-foreground flex items-center text-xs shrink-0">
+          Salesperson
+          {tooltip && <InfoTooltip text={tooltip} />}
+        </span>
+        <select
+          autoFocus
+          value={value}
+          onChange={e => {
+            onSave(e.target.value || null)
+            setEditing(false)
+          }}
+          onBlur={() => setEditing(false)}
+          onKeyDown={e => {
+            if (e.key === 'Escape') setEditing(false)
+          }}
+          className="min-w-0 bg-muted border border-border rounded px-2 py-1 text-sm text-foreground focus:outline-none focus:border-ring"
+        >
+          <option value="">—</option>
+          {salespersonOptions(value).map(name => (
+            <option key={name} value={name}>
+              {name}
+            </option>
+          ))}
+        </select>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex justify-between items-center text-sm gap-2">
+      <span className="text-muted-foreground flex items-center text-xs shrink-0">
+        Salesperson
+        {tooltip && <InfoTooltip text={tooltip} />}
+      </span>
+      <button
+        onClick={() => setEditing(true)}
+        className="text-sm text-foreground hover:text-foreground/70 cursor-pointer truncate"
+        title="Click to change"
+      >
+        {value || <span className="text-muted-foreground/50">— click to set</span>}
       </button>
     </div>
   )
