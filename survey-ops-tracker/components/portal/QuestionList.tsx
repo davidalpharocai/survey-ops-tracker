@@ -60,10 +60,13 @@ export function QuestionList({ questions }: { questions: PortalQuestion[] }) {
                 <div className="flex-1">
                   <p className="text-sm text-slate-800 dark:text-slate-200">{q.text}</p>
                   {q.answer_options.length > 0 && (
-                    <p className="text-xs text-slate-500 mt-1">
-                      <span className="text-slate-400 dark:text-slate-600">Options:</span>{' '}
-                      {q.answer_options.join(' · ')}
-                    </p>
+                    <ul className="list-disc pl-5 mt-1.5 space-y-0.5">
+                      {q.answer_options.map((opt, idx) => (
+                        <li key={idx} className="text-xs text-slate-600 dark:text-slate-400">
+                          {opt}
+                        </li>
+                      ))}
+                    </ul>
                   )}
                   <div className="flex gap-2 mt-1.5 flex-wrap">
                     <span

@@ -18,6 +18,31 @@ describe('normalizeQuestions', () => {
     expect(result.questions).toHaveLength(1)
   })
 
+  it('splits newline-embedded options out of closed-question text', () => {
+    const result = normalizeQuestions([
+      { ...valid, text: 'Is this a test?\nyes\nno', answer_options: [] },
+    ])
+    expect(result.ok).toBe(true)
+    expect(result.questions[0].text).toBe('Is this a test?')
+    expect(result.questions[0].answer_options).toEqual(['yes', 'no'])
+  })
+
+  it('leaves open-text question text intact even with newlines', () => {
+    const result = normalizeQuestions([
+      { ...valid, type: 'open_text', text: 'Describe your day.\nBe specific.', answer_options: [] },
+    ])
+    expect(result.questions[0].text).toBe('Describe your day.\nBe specific.')
+    expect(result.questions[0].answer_options).toEqual([])
+  })
+
+  it('does not split when options are already provided', () => {
+    const result = normalizeQuestions([
+      { ...valid, text: 'Pick one?\nstray line', answer_options: ['A', 'B'] },
+    ])
+    expect(result.questions[0].text).toBe('Pick one?\nstray line')
+    expect(result.questions[0].answer_options).toEqual(['A', 'B'])
+  })
+
   it('forces is_open_text=true when is_ai_followup=true', () => {
     const result = normalizeQuestions([
       { ...valid, type: 'other', is_open_text: false, is_ai_followup: true },

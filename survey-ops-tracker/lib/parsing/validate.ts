@@ -31,13 +31,29 @@ export function normalizeQuestions(raw: DraftQuestion[]): NormalizeResult {
   }
 
   const questions = raw.map((q, i) => {
-    const text = typeof q.text === 'string' ? q.text.trim() : ''
-    if (!text) errors.push(`Question ${i + 1}: empty text`)
+    let text = typeof q.text === 'string' ? q.text.trim() : ''
 
     const type: QuestionType = VALID_TYPES.includes(q.type) ? q.type : 'other'
     const isAiFollowup = q.is_ai_followup === true
     // Domain rules: AI follow-ups are always open-text; open_text type implies the flag
     const isOpenText = isAiFollowup || type === 'open_text' || q.is_open_text === true
+
+    let answerOptions = Array.isArray(q.answer_options)
+      ? q.answer_options.filter(o => typeof o === 'string')
+      : []
+
+    // Analysts often paste a question with its options on the lines below it.
+    // For closed questions with no separate options, split them out so the
+    // compliance view renders options as a proper list rather than run-on text.
+    if (!isOpenText && answerOptions.length === 0 && text.includes('\n')) {
+      const lines = text.split('\n').map(l => l.trim()).filter(Boolean)
+      if (lines.length >= 2) {
+        text = lines[0]
+        answerOptions = lines.slice(1)
+      }
+    }
+
+    if (!text) errors.push(`Question ${i + 1}: empty text`)
 
     return {
       order_num: i + 1,
@@ -46,9 +62,7 @@ export function normalizeQuestions(raw: DraftQuestion[]): NormalizeResult {
       type,
       is_open_text: isOpenText,
       is_ai_followup: isAiFollowup,
-      answer_options: Array.isArray(q.answer_options)
-        ? q.answer_options.filter(o => typeof o === 'string')
-        : [],
+      answer_options: answerOptions,
     }
   })
 
