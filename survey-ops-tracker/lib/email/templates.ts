@@ -65,7 +65,7 @@ export function submissionCreatedEmail(args: {
       </table>
       ${messageBlock}
       <div style="text-align: center; margin: 28px 0 8px;">
-        <a href="${esc(args.reviewUrl)}" style="display: inline-block; background: #2563eb; color: #ffffff; padding: 13px 36px; border-radius: 8px; text-decoration: none; font-size: 15px; font-weight: bold;">Review &amp; respond</a>
+        <a href="${esc(args.reviewUrl)}" style="display: inline-block; background: #2563eb; color: #ffffff; padding: 13px 36px; border-radius: 8px; text-decoration: none; font-size: 15px; font-weight: bold;">Review &amp; Approve</a>
       </div>
       <p style="font-size: 12px; color: #94a3b8; text-align: center; margin: 0 0 16px;">
         This secure link signs you in automatically &mdash; no password needed.
