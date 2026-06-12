@@ -39,7 +39,7 @@ export function ScopingProgress({ project }: ScopingProgressProps) {
             <button
               key={stage}
               onClick={() => setStage(stage)}
-              className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
+              className={`text-sm px-3 py-1.5 rounded-full border transition-colors ${
                 isCurrent
                   ? 'bg-violet-500/20 border-violet-500 text-violet-600 dark:text-violet-300 font-medium'
                   : isPast
@@ -61,7 +61,7 @@ export function ScopingProgress({ project }: ScopingProgressProps) {
       <div className="flex items-center gap-3 flex-wrap">
         <button
           onClick={promote}
-          className="text-xs bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg transition-colors"
+          className="text-sm bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg transition-colors"
         >
           ✓ Approved — move to pipeline
         </button>

@@ -219,7 +219,7 @@ export function BidWidget({ projectId }: { projectId: string }) {
                 Average
                 <InfoTooltip text="Simple average of all bid entries, unweighted." />
               </span>
-              <span className="text-xs text-foreground">{formatAmount(avg)}</span>
+              <span className="text-sm text-foreground">{formatAmount(avg)}</span>
             </div>
           )}
           {weightedAvg != null && bids!.length > 1 && (
@@ -228,7 +228,7 @@ export function BidWidget({ projectId }: { projectId: string }) {
                 Weighted avg (by blasts)
                 <InfoTooltip text="Average bid weighted by blasts — the number of sends at each rate." />
               </span>
-              <span className="text-xs text-foreground">{formatAmount(weightedAvg)}</span>
+              <span className="text-sm text-foreground">{formatAmount(weightedAvg)}</span>
             </div>
           )}
 
@@ -273,8 +273,8 @@ export function BidWidget({ projectId }: { projectId: string }) {
                   </div>
                 ) : (
                   <div key={b.id} className="group flex items-center gap-1">
-                    <p className="text-xs text-muted-foreground truncate flex-1" title={b.note ?? undefined}>
-                      <span className="text-foreground/80">{formatAmount(b.amount)}</span>
+                    <p className="text-sm text-muted-foreground truncate flex-1" title={b.note ?? undefined}>
+                      <span className="text-foreground">{formatAmount(b.amount)}</span>
                       {b.blasts != null && <> · {b.blasts} blasts</>}
                       {' · '}
                       {formatBidDate(b.created_at)}

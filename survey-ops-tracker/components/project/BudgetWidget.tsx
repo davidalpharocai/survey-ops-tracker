@@ -58,7 +58,7 @@ function EditableAmount({
           if (e.key === 'Escape') setEditing(false)
         }}
         placeholder={placeholder}
-        className="w-24 bg-muted border border-border rounded px-2 py-0.5 text-xs text-foreground focus:outline-none focus:border-blue-500 text-right"
+        className="w-24 bg-muted border border-border rounded px-2 py-0.5 text-sm text-foreground focus:outline-none focus:border-blue-500 text-right"
       />
     )
   }
@@ -66,7 +66,7 @@ function EditableAmount({
   return (
     <button
       onClick={startEdit}
-      className="text-xs text-foreground hover:underline transition-colors cursor-pointer"
+      className="text-sm text-foreground hover:underline transition-colors cursor-pointer"
       title="Click to edit"
     >
       {formatCurrency(value)}
@@ -130,7 +130,7 @@ export function BudgetWidget({ projectId, budget, actualSpend, nTarget, nCollect
                 {isOver ? '⚠ Over budget' : 'Remaining'}
                 <InfoTooltip text="Allocated budget minus actual spend." />
               </span>
-              <span className={`text-xs font-medium ${isOver ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+              <span className={`text-sm font-medium ${isOver ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
                 {isOver ? '-' : ''}{formatCurrency(Math.abs(remaining!))}
               </span>
             </div>
@@ -146,7 +146,7 @@ export function BudgetWidget({ projectId, budget, actualSpend, nTarget, nCollect
                 Target Cost / N
                 <InfoTooltip text="Allocated budget ÷ N Target." />
               </span>
-              <span className="text-xs text-foreground">{formatCostPerN(targetCostPerN)}</span>
+              <span className="text-sm text-foreground">{formatCostPerN(targetCostPerN)}</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-xs text-muted-foreground flex items-center">
@@ -154,7 +154,7 @@ export function BudgetWidget({ projectId, budget, actualSpend, nTarget, nCollect
                 <InfoTooltip text="Actual spend ÷ N Actual (or N Collected until cleaning is done)." />
               </span>
               <span
-                className={`text-xs font-medium ${
+                className={`text-sm font-medium ${
                   actualCostPerN == null
                     ? 'text-foreground'
                     : costPerNOver

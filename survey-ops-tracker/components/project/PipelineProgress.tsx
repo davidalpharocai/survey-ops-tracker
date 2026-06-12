@@ -93,7 +93,7 @@ export function PipelineProgress({ project }: PipelineProgressProps) {
                     ? `${STAGE_DESCRIPTIONS[stage] ?? stage} Click to toggle this stage done/undone.`
                     : STAGE_DESCRIPTIONS[stage]
                 }
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium border transition-colors ${
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${
                   isDone
                     ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-600 dark:text-emerald-400'
                     : isCurrent
