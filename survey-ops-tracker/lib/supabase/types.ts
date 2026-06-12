@@ -82,6 +82,7 @@ export type Database = {
           captain_assigned_by: string | null
           sort_order: number | null
           co_captain_ids: string[] | null
+          project_code: string | null
           created_at: string
           updated_at: string
         }
@@ -133,6 +134,7 @@ export type Database = {
           captain_assigned_by?: string | null
           sort_order?: number | null
           co_captain_ids?: string[] | null
+          project_code?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -184,6 +186,7 @@ export type Database = {
           captain_assigned_by?: string | null
           sort_order?: number | null
           co_captain_ids?: string[] | null
+          project_code?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -201,16 +204,19 @@ export type Database = {
         Row: {
           id: string
           name: string
+          code: string | null
           created_at: string
         }
         Insert: {
           id?: string
           name: string
+          code?: string | null
           created_at?: string
         }
         Update: {
           id?: string
           name?: string
+          code?: string | null
           created_at?: string
         }
         Relationships: []

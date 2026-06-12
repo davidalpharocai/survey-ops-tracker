@@ -53,6 +53,13 @@ export function AppMenu() {
           <Link href="/list" className={itemClass} title="All projects as a sortable table, with CSV export">
             <span>📋</span> List view
           </Link>
+          <Link
+            href="/admin"
+            className={itemClass}
+            title="Admin — system links (incl. password resets), client ids, roster, and data health"
+          >
+            <span>⚙️</span> Admin
+          </Link>
           <div className="border-t border-border my-1.5" />
           <a
             href={USER_GUIDE_URL}

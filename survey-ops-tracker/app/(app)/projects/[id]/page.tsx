@@ -162,6 +162,14 @@ export default function ProjectDetailPage() {
         </button>
         <span className="text-muted-foreground/50">/</span>
         <h1 className="text-2xl font-bold text-foreground">{project.project_name}</h1>
+        {project.project_code && (
+          <span
+            className="text-xs font-mono text-muted-foreground border border-border rounded px-1.5 py-0.5"
+            title="Project ID — a permanent reference that never changes; also recorded in the Survey Ops sheet"
+          >
+            {project.project_code}
+          </span>
+        )}
         {project.project_type && (
           <span className={`text-xs px-2 py-1 rounded ${TYPE_BADGE[project.project_type] ?? ''}`}>
             {project.project_type}

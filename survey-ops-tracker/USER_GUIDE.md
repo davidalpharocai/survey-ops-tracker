@@ -93,7 +93,12 @@ The **✦ Assistant** button (bottom-right) answers questions from live project 
 - **Live updates**: teammates' changes appear on your screen within a second — no refreshing
 - **If a save ever fails**, a message pops up bottom-left and the change safely reverts — nothing is ever half-saved
 
-## 7. Tips
+## 7. Project IDs & Admin
+
+- Every project has a permanent **Project ID** like `PR00042` — shown next to the project title and in the list view, included in CSV exports, and assigned automatically to new projects. It never changes, so use it when referencing a project in email or Slack. Clients have matching `Cl#####` ids.
+- The **☰ menu → Admin** page has: links to every system behind the tracker (including Supabase Users for password resets), the client list with their ids, the team roster, and a data-health checklist (open projects missing a captain or due date).
+
+## 8. Tips
 
 - Hover almost anything — (i) icons and labels explain every field, stage, and badge
 - Light/dark/system theme: the toggle at the top right
