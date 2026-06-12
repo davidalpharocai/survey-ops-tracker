@@ -109,7 +109,7 @@ export default function ProjectDetailPage() {
             </div>
           ))}
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
           <div className="flex flex-col gap-4">
             {['h-28', 'h-40', 'h-36'].map((h, i) => (
               <div key={i} className="bg-card rounded-xl p-4 flex flex-col gap-3">
@@ -158,7 +158,7 @@ export default function ProjectDetailPage() {
           ← Board
         </button>
         <span className="text-muted-foreground/50">/</span>
-        <h1 className="text-xl font-bold text-foreground">{project.project_name}</h1>
+        <h1 className="text-2xl font-bold text-foreground">{project.project_name}</h1>
         {project.project_type && (
           <span className={`text-xs px-2 py-1 rounded ${TYPE_BADGE[project.project_type] ?? ''}`}>
             {project.project_type}
@@ -194,7 +194,7 @@ export default function ProjectDetailPage() {
             <button
               onClick={() => setStatus('Hold')}
               title="Pause this project. It stays on the board, greyed out."
-              className="text-xs border border-border text-muted-foreground hover:text-foreground hover:border-ring px-3 py-1.5 rounded-lg transition-colors shrink-0"
+              className="text-sm border border-border text-muted-foreground hover:text-foreground hover:border-ring px-3 py-1.5 rounded-lg transition-colors shrink-0"
             >
               ⏸ Hold
             </button>
@@ -202,7 +202,7 @@ export default function ProjectDetailPage() {
           {project.status === 'Hold' && (
             <button
               onClick={() => setStatus('Open')}
-              className="text-xs border border-border text-muted-foreground hover:text-foreground hover:border-ring px-3 py-1.5 rounded-lg transition-colors shrink-0"
+              className="text-sm border border-border text-muted-foreground hover:text-foreground hover:border-ring px-3 py-1.5 rounded-lg transition-colors shrink-0"
             >
               ▶ Resume
             </button>
@@ -211,14 +211,14 @@ export default function ProjectDetailPage() {
             <button
               onClick={() => setStatus('Closed')}
               title="Marks the project Closed (done/archived). It stays visible in Full View and can be reopened anytime."
-              className="text-xs border border-border text-muted-foreground hover:text-foreground hover:border-ring px-3 py-1.5 rounded-lg transition-colors shrink-0"
+              className="text-sm border border-border text-muted-foreground hover:text-foreground hover:border-ring px-3 py-1.5 rounded-lg transition-colors shrink-0"
             >
               ✕ Close Project
             </button>
           ) : (
             <button
               onClick={() => setStatus('Open')}
-              className="text-xs border border-border text-muted-foreground hover:text-foreground hover:border-ring px-3 py-1.5 rounded-lg transition-colors shrink-0"
+              className="text-sm border border-border text-muted-foreground hover:text-foreground hover:border-ring px-3 py-1.5 rounded-lg transition-colors shrink-0"
             >
               ↺ Reopen Project
             </button>
@@ -226,7 +226,7 @@ export default function ProjectDetailPage() {
           <button
             onClick={() => setConfirmingDelete(true)}
             title="Permanently delete this project and its activity log."
-            className="text-xs border border-border text-muted-foreground hover:text-red-600 dark:hover:text-red-400 hover:border-red-500/50 px-3 py-1.5 rounded-lg transition-colors shrink-0"
+            className="text-sm border border-border text-muted-foreground hover:text-red-600 dark:hover:text-red-400 hover:border-red-500/50 px-3 py-1.5 rounded-lg transition-colors shrink-0"
           >
             🗑 Delete
           </button>
@@ -250,7 +250,7 @@ export default function ProjectDetailPage() {
         <button
           onClick={() => setActiveTab('overview')}
           title='The full project view — stats, pipeline, next steps, documents, and details'
-          className={`text-xs px-3 py-1.5 rounded font-medium transition-colors ${
+          className={`text-sm px-3 py-1.5 rounded font-medium transition-colors ${
             activeTab === 'overview'
               ? 'bg-background text-foreground'
               : 'text-muted-foreground hover:text-foreground'
@@ -261,7 +261,7 @@ export default function ProjectDetailPage() {
         <button
           onClick={() => setActiveTab('datalog')}
           title="Engineer log of manual data changes for this project"
-          className={`text-xs px-3 py-1.5 rounded font-medium transition-colors ${
+          className={`text-sm px-3 py-1.5 rounded font-medium transition-colors ${
             activeTab === 'datalog'
               ? 'bg-background text-foreground'
               : 'text-muted-foreground hover:text-foreground'
@@ -272,7 +272,7 @@ export default function ProjectDetailPage() {
         <button
           onClick={() => setActiveTab('links')}
           title="Survey IDs, Slack channel link, and notification settings"
-          className={`text-xs px-3 py-1.5 rounded font-medium transition-colors ${
+          className={`text-sm px-3 py-1.5 rounded font-medium transition-colors ${
             activeTab === 'links'
               ? 'bg-background text-foreground'
               : 'text-muted-foreground hover:text-foreground'
@@ -301,7 +301,7 @@ export default function ProjectDetailPage() {
               />
               {project.survey_id_discrepancy && (
                 <div className="bg-amber-500/10 border border-amber-500/40 rounded-lg p-2 flex flex-col gap-1.5">
-                  <p className="text-xs text-amber-700 dark:text-amber-400">
+                  <p className="text-sm text-amber-700 dark:text-amber-400">
                     ⚠ {project.survey_id_discrepancy}
                   </p>
                   <div className="flex gap-2">
@@ -336,7 +336,7 @@ export default function ProjectDetailPage() {
 
           <SlackChannel projectId={project.id} url={project.slack_channel_url ?? null} />
 
-          <div className="bg-card rounded-xl p-4 text-xs text-muted-foreground leading-relaxed">
+          <div className="bg-card rounded-xl p-4 text-sm text-muted-foreground leading-relaxed">
             <p className="font-medium text-muted-foreground mb-1 text-xs uppercase tracking-widest">
               Notifications
             </p>
@@ -373,7 +373,7 @@ export default function ProjectDetailPage() {
         </div>
 
         {/* Two-column layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
           {/* Left column */}
           <div className="flex flex-col gap-4">
             <div className="flex">
@@ -778,7 +778,7 @@ function PriorityButton({
 }) {
   const next = PRIORITY_NEXT[priority] ?? 'high'
   const title = 'Click to cycle priority: none → high → urgent. High and urgent projects sort to the top of their board column.'
-  const base = 'text-xs px-3 py-1.5 rounded-lg transition-colors shrink-0 cursor-pointer'
+  const base = 'text-sm px-3 py-1.5 rounded-lg transition-colors shrink-0 cursor-pointer'
 
   if (priority === 'high') {
     return (
@@ -838,7 +838,7 @@ function EditableRow({
             value={draft}
             onChange={e => setDraft(e.target.value)}
             placeholder={placeholder}
-            className="flex-1 min-w-0 bg-muted border border-border rounded px-2 py-1 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring"
+            className="flex-1 min-w-0 bg-muted border border-border rounded px-2 py-1 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring"
             onKeyDown={e => {
               if (e.key === 'Enter') save()
               if (e.key === 'Escape') setEditing(false)
@@ -866,7 +866,7 @@ function EditableRow({
           setDraft(value)
           setEditing(true)
         }}
-        className="text-xs text-foreground/80 hover:text-foreground truncate cursor-pointer"
+        className="text-sm text-foreground hover:text-foreground/70 truncate cursor-pointer"
         title="Click to edit"
       >
         {value || <span className="text-muted-foreground/50">— click to add</span>}
@@ -926,7 +926,7 @@ function DetailRow({
         {label}
         {tooltip && <InfoTooltip text={tooltip} />}
       </span>
-      <span className={`text-xs ${valueClass}`}>{value}</span>
+      <span className={`text-sm ${valueClass}`}>{value}</span>
     </div>
   )
 }
@@ -935,7 +935,7 @@ function EditableNumberRow({
   label,
   value,
   tooltip,
-  valueClass = 'text-foreground/80 hover:text-foreground',
+  valueClass = 'text-foreground hover:text-foreground/70',
   onSave,
 }: {
   label: string
@@ -966,7 +966,7 @@ function EditableNumberRow({
             type="number"
             value={draft}
             onChange={e => setDraft(e.target.value)}
-            className="w-20 bg-muted border border-border rounded px-2 py-1 text-xs text-foreground text-right focus:outline-none focus:border-ring"
+            className="w-20 bg-muted border border-border rounded px-2 py-1 text-sm text-foreground text-right focus:outline-none focus:border-ring"
             onKeyDown={e => {
               if (e.key === 'Enter') save()
               if (e.key === 'Escape') setEditing(false)
@@ -994,7 +994,7 @@ function EditableNumberRow({
           setDraft(value != null ? String(value) : '')
           setEditing(true)
         }}
-        className={`text-xs cursor-pointer ${valueClass}`}
+        className={`text-sm cursor-pointer ${valueClass}`}
         title="Click to edit"
       >
         {value != null ? value.toString() : <span className="text-muted-foreground/50">—</span>}
@@ -1007,7 +1007,7 @@ function EditableDateRow({
   label,
   value,
   tooltip,
-  valueClass = 'text-foreground/80 hover:text-foreground',
+  valueClass = 'text-foreground hover:text-foreground/70',
   onSave,
 }: {
   label: string
@@ -1037,7 +1037,7 @@ function EditableDateRow({
             type="date"
             value={draft}
             onChange={e => setDraft(e.target.value)}
-            className="bg-muted border border-border rounded px-2 py-1 text-xs text-foreground focus:outline-none focus:border-ring"
+            className="bg-muted border border-border rounded px-2 py-1 text-sm text-foreground focus:outline-none focus:border-ring"
             onKeyDown={e => {
               if (e.key === 'Enter') save()
               if (e.key === 'Escape') setEditing(false)
@@ -1065,7 +1065,7 @@ function EditableDateRow({
           setDraft(value ? value.slice(0, 10) : '')
           setEditing(true)
         }}
-        className={`text-xs cursor-pointer ${valueClass}`}
+        className={`text-sm cursor-pointer ${valueClass}`}
         title="Click to edit"
       >
         {formatDate(value)}
@@ -1107,7 +1107,7 @@ function CaptainRow({
             autoFocus
             value={draft}
             onChange={e => setDraft(e.target.value)}
-            className="min-w-0 bg-muted border border-border rounded px-2 py-1 text-xs text-foreground focus:outline-none focus:border-ring"
+            className="min-w-0 bg-muted border border-border rounded px-2 py-1 text-sm text-foreground focus:outline-none focus:border-ring"
             onKeyDown={e => {
               if (e.key === 'Enter') save()
               if (e.key === 'Escape') setEditing(false)
@@ -1142,10 +1142,10 @@ function CaptainRow({
           setDraft(captain?.id ?? '')
           setEditing(true)
         }}
-        className="text-xs text-foreground/80 hover:text-foreground cursor-pointer"
+        className="text-sm text-foreground hover:text-foreground/70 cursor-pointer truncate"
         title={captain ? `${captain.name} — click to change` : 'Click to assign'}
       >
-        {captain?.initials ?? <span className="text-muted-foreground/50">—</span>}
+        {captain?.name ?? <span className="text-muted-foreground/50">—</span>}
       </button>
     </div>
   )
@@ -1174,8 +1174,8 @@ function DeleteProjectModal({
         className="bg-card border border-border rounded-2xl p-5 w-full max-w-md flex flex-col gap-3 shadow-2xl"
         onClick={e => e.stopPropagation()}
       >
-        <h2 className="text-sm font-semibold text-foreground">Delete project</h2>
-        <p className="text-xs text-muted-foreground leading-relaxed">
+        <h2 className="text-base font-semibold text-foreground">Delete project</h2>
+        <p className="text-sm text-muted-foreground leading-relaxed">
           This permanently deletes <span className="text-foreground font-medium">{projectName}</span> and
           its activity log. This cannot be undone. If you just want it off the board, use Close Project
           instead.

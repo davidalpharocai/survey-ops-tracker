@@ -69,7 +69,7 @@ export function ActivityLog({ projectId }: { projectId: string }) {
                 onClick={() => setExpanded(isOpen ? null : a.id)}
                 className="w-full text-left px-3 py-2 hover:bg-accent/60 transition-colors"
               >
-                <div className="flex items-center gap-2 text-xs">
+                <div className="flex items-center gap-2 text-sm">
                   <span>{TYPE_ICON[a.type] ?? '•'}</span>
                   <span className="text-muted-foreground shrink-0">
                     {formatWhen(a.occurred_at)}
@@ -98,7 +98,7 @@ export function ActivityLog({ projectId }: { projectId: string }) {
                       {a.recipients && <>To: {a.recipients}</>}
                     </p>
                   )}
-                  <pre className="text-xs text-foreground/80 whitespace-pre-wrap font-sans leading-relaxed max-h-80 overflow-y-auto">
+                  <pre className="text-sm text-foreground/90 whitespace-pre-wrap font-sans leading-relaxed max-h-80 overflow-y-auto">
                     {a.body ?? a.snippet ?? ''}
                   </pre>
                 </div>

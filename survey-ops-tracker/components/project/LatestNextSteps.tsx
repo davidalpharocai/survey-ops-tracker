@@ -364,7 +364,7 @@ export function LatestNextSteps({ projectId, notes }: LatestNextStepsProps) {
                 </div>
               </div>
             ) : (
-              <pre className="text-foreground/80 text-sm leading-relaxed whitespace-pre-wrap mt-2 font-sans">
+              <pre className="text-foreground/90 text-sm leading-relaxed whitespace-pre-wrap mt-2 font-sans">
                 {notes}
               </pre>
             ))}
