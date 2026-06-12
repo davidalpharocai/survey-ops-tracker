@@ -130,11 +130,12 @@ export default function BoardPage() {
         <div className="flex items-center gap-3">
           {/* Board/List tabs */}
           <div className="flex bg-muted rounded-lg p-1 gap-1">
-            <span className="text-xs bg-background text-foreground px-3 py-1.5 rounded font-medium">
+            <span title="Kanban view — drag cards between pipeline stages" className="text-xs bg-background text-foreground px-3 py-1.5 rounded font-medium">
               Board
             </span>
             <Link
               href="/list"
+              title="Table view — sortable columns, all projects in one list"
               className="text-xs text-muted-foreground hover:text-foreground px-3 py-1.5 rounded transition-colors"
             >
               List

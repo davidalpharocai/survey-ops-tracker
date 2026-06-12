@@ -61,11 +61,12 @@ export default function ListView() {
         <div className="flex bg-muted rounded-lg p-1 gap-1">
           <Link
             href="/"
+            title="Kanban view — drag cards between pipeline stages"
             className="text-xs text-muted-foreground hover:text-foreground px-3 py-1.5 rounded transition-colors"
           >
             Board
           </Link>
-          <span className="text-xs bg-background text-foreground px-3 py-1.5 rounded font-medium">
+          <span title="Table view — sortable columns, all projects in one list" className="text-xs bg-background text-foreground px-3 py-1.5 rounded font-medium">
             List
           </span>
         </div>

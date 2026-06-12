@@ -208,6 +208,7 @@ export default function ProjectDetailPage() {
       <div className="flex bg-muted rounded-lg p-1 gap-1 w-fit mb-4">
         <button
           onClick={() => setActiveTab('overview')}
+          title='The full project view — stats, pipeline, next steps, documents, and details'
           className={`text-xs px-3 py-1.5 rounded font-medium transition-colors ${
             activeTab === 'overview'
               ? 'bg-background text-foreground'
