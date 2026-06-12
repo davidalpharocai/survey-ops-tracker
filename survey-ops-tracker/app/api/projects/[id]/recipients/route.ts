@@ -28,8 +28,10 @@ export async function POST(
 
   const admin = createAdminClient()
 
+  // Validate before any writes
+  let clientId: string | null = null
+  let needsProvisioning = false
   if (body.role === 'compliance') {
-    // Provision portal access: auth user + compliance profile scoped to the project's client
     const { data: project } = await admin
       .from('survey_projects').select('client_id').eq('id', projectId).single()
     if (!project?.client_id) {
@@ -38,47 +40,58 @@ export async function POST(
         { status: 400 }
       )
     }
+    clientId = project.client_id
 
     const { data: existingProfile } = await admin
       .from('profiles').select('id, role, client_id').eq('email', email).maybeSingle()
-
     if (existingProfile) {
       if (existingProfile.role !== 'compliance') {
         return NextResponse.json(
           { error: 'That email belongs to an internal analyst account' }, { status: 400 })
       }
-      if (existingProfile.client_id !== project.client_id) {
+      if (existingProfile.client_id !== clientId) {
         return NextResponse.json(
           { error: 'That compliance user belongs to a different client' }, { status: 400 })
       }
     } else {
-      const { data: created, error: createError } = await admin.auth.admin.createUser({
-        email, email_confirm: true,
-      })
-      if (createError || !created.user) {
-        return NextResponse.json(
-          { error: createError?.message ?? 'Could not create portal user' }, { status: 500 })
-      }
-      const { error: profileError } = await admin.from('profiles').insert({
-        id: created.user.id, email, full_name: body.name ?? null,
-        role: 'compliance', client_id: project.client_id,
-      })
-      if (profileError) {
-        await admin.auth.admin.deleteUser(created.user.id)
-        return NextResponse.json({ error: profileError.message }, { status: 500 })
-      }
+      needsProvisioning = true
     }
   }
 
+  // Insert the recipient row FIRST: for external compliance contacts this is
+  // also the DB-level allowlist entry that lets the auth account be created
+  // (the auth.users domain trigger excepts vetted compliance contacts — see
+  // migration 025). Compensated below if provisioning fails.
   const { data: recipient, error } = await admin
     .from('project_recipients')
     .insert({ project_id: projectId, email, name: body.name ?? null, role: body.role })
     .select()
     .single()
-  if (error) {
-    const friendly = error.code === '23505' ? 'Already a recipient on this project' : error.message
-    return NextResponse.json({ error: friendly }, { status: 400 })
+  if (error || !recipient) {
+    const friendly = error?.code === '23505' ? 'Already a recipient on this project' : error?.message
+    return NextResponse.json({ error: friendly ?? 'Could not add recipient' }, { status: 400 })
   }
+
+  if (needsProvisioning) {
+    const { data: created, error: createError } = await admin.auth.admin.createUser({
+      email, email_confirm: true,
+    })
+    if (createError || !created.user) {
+      await admin.from('project_recipients').delete().eq('id', recipient.id)
+      return NextResponse.json(
+        { error: createError?.message ?? 'Could not create portal user' }, { status: 500 })
+    }
+    const { error: profileError } = await admin.from('profiles').insert({
+      id: created.user.id, email, full_name: body.name ?? null,
+      role: 'compliance', client_id: clientId,
+    })
+    if (profileError) {
+      await admin.auth.admin.deleteUser(created.user.id)
+      await admin.from('project_recipients').delete().eq('id', recipient.id)
+      return NextResponse.json({ error: profileError.message }, { status: 500 })
+    }
+  }
+
   return NextResponse.json({ recipient })
 }
 
