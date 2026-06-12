@@ -1,6 +1,6 @@
 # Survey Ops Command Center — User Guide
 
-*Last updated: June 11, 2026. The team's tracker for survey projects from first inquiry through delivery.*
+*Last updated: June 12, 2026. The team's tracker for survey projects from first inquiry through delivery.*
 
 **Finding this guide later:** the ☰ menu in the app's top-left corner links straight here, along with the Systems & Handover doc.
 
@@ -67,7 +67,7 @@ Four big numbers: **N collected** (click to edit), **Due date** (click to change
 - **✦ Edit by description** — type changes in plain English ("collected is 180, due pushed to July 20"), review the before→after preview, approve
 
 ### Right sidebar
-Titled groups: **People** (client, captain, salesperson), **Dates**, **Sample** (N target/actual, audience), **Flags** (click a chip to toggle), **Money** (budget, spend, and bid history with averages).
+Titled groups: **People** (client, captain + optional co-captains, salesperson from a dropdown), **Dates**, **Sample** (N target/actual, audience), **Flags** (click a chip to toggle), **Money** (budget, spend, and bid history with averages). Most projects have one captain; "+ add" under Co-Captains shares a project, and shared projects show "+1" on their board card.
 
 ### Header buttons
 **⚑ Priority** (cycles none → high → urgent) · **⏸ Hold** (pauses; card greys out, sinks to column bottom; Resume brings it back) · **✕ Close** (done/archived — lives in Full View's Closed section, reopenable) · **🗑 Delete** (permanent, asks you to type "delete")

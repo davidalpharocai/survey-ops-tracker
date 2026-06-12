@@ -81,6 +81,7 @@ export type Database = {
           captain_assigned_at: string | null
           captain_assigned_by: string | null
           sort_order: number | null
+          co_captain_ids: string[] | null
           created_at: string
           updated_at: string
         }
@@ -131,6 +132,7 @@ export type Database = {
           captain_assigned_at?: string | null
           captain_assigned_by?: string | null
           sort_order?: number | null
+          co_captain_ids?: string[] | null
           created_at?: string
           updated_at?: string
         }
@@ -181,6 +183,7 @@ export type Database = {
           captain_assigned_at?: string | null
           captain_assigned_by?: string | null
           sort_order?: number | null
+          co_captain_ids?: string[] | null
           created_at?: string
           updated_at?: string
         }

@@ -52,6 +52,7 @@ const SLIM_PROJECT_COLUMNS = [
   'captain_assigned_at',
   'captain_assigned_by',
   'sort_order',
+  'co_captain_ids',
   'created_at',
   'updated_at',
 ] as const
@@ -64,16 +65,25 @@ export type SlimProject = Pick<ProjectRow, (typeof SLIM_PROJECT_COLUMNS)[number]
 const CAPTAIN_JOIN = 'captain:team_members(id, name, initials)'
 const SLIM_SELECT = `${SLIM_PROJECT_COLUMNS.join(', ')}, ${CAPTAIN_JOIN}`
 const FULL_SELECT = `*, ${CAPTAIN_JOIN}`
+// Until migration 022 lands, co_captain_ids doesn't exist in the database —
+// retry without it so the board never breaks during the rollout window.
+const SLIM_SELECT_LEGACY = `${SLIM_PROJECT_COLUMNS.filter(c => c !== 'co_captain_ids').join(', ')}, ${CAPTAIN_JOIN}`
 
 export function useProjects() {
   const supabase = createClient()
   return useQuery({
     queryKey: ['projects'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let { data, error } = await supabase
         .from('survey_projects')
         .select(SLIM_SELECT)
         .order('created_at', { ascending: false })
+      if (error && error.message.includes('co_captain_ids')) {
+        ;({ data, error } = await supabase
+          .from('survey_projects')
+          .select(SLIM_SELECT_LEGACY)
+          .order('created_at', { ascending: false }))
+      }
       if (error) throw error
       return data as unknown as SlimProject[]
     },

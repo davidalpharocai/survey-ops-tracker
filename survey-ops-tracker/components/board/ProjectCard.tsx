@@ -168,9 +168,16 @@ export function ProjectCard({ project, onClick, isNew }: ProjectCardProps) {
           {project.captain ? (
             <span
               className="text-xs bg-muted text-foreground/80 px-2 py-0.5 rounded-full shrink-0"
-              title={`Project captain: ${project.captain.name}`}
+              title={`Project captain: ${project.captain.name}${
+                (project.co_captain_ids ?? []).length > 0
+                  ? ` (+${project.co_captain_ids!.length} co-captain${project.co_captain_ids!.length > 1 ? 's' : ''} — see project page)`
+                  : ''
+              }`}
             >
               {project.captain.initials}
+              {(project.co_captain_ids ?? []).length > 0 && (
+                <span className="text-muted-foreground"> +{project.co_captain_ids!.length}</span>
+              )}
             </span>
           ) : (
             <span
