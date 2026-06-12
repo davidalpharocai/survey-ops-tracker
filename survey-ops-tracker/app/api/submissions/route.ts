@@ -34,6 +34,21 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient()
 
+  // A submission with nobody to review it is a dead letter — require at
+  // least one client compliance contact on the project before accepting.
+  const { data: complianceContacts } = await admin
+    .from('project_recipients')
+    .select('id')
+    .eq('project_id', body.projectId)
+    .eq('role', 'compliance')
+    .limit(1)
+  if (!complianceContacts?.length) {
+    return NextResponse.json(
+      { error: 'Add at least one client compliance contact to this project before submitting for review' },
+      { status: 400 }
+    )
+  }
+
   // Next version number
   const { data: latest } = await admin
     .from('question_submissions')

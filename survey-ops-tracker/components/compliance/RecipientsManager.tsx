@@ -82,7 +82,27 @@ export function RecipientsManager({ projectId }: { projectId: string }) {
   return (
     <div>
       {group('compliance', 'Client compliance reviewers')}
-      {group('alpharoc', 'AlphaRoc notify list')}
+      <div className="mb-3">
+        <p className="text-xs text-slate-500 mb-1">AlphaRoc notify list</p>
+        <p className="text-xs text-slate-400">
+          Automatic: the submitting analyst, the project captain, and shanu@alpharoc.ai
+        </p>
+        <p className="text-[11px] text-slate-600 italic">
+          During beta, all AlphaRoc notifications route to david@alpharoc.ai only.
+        </p>
+        {recipients.filter(r => r.role === 'alpharoc').map(r => (
+          <div key={r.id} className="flex items-center justify-between text-xs py-1">
+            <span className="text-slate-300">{r.email} <span className="text-slate-600">(added)</span></span>
+            <button
+              onClick={() => removeRecipient(r)}
+              className="text-slate-600 hover:text-red-400 transition-colors"
+              aria-label={`Remove ${r.email}`}
+            >
+              ✕
+            </button>
+          </div>
+        ))}
+      </div>
       <form onSubmit={addRecipient} className="flex gap-2 mt-2">
         <Input
           type="email"

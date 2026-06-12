@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
-import { useSubmissions, useInvalidateCompliance } from '@/lib/hooks/useSubmissions'
+import { useSubmissions, useRecipients, useInvalidateCompliance } from '@/lib/hooks/useSubmissions'
 import { RecipientsManager } from './RecipientsManager'
 import { SubmitQuestionsModal } from './SubmitQuestionsModal'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
@@ -173,6 +173,8 @@ function CountdownRow({
 
 export function CompliancePanel({ projectId }: { projectId: string }) {
   const { data: submissions = [] } = useSubmissions(projectId)
+  const { data: recipients = [] } = useRecipients(projectId)
+  const hasComplianceContact = recipients.some(r => r.role === 'compliance')
   const invalidate = useInvalidateCompliance(projectId)
   const [modalOpen, setModalOpen] = useState(false)
   const [recallData, setRecallData] = useState<{
@@ -289,8 +291,8 @@ export function CompliancePanel({ projectId }: { projectId: string }) {
           setRecallData(null)
           setModalOpen(true)
         }}
-        disabled={latest?.status === 'pending_review' || latestIsUndispatched}
-        className="w-full text-xs mb-4"
+        disabled={latest?.status === 'pending_review' || latestIsUndispatched || !hasComplianceContact}
+        className="w-full text-xs mb-1"
       >
         {latest?.status === 'pending_review'
           ? 'Awaiting compliance review'
@@ -300,6 +302,12 @@ export function CompliancePanel({ projectId }: { projectId: string }) {
               ? 'Submit revised questions'
               : 'Submit questions for review'}
       </Button>
+      {!hasComplianceContact && (
+        <p className="text-xs text-amber-400/90 mb-3">
+          Add a client compliance contact below before submitting for review.
+        </p>
+      )}
+      <div className="mb-3" />
 
       <div className="border-t border-slate-800 pt-3">
         <RecipientsManager projectId={projectId} />
