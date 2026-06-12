@@ -4,9 +4,10 @@ import { BoardColumn } from './BoardColumn'
 import { BoardFilters } from './BoardFilters'
 import { useState, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useQueryClient } from '@tanstack/react-query'
 import { useCurrentMember } from '@/lib/hooks/useCurrentMember'
 import { useIsNewForMe } from '@/lib/hooks/useSeenProjects'
-import { STAGE_ORDER, type BoardColumn as BoardColumnType } from '@/lib/utils/stage'
+import { STAGE_ORDER, getCheckboxesForColumn, type BoardColumn as BoardColumnType } from '@/lib/utils/stage'
 import { getDueUrgency } from '@/lib/utils/date'
 import { boardOrder, sortOrderBetween } from '@/lib/utils/ordering'
 import type { SlimProject } from '@/lib/hooks/useProjects'
@@ -33,6 +34,7 @@ export function columnSortRank(p: SlimProject): number {
 
 export function Board({ projects, teamMembers, onMoveProject, wrapInContext = true }: BoardProps) {
   const router = useRouter()
+  const queryClient = useQueryClient()
   const { data: currentMember, isLoading: memberLoading } = useCurrentMember()
   const isNewForMe = useIsNewForMe()
   const [captainFilter, setCaptainFilter] = useState<string | null>(null)
@@ -102,6 +104,15 @@ export function Board({ projects, teamMembers, onMoveProject, wrapInContext = tr
     const i = result.destination.index
     const sortOrder = sortOrderBetween(destCards[i - 1]?.sort_order, destCards[i]?.sort_order)
     if (sameColumn && result.destination.index === result.source.index) return
+    // Apply the move to the cache RIGHT HERE, in the same tick as the drop —
+    // the drop animation then aims at the card's new home, not its old one.
+    queryClient.setQueriesData<SlimProject[]>({ queryKey: ['projects'] }, old =>
+      old?.map(p =>
+        p.id === result.draggableId
+          ? { ...p, board_column: newColumn, sort_order: sortOrder, ...getCheckboxesForColumn(newColumn) }
+          : p
+      )
+    )
     onMoveProject(result.draggableId, newColumn, sortOrder)
   }
 

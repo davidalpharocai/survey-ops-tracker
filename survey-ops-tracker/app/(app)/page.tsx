@@ -8,8 +8,9 @@ import { NewProjectModal } from '@/components/board/NewProjectModal'
 import { ProjectCard } from '@/components/board/ProjectCard'
 import { ViewToggle } from '@/components/shared/ViewToggle'
 import { ColorKey } from '@/components/shared/ColorKey'
-import { useProjects, useMoveProjectToColumn, useUpdateProject, fetchFullProjects } from '@/lib/hooks/useProjects'
+import { useProjects, useMoveProjectToColumn, useUpdateProject, fetchFullProjects, type SlimProject } from '@/lib/hooks/useProjects'
 import { useTeamMembers } from '@/lib/hooks/useTeamMembers'
+import { useQueryClient } from '@tanstack/react-query'
 import { useIsNewForMe } from '@/lib/hooks/useSeenProjects'
 import { useViewMode } from '@/lib/hooks/useViewMode'
 import { exportProjectsCsv } from '@/lib/utils/exportCsv'
@@ -21,6 +22,7 @@ import Link from 'next/link'
 
 export default function BoardPage() {
   const router = useRouter()
+  const queryClient = useQueryClient()
   const { data: projects = [], isLoading } = useProjects()
   const { data: teamMembers = [] } = useTeamMembers()
   const moveProject = useMoveProjectToColumn()
@@ -99,7 +101,15 @@ export default function BoardPage() {
     const i = result.destination.index
     const sortOrder = sortOrderBetween(destSorted[i - 1]?.sort_order, destSorted[i]?.sort_order)
 
+    // Same-tick cache apply so the drop animation targets the new home
+    function applyNow(patch: Partial<SlimProject>) {
+      queryClient.setQueriesData<SlimProject[]>({ queryKey: ['projects'] }, old =>
+        old?.map(pr => (pr.id === id ? ({ ...pr, ...patch } as SlimProject) : pr))
+      )
+    }
+
     if (fromScoping && toScoping) {
+      applyNow({ scoping_stage: to as Database['public']['Enums']['scoping_stage'], sort_order: sortOrder })
       updateProject.mutate({
         id,
         updates: {
@@ -109,6 +119,12 @@ export default function BoardPage() {
       })
     } else if (fromScoping && toPipeline) {
       // Approve: promote into the pipeline at the column it was dropped on
+      applyNow({
+        phase: 'Active',
+        board_column: to as Database['public']['Enums']['board_column'],
+        sort_order: sortOrder,
+        ...getCheckboxesForColumn(to as BoardColumnType),
+      })
       updateProject.mutate({
         id,
         updates: {
@@ -120,6 +136,11 @@ export default function BoardPage() {
         },
       })
     } else if (toPipeline) {
+      applyNow({
+        board_column: to as Database['public']['Enums']['board_column'],
+        sort_order: sortOrder,
+        ...getCheckboxesForColumn(to as BoardColumnType),
+      })
       moveProject(id, to as BoardColumnType, sortOrder)
     }
     // pipeline -> scoping drags are ignored (demote via the project page if ever needed)
