@@ -72,15 +72,61 @@ export default function AdminPage() {
   const { data: teamMembers = [] } = useTeamMembers()
 
   // Slim projects carry the contact-level text ("BAM - Jeff Cummings");
-  // clients are firm-level, so count by the firm prefix before " - ".
-  const projectCountByClientName = useMemo(() => {
-    const counts = new Map<string, number>()
+  // clients are firm-level, so group by the firm prefix before " - ".
+  const firmStats = useMemo(() => {
+    const stats = new Map<string, { total: number; activePipeline: number; activeScoping: number; closed: number }>()
     for (const p of projects) {
       const key = p.client.split(' - ')[0].trim().toLowerCase()
-      counts.set(key, (counts.get(key) ?? 0) + 1)
+      const s = stats.get(key) ?? { total: 0, activePipeline: 0, activeScoping: 0, closed: 0 }
+      s.total++
+      if (p.status === 'Closed') s.closed++
+      else if (p.phase === 'Scoping') s.activeScoping++
+      else s.activePipeline++
+      stats.set(key, s)
     }
-    return counts
+    return stats
   }, [projects])
+
+  // Account buckets per David: Prospect = only scoping activity, no other
+  // active projects. Client = active pipeline work. Former = closed work only.
+  type Bucket = 'client' | 'former' | 'prospect' | 'none'
+  function bucketOf(name: string): Bucket {
+    const s = firmStats.get(name.trim().toLowerCase())
+    if (!s) return 'none'
+    if (s.activePipeline > 0) return 'client'
+    if (s.activeScoping > 0) return 'prospect'
+    if (s.closed > 0) return 'former'
+    return 'none'
+  }
+  const bucketCounts = useMemo(() => {
+    const counts = { client: 0, former: 0, prospect: 0, none: 0 }
+    for (const c of clients) counts[bucketOf(c.name)]++
+    return counts
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clients, firmStats])
+
+  const BUCKET_BADGE: Record<Bucket, { label: string; cls: string; help: string }> = {
+    client: {
+      label: 'Client',
+      cls: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400',
+      help: 'Has active projects in the pipeline right now.',
+    },
+    prospect: {
+      label: 'Prospect',
+      cls: 'bg-violet-500/15 text-violet-600 dark:text-violet-400',
+      help: 'Only scoping-phase projects — a deal in the works, nothing else active.',
+    },
+    former: {
+      label: 'Former',
+      cls: 'bg-muted text-muted-foreground',
+      help: 'Past projects only — nothing active. A re-engagement candidate.',
+    },
+    none: {
+      label: 'No projects',
+      cls: 'text-muted-foreground/50',
+      help: 'On the approved account list but no projects recorded yet.',
+    },
+  }
 
   const health = useMemo(() => {
     const open = projects.filter(p => p.status === 'Open')
@@ -138,29 +184,54 @@ export default function AdminPage() {
         </div>
       </div>
 
-      {/* Clients */}
+      {/* Accounts */}
       <div className={tile}>
         <h3 className={heading}>
-          Clients ({clients.length})
-          <InfoTooltip text="The client list with their Cl##### ids (same ids as the sheet's Unique Clients tab). Cleanup pending — duplicates and contact-level entries will be consolidated." />
+          Accounts ({clients.length})
+          <InfoTooltip text="Every approved account with its Cl##### id (same ids as the sheet's Unique Clients tab). Click one for its client page — projects, spend, and history." />
         </h3>
+        <p className="text-sm text-muted-foreground mb-3 flex items-center gap-x-3 gap-y-1 flex-wrap">
+          <span className="flex items-center">
+            <span className="text-foreground font-semibold mr-1">{bucketCounts.client}</span> Clients
+            <InfoTooltip text={BUCKET_BADGE.client.help} />
+          </span>
+          <span className="flex items-center">
+            <span className="text-foreground font-semibold mr-1">{bucketCounts.former}</span> Former Clients
+            <InfoTooltip text={BUCKET_BADGE.former.help} />
+          </span>
+          <span className="flex items-center">
+            <span className="text-foreground font-semibold mr-1">{bucketCounts.prospect}</span> Prospects
+            <InfoTooltip text={BUCKET_BADGE.prospect.help} />
+          </span>
+          {bucketCounts.none > 0 && (
+            <span className="flex items-center">
+              <span className="text-foreground font-semibold mr-1">{bucketCounts.none}</span> No projects yet
+              <InfoTooltip text={BUCKET_BADGE.none.help} />
+            </span>
+          )}
+        </p>
         {clientsLoading ? (
           <p className="text-xs text-muted-foreground/50">Loading…</p>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
             {clients.map(c => {
-              const count = projectCountByClientName.get(c.name.trim().toLowerCase()) ?? 0
+              const count = firmStats.get(c.name.trim().toLowerCase())?.total ?? 0
+              const bucket = bucketOf(c.name)
+              const badge = BUCKET_BADGE[bucket]
               return (
                 <Link
                   key={c.id}
                   href={`/clients/${c.id}`}
-                  title={`Open ${c.name}'s client page — projects, spend, and history`}
+                  title={`Open ${c.name}'s client page — projects, spend, and history. ${badge.help}`}
                   className="flex items-center justify-between gap-2 py-1 border-b border-border/40 last:border-0 hover:bg-accent/50 rounded px-1 -mx-1 transition-colors group"
                 >
                   <span className="text-sm text-foreground group-hover:text-blue-600 dark:group-hover:text-blue-400 truncate transition-colors">
                     {c.name}
                   </span>
                   <span className="flex items-center gap-2 shrink-0">
+                    {bucket !== 'none' && (
+                      <span className={`text-xs px-1.5 py-0.5 rounded ${badge.cls}`}>{badge.label}</span>
+                    )}
                     {count > 0 && (
                       <span className="text-xs text-muted-foreground">{count} project{count > 1 ? 's' : ''}</span>
                     )}
