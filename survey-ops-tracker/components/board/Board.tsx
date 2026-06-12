@@ -2,6 +2,7 @@
 import { DragDropContext, type DropResult } from '@hello-pangea/dnd'
 import { BoardColumn } from './BoardColumn'
 import { BoardFilters } from './BoardFilters'
+import { SavedViews, type BoardView } from './SavedViews'
 import { useState, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useQueryClient } from '@tanstack/react-query'
@@ -142,22 +143,35 @@ export function Board({ projects, teamMembers, onMoveProject, wrapInContext = tr
     </div>
   )
 
+  function applyView(v: BoardView) {
+    handleCaptainChange(v.captain)
+    setTypeFilter(v.type)
+    setDueFilter(v.due)
+    setStageFilter(v.stage)
+  }
+
   return (
     <div className="flex flex-col gap-4">
-      <BoardFilters
-        captains={teamMembers}
-        captainFilter={captainFilter}
-        currentMemberId={currentMember?.id ?? null}
-        typeFilter={typeFilter}
-        dueFilter={dueFilter}
-        stageFilter={stageFilter}
-        search={search}
-        onCaptainChange={handleCaptainChange}
-        onTypeChange={setTypeFilter}
-        onDueChange={setDueFilter}
-        onStageChange={setStageFilter}
-        onSearchChange={setSearch}
-      />
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <BoardFilters
+          captains={teamMembers}
+          captainFilter={captainFilter}
+          currentMemberId={currentMember?.id ?? null}
+          typeFilter={typeFilter}
+          dueFilter={dueFilter}
+          stageFilter={stageFilter}
+          search={search}
+          onCaptainChange={handleCaptainChange}
+          onTypeChange={setTypeFilter}
+          onDueChange={setDueFilter}
+          onStageChange={setStageFilter}
+          onSearchChange={setSearch}
+        />
+        <SavedViews
+          current={{ captain: captainFilter, type: typeFilter, due: dueFilter, stage: stageFilter }}
+          onApply={applyView}
+        />
+      </div>
       {wrapInContext ? (
         <DragDropContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>{columns}</DragDropContext>
       ) : (

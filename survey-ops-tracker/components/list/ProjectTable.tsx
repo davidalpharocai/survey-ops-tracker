@@ -1,5 +1,5 @@
 'use client'
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { formatDate, getDueDateStatus } from '@/lib/utils/date'
 import type { SlimProject } from '@/lib/hooks/useProjects'
@@ -40,11 +40,41 @@ function FlagCell({ value, warn = false }: { value: boolean; warn?: boolean }) {
   )
 }
 
+const HIDDEN_COLS_KEY = 'sot.listHiddenColumns'
+
 export function ProjectTable({ projects }: ProjectTableProps) {
   const router = useRouter()
   const [sortField, setSortField] = useState<SortField>('due_date')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
   const { data: complianceStatuses } = useLatestSubmissionStatuses()
+
+  // Per-user column visibility — saved in this browser only
+  const [hiddenCols, setHiddenCols] = useState<Set<string>>(new Set())
+  const [colsOpen, setColsOpen] = useState(false)
+  const colsRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    try {
+      setHiddenCols(new Set(JSON.parse(localStorage.getItem(HIDDEN_COLS_KEY) ?? '[]')))
+    } catch {
+      // corrupted storage — show everything
+    }
+  }, [])
+  useEffect(() => {
+    if (!colsOpen) return
+    function onPointerDown(e: PointerEvent) {
+      if (colsRef.current && !colsRef.current.contains(e.target as Node)) setColsOpen(false)
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    return () => document.removeEventListener('pointerdown', onPointerDown)
+  }, [colsOpen])
+  function toggleCol(key: string) {
+    const next = new Set(hiddenCols)
+    if (next.has(key)) next.delete(key)
+    else next.add(key)
+    setHiddenCols(next)
+    localStorage.setItem(HIDDEN_COLS_KEY, JSON.stringify([...next]))
+  }
+  const show = (key: string) => !hiddenCols.has(key)
 
   function handleSort(field: SortField) {
     if (sortField === field) {
@@ -69,26 +99,58 @@ export function ProjectTable({ projects }: ProjectTableProps) {
     return <span className="text-foreground/80 ml-1">{sortDir === 'asc' ? '↑' : '↓'}</span>
   }
 
-  const headers: { field: SortField | null; label: string; title: string }[] = [
-    { field: 'project_name', label: 'Project', title: 'Project name. ⏸ marks projects on hold.' },
-    { field: 'client', label: 'Client', title: 'The client this project is for.' },
-    { field: null, label: 'Type', title: 'PS = PureSpectrum consumer panel, B2B = expert/business panel, Rerun = repeat wave of an earlier study.' },
-    { field: 'board_column', label: 'Stage', title: 'Current pipeline stage, from Submitted through Delivery.' },
-    { field: null, label: 'Captain', title: 'Team member responsible for the project end-to-end. ! = unassigned.' },
-    { field: null, label: 'N / Target', title: 'Responses collected so far (auto-synced) vs the response goal.' },
-    { field: null, label: 'N Actual', title: 'Usable responses after data cleaning.' },
-    { field: null, label: 'Long.', title: 'Longitudinal — study tracked across multiple waves.' },
-    { field: null, label: 'Voter QA', title: 'Whether the project needs the extra voter-survey QA pass.' },
-    { field: null, label: 'Citation', title: 'Whether deliverables need citation language.' },
-    { field: 'due_date', label: 'Due', title: 'Date the deliverable is due to the client.' },
+  // key: hideable column id (null = always shown)
+  const headers: { key: string | null; field: SortField | null; label: string; title: string }[] = [
+    { key: null, field: 'project_name', label: 'Project', title: 'Project name. ⏸ marks projects on hold.' },
+    { key: 'client', field: 'client', label: 'Client', title: 'The client this project is for.' },
+    { key: 'type', field: null, label: 'Type', title: 'PS = PureSpectrum consumer panel, B2B = expert/business panel, Rerun = repeat wave of an earlier study.' },
+    { key: 'stage', field: 'board_column', label: 'Stage', title: 'Current pipeline stage, from Submitted through Delivery.' },
+    { key: 'captain', field: null, label: 'Captain', title: 'Team member responsible for the project end-to-end. ! = unassigned.' },
+    { key: 'n', field: null, label: 'N / Target', title: 'Responses collected so far (auto-synced) vs the response goal.' },
+    { key: 'nActual', field: null, label: 'N Actual', title: 'Usable responses after data cleaning.' },
+    { key: 'long', field: null, label: 'Long.', title: 'Longitudinal — study tracked across multiple waves.' },
+    { key: 'voterQA', field: null, label: 'Voter QA', title: 'Whether the project needs the extra voter-survey QA pass.' },
+    { key: 'citation', field: null, label: 'Citation', title: 'Whether deliverables need citation language.' },
+    { key: 'due', field: 'due_date', label: 'Due', title: 'Internal deadline — when our work must be done.' },
   ]
+  const visibleHeaders = headers.filter(h => h.key === null || show(h.key))
 
   return (
     <div className="bg-card border border-border shadow-sm rounded-xl overflow-hidden">
+      <div className="flex justify-end px-2 pt-2 relative" ref={colsRef}>
+        <button
+          onClick={() => setColsOpen(o => !o)}
+          title="Choose which columns you see — personal to you, remembered in this browser"
+          className="text-xs text-muted-foreground hover:text-foreground border border-border hover:border-ring rounded px-2 py-1 transition-colors"
+        >
+          ⚙ Columns
+        </button>
+        {colsOpen && (
+          <div className="absolute right-2 top-full mt-1 z-40 bg-popover border border-border rounded-lg shadow-xl p-2 flex flex-col gap-1 w-44">
+            {headers
+              .filter(h => h.key !== null)
+              .map(h => (
+                <label
+                  key={h.key}
+                  className="flex items-center gap-2 text-sm text-foreground/90 hover:bg-accent rounded px-1.5 py-1 cursor-pointer"
+                  title={h.title}
+                >
+                  <input
+                    type="checkbox"
+                    checked={show(h.key!)}
+                    onChange={() => toggleCol(h.key!)}
+                    className="accent-blue-600"
+                  />
+                  {h.label}
+                </label>
+              ))}
+          </div>
+        )}
+      </div>
       <table className="w-full">
         <thead>
           <tr className="bg-background border-b border-border">
-            {headers.map(({ field, label, title }) => (
+            {visibleHeaders.map(({ field, label, title }) => (
               <th
                 key={label}
                 title={field ? `${title} Click to sort.` : title}
@@ -106,7 +168,7 @@ export function ProjectTable({ projects }: ProjectTableProps) {
         <tbody>
           {sorted.length === 0 && (
             <tr>
-              <td colSpan={11} className="px-4 py-8 text-center text-muted-foreground text-sm">
+              <td colSpan={visibleHeaders.length} className="px-4 py-8 text-center text-muted-foreground text-sm">
                 No projects found
               </td>
             </tr>
@@ -153,45 +215,59 @@ export function ProjectTable({ projects }: ProjectTableProps) {
                     )}
                   </div>
                 </td>
-                <td className="px-4 py-3 text-sm text-muted-foreground">{p.client}</td>
-                <td className="px-4 py-3">
-                  {p.project_type && (
-                    <span className={`text-xs px-2 py-0.5 rounded ${TYPE_BADGE[p.project_type] ?? ''}`}>
-                      {p.project_type}
+                {show('client') && (
+                  <td className="px-4 py-3 text-sm text-muted-foreground">{p.client}</td>
+                )}
+                {show('type') && (
+                  <td className="px-4 py-3">
+                    {p.project_type && (
+                      <span className={`text-xs px-2 py-0.5 rounded ${TYPE_BADGE[p.project_type] ?? ''}`}>
+                        {p.project_type}
+                      </span>
+                    )}
+                  </td>
+                )}
+                {show('stage') && (
+                  <td className="px-4 py-3">
+                    <span className={`text-xs px-2 py-1 rounded ${STAGE_BADGE[p.board_column] ?? 'bg-muted text-muted-foreground'}`}>
+                      {p.board_column}
                     </span>
-                  )}
-                </td>
-                <td className="px-4 py-3">
-                  <span className={`text-xs px-2 py-1 rounded ${STAGE_BADGE[p.board_column] ?? 'bg-muted text-muted-foreground'}`}>
-                    {p.board_column}
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-sm">
-                  {p.captain ? (
-                    <span className="bg-muted text-foreground/80 text-xs px-2 py-0.5 rounded-full">
-                      {p.captain.initials}
-                    </span>
-                  ) : (
-                    <span className="text-red-600 dark:text-red-400 text-xs">!</span>
-                  )}
-                </td>
-                <td className={`px-4 py-3 text-xs ${nMet ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>
-                  {p.n_collected} / {p.n_target ?? '—'}
-                  {nMet && ' ✓'}
-                </td>
-                <td className="px-4 py-3 text-xs text-muted-foreground">
-                  {p.n_actual ?? '—'}
-                </td>
-                <FlagCell value={p.longitudinal ?? false} />
-                <FlagCell value={p.voter_survey_qa ?? false} warn />
-                <FlagCell value={p.citation_language_needed ?? false} warn />
-                <td className={`px-4 py-3 text-xs ${
-                  dueDateStatus === 'overdue' ? 'text-red-600 dark:text-red-400' :
-                  dueDateStatus === 'soon' ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'
-                }`}>
-                  {dueDateStatus === 'overdue' && '⚠ '}
-                  {formatDate(p.due_date)}
-                </td>
+                  </td>
+                )}
+                {show('captain') && (
+                  <td className="px-4 py-3 text-sm">
+                    {p.captain ? (
+                      <span className="bg-muted text-foreground/80 text-xs px-2 py-0.5 rounded-full">
+                        {p.captain.initials}
+                      </span>
+                    ) : (
+                      <span className="text-red-600 dark:text-red-400 text-xs">!</span>
+                    )}
+                  </td>
+                )}
+                {show('n') && (
+                  <td className={`px-4 py-3 text-xs ${nMet ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>
+                    {p.n_collected} / {p.n_target ?? '—'}
+                    {nMet && ' ✓'}
+                  </td>
+                )}
+                {show('nActual') && (
+                  <td className="px-4 py-3 text-xs text-muted-foreground">
+                    {p.n_actual ?? '—'}
+                  </td>
+                )}
+                {show('long') && <FlagCell value={p.longitudinal ?? false} />}
+                {show('voterQA') && <FlagCell value={p.voter_survey_qa ?? false} warn />}
+                {show('citation') && <FlagCell value={p.citation_language_needed ?? false} warn />}
+                {show('due') && (
+                  <td className={`px-4 py-3 text-xs ${
+                    dueDateStatus === 'overdue' ? 'text-red-600 dark:text-red-400' :
+                    dueDateStatus === 'soon' ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'
+                  }`}>
+                    {dueDateStatus === 'overdue' && '⚠ '}
+                    {formatDate(p.due_date)}
+                  </td>
+                )}
               </tr>
             )
           })}
