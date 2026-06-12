@@ -15,6 +15,9 @@ interface BoardProps {
   projects: SlimProject[]
   teamMembers: TeamMember[]
   onMoveProject: (id: string, column: BoardColumnType) => void
+  // Full View provides a page-level DragDropContext (so cards can be dragged
+  // from scoping into the pipeline); the board then skips its own context
+  wrapInContext?: boolean
 }
 
 const CAPTAIN_FILTER_KEY = 'sot.captainFilter'
@@ -27,7 +30,7 @@ function columnSortRank(p: SlimProject): number {
   return PRIORITY_RANK[p.priority ?? ''] ?? 2
 }
 
-export function Board({ projects, teamMembers, onMoveProject }: BoardProps) {
+export function Board({ projects, teamMembers, onMoveProject, wrapInContext = true }: BoardProps) {
   const router = useRouter()
   const { data: currentMember, isLoading: memberLoading } = useCurrentMember()
   const isNewForMe = useIsNewForMe()
@@ -94,6 +97,23 @@ export function Board({ projects, teamMembers, onMoveProject }: BoardProps) {
     }
   }
 
+  const columns = (
+    <div className="flex gap-2 overflow-x-auto pb-4">
+      {STAGE_ORDER.map(stage => (
+        <BoardColumn
+          key={stage}
+          id={stage}
+          title={stage}
+          projects={filtered
+            .filter(p => p.board_column === stage)
+            .sort((a, b) => columnSortRank(a) - columnSortRank(b))}
+          isNewFor={isNewForMe}
+          onCardClick={id => router.push(`/projects/${id}`)}
+        />
+      ))}
+    </div>
+  )
+
   return (
     <div className="flex flex-col gap-4">
       <BoardFilters
@@ -110,22 +130,11 @@ export function Board({ projects, teamMembers, onMoveProject }: BoardProps) {
         onStageChange={setStageFilter}
         onSearchChange={setSearch}
       />
-      <DragDropContext onDragEnd={handleDragEnd}>
-        <div className="flex gap-2 overflow-x-auto pb-4">
-          {STAGE_ORDER.map(stage => (
-            <BoardColumn
-              key={stage}
-              id={stage}
-              title={stage}
-              projects={filtered
-                .filter(p => p.board_column === stage)
-                .sort((a, b) => columnSortRank(a) - columnSortRank(b))}
-              onCardClick={id => router.push(`/projects/${id}`)}
-              isNewFor={isNewForMe}
-            />
-          ))}
-        </div>
-      </DragDropContext>
+      {wrapInContext ? (
+        <DragDropContext onDragEnd={handleDragEnd}>{columns}</DragDropContext>
+      ) : (
+        columns
+      )}
     </div>
   )
 }

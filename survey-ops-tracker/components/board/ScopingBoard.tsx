@@ -18,9 +18,12 @@ export const SCOPING_STAGES: ScopingStage[] = [
 
 interface ScopingBoardProps {
   projects: SlimProject[]
+  // Full View provides a page-level DragDropContext shared with the pipeline
+  // so cards can be dragged from scoping straight into a pipeline column
+  wrapInContext?: boolean
 }
 
-export function ScopingBoard({ projects }: ScopingBoardProps) {
+export function ScopingBoard({ projects, wrapInContext = true }: ScopingBoardProps) {
   const router = useRouter()
   const updateProject = useUpdateProject()
   const isNewForMe = useIsNewForMe()
@@ -36,6 +39,23 @@ export function ScopingBoard({ projects }: ScopingBoardProps) {
     }
   }
 
+  const columns = (
+    <div className="flex gap-2 overflow-x-auto pb-2">
+      {SCOPING_STAGES.map(stage => (
+        <BoardColumn
+          key={stage}
+          id={stage}
+          title={stage}
+          projects={projects.filter(
+            p => (p.scoping_stage ?? 'New Inquiry') === stage
+          )}
+          onCardClick={id => router.push(`/projects/${id}`)}
+          isNewFor={isNewForMe}
+        />
+      ))}
+    </div>
+  )
+
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-2">
@@ -45,23 +65,15 @@ export function ScopingBoard({ projects }: ScopingBoardProps) {
         <span className="text-xs bg-violet-500/15 text-violet-600 dark:text-violet-400 px-2 py-0.5 rounded-full">
           {projects.length}
         </span>
+        <span className="text-xs text-muted-foreground/60">
+          drag a card into the pipeline below to approve it
+        </span>
       </div>
-      <DragDropContext onDragEnd={handleDragEnd}>
-        <div className="flex gap-2 overflow-x-auto pb-2">
-          {SCOPING_STAGES.map(stage => (
-            <BoardColumn
-              key={stage}
-              id={stage}
-              title={stage}
-              projects={projects.filter(
-                p => (p.scoping_stage ?? 'New Inquiry') === stage
-              )}
-              onCardClick={id => router.push(`/projects/${id}`)}
-              isNewFor={isNewForMe}
-            />
-          ))}
-        </div>
-      </DragDropContext>
+      {wrapInContext ? (
+        <DragDropContext onDragEnd={handleDragEnd}>{columns}</DragDropContext>
+      ) : (
+        columns
+      )}
     </div>
   )
 }

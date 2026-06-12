@@ -1,18 +1,21 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { DragDropContext, type DropResult } from '@hello-pangea/dnd'
 import { Board } from '@/components/board/Board'
-import { ScopingBoard } from '@/components/board/ScopingBoard'
+import { ScopingBoard, SCOPING_STAGES } from '@/components/board/ScopingBoard'
 import { NewProjectModal } from '@/components/board/NewProjectModal'
 import { ProjectCard } from '@/components/board/ProjectCard'
 import { ViewToggle } from '@/components/shared/ViewToggle'
 import { ColorKey } from '@/components/shared/ColorKey'
-import { useProjects, useMoveProjectToColumn, fetchFullProjects } from '@/lib/hooks/useProjects'
+import { useProjects, useMoveProjectToColumn, useUpdateProject, fetchFullProjects } from '@/lib/hooks/useProjects'
 import { useTeamMembers } from '@/lib/hooks/useTeamMembers'
 import { useIsNewForMe } from '@/lib/hooks/useSeenProjects'
 import { useViewMode } from '@/lib/hooks/useViewMode'
 import { exportProjectsCsv } from '@/lib/utils/exportCsv'
 import { isTypingTarget } from '@/lib/utils/keyboard'
+import { STAGE_ORDER, getCheckboxesForColumn, type BoardColumn as BoardColumnType } from '@/lib/utils/stage'
+import type { Database } from '@/lib/supabase/types'
 import Link from 'next/link'
 
 export default function BoardPage() {
@@ -20,6 +23,7 @@ export default function BoardPage() {
   const { data: projects = [], isLoading } = useProjects()
   const { data: teamMembers = [] } = useTeamMembers()
   const moveProject = useMoveProjectToColumn()
+  const updateProject = useUpdateProject()
   const isNewForMe = useIsNewForMe()
   const { mode, setMode } = useViewMode()
   const [showNewProject, setShowNewProject] = useState(false)
@@ -71,6 +75,40 @@ export default function BoardPage() {
     }
   }
 
+  // Full View drag handler: routes drops to the right action depending on
+  // where the card came from and where it landed
+  function handleFullViewDragEnd(result: DropResult) {
+    if (!result.destination) return
+    const from = result.source.droppableId
+    const to = result.destination.droppableId
+    if (from === to) return
+    const id = result.draggableId
+    const toScoping = (SCOPING_STAGES as string[]).includes(to)
+    const fromScoping = (SCOPING_STAGES as string[]).includes(from)
+    const toPipeline = (STAGE_ORDER as string[]).includes(to)
+
+    if (fromScoping && toScoping) {
+      updateProject.mutate({
+        id,
+        updates: { scoping_stage: to as Database['public']['Enums']['scoping_stage'] },
+      })
+    } else if (fromScoping && toPipeline) {
+      // Approve: promote into the pipeline at the column it was dropped on
+      updateProject.mutate({
+        id,
+        updates: {
+          phase: 'Active',
+          board_column: to as Database['public']['Enums']['board_column'],
+          submitted_date: new Date().toISOString().split('T')[0],
+          ...getCheckboxesForColumn(to as BoardColumnType),
+        },
+      })
+    } else if (toPipeline) {
+      moveProject(id, to as BoardColumnType)
+    }
+    // pipeline -> scoping drags are ignored (demote via the project page if ever needed)
+  }
+
   if (isLoading) {
     return <div className="text-muted-foreground text-sm">Loading projects...</div>
   }
@@ -116,20 +154,28 @@ export default function BoardPage() {
       {/* Color key */}
       <ColorKey />
 
-      {/* Scoping board (Full View only) */}
-      {mode === 'full' && <ScopingBoard projects={scopingProjects} />}
-
-      {/* Operations pipeline */}
-      {mode === 'full' && (
-        <h2 className="text-xs text-muted-foreground uppercase tracking-widest font-semibold -mb-1">
-          Operations Pipeline
-        </h2>
+      {/* Full View: one shared drag context spanning scoping + pipeline, so a
+          scoping card dropped on a pipeline column gets promoted on the spot */}
+      {mode === 'full' ? (
+        <DragDropContext onDragEnd={handleFullViewDragEnd}>
+          <ScopingBoard projects={scopingProjects} wrapInContext={false} />
+          <h2 className="text-xs text-muted-foreground uppercase tracking-widest font-semibold -mb-1">
+            Operations Pipeline
+          </h2>
+          <Board
+            projects={activeProjects}
+            teamMembers={teamMembers}
+            onMoveProject={moveProject}
+            wrapInContext={false}
+          />
+        </DragDropContext>
+      ) : (
+        <Board
+          projects={activeProjects}
+          teamMembers={teamMembers}
+          onMoveProject={moveProject}
+        />
       )}
-      <Board
-        projects={activeProjects}
-        teamMembers={teamMembers}
-        onMoveProject={moveProject}
-      />
 
       {/* Closed section (Full View only) */}
       {mode === 'full' && (
