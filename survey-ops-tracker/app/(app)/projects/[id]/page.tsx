@@ -15,7 +15,8 @@ import { LinkedDocuments } from '@/components/project/LinkedDocuments'
 import { SlackChannel } from '@/components/project/SlackChannel'
 import { NProgressBar } from '@/components/shared/NProgressBar'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
-import { formatDate } from '@/lib/utils/date'
+import { formatDate, getDueUrgency } from '@/lib/utils/date'
+import { differenceInCalendarDays, parseISO, startOfDay } from 'date-fns'
 import { deriveWaitingOn } from '@/lib/utils/waitingOn'
 import { BudgetWidget } from '@/components/project/BudgetWidget'
 import { BidWidget } from '@/components/project/BidWidget'
@@ -55,7 +56,7 @@ export default function ProjectDetailPage() {
   const updateProject = useUpdateProject()
   const deleteProject = useDeleteProject()
   const [confirmingDelete, setConfirmingDelete] = useState(false)
-  const [activeTab, setActiveTab] = useState<'overview' | 'datalog'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'datalog' | 'links'>('overview')
   const queryClient = useQueryClient()
   const projectLoaded = !!project
 
@@ -226,6 +227,17 @@ export default function ProjectDetailPage() {
         >
           Data Change Log
         </button>
+        <button
+          onClick={() => setActiveTab('links')}
+          title="Survey IDs, Slack channel link, and notification settings"
+          className={`text-xs px-3 py-1.5 rounded font-medium transition-colors ${
+            activeTab === 'links'
+              ? 'bg-background text-foreground'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          Links &amp; setup
+        </button>
       </div>
 
       {activeTab === 'datalog' && (
@@ -234,45 +246,119 @@ export default function ProjectDetailPage() {
         </div>
       )}
 
-      {/* Two-column layout */}
-      <div className={activeTab === 'overview' ? 'grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6' : 'hidden'}>
-        {/* Left column */}
-        <div className="flex flex-col gap-4">
-          <div className="flex">
-            <QuickEdit project={project} />
-          </div>
+      {activeTab === 'links' && (
+        <div className="max-w-3xl flex flex-col gap-4">
           <div className="bg-card rounded-xl p-4">
-            <h3 className="text-xs text-muted-foreground uppercase tracking-widest mb-4 font-medium">
-              {project.phase === 'Scoping' ? 'Scoping Stage' : 'Pipeline Progress'}
-            </h3>
-            {project.phase === 'Scoping' ? (
-              <ScopingProgress project={project} />
-            ) : (
-              <PipelineProgress project={project} />
-            )}
+            <div className="flex flex-col gap-3">
+              <EditableRow
+                label="Survey IDs"
+                value={project.survey_tool_id ?? ''}
+                placeholder="e.g. SV-1042, SV-1043"
+                tooltip={TOOLTIPS['Survey IDs']}
+                onSave={v => updateProject.mutate({ id, updates: { survey_tool_id: v || null } })}
+              />
+              {project.survey_id_discrepancy && (
+                <div className="bg-amber-500/10 border border-amber-500/40 rounded-lg p-2 flex flex-col gap-1.5">
+                  <p className="text-xs text-amber-700 dark:text-amber-400">
+                    ⚠ {project.survey_id_discrepancy}
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        const m = project.survey_id_discrepancy?.match(/"([^"]+)"/)
+                        updateProject.mutate({
+                          id,
+                          updates: {
+                            survey_tool_id: m?.[1] ?? project.survey_tool_id,
+                            survey_id_discrepancy: null,
+                          },
+                        })
+                      }}
+                      className="text-[11px] bg-amber-500/20 hover:bg-amber-500/30 text-amber-700 dark:text-amber-300 px-2 py-1 rounded transition-colors"
+                    >
+                      Use Edwin ID
+                    </button>
+                    <button
+                      onClick={() =>
+                        updateProject.mutate({ id, updates: { survey_id_discrepancy: null } })
+                      }
+                      className="text-[11px] text-muted-foreground hover:text-foreground px-2 py-1 transition-colors"
+                    >
+                      Keep current — dismiss
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
-          <LatestNextSteps projectId={project.id} notes={project.latest_next_steps} />
-          <LinkedDocuments
-            projectId={project.id}
-            documents={project.linked_documents ?? []}
-          />
+
           <SlackChannel projectId={project.id} url={project.slack_channel_url ?? null} />
-          <ActivityLog projectId={project.id} />
+
+          <div className="bg-card rounded-xl p-4 text-xs text-muted-foreground leading-relaxed">
+            <p className="font-medium text-muted-foreground mb-1 text-xs uppercase tracking-widest">
+              Notifications
+            </p>
+            Slack alerts sent to #survey-ops when: stage advances, due date is tomorrow, N target is hit.
+          </div>
+        </div>
+      )}
+
+      {/* Overview tab — kept mounted (hidden) so in-progress edits survive tab switches */}
+      <div className={activeTab === 'overview' ? '' : 'hidden'}>
+        {/* Hero stat strip */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+          <HeroNCollected
+            collected={project.n_collected}
+            target={project.n_target}
+            tooltip={TOOLTIPS['N Collected']}
+            onSave={v => updateProject.mutate({ id, updates: { n_collected: v ?? 0 } })}
+          />
+          <HeroDue
+            value={project.due_date}
+            tooltip={TOOLTIPS['Due Date']}
+            onSave={v => updateProject.mutate({ id, updates: { due_date: v } })}
+          />
+          <HeroBudgetLeft
+            budget={project.budget ?? null}
+            actualSpend={project.actual_spend ?? null}
+            nCollected={project.n_collected}
+            nActual={project.n_actual ?? null}
+          />
+          <HeroWaitingOn
+            project={project}
+            onSetBlockedBy={v => updateProject.mutate({ id, updates: { blocked_by: v } })}
+          />
         </div>
 
-        {/* Right sidebar */}
-        <div className="flex flex-col gap-4">
-          <div className="bg-card rounded-xl p-4">
-            <h3 className="text-xs text-muted-foreground uppercase tracking-widest mb-4 font-medium">
-              Project Details
-            </h3>
-            <div className="flex flex-col gap-3">
-              {/* Basic fields */}
+        {/* Two-column layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6">
+          {/* Left column */}
+          <div className="flex flex-col gap-4">
+            <div className="flex">
+              <QuickEdit project={project} />
+            </div>
+            <div className="bg-card rounded-xl p-4">
+              <h3 className="text-xs text-muted-foreground uppercase tracking-widest mb-4 font-medium">
+                {project.phase === 'Scoping' ? 'Scoping Stage' : 'Pipeline Progress'}
+              </h3>
+              {project.phase === 'Scoping' ? (
+                <ScopingProgress project={project} />
+              ) : (
+                <PipelineProgress project={project} />
+              )}
+            </div>
+            <LatestNextSteps projectId={project.id} notes={project.latest_next_steps} />
+            <LinkedDocuments
+              projectId={project.id}
+              documents={project.linked_documents ?? []}
+            />
+            <ActivityLog projectId={project.id} />
+          </div>
+
+          {/* Right sidebar */}
+          <div className="flex flex-col gap-4">
+            <SidebarCard title="People">
               <DetailRow label="Client" value={project.client} tooltip={TOOLTIPS['Client']} />
-              <WaitingOnRow
-                project={project}
-                onSetBlockedBy={v => updateProject.mutate({ id, updates: { blocked_by: v } })}
-              />
               <CaptainRow
                 label="Project Captain"
                 captain={project.captain}
@@ -287,6 +373,9 @@ export default function ProjectDetailPage() {
                 tooltip={TOOLTIPS['Salesperson']}
                 onSave={v => updateProject.mutate({ id, updates: { salesperson: v || null } })}
               />
+            </SidebarCard>
+
+            <SidebarCard title="Dates">
               <EditableDateRow
                 label="Submitted"
                 value={project.submitted_date}
@@ -300,136 +389,75 @@ export default function ProjectDetailPage() {
                 onSave={v => updateProject.mutate({ id, updates: { launch_date: v } })}
               />
               <EditableDateRow
-                label="Due Date"
-                value={project.due_date}
-                valueClass="text-amber-600 dark:text-amber-400"
-                tooltip={TOOLTIPS['Due Date']}
-                onSave={v => updateProject.mutate({ id, updates: { due_date: v } })}
-              />
-              <EditableDateRow
                 label="Deliver Date"
                 value={project.deliver_date}
                 tooltip={TOOLTIPS['Deliver Date']}
                 onSave={v => updateProject.mutate({ id, updates: { deliver_date: v } })}
               />
+            </SidebarCard>
 
-              <div className="border-t border-border pt-3 mt-1">
-                <EditableNumberRow
-                  label="N Target"
-                  value={project.n_target}
-                  tooltip={TOOLTIPS['N Target']}
-                  onSave={v => updateProject.mutate({ id, updates: { n_target: v } })}
-                />
-                <div className="mt-2">
-                  <EditableNumberRow
-                    label="N Collected"
-                    value={project.n_collected}
-                    valueClass="text-emerald-600 dark:text-emerald-400"
-                    tooltip={TOOLTIPS['N Collected']}
-                    onSave={v => updateProject.mutate({ id, updates: { n_collected: v ?? 0 } })}
-                  />
-                  <div className="mt-1">
-                    <NProgressBar
-                      collected={project.n_collected}
-                      target={project.n_target}
-                      showLabel={false}
-                    />
-                  </div>
-                </div>
-                <div className="mt-3">
-                  <EditableNumberRow
-                    label="N Actual"
-                    value={project.n_actual}
-                    tooltip={TOOLTIPS['N Actual']}
-                    onSave={v => updateProject.mutate({ id, updates: { n_actual: v } })}
-                  />
-                </div>
-                <div className="mt-3">
-                  <EditableNumberRow
-                    label="Audience Size"
-                    value={project.audience_size}
-                    tooltip={TOOLTIPS['Audience Size']}
-                    onSave={v => updateProject.mutate({ id, updates: { audience_size: v } })}
-                  />
-                </div>
-              </div>
+            <SidebarCard title="Sample">
+              <EditableNumberRow
+                label="N Target"
+                value={project.n_target}
+                tooltip={TOOLTIPS['N Target']}
+                onSave={v => updateProject.mutate({ id, updates: { n_target: v } })}
+              />
+              <EditableNumberRow
+                label="N Actual"
+                value={project.n_actual}
+                tooltip={TOOLTIPS['N Actual']}
+                onSave={v => updateProject.mutate({ id, updates: { n_actual: v } })}
+              />
+              <EditableNumberRow
+                label="Audience Size"
+                value={project.audience_size}
+                tooltip={TOOLTIPS['Audience Size']}
+                onSave={v => updateProject.mutate({ id, updates: { audience_size: v } })}
+              />
+            </SidebarCard>
 
-              <div className="border-t border-border pt-3 mt-1">
-                <FlagRow
-                  label="Row-Level Data"
-                  value={project.row_level_data}
-                  tooltip={TOOLTIPS['Row-Level Data']}
-                  onToggle={v => updateProject.mutate({ id, updates: { row_level_data: v } })}
-                />
-                <FlagRow
-                  label="Terminations"
-                  value={project.terminations}
-                  warn
-                  tooltip={TOOLTIPS['Terminations']}
-                  onToggle={v => updateProject.mutate({ id, updates: { terminations: v } })}
-                />
-                <FlagRow
+            <SidebarCard title="Flags">
+              <div className="flex flex-wrap gap-1.5">
+                <FlagChip
                   label="Longitudinal"
                   value={project.longitudinal ?? false}
+                  tone="emerald"
                   tooltip={TOOLTIPS['Longitudinal']}
                   onToggle={v => updateProject.mutate({ id, updates: { longitudinal: v } })}
                 />
-                <FlagRow
+                <FlagChip
                   label="Voter Survey QA"
                   value={project.voter_survey_qa ?? false}
+                  tone="amber"
                   tooltip={TOOLTIPS['Voter Survey QA']}
                   onToggle={v => updateProject.mutate({ id, updates: { voter_survey_qa: v } })}
                 />
-                <FlagRow
+                <FlagChip
                   label="Citation Language"
                   value={project.citation_language_needed ?? false}
+                  tone="amber"
                   tooltip={TOOLTIPS['Citation Language']}
                   onToggle={v => updateProject.mutate({ id, updates: { citation_language_needed: v } })}
                 />
-              </div>
-
-              <div className="border-t border-border pt-3 mt-1">
-                <EditableRow
-                  label="Survey IDs"
-                  value={project.survey_tool_id ?? ''}
-                  placeholder="e.g. SV-1042, SV-1043"
-                  tooltip={TOOLTIPS['Survey IDs']}
-                  onSave={v => updateProject.mutate({ id, updates: { survey_tool_id: v || null } })}
+                <FlagChip
+                  label="Row-Level Data"
+                  value={project.row_level_data}
+                  tone="emerald"
+                  tooltip={TOOLTIPS['Row-Level Data']}
+                  onToggle={v => updateProject.mutate({ id, updates: { row_level_data: v } })}
                 />
-                {project.survey_id_discrepancy && (
-                  <div className="mt-2 bg-amber-500/10 border border-amber-500/40 rounded-lg p-2 flex flex-col gap-1.5">
-                    <p className="text-xs text-amber-700 dark:text-amber-400">
-                      ⚠ {project.survey_id_discrepancy}
-                    </p>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => {
-                          const m = project.survey_id_discrepancy?.match(/"([^"]+)"/)
-                          updateProject.mutate({
-                            id,
-                            updates: {
-                              survey_tool_id: m?.[1] ?? project.survey_tool_id,
-                              survey_id_discrepancy: null,
-                            },
-                          })
-                        }}
-                        className="text-[11px] bg-amber-500/20 hover:bg-amber-500/30 text-amber-700 dark:text-amber-300 px-2 py-1 rounded transition-colors"
-                      >
-                        Use Edwin ID
-                      </button>
-                      <button
-                        onClick={() =>
-                          updateProject.mutate({ id, updates: { survey_id_discrepancy: null } })
-                        }
-                        className="text-[11px] text-muted-foreground hover:text-foreground px-2 py-1 transition-colors"
-                      >
-                        Keep current — dismiss
-                      </button>
-                    </div>
-                  </div>
-                )}
+                <FlagChip
+                  label="Terminations"
+                  value={project.terminations}
+                  tone="red"
+                  tooltip={TOOLTIPS['Terminations']}
+                  onToggle={v => updateProject.mutate({ id, updates: { terminations: v } })}
+                />
               </div>
+            </SidebarCard>
 
+            <SidebarCard title="Money">
               <BudgetWidget
                 projectId={project.id}
                 budget={project.budget ?? null}
@@ -438,19 +466,257 @@ export default function ProjectDetailPage() {
                 nCollected={project.n_collected}
                 nActual={project.n_actual ?? null}
               />
-
               <BidWidget projectId={project.id} />
-            </div>
-          </div>
-
-          <div className="bg-card rounded-xl p-4 text-xs text-muted-foreground leading-relaxed">
-            <p className="font-medium text-muted-foreground mb-1 text-xs uppercase tracking-widest">
-              Notifications
-            </p>
-            Slack alerts sent to #survey-ops when: stage advances, due date is tomorrow, N target is hit.
+            </SidebarCard>
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+function SidebarCard({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="bg-card rounded-xl p-4">
+      <h3 className="text-xs text-muted-foreground uppercase tracking-widest mb-4 font-medium">
+        {title}
+      </h3>
+      <div className="flex flex-col gap-3">{children}</div>
+    </div>
+  )
+}
+
+/* ---------- Hero stat strip cards ---------- */
+
+function HeroNCollected({
+  collected,
+  target,
+  tooltip,
+  onSave,
+}: {
+  collected: number
+  target: number | null
+  tooltip: string
+  onSave: (next: number | null) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState('')
+
+  function save() {
+    const parsed = parseInt(draft, 10)
+    onSave(isNaN(parsed) ? null : parsed)
+    setEditing(false)
+  }
+
+  return (
+    <div className="bg-card rounded-xl p-3 flex flex-col gap-1">
+      <span className="text-xs text-muted-foreground flex items-center">
+        N collected
+        <InfoTooltip text={tooltip} />
+      </span>
+      {editing ? (
+        <div className="flex gap-1.5 items-center">
+          <input
+            autoFocus
+            type="number"
+            value={draft}
+            onChange={e => setDraft(e.target.value)}
+            className="w-20 min-w-0 bg-muted border border-border rounded px-2 py-1 text-sm text-foreground focus:outline-none focus:border-ring"
+            onKeyDown={e => {
+              if (e.key === 'Enter') save()
+              if (e.key === 'Escape') setEditing(false)
+            }}
+          />
+          <button
+            onClick={save}
+            className="text-xs bg-muted hover:bg-accent text-foreground px-2 py-1 rounded transition-colors"
+          >
+            Save
+          </button>
+        </div>
+      ) : (
+        <button
+          onClick={() => {
+            setDraft(String(collected))
+            setEditing(true)
+          }}
+          className="text-2xl font-semibold text-foreground leading-tight text-left cursor-pointer"
+          title="Click to edit"
+        >
+          {collected}
+          <span className="text-base font-normal text-muted-foreground"> / {target ?? '—'}</span>
+        </button>
+      )}
+      <div className="mt-1">
+        <NProgressBar collected={collected} target={target} showLabel={false} />
+      </div>
+    </div>
+  )
+}
+
+function HeroDue({
+  value,
+  tooltip,
+  onSave,
+}: {
+  value: string | null
+  tooltip: string
+  onSave: (next: string | null) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState('')
+
+  function save() {
+    onSave(draft || null)
+    setEditing(false)
+  }
+
+  const urgency = getDueUrgency(value)
+  const valueColor =
+    urgency === 'overdue'
+      ? 'text-red-600 dark:text-red-400'
+      : urgency === 'tomorrow'
+      ? 'text-orange-600 dark:text-orange-400'
+      : urgency === 'twodays'
+      ? 'text-amber-600 dark:text-amber-400'
+      : 'text-foreground'
+
+  let phrase = '—'
+  if (value) {
+    const days = differenceInCalendarDays(startOfDay(parseISO(value)), startOfDay(new Date()))
+    phrase =
+      days < 0 ? 'overdue' : days === 0 ? 'today' : days === 1 ? 'tomorrow' : `in ${days} days`
+  }
+
+  return (
+    <div className="bg-card rounded-xl p-3 flex flex-col gap-1">
+      <span className="text-xs text-muted-foreground flex items-center">
+        Due
+        <InfoTooltip text={tooltip} />
+      </span>
+      {editing ? (
+        <div className="flex gap-1.5 items-center">
+          <input
+            autoFocus
+            type="date"
+            value={draft}
+            onChange={e => setDraft(e.target.value)}
+            className="min-w-0 bg-muted border border-border rounded px-2 py-1 text-sm text-foreground focus:outline-none focus:border-ring"
+            onKeyDown={e => {
+              if (e.key === 'Enter') save()
+              if (e.key === 'Escape') setEditing(false)
+            }}
+          />
+          <button
+            onClick={save}
+            className="text-xs bg-muted hover:bg-accent text-foreground px-2 py-1 rounded transition-colors"
+          >
+            Save
+          </button>
+        </div>
+      ) : (
+        <button
+          onClick={() => {
+            setDraft(value ? value.slice(0, 10) : '')
+            setEditing(true)
+          }}
+          className={`text-2xl font-semibold leading-tight text-left cursor-pointer ${valueColor}`}
+          title="Click to edit"
+        >
+          {formatDate(value)}
+        </button>
+      )}
+      <span className="text-xs text-muted-foreground">{phrase}</span>
+    </div>
+  )
+}
+
+function HeroBudgetLeft({
+  budget,
+  actualSpend,
+  nCollected,
+  nActual,
+}: {
+  budget: number | null
+  actualSpend: number | null
+  nCollected: number
+  nActual: number | null
+}) {
+  const hasBoth = budget != null && actualSpend != null
+  const remaining = hasBoth ? budget - actualSpend : null
+
+  function compact(v: number): string {
+    const abs = Math.abs(v)
+    return abs >= 1000 ? `$${(abs / 1000).toFixed(1)}k` : `$${Math.round(abs)}`
+  }
+
+  // Mirrors BudgetWidget: spend ÷ best-known N (N Actual once cleaned, else N Collected)
+  const effectiveN = nActual ?? (nCollected > 0 ? nCollected : null)
+  const actualCostPerN =
+    actualSpend != null && effectiveN != null ? actualSpend / effectiveN : null
+
+  return (
+    <div className="bg-card rounded-xl p-3 flex flex-col gap-1">
+      <span className="text-xs text-muted-foreground flex items-center">
+        Budget left
+        <InfoTooltip text="Allocated budget minus actual spend. Edit the amounts in the Money card." />
+      </span>
+      {remaining == null ? (
+        <span className="text-2xl font-semibold text-foreground leading-tight">—</span>
+      ) : remaining < 0 ? (
+        <span className="text-2xl font-semibold leading-tight text-red-600 dark:text-red-400">
+          -{compact(remaining)} over
+        </span>
+      ) : (
+        <span className="text-2xl font-semibold text-foreground leading-tight">
+          {compact(remaining)}
+        </span>
+      )}
+      <span className="text-xs text-muted-foreground">
+        {remaining == null
+          ? 'set in Money'
+          : actualCostPerN != null
+          ? `$${actualCostPerN.toLocaleString('en-US', { maximumFractionDigits: 2 })} / N`
+          : ' '}
+      </span>
+    </div>
+  )
+}
+
+function HeroWaitingOn({
+  project,
+  onSetBlockedBy,
+}: {
+  project: Parameters<typeof deriveWaitingOn>[0] & { blocked_by?: string | null }
+  onSetBlockedBy: (next: string) => void
+}) {
+  const derived = deriveWaitingOn(project)
+  const [main, sub] = derived.split(' — ')
+  return (
+    <div className="bg-card rounded-xl p-3 flex flex-col gap-1">
+      <span className="text-xs text-muted-foreground flex items-center">
+        Waiting on
+        <InfoTooltip text="Auto-derived from status, phase, stage checkboxes, and fielding progress. Set the dropdown when the project is blocked to force it to Client or Us." />
+      </span>
+      <span
+        className={`text-2xl font-semibold leading-tight truncate ${
+          main === 'Client' ? 'text-amber-600 dark:text-amber-400' : 'text-foreground'
+        }`}
+        title={derived}
+      >
+        {main}
+      </span>
+      <span className="text-xs text-muted-foreground">{sub ?? ' '}</span>
+      <select
+        value={project.blocked_by ?? 'none'}
+        onChange={e => onSetBlockedBy(e.target.value)}
+        className="mt-1 self-start bg-muted border border-border rounded px-1 py-0.5 text-[11px] text-muted-foreground focus:outline-none focus:border-ring cursor-pointer"
+        title="Force the Waiting On value when the project is blocked"
+      >
+        <option value="none">None</option>
+        <option value="client">Blocked — client</option>
+        <option value="internal">Blocked — us</option>
+      </select>
     </div>
   )
 }
@@ -493,45 +759,6 @@ function PriorityButton({
       className={`${base} border border-border text-muted-foreground hover:text-foreground hover:border-ring`}>
       ⚑ Priority
     </button>
-  )
-}
-
-function WaitingOnRow({
-  project,
-  onSetBlockedBy,
-}: {
-  project: Parameters<typeof deriveWaitingOn>[0] & { blocked_by?: string | null }
-  onSetBlockedBy: (next: string) => void
-}) {
-  const derived = deriveWaitingOn(project)
-  return (
-    <div className="flex justify-between items-center text-sm gap-2">
-      <span className="text-muted-foreground flex items-center text-xs shrink-0">
-        Waiting On
-        <InfoTooltip text="Auto-derived from status, phase, stage checkboxes, and fielding progress. Set the dropdown when the project is blocked to force it to Client or Us." />
-      </span>
-      <div className="flex items-center gap-1.5 min-w-0">
-        <span
-          className={`text-xs truncate ${
-            derived === 'Client'
-              ? 'text-amber-600 dark:text-amber-400'
-              : 'text-foreground/80'
-          }`}
-        >
-          {derived}
-        </span>
-        <select
-          value={project.blocked_by ?? 'none'}
-          onChange={e => onSetBlockedBy(e.target.value)}
-          className="bg-muted border border-border rounded px-1 py-0.5 text-[11px] text-muted-foreground focus:outline-none focus:border-ring cursor-pointer"
-          title="Force the Waiting On value when the project is blocked"
-        >
-          <option value="none">None</option>
-          <option value="client">Blocked — client</option>
-          <option value="internal">Blocked — us</option>
-        </select>
-      </div>
-    </div>
   )
 }
 
@@ -606,39 +833,37 @@ function EditableRow({
   )
 }
 
-function FlagRow({
+const CHIP_ON: Record<'red' | 'amber' | 'emerald', string> = {
+  red: 'bg-red-500/15 text-red-600 dark:text-red-400 hover:bg-red-500/25',
+  amber: 'bg-amber-500/15 text-amber-600 dark:text-amber-400 hover:bg-amber-500/25',
+  emerald: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/25',
+}
+
+function FlagChip({
   label,
   value,
+  tone,
   tooltip,
-  warn = false,
   onToggle,
 }: {
   label: string
   value: boolean
+  tone: 'red' | 'amber' | 'emerald'
   tooltip?: string
-  warn?: boolean
   onToggle: (next: boolean) => void
 }) {
   return (
-    <div className="flex justify-between items-center text-sm">
-      <span className="text-muted-foreground flex items-center text-xs">
-        {label}
-        {tooltip && <InfoTooltip text={tooltip} />}
-      </span>
-      <button
-        onClick={() => onToggle(!value)}
-        className={`text-xs px-1.5 py-0.5 rounded transition-colors cursor-pointer ${
-          value
-            ? warn
-              ? 'text-red-600 dark:text-red-400 hover:bg-red-500/10'
-              : 'text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10'
-            : 'text-muted-foreground hover:bg-accent'
-        }`}
-        title="Click to toggle"
-      >
-        {value ? (warn ? '⚠ Yes' : '✓ Yes') : 'No'}
-      </button>
-    </div>
+    <button
+      onClick={() => onToggle(!value)}
+      title={tooltip}
+      className={`rounded-full px-2.5 py-1 text-xs cursor-pointer transition-colors ${
+        value
+          ? CHIP_ON[tone]
+          : 'bg-muted text-muted-foreground opacity-60 hover:opacity-100'
+      }`}
+    >
+      {value && tone === 'red' ? `⚠ ${label}` : label}
+    </button>
   )
 }
 

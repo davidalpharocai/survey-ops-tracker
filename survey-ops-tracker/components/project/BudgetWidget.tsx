@@ -97,7 +97,7 @@ export function BudgetWidget({ projectId, budget, actualSpend, nTarget, nCollect
   const costPerNOver = targetCostPerN != null && actualCostPerN != null && actualCostPerN > targetCostPerN
 
   return (
-    <div className="border-t border-border pt-3 mt-1">
+    <div>
       <p className="text-xs text-muted-foreground uppercase tracking-widest mb-3 font-medium flex items-center">
         Budget
         <InfoTooltip text="Internal cost tracking for this project — not client-facing. Click a value to edit it." />
