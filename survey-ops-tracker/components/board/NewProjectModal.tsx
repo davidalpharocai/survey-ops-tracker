@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { FIELD_LABELS, formatFieldValue, fieldsToUpdates } from '@/lib/utils/quickFields'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
 import { salespersonOptions } from '@/lib/utils/salespeople'
-import type { TeamMember } from '@/lib/hooks/useTeamMembers'
+import { assignableMembers, type TeamMember } from '@/lib/hooks/useTeamMembers'
 import type { Database } from '@/lib/supabase/types'
 
 // Fields handled by the visible form inputs; everything else parsed by AI goes into "extras"
@@ -201,8 +201,8 @@ export function NewProjectModal({ teamMembers, knownClients = [], onClose }: New
               onChange={e => setCaptainId(e.target.value)}
               className={inputClass}
             >
-              <option value="">—</option>
-              {teamMembers.map(m => (
+              <option value="">Unassigned</option>
+              {assignableMembers(teamMembers).map(m => (
                 <option key={m.id} value={m.id}>
                   {m.name}
                 </option>

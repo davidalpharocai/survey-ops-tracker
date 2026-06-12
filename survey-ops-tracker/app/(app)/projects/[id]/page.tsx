@@ -4,7 +4,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { useProject, useUpdateProject, useDeleteProject } from '@/lib/hooks/useProjects'
-import { useTeamMembers, type TeamMember } from '@/lib/hooks/useTeamMembers'
+import { useTeamMembers, assignableMembers, type TeamMember } from '@/lib/hooks/useTeamMembers'
 import { PipelineProgress } from '@/components/project/PipelineProgress'
 import { ScopingProgress } from '@/components/project/ScopingProgress'
 import { QuickEdit } from '@/components/project/QuickEdit'
@@ -31,7 +31,8 @@ const TOOLTIPS: Record<string, string> = {
   'Audience Size': 'Total size of the panel or population being surveyed. Different from N (target responses).',
   'Row-Level Data': 'Whether individual respondent-level data is included in the deliverable.',
   'Terminations': 'Whether any survey participants have been terminated (screened out) from the study.',
-  'Project Captain': 'The team member responsible for this project end-to-end.',
+  'Project Captain': 'The team member responsible for this project end-to-end. Add co-captains below when a project is shared.',
+  'Co-Captains': 'Additional captains sharing this project. Most projects have none — the main captain stays the primary owner.',
   'Salesperson': 'The sales lead for this project.',
   'N Actual': 'Final usable response count after cleaning N Collected.',
   'Longitudinal': 'Whether this is a longitudinal study tracked across multiple waves.',
@@ -411,6 +412,15 @@ export default function ProjectDetailPage() {
                 tooltip={TOOLTIPS['Project Captain']}
                 onSave={v => updateProject.mutate({ id, updates: { captain_id: v } })}
               />
+              {'co_captain_ids' in project && (
+                <CoCaptainsRow
+                  ids={project.co_captain_ids ?? []}
+                  teamMembers={teamMembers}
+                  primaryId={project.captain?.id ?? null}
+                  tooltip={TOOLTIPS['Co-Captains']}
+                  onSave={ids => updateProject.mutate({ id, updates: { co_captain_ids: ids } })}
+                />
+              )}
               <SalespersonRow
                 value={project.salesperson ?? ''}
                 tooltip={TOOLTIPS['Salesperson']}
@@ -1173,8 +1183,8 @@ function CaptainRow({
               if (e.key === 'Escape') setEditing(false)
             }}
           >
-            <option value="">— Unassigned</option>
-            {teamMembers.map(m => (
+            <option value="">Unassigned</option>
+            {assignableMembers(teamMembers).map(m => (
               <option key={m.id} value={m.id}>
                 {m.name}
               </option>
@@ -1207,6 +1217,80 @@ function CaptainRow({
       >
         {captain?.name ?? <span className="text-muted-foreground/50">—</span>}
       </button>
+    </div>
+  )
+}
+
+function CoCaptainsRow({
+  ids,
+  teamMembers,
+  primaryId,
+  tooltip,
+  onSave,
+}: {
+  ids: string[]
+  teamMembers: TeamMember[]
+  primaryId: string | null
+  tooltip?: string
+  onSave: (next: string[]) => void
+}) {
+  const [adding, setAdding] = useState(false)
+  const byId = new Map(teamMembers.map(m => [m.id, m]))
+  const available = assignableMembers(teamMembers).filter(
+    m => m.id !== primaryId && !ids.includes(m.id)
+  )
+
+  return (
+    <div className="flex justify-between items-start text-sm gap-2">
+      <span className="text-muted-foreground flex items-center text-xs shrink-0 pt-0.5">
+        Co-Captains
+        {tooltip && <InfoTooltip text={tooltip} />}
+      </span>
+      <div className="flex flex-col items-end gap-1 min-w-0">
+        {ids.map(cid => (
+          <span key={cid} className="flex items-center gap-1 text-sm text-foreground">
+            <span className="truncate">{byId.get(cid)?.name ?? 'Unknown'}</span>
+            <button
+              onClick={() => onSave(ids.filter(x => x !== cid))}
+              title="Remove this co-captain"
+              className="text-muted-foreground/50 hover:text-red-600 dark:hover:text-red-400 text-xs"
+            >
+              ✕
+            </button>
+          </span>
+        ))}
+        {adding ? (
+          <select
+            autoFocus
+            defaultValue=""
+            onChange={e => {
+              if (e.target.value) onSave([...ids, e.target.value])
+              setAdding(false)
+            }}
+            onBlur={() => setAdding(false)}
+            onKeyDown={e => {
+              if (e.key === 'Escape') setAdding(false)
+            }}
+            className="min-w-0 bg-muted border border-border rounded px-2 py-1 text-sm text-foreground focus:outline-none focus:border-ring"
+          >
+            <option value="">— pick —</option>
+            {available.map(m => (
+              <option key={m.id} value={m.id}>
+                {m.name}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <button
+            onClick={() => setAdding(true)}
+            disabled={available.length === 0}
+            title="Add a co-captain"
+            className="text-xs text-muted-foreground hover:text-foreground disabled:opacity-40 transition-colors cursor-pointer"
+          >
+            {ids.length === 0 ? <span className="text-sm text-muted-foreground/50">none — + add</span> : '+ add'}
+          </button>
+        )}
+      </div>
     </div>
   )
 }
