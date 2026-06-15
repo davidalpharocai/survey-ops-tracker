@@ -59,8 +59,8 @@ Four big tiles: **N collected** (click to edit), **Timing** — Due (internal: w
 ### Tabs
 - **Overview** — everything below
 - **Data Change Log** — engineers log manual data edits here ("removed 4 speeders from SV-2201"); date + author stamped, edit/delete with confirmation
-- **Audit Log** — automatic history of every field change on this project: who changed what, when, and the old → new value. You don't write to it — the system records it for you ("system" means an automated update like the nightly Edwin sync).
 - **Links & setup** — Survey IDs (auto-synced nightly from the Edwin link; mismatches get flagged for review), Slack channel link, notification info
+- **Audit Log** (last tab) — automatic history of every field change on this project: who changed what, when, and the old → new value. You don't write to it — the system records it for you ("system" means an automated update like the nightly Edwin sync).
 
 ### Left column
 - **Pipeline progress** — check off stages (this moves the card on the board)
