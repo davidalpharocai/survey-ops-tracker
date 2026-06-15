@@ -36,10 +36,13 @@ export async function GET(req: NextRequest) {
 
   try {
     const res = await fetch(parsed.toString(), {
-      redirect: 'follow',
+      // Don't follow redirects — a 3xx could bounce to an internal host (SSRF).
+      // A real Google doc title page responds 200 directly.
+      redirect: 'manual',
       signal: AbortSignal.timeout(5000),
       headers: { 'User-Agent': 'Mozilla/5.0 (compatible; SurveyOpsTracker/1.0)' },
     })
+    if (!res.ok) return Response.json({ title: null })
     const html = (await res.text()).slice(0, 50_000)
     const m = html.match(/<title[^>]*>([^<]*)<\/title>/i)
     if (!m) return Response.json({ title: null })

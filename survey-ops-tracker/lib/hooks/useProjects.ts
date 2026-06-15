@@ -67,28 +67,16 @@ export type SlimProject = Pick<ProjectRow, (typeof SLIM_PROJECT_COLUMNS)[number]
 const CAPTAIN_JOIN = 'captain:team_members(id, name, initials)'
 const SLIM_SELECT = `${SLIM_PROJECT_COLUMNS.join(', ')}, ${CAPTAIN_JOIN}`
 const FULL_SELECT = `*, ${CAPTAIN_JOIN}`
-// Until migrations 026/027 land, these columns don't exist in the database —
-// retry without them so the board never breaks during the rollout window.
-const PENDING_MIGRATION_COLUMNS = ['co_captain_ids', 'project_code']
-const SLIM_SELECT_LEGACY = `${SLIM_PROJECT_COLUMNS.filter(
-  c => !(PENDING_MIGRATION_COLUMNS as string[]).includes(c)
-).join(', ')}, ${CAPTAIN_JOIN}`
 
 export function useProjects() {
   const supabase = createClient()
   return useQuery({
     queryKey: ['projects'],
     queryFn: async () => {
-      let { data, error } = await supabase
+      const { data, error } = await supabase
         .from('survey_projects')
         .select(SLIM_SELECT)
         .order('created_at', { ascending: false })
-      if (error && PENDING_MIGRATION_COLUMNS.some(c => error!.message.includes(c))) {
-        ;({ data, error } = await supabase
-          .from('survey_projects')
-          .select(SLIM_SELECT_LEGACY)
-          .order('created_at', { ascending: false }))
-      }
       if (error) throw error
       return data as unknown as SlimProject[]
     },

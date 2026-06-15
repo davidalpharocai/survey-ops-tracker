@@ -90,7 +90,8 @@ export function Board({ projects, teamMembers, onMoveProject, wrapInContext = tr
       if (
         q &&
         !p.project_name.toLowerCase().includes(q) &&
-        !p.client.toLowerCase().includes(q)
+        !p.client.toLowerCase().includes(q) &&
+        !(p.latest_next_steps ?? '').toLowerCase().includes(q)
       ) {
         return false
       }
@@ -98,14 +99,27 @@ export function Board({ projects, teamMembers, onMoveProject, wrapInContext = tr
     })
   }, [projects, captainFilter, typeFilter, dueFilter, stageFilter, search])
 
+  const hasActiveFilters = !!(captainFilter || typeFilter || dueFilter || stageFilter || search)
+  function clearAllFilters() {
+    handleCaptainChange(null)
+    setTypeFilter(null)
+    setDueFilter(null)
+    setStageFilter(null)
+    setSearch('')
+  }
+
   function handleDragEnd(result: DropResult) {
     window.__sotDragging = false
     if (!result.destination) return
     const newColumn = result.destination.droppableId as BoardColumnType
     const sameColumn = newColumn === result.source.droppableId
-    // The dropped card takes a persisted position between its new neighbors
-    const destCards = filtered
-      .filter(p => p.board_column === newColumn && p.id !== result.draggableId)
+    // The dropped card takes a persisted position between its new neighbors.
+    // Use the UNFILTERED projects (not `filtered`) so sort_order reflects the
+    // true column order — otherwise a card dropped while a filter hides
+    // teammates' cards gets an order that's right among visible cards but
+    // arbitrary among hidden ones, silently corrupting the board for everyone.
+    const destCards = projects
+      .filter(p => p.board_column === newColumn && p.id !== result.draggableId && p.status !== 'Closed')
       .sort((a, b) => columnSortRank(a) - columnSortRank(b) || boardOrder(a, b))
     const i = result.destination.index
     const sortOrder = sortOrderBetween(destCards[i - 1]?.sort_order, destCards[i]?.sort_order)
@@ -181,6 +195,14 @@ export function Board({ projects, teamMembers, onMoveProject, wrapInContext = tr
           tooltip="Save the current board filters (captain, type, due, stage) as a named view and jump back in one click. Personal to you. Pick one, then Update / Rename / Delete."
         />
       </div>
+      {filtered.length === 0 && projects.length > 0 && hasActiveFilters && (
+        <div className="bg-card border border-border rounded-xl px-4 py-6 text-center text-sm text-muted-foreground">
+          No projects match your filters.{' '}
+          <button onClick={clearAllFilters} className="text-blue-600 dark:text-blue-400 hover:underline">
+            Clear all filters
+          </button>
+        </div>
+      )}
       {wrapInContext ? (
         <DragDropContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>{columns}</DragDropContext>
       ) : (

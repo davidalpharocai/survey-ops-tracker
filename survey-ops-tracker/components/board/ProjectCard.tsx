@@ -209,7 +209,10 @@ export function ProjectCard({ project, onClick, isNew }: ProjectCardProps) {
                 : 'text-muted-foreground'
             }`}
           >
-            {!onHold && !closed && dueDateStatus === 'overdue' && '⚠ '}
+            {/* Word label so urgency isn't conveyed by color alone */}
+            {urgency === 'overdue' && '⚠ Overdue · '}
+            {urgency === 'tomorrow' && 'Due tomorrow · '}
+            {urgency === 'twodays' && 'Due in 2d · '}
             {formatDate(project.due_date)}
           </span>
         )}

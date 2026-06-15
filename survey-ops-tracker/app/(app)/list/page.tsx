@@ -123,7 +123,12 @@ export default function ListView() {
         return false
       }
     }
-    if (q && !p.project_name.toLowerCase().includes(q) && !p.client.toLowerCase().includes(q)) {
+    if (
+      q &&
+      !p.project_name.toLowerCase().includes(q) &&
+      !p.client.toLowerCase().includes(q) &&
+      !(p.latest_next_steps ?? '').toLowerCase().includes(q)
+    ) {
       return false
     }
     return true

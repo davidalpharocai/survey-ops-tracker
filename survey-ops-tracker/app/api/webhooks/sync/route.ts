@@ -1,18 +1,17 @@
 import { NextRequest } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { resolveSurveyIds } from '@/lib/utils/surveyIdsSync'
+import { safeEqual } from '@/lib/utils/secureCompare'
 import type { Database } from '@/lib/supabase/types'
 
 export const dynamic = 'force-dynamic'
 
-// Shared-secret auth for external workflows (Make.com etc.)
+// Shared-secret auth for external workflows (Make.com etc.) — constant-time compare
 function authorized(req: NextRequest): boolean {
-  const secret = process.env.WEBHOOK_SECRET
-  if (!secret) return false
   const header =
     req.headers.get('x-webhook-secret') ??
     req.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
-  return header === secret
+  return safeEqual(header, process.env.WEBHOOK_SECRET)
 }
 
 // GET: list open projects with the fields the sync workflow needs
