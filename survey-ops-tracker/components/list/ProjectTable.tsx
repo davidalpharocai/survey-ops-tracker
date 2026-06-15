@@ -5,8 +5,8 @@ import { formatDate, getDueDateStatus } from '@/lib/utils/date'
 import type { SlimProject } from '@/lib/hooks/useProjects'
 import { useLatestSubmissionStatuses } from '@/lib/hooks/useSubmissions'
 
-type SortField = 'project_name' | 'client' | 'board_column' | 'due_date'
-type SortDir = 'asc' | 'desc'
+export type SortField = 'project_name' | 'client' | 'board_column' | 'due_date'
+export type SortDir = 'asc' | 'desc'
 
 const STAGE_BADGE: Record<string, string> = {
   'Submitted': 'bg-blue-500/15 text-blue-600 dark:text-blue-400',
@@ -26,6 +26,12 @@ const TYPE_BADGE: Record<string, string> = {
 
 interface ProjectTableProps {
   projects: SlimProject[]
+  // Controlled by the list page so they can be captured in saved views
+  hiddenCols: Set<string>
+  onToggleCol: (key: string) => void
+  sortField: SortField
+  sortDir: SortDir
+  onSortChange: (field: SortField, dir: SortDir) => void
 }
 
 function FlagCell({ value, warn = false }: { value: boolean; warn?: boolean }) {
@@ -40,25 +46,19 @@ function FlagCell({ value, warn = false }: { value: boolean; warn?: boolean }) {
   )
 }
 
-const HIDDEN_COLS_KEY = 'sot.listHiddenColumns'
-
-export function ProjectTable({ projects }: ProjectTableProps) {
+export function ProjectTable({
+  projects,
+  hiddenCols,
+  onToggleCol,
+  sortField,
+  sortDir,
+  onSortChange,
+}: ProjectTableProps) {
   const router = useRouter()
-  const [sortField, setSortField] = useState<SortField>('due_date')
-  const [sortDir, setSortDir] = useState<SortDir>('asc')
   const { data: complianceStatuses } = useLatestSubmissionStatuses()
 
-  // Per-user column visibility — saved in this browser only
-  const [hiddenCols, setHiddenCols] = useState<Set<string>>(new Set())
   const [colsOpen, setColsOpen] = useState(false)
   const colsRef = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    try {
-      setHiddenCols(new Set(JSON.parse(localStorage.getItem(HIDDEN_COLS_KEY) ?? '[]')))
-    } catch {
-      // corrupted storage — show everything
-    }
-  }, [])
   useEffect(() => {
     if (!colsOpen) return
     function onPointerDown(e: PointerEvent) {
@@ -67,22 +67,10 @@ export function ProjectTable({ projects }: ProjectTableProps) {
     document.addEventListener('pointerdown', onPointerDown)
     return () => document.removeEventListener('pointerdown', onPointerDown)
   }, [colsOpen])
-  function toggleCol(key: string) {
-    const next = new Set(hiddenCols)
-    if (next.has(key)) next.delete(key)
-    else next.add(key)
-    setHiddenCols(next)
-    localStorage.setItem(HIDDEN_COLS_KEY, JSON.stringify([...next]))
-  }
   const show = (key: string) => !hiddenCols.has(key)
 
   function handleSort(field: SortField) {
-    if (sortField === field) {
-      setSortDir(d => (d === 'asc' ? 'desc' : 'asc'))
-    } else {
-      setSortField(field)
-      setSortDir('asc')
-    }
+    onSortChange(field, sortField === field ? (sortDir === 'asc' ? 'desc' : 'asc') : 'asc')
   }
 
   const sorted = useMemo(() => {
@@ -138,7 +126,7 @@ export function ProjectTable({ projects }: ProjectTableProps) {
                   <input
                     type="checkbox"
                     checked={show(h.key!)}
-                    onChange={() => toggleCol(h.key!)}
+                    onChange={() => onToggleCol(h.key!)}
                     className="accent-blue-600"
                   />
                   {h.label}

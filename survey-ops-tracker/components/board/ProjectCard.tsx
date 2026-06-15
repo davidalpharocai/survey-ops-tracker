@@ -100,12 +100,13 @@ export function ProjectCard({ project, onClick, isNew }: ProjectCardProps) {
         </span>
       )}
 
-      {/* Title row */}
-      <div className="flex items-start justify-between gap-2 mb-1">
-        <span className="text-foreground text-sm font-semibold leading-tight min-w-0 break-words">
+      {/* Title row — wraps so badges drop to their own line on narrow cards
+          instead of crushing the title into one-letter-per-line */}
+      <div className="flex items-start justify-between gap-x-2 gap-y-1 mb-1 flex-wrap">
+        <span className="text-foreground text-sm font-semibold leading-tight break-words flex-1 basis-28 min-w-0">
           {project.project_name}
         </span>
-        <span className="flex items-center gap-1 shrink-0">
+        <span className="flex items-center gap-1 flex-wrap justify-end shrink-0">
           {stale && (
             <span
               className="text-[11px] px-1.5 py-0.5 rounded-full bg-muted border border-muted-foreground/40 text-muted-foreground whitespace-nowrap"

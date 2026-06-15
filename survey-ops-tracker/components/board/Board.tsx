@@ -2,7 +2,7 @@
 import { DragDropContext, type DropResult } from '@hello-pangea/dnd'
 import { BoardColumn } from './BoardColumn'
 import { BoardFilters } from './BoardFilters'
-import { SavedViews, type BoardView } from './SavedViews'
+import { SavedViews } from '@/components/shared/SavedViews'
 import { useState, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useQueryClient } from '@tanstack/react-query'
@@ -143,11 +143,17 @@ export function Board({ projects, teamMembers, onMoveProject, wrapInContext = tr
     </div>
   )
 
-  function applyView(v: BoardView) {
-    handleCaptainChange(v.captain)
-    setTypeFilter(v.type)
-    setDueFilter(v.due)
-    setStageFilter(v.stage)
+  type BoardViewConfig = {
+    captain: string | null
+    type: string | null
+    due: string | null
+    stage: string | null
+  }
+  function applyView(c: BoardViewConfig) {
+    handleCaptainChange(c.captain)
+    setTypeFilter(c.type)
+    setDueFilter(c.due)
+    setStageFilter(c.stage)
   }
 
   return (
@@ -167,9 +173,11 @@ export function Board({ projects, teamMembers, onMoveProject, wrapInContext = tr
           onStageChange={setStageFilter}
           onSearchChange={setSearch}
         />
-        <SavedViews
+        <SavedViews<BoardViewConfig>
+          storageKey="sot.savedViews"
           current={{ captain: captainFilter, type: typeFilter, due: dueFilter, stage: stageFilter }}
           onApply={applyView}
+          tooltip="Save the current board filters (captain, type, due, stage) as a named view and jump back in one click. Personal to you. Pick one, then Update / Rename / Delete."
         />
       </div>
       {wrapInContext ? (

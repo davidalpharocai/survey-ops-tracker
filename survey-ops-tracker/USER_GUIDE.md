@@ -36,7 +36,7 @@ The board shows every active project as a card moving left-to-right through the 
 ### Filters & search
 Captain, Type, Due (today/tomorrow/2 days), Stage (including Closed), and a search box (project or client name). Hover any filter label's (i) for what it does.
 
-**Saved views**: set the filters how you like, hit ★ Save, name it ("My urgent", "Jenna's PS work") — then jump back to it from the Views dropdown anytime. Views are personal (saved in your browser). In Full View, the Scoping and Operations Pipeline sections collapse with the ▾ next to their titles — also remembered per person.
+**Saved views**: set the filters how you like, hit ★ Save, name it ("My urgent", "Jenna's PS work") — then jump back to it from the Views dropdown anytime. After picking a view you can **⟳ Update** it to your current filters, **✎** rename it, or **🗑** delete it. Views are personal (saved in your browser). In Full View, the Scoping and Operations Pipeline sections collapse with the ▾ next to their titles — also remembered per person.
 
 ### Shortcuts
 - **Ctrl+K** (or Cmd+K) — command palette: type a few letters of any project and jump straight to it; type `>` for actions
@@ -76,7 +76,7 @@ Titled groups: **People** (client, captain + optional co-captains, salesperson f
 
 ## 4. The List view
 
-A sortable table of all projects (click column headers to sort). Same search and view toggle as the board. **⚙ Columns** lets you hide columns you don't use — your choice is personal (saved in your browser) and doesn't affect teammates. **⬇ Export CSV** downloads whatever is currently shown, with every field regardless of hidden columns.
+A sortable table of all projects (click column headers to sort). Same search and view toggle as the board. **⚙ Columns** lets you hide columns you don't use — your choice is personal (saved in your browser) and doesn't affect teammates. **Saved views** here remember the whole table setup — Operations/Full, which columns are showing, and the sort — under a name you pick; ⟳ Update, ✎ rename, and 🗑 delete them just like board views. **⬇ Export CSV** downloads whatever is currently shown, with every field regardless of hidden columns.
 
 ## 5. The AI Assistant
 
