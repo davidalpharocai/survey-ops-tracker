@@ -11,9 +11,13 @@ interface BoardColumnProps {
   onCardClick: (id: string) => void
   /** Predicate from useIsNewForMe — marks cards newly assigned to the viewer */
   isNewFor?: (p: SlimProject) => boolean
+  /** Extra classes for the card list (e.g. a fixed lane height + scroll). The
+   *  pipeline passes a uniform height so every column is the same size and
+   *  scrolls on its own; scoping leaves it unset (natural height). */
+  bodyClassName?: string
 }
 
-export function BoardColumn({ id, title, projects, onCardClick, isNewFor }: BoardColumnProps) {
+export function BoardColumn({ id, title, projects, onCardClick, isNewFor, bodyClassName = '' }: BoardColumnProps) {
   return (
     <div className="bg-card border border-border rounded-xl p-2 min-w-[158px] max-w-[253px] flex-1 basis-0 flex flex-col gap-2">
       <div className="flex items-center justify-between">
@@ -35,7 +39,7 @@ export function BoardColumn({ id, title, projects, onCardClick, isNewFor }: Boar
           <div
             ref={provided.innerRef}
             {...provided.droppableProps}
-            className={`flex flex-col gap-2 min-h-[80px] max-h-[calc(100vh-15rem)] overflow-y-auto thin-scroll rounded-lg transition-colors ${
+            className={`flex flex-col gap-2 min-h-[80px] rounded-lg transition-colors ${bodyClassName} ${
               snapshot.isDraggingOver ? 'bg-accent/50' : ''
             }`}
           >

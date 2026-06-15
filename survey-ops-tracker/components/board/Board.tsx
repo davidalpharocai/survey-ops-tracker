@@ -138,6 +138,7 @@ export function Board({ projects, teamMembers, onMoveProject, wrapInContext = tr
             .sort((a, b) => columnSortRank(a) - columnSortRank(b) || boardOrder(a, b))}
           isNewFor={isNewForMe}
           onCardClick={id => router.push(`/projects/${id}`)}
+          bodyClassName="h-[calc(100vh-15rem)] overflow-y-auto thin-scroll"
         />
       ))}
     </div>
