@@ -56,14 +56,29 @@ export default async function ReviewPage({
               · {openTextCount} open-text
             </p>
           </div>
-          {fileUrl?.signedUrl && (
-            <a
-              href={fileUrl.signedUrl}
-              className="text-xs border border-slate-300 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:border-slate-400 dark:hover:border-slate-500 px-3 py-1.5 rounded-lg transition-colors"
+          <div className="flex flex-col items-end gap-1.5">
+            <Link
+              href={`/portal/review/${submissionId}/print`}
+              target="_blank"
+              rel="noopener"
+              className="text-sm bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded-lg transition-colors"
             >
-              ↓ Source file
-            </a>
-          )}
+              Print / Save as PDF
+            </Link>
+            {fileUrl?.signedUrl && (
+              <div className="text-right">
+                <a
+                  href={fileUrl.signedUrl}
+                  className="text-xs border border-slate-300 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:border-slate-400 dark:hover:border-slate-500 px-3 py-1 rounded-lg transition-colors"
+                >
+                  ↓ Analyst&apos;s original upload
+                </a>
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
+                  Reference only — the question list above is the approved record.
+                </p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
       {submission.analyst_message && (
