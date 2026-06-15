@@ -28,6 +28,7 @@ export async function GET(req: NextRequest) {
     .select('project_name, client, board_column, due_date, n_target, n_collected, status, phase, captain:team_members(initials)')
     .eq('status', 'Open')
     .eq('phase', 'Active')
+    .is('deleted_at', null)
 
   if (error) return new Response('Database error', { status: 500 })
 

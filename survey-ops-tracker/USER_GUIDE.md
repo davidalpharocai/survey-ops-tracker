@@ -73,7 +73,7 @@ Four big tiles: **N collected** (click to edit), **Timing** — Due (internal: w
 Titled groups: **People** (client, captain + optional co-captains, salesperson from a dropdown), **Dates**, **Sample** (N target/actual, audience), **Flags** (click a chip to toggle), **Money** (budget, spend, and bid history with averages). Most projects have one captain; "+ add" under Co-Captains shares a project, and shared projects show "+1" on their board card.
 
 ### Header buttons
-**⚑ Priority** (cycles none → high → urgent) · **⏸ Hold** (pauses; card greys out, sinks to column bottom; Resume brings it back) · **✕ Close** (done/archived — lives in Full View's Closed section, reopenable) · **🗑 Delete** (permanent, asks you to type "delete")
+**⚑ Priority** (cycles none → high → urgent) · **⏸ Hold** (pauses; card greys out, sinks to column bottom; Resume brings it back) · **✕ Close** (done/archived — lives in Full View's Closed section, reopenable) · **🗑 Delete** (asks you to type "delete"; the project moves to Admin → Recently Deleted and can be restored — it's not gone for good unless you delete it permanently from there)
 
 ## 4. The List view
 
@@ -99,7 +99,8 @@ The **✦ Assistant** button (bottom-right) answers questions from live project 
 ## 7. Project IDs & Admin
 
 - Every project has a permanent **Project ID** like `PR00042` — shown next to the project title and in the list view, included in CSV exports, and assigned automatically to new projects. It never changes, so use it when referencing a project in email or Slack. Clients have matching `Cl#####` ids.
-- The **☰ menu → Admin** page has: links to every system behind the tracker (including Supabase Users for password resets), a **master audit log** (every field change across all projects — who, when, old → new, with the project linked), the client list with their ids, the team roster, and a data-health checklist (open projects missing a captain or due date).
+- The **☰ menu → Insights** page rolls up the whole pipeline: active/scoping/closed counts, overdue and due-this-week, on-time delivery %, average cycle time, stage distribution, per-captain workload, budget vs spend, and top clients — all derived live from your projects.
+- The **☰ menu → Admin** page has: links to every system behind the tracker (including Supabase Users for password resets), **Recently Deleted** (restore a project you deleted by mistake, or delete it permanently), a **master audit log** (every field change across all projects — who, when, old → new, with the project linked), the client list with their ids, the team roster, and a data-health checklist (open projects missing a captain or due date).
 - **Client pages**: click any client on the Admin page — or the client name on a project page — to see that client's full picture: client since, open/closed project counts, average spend per project, how often they come back, the contacts who've brought us work, and every project (click one to open it).
 
 ## 8. Tips

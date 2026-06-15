@@ -26,6 +26,7 @@ export async function GET(req: NextRequest) {
       'id, project_name, status, phase, linked_documents, survey_tool_id, survey_ids_from_sheet, n_collected, n_target'
     )
     .eq('status', 'Open')
+    .is('deleted_at', null)
 
   if (error) return new Response('Database error', { status: 500 })
   return Response.json({ projects: data })

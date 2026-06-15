@@ -58,6 +58,7 @@ function useClientPage(clientId: string) {
         .from('survey_projects')
         .select(PROJECT_COLS)
         .eq('client_id', clientId)
+        .is('deleted_at', null)
         .order('submitted_date', { ascending: false, nullsFirst: false })
       if (error) throw error
       return data as unknown as ClientProject[]

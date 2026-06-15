@@ -7,6 +7,7 @@ import { useProjects } from '@/lib/hooks/useProjects'
 import { useTeamMembers } from '@/lib/hooks/useTeamMembers'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
 import { MasterAuditLog } from '@/components/admin/MasterAuditLog'
+import { RecentlyDeleted } from '@/components/admin/RecentlyDeleted'
 import type { Tables } from '@/lib/supabase/types'
 
 type Client = Tables<'clients'>
@@ -189,6 +190,9 @@ export default function AdminPage() {
           <HealthList label="On hold" items={health.onHold} empty="Nothing on hold" />
         </div>
       </div>
+
+      {/* Recently deleted (restore) */}
+      <RecentlyDeleted />
 
       {/* Master audit log */}
       <MasterAuditLog />

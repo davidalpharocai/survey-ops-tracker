@@ -54,9 +54,16 @@ export function AppMenu() {
             <span>📋</span> List view
           </Link>
           <Link
+            href="/insights"
+            className={itemClass}
+            title="Insights — pipeline rollup, deadlines, on-time delivery, workload, budget"
+          >
+            <span>📊</span> Insights
+          </Link>
+          <Link
             href="/admin"
             className={itemClass}
-            title="Admin — system links (incl. password resets), client ids, roster, and data health"
+            title="Admin — system links (incl. password resets), client ids, roster, recently deleted, and data health"
           >
             <span>⚙️</span> Admin
           </Link>

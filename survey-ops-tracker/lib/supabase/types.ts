@@ -113,6 +113,7 @@ export type Database = {
           sort_order: number | null
           co_captain_ids: string[] | null
           project_code: string | null
+          deleted_at: string | null
           created_at: string
           updated_at: string
         }
@@ -165,6 +166,7 @@ export type Database = {
           sort_order?: number | null
           co_captain_ids?: string[] | null
           project_code?: string | null
+          deleted_at?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -217,6 +219,7 @@ export type Database = {
           sort_order?: number | null
           co_captain_ids?: string[] | null
           project_code?: string | null
+          deleted_at?: string | null
           created_at?: string
           updated_at?: string
         }

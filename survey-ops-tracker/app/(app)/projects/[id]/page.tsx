@@ -1465,9 +1465,9 @@ function DeleteProjectModal({
       >
         <h2 className="text-base font-semibold text-foreground">Delete project</h2>
         <p className="text-sm text-muted-foreground leading-relaxed">
-          This permanently deletes <span className="text-foreground font-medium">{projectName}</span> and
-          its activity log. This cannot be undone. If you just want it off the board, use Close Project
-          instead.
+          This removes <span className="text-foreground font-medium">{projectName}</span> from the board.
+          It moves to <span className="text-foreground">Recently Deleted</span> on the Admin page, where you
+          can restore it or delete it permanently. If you just want it off the board, use Close Project instead.
         </p>
         <label className="flex flex-col gap-1 text-xs text-muted-foreground">
           Type <span className="font-mono text-foreground">delete</span> to confirm
