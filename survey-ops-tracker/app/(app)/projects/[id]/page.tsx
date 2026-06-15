@@ -673,7 +673,7 @@ function HeroNCollected({
             setDraft(String(collected))
             setEditing(true)
           }}
-          className="text-2xl font-semibold text-foreground leading-tight text-left cursor-pointer"
+          className="text-2xl font-semibold text-foreground leading-tight text-left cursor-pointer hover:bg-accent rounded-md px-1.5 -ml-1.5 transition-colors"
           title="Click to edit"
         >
           {collected}
@@ -807,7 +807,7 @@ function TimingHalf({
             setDraft(value ? value.slice(0, 10) : '')
             setEditing(true)
           }}
-          className={`text-xl font-semibold leading-tight text-left cursor-pointer truncate ${valueColor}`}
+          className={`text-xl font-semibold leading-tight text-left cursor-pointer truncate hover:bg-accent rounded-md px-1.5 -ml-1.5 transition-colors ${valueColor}`}
           title="Click to edit"
         >
           {formatDate(value)}
@@ -1022,7 +1022,7 @@ function EditableRow({
           setDraft(value)
           setEditing(true)
         }}
-        className="text-sm text-foreground hover:text-foreground/70 truncate cursor-pointer"
+        className="text-sm text-foreground hover:bg-accent rounded px-1.5 transition-colors truncate cursor-pointer"
         title="Click to edit"
       >
         {value || <span className="text-muted-foreground/50">— click to add</span>}
@@ -1150,7 +1150,7 @@ function EditableNumberRow({
           setDraft(value != null ? String(value) : '')
           setEditing(true)
         }}
-        className={`text-sm cursor-pointer ${valueClass}`}
+        className={`text-sm cursor-pointer hover:bg-accent rounded px-1.5 transition-colors ${valueClass}`}
         title="Click to edit"
       >
         {value != null ? value.toString() : <span className="text-muted-foreground/50">—</span>}
@@ -1221,7 +1221,7 @@ function EditableDateRow({
           setDraft(value ? value.slice(0, 10) : '')
           setEditing(true)
         }}
-        className={`text-sm cursor-pointer ${valueClass}`}
+        className={`text-sm cursor-pointer hover:bg-accent rounded px-1.5 transition-colors ${valueClass}`}
         title="Click to edit"
       >
         {formatDate(value)}
@@ -1280,7 +1280,7 @@ function SalespersonRow({
       </span>
       <button
         onClick={() => setEditing(true)}
-        className="text-sm text-foreground hover:text-foreground/70 cursor-pointer truncate"
+        className="text-sm text-foreground hover:bg-accent rounded px-1.5 transition-colors cursor-pointer truncate"
         title="Click to change"
       >
         {value || <span className="text-muted-foreground/50">— click to set</span>}
@@ -1357,7 +1357,7 @@ function CaptainRow({
           setDraft(captain?.id ?? '')
           setEditing(true)
         }}
-        className="text-sm text-foreground hover:text-foreground/70 cursor-pointer truncate"
+        className="text-sm text-foreground hover:bg-accent rounded px-1.5 transition-colors cursor-pointer truncate"
         title={captain ? `${captain.name} — click to change` : 'Click to assign'}
       >
         {captain?.name ?? <span className="text-muted-foreground/50">—</span>}
