@@ -35,7 +35,7 @@ export function BoardColumn({ id, title, projects, onCardClick, isNewFor }: Boar
           <div
             ref={provided.innerRef}
             {...provided.droppableProps}
-            className={`flex flex-col gap-2 min-h-[80px] rounded-lg transition-colors ${
+            className={`flex flex-col gap-2 min-h-[80px] max-h-[calc(100vh-15rem)] overflow-y-auto rounded-lg transition-colors ${
               snapshot.isDraggingOver ? 'bg-accent/50' : ''
             }`}
           >

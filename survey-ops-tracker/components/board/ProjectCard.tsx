@@ -47,15 +47,18 @@ interface ProjectCardProps {
 
 export function ProjectCard({ project, onClick, isNew }: ProjectCardProps) {
   const onHold = project.status === 'Hold'
+  const closed = project.status === 'Closed'
   // Hold takes precedence over NEW if both somehow apply
   const showNew = !!isNew && !onHold
   const dueDateStatus = getDueDateStatus(project.due_date)
-  const urgency = getDueUrgency(project.due_date)
+  // Closed and Hold projects drop the due-date urgency treatment — they're
+  // done or paused, so red/orange/amber would be misleading.
+  const urgency = onHold || closed ? null : getDueUrgency(project.due_date)
   const urgencyBorder = urgency ? URGENCY_BORDER[urgency] : undefined
-  // Hold: greyed out, grey border, urgency colors suppressed (it's paused)
-  // NEW: green border overrides urgency until the assignee opens the project
   const border = onHold
     ? 'border-2 border-muted-foreground/40 border-l-4 border-l-muted-foreground/50'
+    : closed
+    ? 'border border-border border-l-4 border-l-muted-foreground/30'
     : showNew
     ? 'border-2 border-emerald-500 border-l-4 border-l-emerald-500'
     : urgencyBorder
@@ -197,14 +200,16 @@ export function ProjectCard({ project, onClick, isNew }: ProjectCardProps) {
         {project.due_date && (
           <span
             className={`text-xs ${
-              dueDateStatus === 'overdue'
+              onHold || closed
+                ? 'text-muted-foreground'
+                : dueDateStatus === 'overdue'
                 ? 'text-red-600 dark:text-red-400'
                 : dueDateStatus === 'soon'
                 ? 'text-amber-600 dark:text-amber-400'
                 : 'text-muted-foreground'
             }`}
           >
-            {dueDateStatus === 'overdue' && '⚠ '}
+            {!onHold && !closed && dueDateStatus === 'overdue' && '⚠ '}
             {formatDate(project.due_date)}
           </span>
         )}

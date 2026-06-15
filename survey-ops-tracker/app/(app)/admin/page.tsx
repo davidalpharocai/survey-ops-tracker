@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useProjects } from '@/lib/hooks/useProjects'
 import { useTeamMembers } from '@/lib/hooks/useTeamMembers'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
+import { MasterAuditLog } from '@/components/admin/MasterAuditLog'
 import type { Tables } from '@/lib/supabase/types'
 
 type Client = Tables<'clients'>
@@ -183,6 +184,9 @@ export default function AdminPage() {
           <HealthList label="On hold" items={health.onHold} empty="Nothing on hold" />
         </div>
       </div>
+
+      {/* Master audit log */}
+      <MasterAuditLog />
 
       {/* Accounts */}
       <div className={tile}>

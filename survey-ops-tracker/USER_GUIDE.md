@@ -59,6 +59,7 @@ Four big tiles: **N collected** (click to edit), **Timing** — Due (internal: w
 ### Tabs
 - **Overview** — everything below
 - **Data Change Log** — engineers log manual data edits here ("removed 4 speeders from SV-2201"); date + author stamped, edit/delete with confirmation
+- **Audit Log** — automatic history of every field change on this project: who changed what, when, and the old → new value. You don't write to it — the system records it for you ("system" means an automated update like the nightly Edwin sync).
 - **Links & setup** — Survey IDs (auto-synced nightly from the Edwin link; mismatches get flagged for review), Slack channel link, notification info
 
 ### Left column
@@ -76,7 +77,7 @@ Titled groups: **People** (client, captain + optional co-captains, salesperson f
 
 ## 4. The List view
 
-A sortable table of all projects (click column headers to sort). Same search and view toggle as the board. **⚙ Columns** lets you hide columns you don't use — your choice is personal (saved in your browser) and doesn't affect teammates. **Saved views** here remember the whole table setup — Operations/Full, which columns are showing, and the sort — under a name you pick; ⟳ Update, ✎ rename, and 🗑 delete them just like board views. **⬇ Export CSV** downloads whatever is currently shown, with every field regardless of hidden columns.
+A sortable table of all projects (click column headers to sort — the header stays frozen as you scroll). It has the **same filters as the board** (Captain, Type, Due, Stage, search). **⚙ Columns** lets you hide columns you don't use — your choice is personal (saved in your browser) and doesn't affect teammates. **Saved views** here remember the whole table setup — Operations/Full, filters, which columns are showing, and the sort — under a name you pick; ⟳ Update, ✎ rename, and 🗑 delete them just like board views. Rows carry the same colored due-date edge as board cards (red overdue, orange tomorrow, amber in 2 days; dropped once a project is closed). **⬇ Export CSV** downloads whatever is currently shown, with every field regardless of hidden columns.
 
 ## 5. The AI Assistant
 
@@ -98,7 +99,7 @@ The **✦ Assistant** button (bottom-right) answers questions from live project 
 ## 7. Project IDs & Admin
 
 - Every project has a permanent **Project ID** like `PR00042` — shown next to the project title and in the list view, included in CSV exports, and assigned automatically to new projects. It never changes, so use it when referencing a project in email or Slack. Clients have matching `Cl#####` ids.
-- The **☰ menu → Admin** page has: links to every system behind the tracker (including Supabase Users for password resets), the client list with their ids, the team roster, and a data-health checklist (open projects missing a captain or due date).
+- The **☰ menu → Admin** page has: links to every system behind the tracker (including Supabase Users for password resets), a **master audit log** (every field change across all projects — who, when, old → new, with the project linked), the client list with their ids, the team roster, and a data-health checklist (open projects missing a captain or due date).
 - **Client pages**: click any client on the Admin page — or the client name on a project page — to see that client's full picture: client since, open/closed project counts, average spend per project, how often they come back, the contacts who've brought us work, and every project (click one to open it).
 
 ## 8. Tips

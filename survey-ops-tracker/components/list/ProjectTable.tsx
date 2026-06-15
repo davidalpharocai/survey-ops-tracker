@@ -1,7 +1,7 @@
 'use client'
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { formatDate, getDueDateStatus } from '@/lib/utils/date'
+import { formatDate, getDueDateStatus, getDueUrgency } from '@/lib/utils/date'
 import type { SlimProject } from '@/lib/hooks/useProjects'
 import { useLatestSubmissionStatuses } from '@/lib/hooks/useSubmissions'
 
@@ -22,6 +22,13 @@ const TYPE_BADGE: Record<string, string> = {
   'PS': 'bg-blue-500/20 text-blue-600 dark:text-blue-400',
   'B2B': 'bg-violet-500/20 text-violet-600 dark:text-violet-400',
   'Rerun': 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400',
+}
+
+// Colored left edge by due urgency, matching the board cards
+const ROW_BORDER: Record<string, string> = {
+  overdue: 'border-l-red-500',
+  tomorrow: 'border-l-orange-500',
+  twodays: 'border-l-amber-400 dark:border-l-amber-400/70',
 }
 
 interface ProjectTableProps {
@@ -135,15 +142,16 @@ export function ProjectTable({
           </div>
         )}
       </div>
+      <div className="overflow-auto max-h-[calc(100vh-16rem)]">
       <table className="w-full">
         <thead>
-          <tr className="bg-background border-b border-border">
+          <tr className="border-b border-border">
             {visibleHeaders.map(({ field, label, title }) => (
               <th
                 key={label}
                 title={field ? `${title} Click to sort.` : title}
                 onClick={() => field && handleSort(field)}
-                className={`px-4 py-3 text-left text-xs text-muted-foreground uppercase tracking-wider font-medium ${
+                className={`sticky top-0 z-10 bg-background px-4 py-3 text-left text-xs text-muted-foreground uppercase tracking-wider font-medium border-b border-border ${
                   field ? 'cursor-pointer hover:text-foreground' : ''
                 }`}
               >
@@ -162,7 +170,10 @@ export function ProjectTable({
             </tr>
           )}
           {sorted.map((p, i) => {
-            const dueDateStatus = getDueDateStatus(p.due_date)
+            // Closed/Hold projects drop the due urgency treatment
+            const openDue = p.status === 'Open'
+            const dueDateStatus = openDue ? getDueDateStatus(p.due_date) : null
+            const urgency = openDue ? getDueUrgency(p.due_date) : null
             const nMet = p.n_target != null && p.n_collected >= p.n_target
             const complianceStatus = complianceStatuses?.get(p.id)
             return (
@@ -173,7 +184,11 @@ export function ProjectTable({
                   i % 2 === 1 ? 'bg-muted/40' : ''
                 } ${p.status === 'Hold' ? 'opacity-60' : ''}`}
               >
-                <td className="px-4 py-3 text-sm text-foreground font-medium">
+                <td
+                  className={`px-4 py-3 text-sm text-foreground font-medium border-l-4 ${
+                    urgency ? ROW_BORDER[urgency] : 'border-l-transparent'
+                  }`}
+                >
                   <div className="flex items-center gap-2">
                     <span>
                       {p.status === 'Hold' && <span title="On hold">⏸ </span>}
@@ -261,6 +276,7 @@ export function ProjectTable({
           })}
         </tbody>
       </table>
+      </div>
     </div>
   )
 }
