@@ -1,11 +1,13 @@
 'use client'
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useQuery } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { useProjects } from '@/lib/hooks/useProjects'
 import { useTeamMembers } from '@/lib/hooks/useTeamMembers'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
+import { MasterAuditLog } from '@/components/admin/MasterAuditLog'
+import { RecentlyDeleted } from '@/components/admin/RecentlyDeleted'
 import type { Tables } from '@/lib/supabase/types'
 
 type Client = Tables<'clients'>
@@ -128,6 +130,11 @@ export default function AdminPage() {
     },
   }
 
+  const [accountFilter, setAccountFilter] = useState<Bucket | null>(null)
+  const visibleClients = accountFilter
+    ? clients.filter(c => bucketOf(c.name) === accountFilter)
+    : clients
+
   const health = useMemo(() => {
     const open = projects.filter(p => p.status === 'Open')
     return {
@@ -184,37 +191,61 @@ export default function AdminPage() {
         </div>
       </div>
 
+      {/* Recently deleted (restore) */}
+      <RecentlyDeleted />
+
+      {/* Master audit log */}
+      <MasterAuditLog />
+
       {/* Accounts */}
       <div className={tile}>
         <h3 className={heading}>
           Accounts ({clients.length})
           <InfoTooltip text="Every approved account with its Cl##### id (same ids as the sheet's Unique Clients tab). Click one for its client page — projects, spend, and history." />
         </h3>
-        <p className="text-sm text-muted-foreground mb-3 flex items-center gap-x-3 gap-y-1 flex-wrap">
-          <span className="flex items-center">
-            <span className="text-foreground font-semibold mr-1">{bucketCounts.client}</span> Clients
-            <InfoTooltip text={BUCKET_BADGE.client.help} />
-          </span>
-          <span className="flex items-center">
-            <span className="text-foreground font-semibold mr-1">{bucketCounts.former}</span> Former Clients
-            <InfoTooltip text={BUCKET_BADGE.former.help} />
-          </span>
-          <span className="flex items-center">
-            <span className="text-foreground font-semibold mr-1">{bucketCounts.prospect}</span> Prospects
-            <InfoTooltip text={BUCKET_BADGE.prospect.help} />
-          </span>
-          {bucketCounts.none > 0 && (
-            <span className="flex items-center">
-              <span className="text-foreground font-semibold mr-1">{bucketCounts.none}</span> No projects yet
-              <InfoTooltip text={BUCKET_BADGE.none.help} />
-            </span>
+        <div className="flex items-center gap-2 mb-3 flex-wrap">
+          {([
+            { key: 'client' as Bucket, label: 'Clients', count: bucketCounts.client },
+            { key: 'former' as Bucket, label: 'Former Clients', count: bucketCounts.former },
+            { key: 'prospect' as Bucket, label: 'Prospects', count: bucketCounts.prospect },
+            ...(bucketCounts.none > 0
+              ? [{ key: 'none' as Bucket, label: 'No projects yet', count: bucketCounts.none }]
+              : []),
+          ]).map(({ key, label, count }) => {
+            const active = accountFilter === key
+            return (
+              <button
+                key={key}
+                onClick={() => setAccountFilter(active ? null : key)}
+                title={`${BUCKET_BADGE[key].help} Click to ${active ? 'show all accounts' : 'filter to these'}.`}
+                className={`text-sm flex items-center gap-1 px-2 py-1 rounded-lg border transition-colors ${
+                  active
+                    ? 'border-ring bg-accent text-foreground'
+                    : 'border-border text-muted-foreground hover:text-foreground hover:border-ring'
+                }`}
+              >
+                <span className="text-foreground font-semibold">{count}</span> {label}
+              </button>
+            )
+          })}
+          {accountFilter && (
+            <button
+              onClick={() => setAccountFilter(null)}
+              className="text-xs text-muted-foreground hover:text-foreground px-1 transition-colors"
+              title="Clear the account filter"
+            >
+              ✕ clear
+            </button>
           )}
-        </p>
+        </div>
         {clientsLoading ? (
           <p className="text-xs text-muted-foreground/50">Loading…</p>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
-            {clients.map(c => {
+            {visibleClients.length === 0 && (
+              <p className="text-xs text-muted-foreground/50">No accounts in this status.</p>
+            )}
+            {visibleClients.map(c => {
               const count = firmStats.get(c.name.trim().toLowerCase())?.total ?? 0
               const bucket = bucketOf(c.name)
               const badge = BUCKET_BADGE[bucket]

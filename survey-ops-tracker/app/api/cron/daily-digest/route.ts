@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { safeEqual } from '@/lib/utils/secureCompare'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -8,10 +9,9 @@ export const maxDuration = 60
 // Slack via an incoming-webhook URL (SLACK_WEBHOOK_URL env var).
 // Runs daily via Vercel Cron; manual trigger allowed with the webhook secret.
 function authorized(req: NextRequest): boolean {
-  const auth = req.headers.get('authorization')
-  if (process.env.CRON_SECRET && auth === `Bearer ${process.env.CRON_SECRET}`) return true
-  const secret = process.env.WEBHOOK_SECRET
-  return !!secret && req.headers.get('x-webhook-secret') === secret
+  const bearer = req.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
+  if (safeEqual(bearer, process.env.CRON_SECRET)) return true
+  return safeEqual(req.headers.get('x-webhook-secret'), process.env.WEBHOOK_SECRET)
 }
 
 function fmt(d: string | null): string {
@@ -28,6 +28,7 @@ export async function GET(req: NextRequest) {
     .select('project_name, client, board_column, due_date, n_target, n_collected, status, phase, captain:team_members(initials)')
     .eq('status', 'Open')
     .eq('phase', 'Active')
+    .is('deleted_at', null)
 
   if (error) return new Response('Database error', { status: 500 })
 
@@ -65,10 +66,19 @@ export async function GET(req: NextRequest) {
     return Response.json({ posted: false, reason: 'SLACK_WEBHOOK_URL not configured', preview: text })
   }
 
-  const res = await fetch(slackUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text }),
-  })
-  return Response.json({ posted: res.ok, status: res.status })
+  // Always return 200 so Vercel Cron doesn't retry and double-post the digest;
+  // a failed Slack POST is logged (and surfaced in the JSON) rather than thrown.
+  try {
+    const res = await fetch(slackUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+      signal: AbortSignal.timeout(10_000),
+    })
+    if (!res.ok) console.error('daily-digest: Slack POST failed', res.status)
+    return Response.json({ posted: res.ok, status: res.status })
+  } catch (err) {
+    console.error('daily-digest: Slack POST error', err)
+    return Response.json({ posted: false, error: 'Slack post failed' })
+  }
 }

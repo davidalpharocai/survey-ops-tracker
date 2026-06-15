@@ -50,13 +50,36 @@ const FIELDS_SCHEMA = {
       type: 'string',
       enum: ['New Inquiry', 'Proposal Sent', 'Pricing Discussion', 'Awaiting Approval', 'Closed'],
     },
-    status: { type: 'string', enum: ['Open', 'Closed'] },
+    status: { type: 'string', enum: ['Open', 'Closed', 'Hold'] },
     note: {
       type: 'string',
       description: 'Any free-text status update or next step the user mentioned, to append to the project log',
     },
   },
   additionalProperties: false as const,
+}
+
+// Belt-and-suspenders validation of the model output before it reaches the UI
+// (the schema already constrains it, but never trust generated data near the DB).
+const ENUMS: Record<string, string[]> = {
+  project_type: ['PS', 'B2B', 'Rerun'],
+  status: ['Open', 'Closed', 'Hold'],
+  board_column: ['Submitted', 'Doc Programming', 'Survey Programming', 'EdWin QA', 'Fielding', 'Data QA', 'Delivery'],
+  scoping_stage: ['New Inquiry', 'Proposal Sent', 'Pricing Discussion', 'Awaiting Approval', 'Closed'],
+}
+const NON_NEGATIVE = ['n_target', 'n_collected', 'n_actual', 'audience_size', 'budget', 'actual_spend']
+
+function sanitizeFields(fields: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {}
+  for (const [k, v] of Object.entries(fields)) {
+    if (v == null) continue
+    if (k in ENUMS && !ENUMS[k].includes(String(v))) continue // drop invalid enum values
+    if (NON_NEGATIVE.includes(k) && typeof v === 'number' && v < 0) continue // drop negatives
+    out[k] = v
+  }
+  // A project is either in the scoping funnel or on the pipeline — never both
+  if (out.scoping_stage && out.board_column) delete out.board_column
+  return out
 }
 
 export async function POST(req: NextRequest) {
@@ -105,8 +128,20 @@ ${mode === 'edit'
       output_config: { format: { type: 'json_schema', schema: FIELDS_SCHEMA } },
       messages: [{ role: 'user', content: description }],
     })
+    if (response.stop_reason === 'refusal') {
+      return Response.json({ error: 'The request was declined. Try rephrasing without sensitive content.' }, { status: 400 })
+    }
+    if (response.stop_reason === 'max_tokens') {
+      return Response.json({ error: 'That description was too long to process — try shortening it.' }, { status: 400 })
+    }
     const text = response.content.find(b => b.type === 'text')?.text ?? '{}'
-    return Response.json({ fields: JSON.parse(text) })
+    let parsed: Record<string, unknown>
+    try {
+      parsed = JSON.parse(text)
+    } catch {
+      return Response.json({ error: 'Could not read the AI response — please try again.' }, { status: 502 })
+    }
+    return Response.json({ fields: sanitizeFields(parsed) })
   } catch (err) {
     console.error('parse-project error:', err)
     let msg = 'Could not understand that description. Try rephrasing.'

@@ -1,16 +1,23 @@
 import { NextRequest } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { safeEqual } from '@/lib/utils/secureCompare'
 
 export const dynamic = 'force-dynamic'
 
+// Cap stored text so a runaway/abusive payload can't bloat rows or the
+// assistant's prompt context downstream.
+const MAX_BODY = 20_000
+const MAX_FIELD = 1_000
+
 function authorized(req: NextRequest): boolean {
-  const secret = process.env.WEBHOOK_SECRET
-  if (!secret) return false
   const header =
     req.headers.get('x-webhook-secret') ??
     req.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
-  return header === secret
+  return safeEqual(header, process.env.WEBHOOK_SECRET)
 }
+
+const clip = (v: unknown, max: number): string | null =>
+  typeof v === 'string' ? v.slice(0, max) : null
 
 // POST: log an activity entry (email etc.) against a project.
 // Body: { project_id, type?, direction?, sender?, recipients?, subject?,
@@ -27,7 +34,7 @@ export async function POST(req: NextRequest) {
   }
   if (!b.project_id) return new Response('project_id required', { status: 400 })
 
-  const bodyText = typeof b.body === 'string' ? b.body : null
+  const bodyText = clip(b.body, MAX_BODY)
   const snippet = bodyText
     ? bodyText.replace(/\s+/g, ' ').trim().slice(0, 200)
     : null
@@ -35,11 +42,11 @@ export async function POST(req: NextRequest) {
   const supabase = createAdminClient()
   const { error } = await supabase.from('project_activity').insert({
     project_id: String(b.project_id),
-    type: typeof b.type === 'string' ? b.type : 'email',
-    direction: typeof b.direction === 'string' ? b.direction : null,
-    sender: typeof b.sender === 'string' ? b.sender : null,
-    recipients: typeof b.recipients === 'string' ? b.recipients : null,
-    subject: typeof b.subject === 'string' ? b.subject : null,
+    type: clip(b.type, MAX_FIELD) ?? 'email',
+    direction: clip(b.direction, MAX_FIELD),
+    sender: clip(b.sender, MAX_FIELD),
+    recipients: clip(b.recipients, MAX_FIELD),
+    subject: clip(b.subject, MAX_FIELD),
     snippet,
     body: bodyText,
     occurred_at:

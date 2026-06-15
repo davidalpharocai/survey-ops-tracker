@@ -36,7 +36,7 @@ The board shows every active project as a card moving left-to-right through the 
 ### Filters & search
 Captain, Type, Due (today/tomorrow/2 days), Stage (including Closed), and a search box (project or client name). Hover any filter label's (i) for what it does.
 
-**Saved views**: set the filters how you like, hit ★ Save, name it ("My urgent", "Jenna's PS work") — then jump back to it from the Views dropdown anytime. Views are personal (saved in your browser). In Full View, the Scoping and Operations Pipeline sections collapse with the ▾ next to their titles — also remembered per person.
+**Saved views**: set the filters how you like, hit ★ Save, name it ("My urgent", "Jenna's PS work") — then jump back to it from the Views dropdown anytime. After picking a view you can **⟳ Update** it to your current filters, **✎** rename it, or **🗑** delete it. Views are personal (saved in your browser). In Full View, the Scoping and Operations Pipeline sections collapse with the ▾ next to their titles — also remembered per person.
 
 ### Shortcuts
 - **Ctrl+K** (or Cmd+K) — command palette: type a few letters of any project and jump straight to it; type `>` for actions
@@ -60,6 +60,7 @@ Four big tiles: **N collected** (click to edit), **Timing** — Due (internal: w
 - **Overview** — everything below
 - **Data Change Log** — engineers log manual data edits here ("removed 4 speeders from SV-2201"); date + author stamped, edit/delete with confirmation
 - **Links & setup** — Survey IDs (auto-synced nightly from the Edwin link; mismatches get flagged for review), Slack channel link, notification info
+- **Audit Log** (last tab) — automatic history of every field change on this project: who changed what, when, and the old → new value. You don't write to it — the system records it for you ("system" means an automated update like the nightly Edwin sync).
 
 ### Left column
 - **Pipeline progress** — check off stages (this moves the card on the board)
@@ -72,11 +73,11 @@ Four big tiles: **N collected** (click to edit), **Timing** — Due (internal: w
 Titled groups: **People** (client, captain + optional co-captains, salesperson from a dropdown), **Dates**, **Sample** (N target/actual, audience), **Flags** (click a chip to toggle), **Money** (budget, spend, and bid history with averages). Most projects have one captain; "+ add" under Co-Captains shares a project, and shared projects show "+1" on their board card.
 
 ### Header buttons
-**⚑ Priority** (cycles none → high → urgent) · **⏸ Hold** (pauses; card greys out, sinks to column bottom; Resume brings it back) · **✕ Close** (done/archived — lives in Full View's Closed section, reopenable) · **🗑 Delete** (permanent, asks you to type "delete")
+**⚑ Priority** (cycles none → high → urgent) · **⏸ Hold** (pauses; card greys out, sinks to column bottom; Resume brings it back) · **✕ Close** (done/archived — lives in Full View's Closed section, reopenable) · **🗑 Delete** (asks you to type "delete"; the project moves to Admin → Recently Deleted and can be restored — it's not gone for good unless you delete it permanently from there)
 
 ## 4. The List view
 
-A sortable table of all projects (click column headers to sort). Same search and view toggle as the board. **⚙ Columns** lets you hide columns you don't use — your choice is personal (saved in your browser) and doesn't affect teammates. **⬇ Export CSV** downloads whatever is currently shown, with every field regardless of hidden columns.
+A sortable table of all projects (click column headers to sort — the header stays frozen as you scroll). It has the **same filters as the board** (Captain, Type, Due, Stage, search). **⚙ Columns** lets you hide columns you don't use — your choice is personal (saved in your browser) and doesn't affect teammates. **Saved views** here remember the whole table setup — Operations/Full, filters, which columns are showing, and the sort — under a name you pick; ⟳ Update, ✎ rename, and 🗑 delete them just like board views. Rows carry the same colored due-date edge as board cards (red overdue, orange tomorrow, amber in 2 days; dropped once a project is closed). **⬇ Export CSV** downloads whatever is currently shown, with every field regardless of hidden columns.
 
 ## 5. The AI Assistant
 
@@ -98,7 +99,8 @@ The **✦ Assistant** button (bottom-right) answers questions from live project 
 ## 7. Project IDs & Admin
 
 - Every project has a permanent **Project ID** like `PR00042` — shown next to the project title and in the list view, included in CSV exports, and assigned automatically to new projects. It never changes, so use it when referencing a project in email or Slack. Clients have matching `Cl#####` ids.
-- The **☰ menu → Admin** page has: links to every system behind the tracker (including Supabase Users for password resets), the client list with their ids, the team roster, and a data-health checklist (open projects missing a captain or due date).
+- The **☰ menu → Insights** page rolls up the whole pipeline: active/scoping/closed counts, overdue and due-this-week, on-time delivery %, average cycle time, stage distribution, per-captain workload, budget vs spend, and top clients — all derived live from your projects.
+- The **☰ menu → Admin** page has: links to every system behind the tracker (including Supabase Users for password resets), **Recently Deleted** (restore a project you deleted by mistake, or delete it permanently), a **master audit log** (every field change across all projects — who, when, old → new, with the project linked), the client list with their ids, the team roster, and a data-health checklist (open projects missing a captain or due date).
 - **Client pages**: click any client on the Admin page — or the client name on a project page — to see that client's full picture: client since, open/closed project counts, average spend per project, how often they come back, the contacts who've brought us work, and every project (click one to open it).
 
 ## 8. Tips

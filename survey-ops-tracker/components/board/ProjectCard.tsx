@@ -47,15 +47,18 @@ interface ProjectCardProps {
 
 export function ProjectCard({ project, onClick, isNew }: ProjectCardProps) {
   const onHold = project.status === 'Hold'
+  const closed = project.status === 'Closed'
   // Hold takes precedence over NEW if both somehow apply
   const showNew = !!isNew && !onHold
   const dueDateStatus = getDueDateStatus(project.due_date)
-  const urgency = getDueUrgency(project.due_date)
+  // Closed and Hold projects drop the due-date urgency treatment — they're
+  // done or paused, so red/orange/amber would be misleading.
+  const urgency = onHold || closed ? null : getDueUrgency(project.due_date)
   const urgencyBorder = urgency ? URGENCY_BORDER[urgency] : undefined
-  // Hold: greyed out, grey border, urgency colors suppressed (it's paused)
-  // NEW: green border overrides urgency until the assignee opens the project
   const border = onHold
     ? 'border-2 border-muted-foreground/40 border-l-4 border-l-muted-foreground/50'
+    : closed
+    ? 'border border-border border-l-4 border-l-muted-foreground/30'
     : showNew
     ? 'border-2 border-emerald-500 border-l-4 border-l-emerald-500'
     : urgencyBorder
@@ -100,12 +103,13 @@ export function ProjectCard({ project, onClick, isNew }: ProjectCardProps) {
         </span>
       )}
 
-      {/* Title row */}
-      <div className="flex items-start justify-between gap-2 mb-1">
-        <span className="text-foreground text-sm font-semibold leading-tight min-w-0 break-words">
+      {/* Title row — wraps so badges drop to their own line on narrow cards
+          instead of crushing the title into one-letter-per-line */}
+      <div className="flex items-start justify-between gap-x-2 gap-y-1 mb-1 flex-wrap">
+        <span className="text-foreground text-sm font-semibold leading-tight break-words flex-1 basis-28 min-w-0">
           {project.project_name}
         </span>
-        <span className="flex items-center gap-1 shrink-0">
+        <span className="flex items-center gap-1 flex-wrap justify-end shrink-0">
           {stale && (
             <span
               className="text-[11px] px-1.5 py-0.5 rounded-full bg-muted border border-muted-foreground/40 text-muted-foreground whitespace-nowrap"
@@ -196,14 +200,19 @@ export function ProjectCard({ project, onClick, isNew }: ProjectCardProps) {
         {project.due_date && (
           <span
             className={`text-xs ${
-              dueDateStatus === 'overdue'
+              onHold || closed
+                ? 'text-muted-foreground'
+                : dueDateStatus === 'overdue'
                 ? 'text-red-600 dark:text-red-400'
                 : dueDateStatus === 'soon'
                 ? 'text-amber-600 dark:text-amber-400'
                 : 'text-muted-foreground'
             }`}
           >
-            {dueDateStatus === 'overdue' && '⚠ '}
+            {/* Word label so urgency isn't conveyed by color alone */}
+            {urgency === 'overdue' && '⚠ Overdue · '}
+            {urgency === 'tomorrow' && 'Due tomorrow · '}
+            {urgency === 'twodays' && 'Due in 2d · '}
             {formatDate(project.due_date)}
           </span>
         )}

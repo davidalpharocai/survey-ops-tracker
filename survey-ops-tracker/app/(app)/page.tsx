@@ -34,6 +34,10 @@ export default function BoardPage() {
   const [showNewProject, setShowNewProject] = useState(false)
   const [showClosed, setShowClosed] = useState(false)
   const [pipelineCollapsed, setPipelineCollapsed] = useStoredFlag('sot.collapse.pipeline', false)
+  // Remember this as the origin so a project's "← Back" returns here
+  useEffect(() => {
+    sessionStorage.setItem('sot.cameFrom', '/')
+  }, [])
   const [exporting, setExporting] = useState(false)
 
   // The command palette's "New project" action lands here as /?new=1 —

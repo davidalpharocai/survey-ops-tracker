@@ -2,7 +2,7 @@
 import { DragDropContext, type DropResult } from '@hello-pangea/dnd'
 import { BoardColumn } from './BoardColumn'
 import { BoardFilters } from './BoardFilters'
-import { SavedViews, type BoardView } from './SavedViews'
+import { SavedViews } from '@/components/shared/SavedViews'
 import { useState, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useQueryClient } from '@tanstack/react-query'
@@ -90,7 +90,8 @@ export function Board({ projects, teamMembers, onMoveProject, wrapInContext = tr
       if (
         q &&
         !p.project_name.toLowerCase().includes(q) &&
-        !p.client.toLowerCase().includes(q)
+        !p.client.toLowerCase().includes(q) &&
+        !(p.latest_next_steps ?? '').toLowerCase().includes(q)
       ) {
         return false
       }
@@ -98,14 +99,27 @@ export function Board({ projects, teamMembers, onMoveProject, wrapInContext = tr
     })
   }, [projects, captainFilter, typeFilter, dueFilter, stageFilter, search])
 
+  const hasActiveFilters = !!(captainFilter || typeFilter || dueFilter || stageFilter || search)
+  function clearAllFilters() {
+    handleCaptainChange(null)
+    setTypeFilter(null)
+    setDueFilter(null)
+    setStageFilter(null)
+    setSearch('')
+  }
+
   function handleDragEnd(result: DropResult) {
     window.__sotDragging = false
     if (!result.destination) return
     const newColumn = result.destination.droppableId as BoardColumnType
     const sameColumn = newColumn === result.source.droppableId
-    // The dropped card takes a persisted position between its new neighbors
-    const destCards = filtered
-      .filter(p => p.board_column === newColumn && p.id !== result.draggableId)
+    // The dropped card takes a persisted position between its new neighbors.
+    // Use the UNFILTERED projects (not `filtered`) so sort_order reflects the
+    // true column order — otherwise a card dropped while a filter hides
+    // teammates' cards gets an order that's right among visible cards but
+    // arbitrary among hidden ones, silently corrupting the board for everyone.
+    const destCards = projects
+      .filter(p => p.board_column === newColumn && p.id !== result.draggableId && p.status !== 'Closed')
       .sort((a, b) => columnSortRank(a) - columnSortRank(b) || boardOrder(a, b))
     const i = result.destination.index
     const sortOrder = sortOrderBetween(destCards[i - 1]?.sort_order, destCards[i]?.sort_order)
@@ -138,16 +152,23 @@ export function Board({ projects, teamMembers, onMoveProject, wrapInContext = tr
             .sort((a, b) => columnSortRank(a) - columnSortRank(b) || boardOrder(a, b))}
           isNewFor={isNewForMe}
           onCardClick={id => router.push(`/projects/${id}`)}
+          bodyClassName="h-[calc(100vh-15rem)] overflow-y-auto thin-scroll"
         />
       ))}
     </div>
   )
 
-  function applyView(v: BoardView) {
-    handleCaptainChange(v.captain)
-    setTypeFilter(v.type)
-    setDueFilter(v.due)
-    setStageFilter(v.stage)
+  type BoardViewConfig = {
+    captain: string | null
+    type: string | null
+    due: string | null
+    stage: string | null
+  }
+  function applyView(c: BoardViewConfig) {
+    handleCaptainChange(c.captain)
+    setTypeFilter(c.type)
+    setDueFilter(c.due)
+    setStageFilter(c.stage)
   }
 
   return (
@@ -167,11 +188,21 @@ export function Board({ projects, teamMembers, onMoveProject, wrapInContext = tr
           onStageChange={setStageFilter}
           onSearchChange={setSearch}
         />
-        <SavedViews
+        <SavedViews<BoardViewConfig>
+          storageKey="sot.savedViews"
           current={{ captain: captainFilter, type: typeFilter, due: dueFilter, stage: stageFilter }}
           onApply={applyView}
+          tooltip="Save the current board filters (captain, type, due, stage) as a named view and jump back in one click. Personal to you. Pick one, then Update / Rename / Delete."
         />
       </div>
+      {filtered.length === 0 && projects.length > 0 && hasActiveFilters && (
+        <div className="bg-card border border-border rounded-xl px-4 py-6 text-center text-sm text-muted-foreground">
+          No projects match your filters.{' '}
+          <button onClick={clearAllFilters} className="text-blue-600 dark:text-blue-400 hover:underline">
+            Clear all filters
+          </button>
+        </div>
+      )}
       {wrapInContext ? (
         <DragDropContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>{columns}</DragDropContext>
       ) : (

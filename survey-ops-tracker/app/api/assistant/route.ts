@@ -121,6 +121,7 @@ export async function POST(req: NextRequest) {
   const { data: projects, error } = await supabase
     .from('survey_projects')
     .select('*, captain:team_members(name, initials)')
+    .is('deleted_at', null)
     .order('due_date', { ascending: true })
 
   if (error) {

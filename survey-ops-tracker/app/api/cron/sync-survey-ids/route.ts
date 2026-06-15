@@ -27,6 +27,7 @@ export async function GET(req: NextRequest) {
     .from('survey_projects')
     .select('id, project_name, linked_documents, survey_tool_id, survey_id_discrepancy')
     .eq('status', 'Open')
+    .is('deleted_at', null)
 
   if (error) return new Response('Database error', { status: 500 })
 

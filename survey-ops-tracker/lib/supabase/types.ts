@@ -9,6 +9,36 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      project_audit: {
+        Row: {
+          id: string
+          project_id: string
+          field: string
+          old_value: string | null
+          new_value: string | null
+          changed_by: string
+          changed_at: string
+        }
+        Insert: {
+          id?: string
+          project_id: string
+          field: string
+          old_value?: string | null
+          new_value?: string | null
+          changed_by?: string
+          changed_at?: string
+        }
+        Update: {
+          id?: string
+          project_id?: string
+          field?: string
+          old_value?: string | null
+          new_value?: string | null
+          changed_by?: string
+          changed_at?: string
+        }
+        Relationships: []
+      }
       team_members: {
         Row: {
           id: string
@@ -83,6 +113,7 @@ export type Database = {
           sort_order: number | null
           co_captain_ids: string[] | null
           project_code: string | null
+          deleted_at: string | null
           created_at: string
           updated_at: string
         }
@@ -135,6 +166,7 @@ export type Database = {
           sort_order?: number | null
           co_captain_ids?: string[] | null
           project_code?: string | null
+          deleted_at?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -187,6 +219,7 @@ export type Database = {
           sort_order?: number | null
           co_captain_ids?: string[] | null
           project_code?: string | null
+          deleted_at?: string | null
           created_at?: string
           updated_at?: string
         }

@@ -11,6 +11,7 @@ import { ScopingProgress } from '@/components/project/ScopingProgress'
 import { QuickEdit } from '@/components/project/QuickEdit'
 import { ActivityLog } from '@/components/project/ActivityLog'
 import { DataChangeLog } from '@/components/project/DataChangeLog'
+import { ProjectAuditLog } from '@/components/project/ProjectAuditLog'
 import { LatestNextSteps } from '@/components/project/LatestNextSteps'
 import { LinkedDocuments } from '@/components/project/LinkedDocuments'
 import { SlackChannel } from '@/components/project/SlackChannel'
@@ -61,7 +62,14 @@ export default function ProjectDetailPage() {
   const updateProject = useUpdateProject()
   const deleteProject = useDeleteProject()
   const [confirmingDelete, setConfirmingDelete] = useState(false)
-  const [activeTab, setActiveTab] = useState<'overview' | 'datalog' | 'links'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'datalog' | 'audit' | 'links'>('overview')
+  // Where to return on "← Back": the board or list, whichever the user came from
+  const [backTo, setBackTo] = useState<{ href: string; label: string }>({ href: '/', label: 'Board' })
+  useEffect(() => {
+    const from = sessionStorage.getItem('sot.cameFrom')
+    if (from === '/list') setBackTo({ href: '/list', label: 'List' })
+    else setBackTo({ href: '/', label: 'Board' })
+  }, [])
   const queryClient = useQueryClient()
   const projectLoaded = !!project
 
@@ -156,10 +164,11 @@ export default function ProjectDetailPage() {
       {/* Header */}
       <div className="flex items-center gap-3 mb-6 flex-wrap">
         <button
-          onClick={() => router.push('/')}
+          onClick={() => router.push(backTo.href)}
           className="text-muted-foreground hover:text-foreground text-sm transition-colors"
+          title={`Back to the ${backTo.label.toLowerCase()}`}
         >
-          ← Board
+          ← {backTo.label}
         </button>
         <span className="text-muted-foreground/50">/</span>
         <h1 className="text-2xl font-bold text-foreground">{project.project_name}</h1>
@@ -299,11 +308,28 @@ export default function ProjectDetailPage() {
         >
           Links &amp; setup
         </button>
+        <button
+          onClick={() => setActiveTab('audit')}
+          title="Automatic history of every field change on this project"
+          className={`text-sm px-3 py-1.5 rounded font-medium transition-colors ${
+            activeTab === 'audit'
+              ? 'bg-background text-foreground'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          Audit Log
+        </button>
       </div>
 
       {activeTab === 'datalog' && (
         <div className="max-w-3xl">
           <DataChangeLog projectId={project.id} />
+        </div>
+      )}
+
+      {activeTab === 'audit' && (
+        <div className="max-w-3xl">
+          <ProjectAuditLog projectId={project.id} />
         </div>
       )}
 
@@ -377,6 +403,7 @@ export default function ProjectDetailPage() {
           <HeroTiming
             due={project.due_date}
             deliver={project.deliver_date}
+            closed={project.status === 'Closed'}
             onSaveDue={v => updateProject.mutate({ id, updates: { due_date: v } })}
             onSaveDeliver={v => updateProject.mutate({ id, updates: { deliver_date: v } })}
           />
@@ -646,7 +673,7 @@ function HeroNCollected({
             setDraft(String(collected))
             setEditing(true)
           }}
-          className="text-2xl font-semibold text-foreground leading-tight text-left cursor-pointer"
+          className="text-2xl font-semibold text-foreground leading-tight text-left cursor-pointer hover:bg-accent rounded-md px-1.5 -ml-1.5 transition-colors"
           title="Click to edit"
         >
           {collected}
@@ -663,15 +690,18 @@ function HeroNCollected({
 function HeroTiming({
   due,
   deliver,
+  closed = false,
   onSaveDue,
   onSaveDeliver,
 }: {
   due: string | null
   deliver: string | null
+  closed?: boolean
   onSaveDue: (next: string | null) => void
   onSaveDeliver: (next: string | null) => void
 }) {
-  const urgency = getDueUrgency(due)
+  // Closed projects are done — drop the red/orange/amber urgency treatment
+  const urgency = closed ? null : getDueUrgency(due)
   const dueColor =
     urgency === 'overdue'
       ? 'text-red-600 dark:text-red-400'
@@ -682,7 +712,7 @@ function HeroTiming({
       : 'text-foreground'
 
   let duePhrase = ' '
-  if (due) {
+  if (due && !closed) {
     const days = differenceInCalendarDays(startOfDay(parseISO(due)), startOfDay(new Date()))
     duePhrase =
       days < 0 ? 'overdue' : days === 0 ? 'today' : days === 1 ? 'tomorrow' : `in ${days} days`
@@ -777,7 +807,7 @@ function TimingHalf({
             setDraft(value ? value.slice(0, 10) : '')
             setEditing(true)
           }}
-          className={`text-xl font-semibold leading-tight text-left cursor-pointer truncate ${valueColor}`}
+          className={`text-xl font-semibold leading-tight text-left cursor-pointer truncate hover:bg-accent rounded-md px-1.5 -ml-1.5 transition-colors ${valueColor}`}
           title="Click to edit"
         >
           {formatDate(value)}
@@ -992,7 +1022,7 @@ function EditableRow({
           setDraft(value)
           setEditing(true)
         }}
-        className="text-sm text-foreground hover:text-foreground/70 truncate cursor-pointer"
+        className="text-sm text-foreground hover:bg-accent rounded px-1.5 transition-colors truncate cursor-pointer"
         title="Click to edit"
       >
         {value || <span className="text-muted-foreground/50">— click to add</span>}
@@ -1120,7 +1150,7 @@ function EditableNumberRow({
           setDraft(value != null ? String(value) : '')
           setEditing(true)
         }}
-        className={`text-sm cursor-pointer ${valueClass}`}
+        className={`text-sm cursor-pointer hover:bg-accent rounded px-1.5 transition-colors ${valueClass}`}
         title="Click to edit"
       >
         {value != null ? value.toString() : <span className="text-muted-foreground/50">—</span>}
@@ -1191,7 +1221,7 @@ function EditableDateRow({
           setDraft(value ? value.slice(0, 10) : '')
           setEditing(true)
         }}
-        className={`text-sm cursor-pointer ${valueClass}`}
+        className={`text-sm cursor-pointer hover:bg-accent rounded px-1.5 transition-colors ${valueClass}`}
         title="Click to edit"
       >
         {formatDate(value)}
@@ -1250,7 +1280,7 @@ function SalespersonRow({
       </span>
       <button
         onClick={() => setEditing(true)}
-        className="text-sm text-foreground hover:text-foreground/70 cursor-pointer truncate"
+        className="text-sm text-foreground hover:bg-accent rounded px-1.5 transition-colors cursor-pointer truncate"
         title="Click to change"
       >
         {value || <span className="text-muted-foreground/50">— click to set</span>}
@@ -1327,7 +1357,7 @@ function CaptainRow({
           setDraft(captain?.id ?? '')
           setEditing(true)
         }}
-        className="text-sm text-foreground hover:text-foreground/70 cursor-pointer truncate"
+        className="text-sm text-foreground hover:bg-accent rounded px-1.5 transition-colors cursor-pointer truncate"
         title={captain ? `${captain.name} — click to change` : 'Click to assign'}
       >
         {captain?.name ?? <span className="text-muted-foreground/50">—</span>}
@@ -1435,9 +1465,9 @@ function DeleteProjectModal({
       >
         <h2 className="text-base font-semibold text-foreground">Delete project</h2>
         <p className="text-sm text-muted-foreground leading-relaxed">
-          This permanently deletes <span className="text-foreground font-medium">{projectName}</span> and
-          its activity log. This cannot be undone. If you just want it off the board, use Close Project
-          instead.
+          This removes <span className="text-foreground font-medium">{projectName}</span> from the board.
+          It moves to <span className="text-foreground">Recently Deleted</span> on the Admin page, where you
+          can restore it or delete it permanently. If you just want it off the board, use Close Project instead.
         </p>
         <label className="flex flex-col gap-1 text-xs text-muted-foreground">
           Type <span className="font-mono text-foreground">delete</span> to confirm

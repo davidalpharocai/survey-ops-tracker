@@ -67,28 +67,17 @@ export type SlimProject = Pick<ProjectRow, (typeof SLIM_PROJECT_COLUMNS)[number]
 const CAPTAIN_JOIN = 'captain:team_members(id, name, initials)'
 const SLIM_SELECT = `${SLIM_PROJECT_COLUMNS.join(', ')}, ${CAPTAIN_JOIN}`
 const FULL_SELECT = `*, ${CAPTAIN_JOIN}`
-// Until migrations 026/027 land, these columns don't exist in the database —
-// retry without them so the board never breaks during the rollout window.
-const PENDING_MIGRATION_COLUMNS = ['co_captain_ids', 'project_code']
-const SLIM_SELECT_LEGACY = `${SLIM_PROJECT_COLUMNS.filter(
-  c => !(PENDING_MIGRATION_COLUMNS as string[]).includes(c)
-).join(', ')}, ${CAPTAIN_JOIN}`
 
 export function useProjects() {
   const supabase = createClient()
   return useQuery({
     queryKey: ['projects'],
     queryFn: async () => {
-      let { data, error } = await supabase
+      const { data, error } = await supabase
         .from('survey_projects')
         .select(SLIM_SELECT)
+        .is('deleted_at', null)
         .order('created_at', { ascending: false })
-      if (error && PENDING_MIGRATION_COLUMNS.some(c => error!.message.includes(c))) {
-        ;({ data, error } = await supabase
-          .from('survey_projects')
-          .select(SLIM_SELECT_LEGACY)
-          .order('created_at', { ascending: false }))
-      }
       if (error) throw error
       return data as unknown as SlimProject[]
     },
@@ -105,6 +94,7 @@ export function useProject(id: string) {
         .from('survey_projects')
         .select(FULL_SELECT)
         .eq('id', id)
+        .is('deleted_at', null)
         .maybeSingle()
       if (error) throw error
       return data as unknown as SurveyProject | null
@@ -126,6 +116,7 @@ export async function fetchFullProjects(ids: string[]): Promise<SurveyProject[]>
     .from('survey_projects')
     .select(FULL_SELECT)
     .in('id', ids)
+    .is('deleted_at', null)
   if (error) throw error
   const byId = new Map((data as unknown as SurveyProject[]).map(p => [p.id, p]))
   return ids
@@ -193,10 +184,11 @@ export function useDeleteProject() {
   const supabase = createClient()
   const queryClient = useQueryClient()
   return useMutation({
+    // Soft delete — set deleted_at so it can be restored from Admin.
     mutationFn: async (id: string) => {
       const { error } = await supabase
         .from('survey_projects')
-        .delete()
+        .update({ deleted_at: new Date().toISOString() })
         .eq('id', id)
       if (error) throw error
     },
@@ -218,7 +210,68 @@ export function useDeleteProject() {
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['projects'] })
+      queryClient.invalidateQueries({ queryKey: ['deleted-projects'] })
     },
+  })
+}
+
+export interface DeletedProject {
+  id: string
+  project_code: string | null
+  project_name: string
+  client: string
+  status: string
+  deleted_at: string
+}
+
+/** Projects in the trash (soft-deleted), newest first — for the Admin restore view. */
+export function useDeletedProjects() {
+  const supabase = createClient()
+  return useQuery({
+    queryKey: ['deleted-projects'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('survey_projects')
+        .select('id, project_code, project_name, client, status, deleted_at')
+        .not('deleted_at', 'is', null)
+        .order('deleted_at', { ascending: false })
+      if (error) throw error
+      return data as DeletedProject[]
+    },
+  })
+}
+
+/** Restore a soft-deleted project (clear deleted_at). */
+export function useRestoreProject() {
+  const supabase = createClient()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('survey_projects')
+        .update({ deleted_at: null })
+        .eq('id', id)
+      if (error) throw error
+    },
+    onError: () => toast("Couldn't restore the project — please try again."),
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] })
+      queryClient.invalidateQueries({ queryKey: ['deleted-projects'] })
+    },
+  })
+}
+
+/** Permanently delete (real DELETE, cascades) — only from the trash view. */
+export function usePermanentlyDeleteProject() {
+  const supabase = createClient()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('survey_projects').delete().eq('id', id)
+      if (error) throw error
+    },
+    onError: () => toast("Couldn't permanently delete — please try again."),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['deleted-projects'] }),
   })
 }
 
