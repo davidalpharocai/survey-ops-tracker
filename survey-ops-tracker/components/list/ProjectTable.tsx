@@ -149,7 +149,7 @@ export function ProjectTable({
           </div>
         )}
       </div>
-      <div className="overflow-auto max-h-[calc(100vh-16rem)]">
+      <div className="overflow-auto thin-scroll max-h-[calc(100vh-16rem)]">
       <table className="w-full">
         <thead>
           <tr className="border-b border-border">

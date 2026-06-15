@@ -25,7 +25,7 @@ export function MasterAuditLog() {
         <p className="text-xs text-muted-foreground/50">No changes recorded yet.</p>
       ) : (
         <>
-          <div className="flex flex-col max-h-[28rem] overflow-y-auto">
+          <div className="flex flex-col max-h-[28rem] overflow-y-auto thin-scroll">
             {entries.map(e => (
               <div
                 key={e.id}
