@@ -1,7 +1,8 @@
 'use client'
 import Link from 'next/link'
 import { useAuditLog } from '@/lib/hooks/useAudit'
-import { auditLabel, formatAuditValue, formatAuditWhen, actorName } from '@/lib/utils/auditFormat'
+import { formatAuditWhen, actorName } from '@/lib/utils/auditFormat'
+import { AuditChange } from '@/components/shared/AuditChange'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
 
 const LIMIT = 150
@@ -51,18 +52,7 @@ export function MasterAuditLog() {
                   )}
                 </span>
                 <span className="flex-1 min-w-0 leading-snug">
-                  {e.field === '(created)' ? (
-                    <span className="text-foreground/90">Project created</span>
-                  ) : (
-                    <>
-                      <span className="text-foreground/90 font-medium">{auditLabel(e.field)}</span>{' '}
-                      <span className="text-muted-foreground line-through">
-                        {formatAuditValue(e.field, e.old_value)}
-                      </span>{' '}
-                      <span className="text-muted-foreground/60">→</span>{' '}
-                      <span className="text-foreground">{formatAuditValue(e.field, e.new_value)}</span>
-                    </>
-                  )}
+                  <AuditChange field={e.field} oldValue={e.old_value} newValue={e.new_value} />
                 </span>
               </div>
             ))}

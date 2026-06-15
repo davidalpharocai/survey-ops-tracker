@@ -8,13 +8,21 @@ export const AUDIT_LABELS: Record<string, string> = {
   priority: 'Priority',
   blocked_by: 'Blocked By',
   '(created)': 'Created',
+  next_step_added: 'Next step added',
+  next_step_completed: 'Next step completed',
+  next_step_reopened: 'Next step reopened',
+  next_step_edited: 'Next step edited',
+  next_step_removed: 'Next step removed',
+  bid_added: 'Bid added',
+  bid_changed: 'Bid changed',
+  bid_removed: 'Bid removed',
 }
 
 export function auditLabel(field: string): string {
   return AUDIT_LABELS[field] ?? field
 }
 
-const MONEY = new Set(['budget', 'actual_spend'])
+const MONEY = new Set(['budget', 'actual_spend', 'bid_added', 'bid_changed', 'bid_removed'])
 
 export function formatAuditValue(field: string, value: string | null): string {
   if (value == null || value === '') return '—'
