@@ -6,6 +6,7 @@ import { fileDeliverable, type FolderResolver } from '@/lib/deliverables/ingest'
 import { findDuplicate } from '@/lib/deliverables/persist'
 import { sha256 } from '@/lib/deliverables/dedup'
 import { projectFolderName } from '@/lib/deliverables/naming'
+import { normalizeUrl } from '@/lib/deliverables/links'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -39,8 +40,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Project must have a client and code before filing deliverables' }, { status: 422 })
   }
 
+  if (!process.env.DELIVERABLES_SHARED_DRIVE_ID) {
+    return NextResponse.json({ error: 'Deliverables drive not configured' }, { status: 500 })
+  }
   const drive = new GoogleDrive()
-  const sharedDriveId = process.env.DELIVERABLES_SHARED_DRIVE_ID!
+  const sharedDriveId = process.env.DELIVERABLES_SHARED_DRIVE_ID
   const dateISO = (project.deliver_date as string | null) ?? new Date().toISOString().slice(0, 10)
 
   const resolver: FolderResolver = {
@@ -51,12 +55,13 @@ export async function POST(req: Request) {
     unsortedFolderName: '_Unsorted',
   }
 
+  const normalizedLink = link ? normalizeUrl(link) : null
   const bytes = file ? Buffer.from(await file.arrayBuffer()) : undefined
   const fileHash = bytes ? sha256(bytes) : null
   const folderId = await resolver.clientFolderId().then((cid) => drive.findChildFolder(cid, resolver.projectFolderName())) // may be null pre-create
   // Dedup check against the resolved project folder (create-or-find happens in fileDeliverable).
   const targetFolderId = folderId ?? (await ensureProjectFolder(drive, resolver))
-  const dup = await findDuplicate(admin, targetFolderId, { fileHash, sourceUrl: link ?? null })
+  const dup = await findDuplicate(admin, targetFolderId, { fileHash, sourceUrl: normalizedLink })
   if (dup) {
     return NextResponse.json({ status: 'duplicate', duplicate_of: dup })
   }
@@ -65,11 +70,11 @@ export async function POST(req: Request) {
     kind: file ? 'file' : 'link',
     confident: true,
     hasProject: true,
-    original_file_name: file?.name ?? (link ?? 'link'),
+    original_file_name: file?.name ?? normalizedLink ?? 'link',
     dateISO,
     mimeType: file?.type,
     bytes,
-    source_url: link ?? undefined,
+    source_url: normalizedLink ?? undefined,
   })
 
   const { data: inserted, error } = await admin.from('deliverables').insert({
@@ -81,7 +86,7 @@ export async function POST(req: Request) {
     file_name: rec.file_name,
     original_file_name: file?.name ?? null,
     file_hash: fileHash,
-    source_url: link ?? null,
+    source_url: normalizedLink,
     mime_type: file?.type ?? null,
     size_bytes: bytes?.length ?? null,
     source: 'upload',
@@ -91,7 +96,10 @@ export async function POST(req: Request) {
     filed_by: user.id,
     filed_at: new Date().toISOString(),
   }).select('id').single()
-  if (error) return NextResponse.json({ error: 'Insert failed' }, { status: 500 })
+  if (error) {
+    console.error('[deliverables/upload] DB insert failed after Drive write', { drive_file_id: rec.drive_file_id, error })
+    return NextResponse.json({ error: 'Insert failed' }, { status: 500 })
+  }
 
   // Audit: log to project_activity (project is known here).
   await admin.from('project_activity').insert({
