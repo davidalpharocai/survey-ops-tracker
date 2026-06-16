@@ -67,6 +67,13 @@ export function AppMenu() {
           >
             <span>⚙️</span> Admin
           </Link>
+          <Link
+            href="/deliverables"
+            className={itemClass}
+            title="Deliverables depository — files and links sent to clients, filed to the Shared Drive"
+          >
+            <span>📦</span> Deliverables
+          </Link>
           <div className="border-t border-border my-1.5" />
           <a
             href={USER_GUIDE_URL}

@@ -24,6 +24,7 @@ import { deriveWaitingOn } from '@/lib/utils/waitingOn'
 import { BudgetWidget } from '@/components/project/BudgetWidget'
 import { BidWidget } from '@/components/project/BidWidget'
 import { CompliancePanel } from '@/components/compliance/CompliancePanel'
+import { DeliverablesPanel } from '@/components/deliverables/DeliverablesPanel'
 import { salespersonOptions } from '@/lib/utils/salespeople'
 
 const TOOLTIPS: Record<string, string> = {
@@ -462,6 +463,7 @@ export default function ProjectDetailPage() {
               documents={project.linked_documents ?? []}
             />
             <CompliancePanel projectId={project.id} />
+            <DeliverablesPanel projectId={project.id} />
             <ActivityLog projectId={project.id} />
           </div>
 
