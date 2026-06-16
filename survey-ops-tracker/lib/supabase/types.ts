@@ -113,6 +113,7 @@ export type Database = {
           sort_order: number | null
           co_captain_ids: string[] | null
           project_code: string | null
+          drive_folder_id: string | null
           deleted_at: string | null
           created_at: string
           updated_at: string
@@ -166,6 +167,7 @@ export type Database = {
           sort_order?: number | null
           co_captain_ids?: string[] | null
           project_code?: string | null
+          drive_folder_id?: string | null
           deleted_at?: string | null
           created_at?: string
           updated_at?: string
@@ -219,6 +221,7 @@ export type Database = {
           sort_order?: number | null
           co_captain_ids?: string[] | null
           project_code?: string | null
+          drive_folder_id?: string | null
           deleted_at?: string | null
           created_at?: string
           updated_at?: string
@@ -238,18 +241,21 @@ export type Database = {
           id: string
           name: string
           code: string | null
+          drive_folder_id: string | null
           created_at: string
         }
         Insert: {
           id?: string
           name: string
           code?: string | null
+          drive_folder_id?: string | null
           created_at?: string
         }
         Update: {
           id?: string
           name?: string
           code?: string | null
+          drive_folder_id?: string | null
           created_at?: string
         }
         Relationships: []
@@ -591,6 +597,96 @@ export type Database = {
         }
         Relationships: []
       }
+      deliverables: {
+        Row: {
+          id: string
+          client_id: string | null
+          project_id: string | null
+          kind: Database['public']['Enums']['deliverable_kind']
+          drive_file_id: string | null
+          drive_folder_id: string | null
+          file_name: string | null
+          original_file_name: string | null
+          file_hash: string | null
+          source_url: string | null
+          mime_type: string | null
+          size_bytes: number | null
+          source: Database['public']['Enums']['deliverable_source']
+          status: Database['public']['Enums']['deliverable_status']
+          match_confidence: number | null
+          match_method: string | null
+          match_candidates: Json
+          duplicate_of: string | null
+          gmail_message_id: string | null
+          email_subject: string | null
+          email_from: string | null
+          email_date: string | null
+          forwarded_by: string | null
+          filed_by: string | null
+          filed_at: string | null
+          deleted_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          client_id?: string | null
+          project_id?: string | null
+          kind: Database['public']['Enums']['deliverable_kind']
+          drive_file_id?: string | null
+          drive_folder_id?: string | null
+          file_name?: string | null
+          original_file_name?: string | null
+          file_hash?: string | null
+          source_url?: string | null
+          mime_type?: string | null
+          size_bytes?: number | null
+          source: Database['public']['Enums']['deliverable_source']
+          status: Database['public']['Enums']['deliverable_status']
+          match_confidence?: number | null
+          match_method?: string | null
+          match_candidates?: Json
+          duplicate_of?: string | null
+          gmail_message_id?: string | null
+          email_subject?: string | null
+          email_from?: string | null
+          email_date?: string | null
+          forwarded_by?: string | null
+          filed_by?: string | null
+          filed_at?: string | null
+          deleted_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          client_id?: string | null
+          project_id?: string | null
+          kind?: Database['public']['Enums']['deliverable_kind']
+          drive_file_id?: string | null
+          drive_folder_id?: string | null
+          file_name?: string | null
+          original_file_name?: string | null
+          file_hash?: string | null
+          source_url?: string | null
+          mime_type?: string | null
+          size_bytes?: number | null
+          source?: Database['public']['Enums']['deliverable_source']
+          status?: Database['public']['Enums']['deliverable_status']
+          match_confidence?: number | null
+          match_method?: string | null
+          match_candidates?: Json
+          duplicate_of?: string | null
+          gmail_message_id?: string | null
+          email_subject?: string | null
+          email_from?: string | null
+          email_date?: string | null
+          forwarded_by?: string | null
+          filed_by?: string | null
+          filed_at?: string | null
+          deleted_at?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       portal_projects: {
@@ -629,6 +725,9 @@ export type Database = {
         | 'Pricing Discussion'
         | 'Awaiting Approval'
         | 'Closed'
+      deliverable_source: 'email' | 'upload'
+      deliverable_kind: 'file' | 'link'
+      deliverable_status: 'filed' | 'review' | 'duplicate' | 'unsorted'
     }
     CompositeTypes: Record<string, never>
   }
