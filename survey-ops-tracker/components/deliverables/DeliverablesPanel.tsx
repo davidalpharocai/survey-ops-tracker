@@ -35,9 +35,9 @@ export function DeliverablesPanel({ projectId }: { projectId: string }) {
     upload.mutate(
       { link: link.trim() },
       {
-        onSuccess: () => {
+        onSuccess: (r) => {
           setLink('')
-          toast('Filed ✓', 'success')
+          toast(r.status === 'duplicate' ? 'Already filed — skipped' : 'Filed ✓', 'success')
         },
         onError: (err) => toast(String((err as Error).message)),
       }
@@ -87,7 +87,7 @@ export function DeliverablesPanel({ projectId }: { projectId: string }) {
             <span>{d.kind === 'link' ? '🔗' : '📄'}</span>
             <a
               className="flex-1 truncate hover:underline"
-              href={d.drive_file_id ? driveUrl(d.drive_file_id) : (d.source_url ?? '#')}
+              href={d.source_url ?? (d.drive_file_id ? driveUrl(d.drive_file_id) : '#')}
               target="_blank"
               rel="noreferrer"
             >

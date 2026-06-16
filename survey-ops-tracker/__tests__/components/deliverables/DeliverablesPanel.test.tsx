@@ -17,6 +17,17 @@ vi.mock('@/lib/hooks/useDeliverables', () => ({
         filed_at: '2026-06-10T00:00:00Z',
         original_file_name: 'Topline.pdf',
       },
+      {
+        id: '2',
+        file_name: '2026.06.10 — Occam study',
+        kind: 'link',
+        status: 'filed',
+        source: 'email',
+        drive_file_id: 'bm1',
+        source_url: 'https://app.occamdata.com/study/42',
+        filed_at: '2026-06-10T00:00:00Z',
+        original_file_name: null,
+      },
     ],
     isLoading: false,
   }),
@@ -33,5 +44,12 @@ describe('DeliverablesPanel', () => {
     render(wrap(<DeliverablesPanel projectId="p1" />))
     expect(screen.getByText('2026.06.10 — Topline.pdf')).toBeInTheDocument()
     expect(screen.getByText(/attach deliverable/i)).toBeInTheDocument()
+  })
+
+  it('link row anchor href is source_url, not a drive.google.com URL', () => {
+    render(wrap(<DeliverablesPanel projectId="p1" />))
+    const anchor = screen.getByRole('link', { name: '2026.06.10 — Occam study' })
+    expect(anchor).toHaveAttribute('href', 'https://app.occamdata.com/study/42')
+    expect(anchor.getAttribute('href')).not.toMatch(/drive\.google\.com/)
   })
 })
