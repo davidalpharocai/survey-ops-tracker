@@ -122,6 +122,7 @@ export async function POST(req: NextRequest) {
     .from('survey_projects')
     .select('*, captain:team_members(name, initials)')
     .is('deleted_at', null)
+    .or('project_type.is.null,project_type.neq.Internal')
     .order('due_date', { ascending: true })
 
   if (error) {

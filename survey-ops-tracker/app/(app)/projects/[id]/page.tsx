@@ -12,6 +12,7 @@ import { QuickEdit } from '@/components/project/QuickEdit'
 import { ActivityLog } from '@/components/project/ActivityLog'
 import { DataChangeLog } from '@/components/project/DataChangeLog'
 import { ProjectAuditLog } from '@/components/project/ProjectAuditLog'
+import { InternalProjectView } from '@/components/internal/InternalProjectView'
 import { LatestNextSteps } from '@/components/project/LatestNextSteps'
 import { LinkedDocuments } from '@/components/project/LinkedDocuments'
 import { SlackChannel } from '@/components/project/SlackChannel'
@@ -154,6 +155,11 @@ export default function ProjectDetailPage() {
         </button>
       </div>
     )
+  }
+
+  // Internal projects use a dedicated, stripped-down view (no survey fields).
+  if (project.project_type === 'Internal') {
+    return <InternalProjectView project={project} />
   }
 
   function setStatus(status: 'Open' | 'Closed' | 'Hold') {

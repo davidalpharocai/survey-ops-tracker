@@ -29,6 +29,7 @@ export async function GET(req: NextRequest) {
     .eq('status', 'Open')
     .eq('phase', 'Active')
     .is('deleted_at', null)
+    .or('project_type.is.null,project_type.neq.Internal')
 
   if (error) return new Response('Database error', { status: 500 })
 

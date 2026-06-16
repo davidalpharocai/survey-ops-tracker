@@ -10,8 +10,11 @@ const SHARED_DRIVE_ID = process.env.DELIVERABLES_SHARED_DRIVE_ID
 const apply = process.argv.includes('--apply')
 
 const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
-const creds = JSON.parse(Buffer.from(process.env.GOOGLE_SERVICE_ACCOUNT_KEY, 'base64').toString('utf8'))
-const auth = new google.auth.JWT({ email: creds.client_email, key: creds.private_key, scopes: ['https://www.googleapis.com/auth/drive'] })
+const auth = new google.auth.JWT({
+  email: process.env.GOOGLE_CLIENT_EMAIL,
+  key: (process.env.GOOGLE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
+  scopes: ['https://www.googleapis.com/auth/drive'],
+})
 const drive = google.drive({ version: 'v3', auth })
 
 const norm = (s) => s.toLowerCase().replace(/\(.*?\)/g, '').replace(/[^a-z0-9]+/g, ' ').trim()

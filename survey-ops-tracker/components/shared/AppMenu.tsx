@@ -54,6 +54,13 @@ export function AppMenu() {
             <span>📋</span> List view
           </Link>
           <Link
+            href="/internal"
+            className={itemClass}
+            title="Internal Projects — AlphaROC's own work, on a sprint-based Backlog → Done board (separate from survey projects)"
+          >
+            <span>🧰</span> Internal Projects
+          </Link>
+          <Link
             href="/insights"
             className={itemClass}
             title="Insights — pipeline rollup, deadlines, on-time delivery, workload, budget"

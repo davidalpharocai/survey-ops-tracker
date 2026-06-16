@@ -56,12 +56,14 @@ function useClientPage(clientId: string) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('survey_projects')
-        .select(PROJECT_COLS)
+        .select(PROJECT_COLS + ', project_type')
         .eq('client_id', clientId)
         .is('deleted_at', null)
         .order('submitted_date', { ascending: false, nullsFirst: false })
       if (error) throw error
-      return data as unknown as ClientProject[]
+      return (data as unknown as (ClientProject & { project_type: string | null })[]).filter(
+        p => p.project_type !== 'Internal'
+      )
     },
     enabled: !!clientId,
   })

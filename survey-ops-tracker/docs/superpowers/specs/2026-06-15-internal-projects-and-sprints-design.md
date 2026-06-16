@@ -10,9 +10,10 @@ A new project **type = "Internal"** for AlphaROC's own work (product, ops, hirin
 - Internal projects use a four-stage workflow instead of the survey pipeline: **Backlog → In Progress → Review → Done**. These are added to the existing `board_column` enum (one column field, two domains; the board renders the set that matches the active Type filter).
 - Internal projects are `phase = 'Active'`, never go through Scoping, and default `board_column = 'Backlog'`.
 
-## Board behaviour
-- Reuses the existing **Type filter**. When Type = **Internal**: the board shows the four internal columns and only `project_type = 'Internal'` projects. For any other Type value (incl. All), the board shows the seven survey columns and **hides** internal projects (they don't belong in survey stages).
-- Drag works the same way (updates `board_column` to an internal stage).
+## Navigation (revised — dedicated tab, not a board mode)
+- Internal projects get their **own ☰ menu entry, "Internal Projects" → `/internal`** — a self-contained section. They never appear on the survey Board, List, Insights, Timeline, client pages, or digest. `project_type = 'Internal'` is the discriminator; it is NOT offered on the main New Project Type dropdown — it's set automatically when creating from the Internal section.
+- `useProjects()` (survey-wide) excludes internal; a dedicated `useInternalProjects()` powers the section.
+- The `/internal` board has the four internal columns with drag, a current-sprint chip, and its own "New internal project" button.
 
 ## Project page (internal variant)
 Hidden vs. survey: N collected/target/actual, audience size, Survey IDs + Edwin sync, bids, Voter QA, Citation, Row-Level Data, Terminations, Salesperson, derived Waiting-On.
