@@ -110,6 +110,34 @@ The **✦ Assistant** button (bottom-right) answers questions from live project 
 - Works on phones at the same address with the same login
 - Made a mess? Nothing here is truly lost: closed projects reopen, deleted bids have ↺ Undo, checked steps uncheck, and the data change log keeps the paper trail
 
+## 9. Deliverables
+
+The **deliverables depository** is a central store for final client deliverables — toplines, data files, links to Occam reports or Edwin surveys, or anything else you send to a client at the end of a project. Every file or link gets filed into the correct folder on the company Shared Drive and indexed here so they're easy to find later.
+
+### Attaching a file or link
+
+On any project page, scroll to the **Deliverables** panel in the left column:
+
+- **File:** click **+ Attach deliverable** and pick a file — it uploads and files immediately.
+- **Link:** paste a URL (Occam, Edwin, Google Sheet, anything) into the link box and click **Add link**. Google-native links (Docs, Sheets, Drive) are stored as Drive shortcuts; other links are saved as bookmark files.
+
+If you attach something that was already filed for the same project, the app says "Already filed — skipped" and doesn't create a duplicate.
+
+### Where files land in Drive
+
+Files go into the Shared Drive under:
+
+```
+Client name (ClXXXXX) / ProjectName_PR#####_YYYY.MM.DD
+```
+
+The date is the project's delivery date (or today if none is set). Low-confidence items (not yet tied to a project) are staged in `00_Needs Review` at the drive root until resolved.
+
+### Coming in later phases
+
+- **Email forwarding:** forward a deliverable email to `deliverables@alpharoc.ai` — it routes and files automatically.
+- **Weekly QA report:** a digest of what was filed, near-duplicates, and items still in the review queue.
+
 ---
 
 *Maintained by Claude alongside the app — when features change, this guide changes. Source of truth lives in the project repo (USER_GUIDE.md).*
