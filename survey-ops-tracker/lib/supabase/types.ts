@@ -9,6 +9,12 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      sprint_config: {
+        Row: { id: number; anchor_date: string; length_days: number }
+        Insert: { id?: number; anchor_date: string; length_days?: number }
+        Update: { id?: number; anchor_date?: string; length_days?: number }
+        Relationships: []
+      }
       project_audit: {
         Row: {
           id: string
@@ -115,6 +121,9 @@ export type Database = {
           project_code: string | null
           drive_folder_id: string | null
           deleted_at: string | null
+          category: string | null
+          objective: string | null
+          sprint_number: number | null
           created_at: string
           updated_at: string
         }
@@ -169,6 +178,9 @@ export type Database = {
           project_code?: string | null
           drive_folder_id?: string | null
           deleted_at?: string | null
+          category?: string | null
+          objective?: string | null
+          sprint_number?: number | null
           created_at?: string
           updated_at?: string
         }
@@ -223,6 +235,9 @@ export type Database = {
           project_code?: string | null
           drive_folder_id?: string | null
           deleted_at?: string | null
+          category?: string | null
+          objective?: string | null
+          sprint_number?: number | null
           created_at?: string
           updated_at?: string
         }
@@ -708,7 +723,7 @@ export type Database = {
       submission_status: 'pending_review' | 'approved' | 'rejected'
       question_type: 'open_text' | 'single_select' | 'multi_select' | 'scale' | 'other'
       recipient_role: 'alpharoc' | 'compliance'
-      project_type: 'PS' | 'B2B' | 'Rerun'
+      project_type: 'PS' | 'B2B' | 'Rerun' | 'Internal'
       project_status: 'Open' | 'Closed' | 'Hold'
       project_phase: 'Scoping' | 'Active'
       board_column:
@@ -719,6 +734,10 @@ export type Database = {
         | 'Fielding'
         | 'Data QA'
         | 'Delivery'
+        | 'Backlog'
+        | 'In Progress'
+        | 'Review'
+        | 'Done'
       scoping_stage:
         | 'New Inquiry'
         | 'Proposal Sent'
