@@ -1,11 +1,24 @@
 import { describe, it, expect, vi } from 'vitest'
+import type { createAdminClient } from '@/lib/supabase/admin'
 import { findDuplicate } from './persist'
 
+/** Minimal chainable query stub that satisfies findDuplicate's Supabase call pattern. */
+interface QueryChain {
+  select: (col: string) => QueryChain
+  eq: (col: string, val: unknown) => QueryChain
+  neq: (col: string, val: unknown) => QueryChain
+  is: (col: string, val: unknown) => QueryChain
+  limit: (n: number) => QueryChain
+  then: (resolve: (v: { data: { id: string }[] }) => void) => void
+}
+
 function adminReturning(rows: { id: string }[]) {
-  const chain: any = {}
-  for (const m of ['select', 'eq', 'neq', 'is', 'limit']) chain[m] = vi.fn(() => chain)
-  chain.then = (res: (v: { data: { id: string }[] }) => void) => res({ data: rows })
-  return { from: vi.fn(() => chain) } as any
+  const chain = {} as QueryChain
+  for (const m of ['select', 'eq', 'neq', 'is', 'limit'] as const) {
+    (chain as Record<string, unknown>)[m] = vi.fn(() => chain)
+  }
+  chain.then = (res) => res({ data: rows })
+  return { from: vi.fn(() => chain) } as unknown as ReturnType<typeof createAdminClient>
 }
 
 describe('findDuplicate', () => {

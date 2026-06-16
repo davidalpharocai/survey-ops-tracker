@@ -25,17 +25,20 @@ export class FakeDrive implements DriveClient {
     const hit = this.childrenOf(parentId).find((n) => n.name === name)
     return hit ? { id: hit.id, name: hit.name, mimeType: hit.mimeType } : null
   }
-  async uploadFile(parentId: string, name: string, mimeType: string, _bytes: Buffer): Promise<string> {
+  async uploadFile(parentId: string, name: string, mimeType: string, bytes: Buffer): Promise<string> {
+    void bytes // fake: content not stored in-memory
     const id = this.id()
     this.nodes.set(id, { id, name, mimeType, parentId })
     return id
   }
-  async createShortcut(parentId: string, name: string, _targetFileId: string): Promise<string> {
+  async createShortcut(parentId: string, name: string, targetFileId: string): Promise<string> {
+    void targetFileId // fake: shortcut target not tracked in-memory
     const id = this.id()
     this.nodes.set(id, { id, name, mimeType: 'application/vnd.google-apps.shortcut', parentId })
     return id
   }
-  async createBookmark(parentId: string, name: string, _url: string): Promise<string> {
+  async createBookmark(parentId: string, name: string, url: string): Promise<string> {
+    void url // fake: URL not stored in-memory
     const id = this.id()
     this.nodes.set(id, { id, name, mimeType: 'text/uri-list', parentId })
     return id

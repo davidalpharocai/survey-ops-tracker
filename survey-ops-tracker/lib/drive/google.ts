@@ -20,10 +20,17 @@ function driveClient() {
 
 const COMMON = { supportsAllDrives: true, includeItemsFromAllDrives: true } as const
 
-const _drive = driveClient()   // module-level singleton, created once
+// Lazy singleton — deferred to first method call so the module can be imported
+// at build time without GOOGLE_SERVICE_ACCOUNT_KEY present in the environment.
+let _drive: ReturnType<typeof driveClient> | undefined
+
+function getDrive() {
+  if (!_drive) _drive = driveClient()
+  return _drive
+}
 
 export class GoogleDrive implements DriveClient {
-  private drive = _drive
+  private get drive() { return getDrive() }
 
   async findChildFolder(parentId: string, name: string): Promise<string | null> {
     const child = await this.findChild(parentId, name)

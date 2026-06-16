@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { matchDeliverable, normalizeName } from './matcher'
+import { matchDeliverable } from './matcher'
 import type { MatchInput } from './types'
 
 const base: Omit<MatchInput, 'subject' | 'body' | 'fromEmail'> = {

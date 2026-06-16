@@ -1,5 +1,5 @@
 // lib/deliverables/matcher.ts
-import type { Candidate, MatchInput, MatchMethod, MatchResult } from './types'
+import type { Candidate, MatchInput, MatchResult } from './types'
 import { SHARED_DOMAINS } from './shared-domains'
 
 const CODE_RE = /\b(PR\d{5}|Cl\d{5})\b/i
