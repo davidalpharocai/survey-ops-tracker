@@ -7,12 +7,12 @@ import type { DriveChild, DriveClient } from './types'
 const FOLDER = 'application/vnd.google-apps.folder'
 
 function driveClient() {
-  const raw = process.env.GOOGLE_SERVICE_ACCOUNT_KEY
-  if (!raw) throw new Error('Missing GOOGLE_SERVICE_ACCOUNT_KEY')
-  const creds = JSON.parse(Buffer.from(raw, 'base64').toString('utf8'))
+  const email = process.env.GOOGLE_CLIENT_EMAIL
+  const key = process.env.GOOGLE_PRIVATE_KEY
+  if (!email || !key) throw new Error('Missing GOOGLE_CLIENT_EMAIL or GOOGLE_PRIVATE_KEY')
   const auth = new google.auth.JWT({
-    email: creds.client_email,
-    key: creds.private_key,
+    email,
+    key: key.replace(/\\n/g, '\n'), // tolerate \n stored literally in env vars
     scopes: ['https://www.googleapis.com/auth/drive'],
   })
   return google.drive({ version: 'v3', auth })
@@ -21,7 +21,7 @@ function driveClient() {
 const COMMON = { supportsAllDrives: true, includeItemsFromAllDrives: true } as const
 
 // Lazy singleton — deferred to first method call so the module can be imported
-// at build time without GOOGLE_SERVICE_ACCOUNT_KEY present in the environment.
+// at build time without the GOOGLE_CLIENT_EMAIL / GOOGLE_PRIVATE_KEY present.
 let _drive: ReturnType<typeof driveClient> | undefined
 
 function getDrive() {
