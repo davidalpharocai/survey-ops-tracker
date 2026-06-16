@@ -20,8 +20,10 @@ function driveClient() {
 
 const COMMON = { supportsAllDrives: true, includeItemsFromAllDrives: true } as const
 
+const _drive = driveClient()   // module-level singleton, created once
+
 export class GoogleDrive implements DriveClient {
-  private drive = driveClient()
+  private drive = _drive
 
   async findChildFolder(parentId: string, name: string): Promise<string | null> {
     const child = await this.findChild(parentId, name)
@@ -38,7 +40,7 @@ export class GoogleDrive implements DriveClient {
   }
 
   async findChild(parentId: string, name: string): Promise<DriveChild | null> {
-    const q = `'${parentId}' in parents and name = '${name.replace(/'/g, "\\'")}' and trashed = false`
+    const q = `'${parentId}' in parents and name = '${name.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}' and trashed = false`
     const res = await this.drive.files.list({ q, fields: 'files(id,name,mimeType)', pageSize: 1, ...COMMON })
     const f = res.data.files?.[0]
     return f ? { id: f.id!, name: f.name!, mimeType: f.mimeType! } : null
@@ -66,7 +68,7 @@ export class GoogleDrive implements DriveClient {
   async createBookmark(parentId: string, name: string, url: string): Promise<string> {
     // A .url internet-shortcut file pointing at the external link.
     const body = `[InternetShortcut]\r\nURL=${url}\r\n`
-    return this.uploadFile(parentId, name.endsWith('.url') ? name : `${name}.url`, 'application/internet-shortcut', Buffer.from(body, 'utf8'))
+    return this.uploadFile(parentId, name.endsWith('.url') ? name : `${name}.url`, 'text/plain', Buffer.from(body, 'utf8'))
   }
 
   async moveFile(fileId: string, newParentId: string): Promise<void> {
