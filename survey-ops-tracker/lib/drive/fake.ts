@@ -44,4 +44,9 @@ export class FakeDrive implements DriveClient {
     const n = this.nodes.get(fileId)
     if (n) n.parentId = newParentId
   }
+
+  // convenience for tests
+  async createFolderIfMissing(parentId: string, name: string): Promise<string> {
+    return (await this.findChildFolder(parentId, name)) ?? (await this.createFolder(parentId, name))
+  }
 }
