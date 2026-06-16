@@ -50,7 +50,7 @@ export async function POST(
   // Notify AlphaRoc recipients (service role)
   const admin = createAdminClient()
   const { data: project } = await admin
-    .from('survey_projects').select('project_name').eq('id', updated.project_id).single()
+    .from('survey_projects').select('project_name').eq('id', updated.project_id).maybeSingle()
 
   const recipients = await getAlphaRocNotifyList(admin, updated.project_id, updated.submitted_by)
 

@@ -73,13 +73,17 @@ export async function POST(
     // (single-use, expiring token) and lands them on the review page. Falls
     // back to the plain URL (login-page flow) if link generation fails.
     let reviewUrl = `${appUrl}${reviewPath}`
-    const { data: linkData } = await admin.auth.admin.generateLink({
-      type: 'magiclink',
-      email: r.email,
-    })
-    const tokenHash = linkData?.properties?.hashed_token
-    if (tokenHash) {
-      reviewUrl = `${appUrl}/auth/confirm?token_hash=${tokenHash}&type=magiclink&next=${encodeURIComponent(reviewPath)}`
+    try {
+      const { data: linkData } = await admin.auth.admin.generateLink({
+        type: 'magiclink',
+        email: r.email,
+      })
+      const tokenHash = linkData?.properties?.hashed_token
+      if (tokenHash) {
+        reviewUrl = `${appUrl}/auth/confirm?token_hash=${tokenHash}&type=magiclink&next=${encodeURIComponent(reviewPath)}`
+      }
+    } catch {
+      // generateLink failure is non-fatal: fall back to plain login URL
     }
 
     const email = submissionCreatedEmail({
