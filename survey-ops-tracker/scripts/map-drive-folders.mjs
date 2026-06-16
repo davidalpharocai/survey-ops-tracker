@@ -28,21 +28,25 @@ async function main() {
     const rows = readFileSync('scripts/drive-folder-mapping.csv', 'utf8').split('\n').slice(1).filter(Boolean)
     let n = 0
     for (const row of rows) {
-      const [clientId, , folderId] = row.split(',')
-      if (clientId && folderId) { await admin.from('clients').update({ drive_folder_id: folderId.trim() }).eq('id', clientId.trim()); n++ }
+      // Machine columns (client_id, folder_id) come first and are comma-free,
+      // so positional split is safe even when the trailing name columns contain commas.
+      const [clientId, folderId] = row.split(',')
+      if (clientId && folderId && folderId.trim()) { await admin.from('clients').update({ drive_folder_id: folderId.trim() }).eq('id', clientId.trim()); n++ }
     }
     console.log(`Applied ${n} mappings.`)
     return
   }
 
-  const lines = ['client_id,client_name,folder_id,folder_name,confidence']
+  // Column order: machine fields first (comma-free), human-readable names last
+  // (JSON-quoted, may contain commas) so --apply can split positionally safely.
+  const lines = ['client_id,folder_id,confidence,client_name,folder_name']
   for (const c of clients ?? []) {
     const exact = folders.find((f) => norm(f.name) === norm(c.name))
     const partial = exact ?? folders.find((f) => norm(f.name).includes(norm(c.name)) || norm(c.name).includes(norm(f.name)))
     const conf = exact ? 'exact' : partial ? 'partial' : 'none'
-    lines.push(`${c.id},${JSON.stringify(c.name)},${partial?.id ?? ''},${JSON.stringify(partial?.name ?? '')},${conf}`)
+    lines.push(`${c.id},${partial?.id ?? ''},${conf},${JSON.stringify(c.name)},${JSON.stringify(partial?.name ?? '')}`)
   }
   writeFileSync('scripts/drive-folder-mapping.csv', lines.join('\n'))
-  console.log(`Wrote scripts/drive-folder-mapping.csv (${(clients ?? []).length} clients). Review it, fix any 'partial'/'none' rows, then run with --apply.`)
+  console.log(`Wrote scripts/drive-folder-mapping.csv (${(clients ?? []).length} clients). Review it, fill the folder_id for any 'partial'/'none' rows, then run with --apply.`)
 }
 main().catch((e) => { console.error(e); process.exit(1) })
