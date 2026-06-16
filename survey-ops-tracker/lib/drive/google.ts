@@ -3,6 +3,7 @@ import 'server-only'
 import { google } from 'googleapis'
 import { Readable } from 'stream'
 import type { DriveChild, DriveClient } from './types'
+import { assertHttpUrl } from './url'
 
 const FOLDER = 'application/vnd.google-apps.folder'
 
@@ -77,8 +78,12 @@ export class GoogleDrive implements DriveClient {
   }
 
   async createBookmark(parentId: string, name: string, url: string): Promise<string> {
-    // A .url internet-shortcut file pointing at the external link.
-    const body = `[InternetShortcut]\r\nURL=${url}\r\n`
+    // A .url internet-shortcut file pointing at the external link. Validate the
+    // URL first: assertHttpUrl rejects non-http(s) schemes and any control char,
+    // so a CR/LF can't inject extra INI keys (e.g. IconFile=\\host\share, which
+    // would leak NTLM creds when the file is viewed on Windows). See url.ts.
+    const safeUrl = assertHttpUrl(url)
+    const body = `[InternetShortcut]\r\nURL=${safeUrl}\r\n`
     return this.uploadFile(parentId, name.endsWith('.url') ? name : `${name}.url`, 'text/plain', Buffer.from(body, 'utf8'))
   }
 

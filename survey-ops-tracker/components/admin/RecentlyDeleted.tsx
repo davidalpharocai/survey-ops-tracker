@@ -22,7 +22,7 @@ export function RecentlyDeleted() {
       ) : deleted.length === 0 ? (
         <p className="text-xs text-muted-foreground/50">Nothing in the trash — deleted projects show up here.</p>
       ) : (
-        <div className="flex flex-col">
+        <div className="flex flex-col max-h-[18rem] overflow-y-auto thin-scroll pr-1">
           {deleted.map(p => (
             <div
               key={p.id}

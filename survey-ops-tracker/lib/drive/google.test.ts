@@ -1,23 +1,23 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
-// Capture the args passed to drive.files.list so we can inspect the `q` string
-// that GoogleDrive.findChild builds. vi.hoisted keeps the mock fn available to
-// the (hoisted) vi.mock factory below.
-const { listMock } = vi.hoisted(() => ({ listMock: vi.fn() }))
+// Capture the args passed to drive.files.{list,create} so we can inspect the
+// `q` string findChild builds and the body createBookmark uploads. vi.hoisted
+// keeps the mock fns available to the (hoisted) vi.mock factory below.
+const { listMock, createMock } = vi.hoisted(() => ({ listMock: vi.fn(), createMock: vi.fn() }))
 
 vi.mock('googleapis', () => ({
   google: {
     auth: { JWT: class {} },
-    drive: () => ({ files: { list: listMock } }),
+    drive: () => ({ files: { list: listMock, create: createMock } }),
   },
 }))
 
-// driveClient() decodes this base64 JSON before building the (mocked) JWT.
-process.env.GOOGLE_SERVICE_ACCOUNT_KEY = Buffer.from(
-  JSON.stringify({ client_email: 'test@example.com', private_key: 'test-key' }),
-).toString('base64')
+// driveClient() reads these before building the (mocked) JWT.
+process.env.GOOGLE_CLIENT_EMAIL = 'test@example.com'
+process.env.GOOGLE_PRIVATE_KEY = 'test-key'
 
 import { GoogleDrive } from './google'
+import { InvalidUrlError } from './url'
 
 const drive = new GoogleDrive()
 
@@ -122,5 +122,41 @@ describe('GoogleDrive.findChild query construction', () => {
     const name = "Acme O'Brien (Cl00042)"
     await drive.findChildFolder('shared-drive', name)
     expect(parseLiteralAfter(lastQuery())).toEqual({ value: name, rest: ' and trashed = false' })
+  })
+})
+
+describe('GoogleDrive.createBookmark', () => {
+  beforeEach(() => {
+    createMock.mockReset()
+    createMock.mockResolvedValue({ data: { id: 'file-1' } })
+  })
+
+  // Read back the bytes that uploadFile streamed to drive.files.create.
+  async function uploadedBody(): Promise<string> {
+    const call = createMock.mock.calls.at(-1)
+    expect(call).toBeTruthy()
+    const stream = call![0].media.body as AsyncIterable<Buffer | string>
+    const chunks: Buffer[] = []
+    for await (const c of stream) chunks.push(Buffer.from(c))
+    return Buffer.concat(chunks).toString('utf8')
+  }
+
+  it('writes a single-line InternetShortcut body with the normalized url', async () => {
+    await drive.createBookmark('folder-1', 'study.url', 'HTTP://Example.com/report')
+    const body = await uploadedBody()
+    expect(body).toBe('[InternetShortcut]\r\nURL=http://example.com/report\r\n')
+    // exactly one key line — nothing injected onto extra lines
+    expect(body.split('\r\n').filter((l) => l.includes('=')).length).toBe(1)
+  })
+
+  it('rejects a non-http(s) scheme without writing a file', async () => {
+    await expect(drive.createBookmark('folder-1', 'x.url', 'file:///etc/passwd')).rejects.toThrow(InvalidUrlError)
+    expect(createMock).not.toHaveBeenCalled()
+  })
+
+  it('rejects a CRLF IconFile-injection payload without writing a file', async () => {
+    const payload = 'http://evil' + String.fromCharCode(13) + String.fromCharCode(10) + 'IconFile=\\\\attacker\\share\\icon.ico'
+    await expect(drive.createBookmark('folder-1', 'x.url', payload)).rejects.toThrow(InvalidUrlError)
+    expect(createMock).not.toHaveBeenCalled()
   })
 })

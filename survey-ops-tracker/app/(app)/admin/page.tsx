@@ -245,7 +245,7 @@ export default function AdminPage() {
         {clientsLoading ? (
           <p className="text-xs text-muted-foreground/50">Loading…</p>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 max-h-[20rem] overflow-y-auto thin-scroll pr-1">
             {visibleClients.length === 0 && (
               <p className="text-xs text-muted-foreground/50">No accounts in this status.</p>
             )}
@@ -287,7 +287,7 @@ export default function AdminPage() {
           Team roster
           <InfoTooltip text="Everyone the tracker knows. Members marked (former employee) stay for history but can't be assigned to projects. Logins are managed in Supabase — Users." />
         </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 max-h-[16rem] overflow-y-auto thin-scroll pr-1">
           {teamMembers.map(m => (
             <div
               key={m.id}
@@ -327,7 +327,7 @@ function HealthList({
       {items.length === 0 ? (
         <p className="text-xs text-muted-foreground/50">✓ {empty}</p>
       ) : (
-        <div className="flex flex-col gap-0.5 max-h-40 overflow-y-auto">
+        <div className="flex flex-col gap-0.5 max-h-40 overflow-y-auto thin-scroll pr-1">
           {items.map(p => (
             <Link
               key={p.id}

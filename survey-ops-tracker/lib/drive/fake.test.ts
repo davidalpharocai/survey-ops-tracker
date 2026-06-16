@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { FakeDrive } from './fake'
+import { InvalidUrlError } from './url'
 
 describe('FakeDrive', () => {
   it('creates and finds folders idempotently by name', async () => {
@@ -26,5 +27,10 @@ describe('FakeDrive', () => {
     const bm = await d.createBookmark('root', 'study.url', 'https://occam/x')
     expect((await d.findChild('root', 'sheet'))?.id).toBe(sc)
     expect((await d.findChild('root', 'study.url'))?.id).toBe(bm)
+  })
+
+  it('rejects an invalid bookmark url (contract parity with GoogleDrive)', async () => {
+    const d = new FakeDrive('root')
+    await expect(d.createBookmark('root', 'x.url', 'file:///etc/passwd')).rejects.toThrow(InvalidUrlError)
   })
 })
