@@ -58,4 +58,39 @@ describe('matchDeliverable', () => {
     expect(r.method).toBe('none')
     expect(r.clientId).toBeNull()
   })
+
+  // (a) Cl-code branch
+  it('tier 1: Cl code in subject resolves to that client with method=code', () => {
+    const r = matchDeliverable({ ...base, subject: 'Deliverables for Cl00012', body: '', fromEmail: 'x@gmail.com' })
+    expect(r.clientId).toBe('c-bam')
+    expect(r.method).toBe('code')
+    expect(r.confidence).toBeCloseTo(0.95, 2)
+    // c-bam has exactly one project (p-1) so the resolver promotes it
+    expect(r.projectId).toBe('p-1')
+  })
+
+  // (b) PR code with no matching project falls through to tier 2
+  it('PR code for unknown project falls through to contact_email', () => {
+    // PR99999 does not exist in the fixture → tier 1 yields no candidate
+    // rspicer@airlines.org is a known contact → tier 2 fires
+    const r = matchDeliverable({ ...base, subject: 'Final deck PR99999', body: '', fromEmail: 'rspicer@airlines.org' })
+    expect(r.method).toBe('contact_email')
+    expect(r.projectId).toBe('p-2')
+  })
+
+  // (c) Tie-break determinism when two project-name candidates share the same confidence
+  it('tie-break: first project in input.projects order wins when both score 0.75', () => {
+    // Both "Q2 Consumer Tracker" and "TSA Poll" appear in the body → each pushes a 0.75 candidate.
+    // Array.prototype.sort is stable (guaranteed since ES2019/V8), so the candidate pushed first
+    // (p-1, which iterates first in input.projects) stays ahead and wins.
+    const r = matchDeliverable({
+      ...base,
+      subject: 'combined report',
+      body: 'See the Q2 Consumer Tracker and TSA Poll results',
+      fromEmail: 'x@gmail.com',
+    })
+    expect(r.projectId).toBe('p-1') // p-1 appears first in base.projects → stable-sort winner
+    expect(r.confidence).toBe(0.75)
+    expect(r.method).toBe('name')
+  })
 })

@@ -21,34 +21,34 @@ export function matchDeliverable(input: MatchInput): MatchResult {
   const code = hay.match(CODE_RE)?.[1]?.toUpperCase()
   if (code?.startsWith('PR')) {
     const p = input.projects.find((p) => p.project_code.toUpperCase() === code)
-    if (p) candidates.push({ clientId: p.client_id, projectId: p.id, confidence: 0.99, reason: `code:${code}` })
+    if (p) candidates.push({ clientId: p.client_id, projectId: p.id, confidence: 0.99, reason: `code:${code}`, method: 'code' })
   } else if (code?.startsWith('CL')) {
     const c = input.clients.find((c) => (c.code ?? '').toUpperCase() === code)
-    if (c) candidates.push({ clientId: c.id, projectId: null, confidence: 0.95, reason: `code:${code}` })
+    if (c) candidates.push({ clientId: c.id, projectId: null, confidence: 0.95, reason: `code:${code}`, method: 'code' })
   }
 
   // Tier 2 — known contact email
   const from = input.fromEmail.toLowerCase().trim()
   const contact = input.contacts.find((c) => c.email.toLowerCase().trim() === from)
-  if (contact?.client_id) candidates.push({ clientId: contact.client_id, projectId: contact.project_id, confidence: 0.9, reason: 'contact' })
+  if (contact?.client_id) candidates.push({ clientId: contact.client_id, projectId: contact.project_id, confidence: 0.9, reason: 'contact', method: 'contact_email' })
 
   // Tier 3 — sender domain (skip shared)
   const dom = domainOf(from)
   if (dom && !SHARED_DOMAINS.has(dom) && input.domainMap[dom]) {
-    candidates.push({ clientId: input.domainMap[dom], projectId: null, confidence: 0.8, reason: `domain:${dom}` })
+    candidates.push({ clientId: input.domainMap[dom], projectId: null, confidence: 0.8, reason: `domain:${dom}`, method: 'domain' })
   }
 
   // Tier 4 — name / project-name text
   for (const p of input.projects) {
     const pn = normalizeName(p.project_name)
     if (pn.length >= 4 && nhay.includes(` ${pn} `)) {
-      candidates.push({ clientId: p.client_id, projectId: p.id, confidence: 0.75, reason: `pname:${p.project_code}` })
+      candidates.push({ clientId: p.client_id, projectId: p.id, confidence: 0.75, reason: `pname:${p.project_code}`, method: 'name' })
     }
   }
   for (const c of input.clients) {
     const cn = normalizeName(c.name)
     if (cn.length >= 3 && nhay.includes(` ${cn} `)) {
-      candidates.push({ clientId: c.id, projectId: null, confidence: 0.6, reason: 'cname' })
+      candidates.push({ clientId: c.id, projectId: null, confidence: 0.6, reason: 'cname', method: 'name' })
     }
   }
 
@@ -67,10 +67,5 @@ export function matchDeliverable(input: MatchInput): MatchResult {
     }
   }
 
-  const method: MatchMethod = best.reason.startsWith('code') ? 'code'
-    : best.reason === 'contact' ? 'contact_email'
-    : best.reason.startsWith('domain') ? 'domain'
-    : 'name'
-
-  return { clientId: best.clientId, projectId, confidence: best.confidence, method, candidates: candidates.slice(0, 3) }
+  return { clientId: best.clientId, projectId, confidence: best.confidence, method: best.method, candidates: candidates.slice(0, 3) }
 }
