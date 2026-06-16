@@ -1,8 +1,8 @@
 // lib/deliverables/matcher.ts
 import type { Candidate, MatchInput, MatchMethod, MatchResult } from './types'
+import { SHARED_DOMAINS } from './shared-domains'
 
 const CODE_RE = /\b(PR\d{5}|Cl\d{5})\b/i
-const SHARED_DOMAINS = new Set(['gmail.com', 'outlook.com', 'hotmail.com', 'yahoo.com', 'icloud.com', 'aol.com', 'me.com'])
 
 export function normalizeName(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()

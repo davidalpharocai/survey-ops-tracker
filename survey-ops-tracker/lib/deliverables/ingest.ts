@@ -62,9 +62,14 @@ export async function fileDeliverable(drive: DriveClient, r: FolderResolver, inp
   let driveFileId: string
   if (input.kind === 'link') {
     const url = input.source_url!
-    driveFileId = isGoogleNative(url)
-      ? await drive.createShortcut(folderId, name, googleFileId(url) ?? name)
-      : await drive.createBookmark(folderId, name, url)
+    if (isGoogleNative(url)) {
+      const targetId = googleFileId(url)
+      driveFileId = targetId
+        ? await drive.createShortcut(folderId, name, targetId)
+        : await drive.createBookmark(folderId, name, url)
+    } else {
+      driveFileId = await drive.createBookmark(folderId, name, url)
+    }
   } else {
     driveFileId = await drive.uploadFile(folderId, name, input.mimeType ?? 'application/octet-stream', input.bytes!)
   }
@@ -74,5 +79,5 @@ export async function fileDeliverable(drive: DriveClient, r: FolderResolver, inp
 
 /** Extract a Google Drive/Docs file id from a share URL, if present. */
 export function googleFileId(url: string): string | null {
-  return url.match(/\/d\/([a-zA-Z0-9_-]+)/)?.[1] ?? null
+  return url.match(/\/d\/([a-zA-Z0-9_-]+)/)?.[1] ?? url.match(/\/folders\/([a-zA-Z0-9_-]+)/)?.[1] ?? null
 }

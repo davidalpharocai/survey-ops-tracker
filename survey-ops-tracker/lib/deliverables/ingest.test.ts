@@ -47,4 +47,42 @@ describe('fileDeliverable', () => {
     expect(rec.kind).toBe('link')
     expect(rec.drive_file_id).toBeTruthy()
   })
+
+  it('files a Google Drive folder link (with id) as a shortcut', async () => {
+    const drive = new FakeDrive('root')
+    const input: FileInput = {
+      kind: 'link', confident: true, hasProject: true,
+      source_url: 'https://drive.google.com/drive/folders/1AbCdef',
+      dateISO: '2026-06-10', original_file_name: 'Client Folder',
+    }
+    const rec = await fileDeliverable(drive, resolver(drive), input)
+    expect(rec.status).toBe('filed')
+    expect(rec.kind).toBe('link')
+    // drive created a shortcut (not a bookmark) — verify by checking the mimeType stored
+    const clientFolder = await drive.findChildFolder('root', 'Balyasny (BAM)')
+    const projFolder = await drive.findChildFolder(clientFolder!, 'Q2 Consumer Tracker_PR00112_2026.06.10')
+    const child = await drive.findChild(projFolder!, '2026.06.10 — Client Folder')
+    expect(child).toBeTruthy()
+    expect(child!.mimeType).toBe('application/vnd.google-apps.shortcut')
+    expect(child!.id).toBe(rec.drive_file_id)
+  })
+
+  it('falls back to a bookmark for a Google-native url with no extractable id', async () => {
+    const drive = new FakeDrive('root')
+    // drive.google.com is Google-native but this path has neither /d/ nor /folders/
+    const input: FileInput = {
+      kind: 'link', confident: true, hasProject: true,
+      source_url: 'https://drive.google.com/open',
+      dateISO: '2026-06-10', original_file_name: 'Mystery Link',
+    }
+    const rec = await fileDeliverable(drive, resolver(drive), input)
+    expect(rec.status).toBe('filed')
+    expect(rec.kind).toBe('link')
+    const clientFolder = await drive.findChildFolder('root', 'Balyasny (BAM)')
+    const projFolder = await drive.findChildFolder(clientFolder!, 'Q2 Consumer Tracker_PR00112_2026.06.10')
+    const child = await drive.findChild(projFolder!, '2026.06.10 — Mystery Link')
+    expect(child).toBeTruthy()
+    expect(child!.mimeType).toBe('text/uri-list')
+    expect(child!.id).toBe(rec.drive_file_id)
+  })
 })

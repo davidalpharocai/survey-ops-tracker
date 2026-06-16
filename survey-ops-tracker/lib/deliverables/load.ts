@@ -1,8 +1,7 @@
 import 'server-only'
 import type { createAdminClient } from '@/lib/supabase/admin'
 import type { ClientRec, ContactRec, ProjectRec } from './types'
-
-const SHARED_DOMAINS = new Set(['gmail.com', 'outlook.com', 'hotmail.com', 'yahoo.com', 'icloud.com', 'aol.com', 'me.com'])
+import { SHARED_DOMAINS } from './shared-domains'
 
 export function buildDomainMap(contacts: ContactRec[]): Record<string, string> {
   const map: Record<string, string> = {}
