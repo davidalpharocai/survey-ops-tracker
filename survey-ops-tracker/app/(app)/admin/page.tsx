@@ -192,11 +192,11 @@ export default function AdminPage() {
         </div>
       </div>
 
-      {/* Sprint cadence (internal projects) */}
-      <SprintCadence />
-
-      {/* Recently deleted (restore) */}
-      <RecentlyDeleted />
+      {/* Sprint cadence + Recently deleted, side by side to compress the page */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+        <SprintCadence />
+        <RecentlyDeleted />
+      </div>
 
       {/* Master audit log */}
       <MasterAuditLog />
