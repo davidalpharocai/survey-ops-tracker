@@ -6,7 +6,7 @@
 
 ## Overview
 
-A central depository for **final deliverables sent to clients**, built into the existing survey-ops-tracker app and backed by the existing AlphaRoc **Shared Drive**. Deliverables are captured two ways — by forwarding the outbound client email to a dedicated alias, or by uploading on the project page — and both flow through one ingest pipeline. The pipeline resolves which client and project a deliverable belongs to (reusing the Tracker's canonical client/project data and AI), then either **auto-files** it into the right Drive folder or **stages** it in a review queue when the match is uncertain. Every filing is logged in Supabase (audit trail + searchable index) and mirrored to the existing activity log. A weekly cron emails a QA/dedup report so the team can clear duplicates, low-confidence files, and stuck queue items.
+A central depository for **final deliverables sent to clients**, built into the existing survey-ops-tracker app and backed by the existing AlphaRoc **Shared Drive**. Deliverables — file **attachments and/or links** (Occam studies, Edwin, Google Sheets) — are captured two ways: by forwarding the outbound client email to a shared alias, or by uploading on the project page; both flow through one ingest pipeline. Each successful auto-file sends an instant **"Filed ✓"** confirmation to whoever forwarded it. The pipeline resolves which client and project a deliverable belongs to (reusing the Tracker's canonical client/project data and AI), then either **auto-files** it into the right Drive folder or **stages** it in a review queue when the match is uncertain. Every filing is logged in Supabase (audit trail + searchable index) and mirrored to the existing activity log. A weekly cron emails a QA/dedup report so the team can clear duplicates, low-confidence files, and stuck queue items.
 
 The guiding constraints: **$0 in new subscriptions** (everything reuses Vercel, Supabase, Resend, the existing Anthropic key, plus a free Google Apps Script and a free Google Cloud service account), and **never silently misfile** (uncertain items are staged, and detection of duplicates/anomalies is a first-class feature, not an assumption). It is built for the **whole internal team** — any AlphaRoc employee (the `analyst` role, auto-provisioned on login) can forward, upload, resolve queue items, and read the report with **no per-user setup**, and the UI follows the app's tooltip convention so a PM can use it as easily as David.
 
@@ -33,8 +33,10 @@ In-Tracker upload ────────────────────�
 
 | Question | Decision |
 |---|---|
-| Capture | **Both** — forward outbound email to an alias (`deliverables@alpharoc.ai`) *and* upload on the project page; one shared pipeline |
-| Email transport | Free **Google Apps Script** on the alias mailbox POSTs each message to the ingest endpoint (no Make.com / no subscription) |
+| Capture | **Both** — forward outbound email to a shared alias (`deliverables@alpharoc.ai`) *and* upload on the project page; one shared pipeline |
+| Deliverable forms | **Attachments and/or links** (Occam studies, Edwin, Google Sheets); a link is saved into the folder as a Drive shortcut/bookmark and logged |
+| Mailbox | `deliverables@alpharoc.ai` is a **free Google Group** (multi-member, Collaborative Inbox) delivering into a backing inbox where the Apps Script runs — multiple employees can see it, **no new license** |
+| Email transport | Free **Google Apps Script** on the backing inbox POSTs each message to the ingest endpoint (no Make.com / no subscription) |
 | Routing | **Layered auto-match:** `PR#####`/`Cl#####` code → known contact email → sender domain → client/project name/alias → AI fallback |
 | Safety | **Auto-file confident, stage the rest** — uncertain items land in a review queue with one-click resolve; nothing silently misfiled |
 | Record | **Drive holds files; Supabase is the index/audit** (`deliverables` table + existing activity log) — "both" |
@@ -42,7 +44,9 @@ In-Tracker upload ────────────────────�
 | Build | **Tracker-centric brain** (all logic in the app); free Apps Script transport; free GCP **service account** for server-side Drive writes; **$0/month** |
 | Users | **All internal employees** (the `analyst` role = any `@alpharoc.ai` login); built for PM-team self-service, not David-only |
 | Folder shape | `Shared Drive / Client / {Project}_{PR#####}_{YYYY.MM.DD delivered} / files`; top-level `00_Needs Review` staging; per-client `_Unsorted` |
-| Dedup | Gmail `Message-ID` idempotency + **SHA-256 content hash**; exact dup → skip & link; near-dup (diff hash) → flag, never auto-skip |
+| Dedup | Gmail `Message-ID` idempotency + **SHA-256 hash** (files) / normalized **URL** (links); exact dup → skip & link; near-dup → flag, never auto-skip |
+| Confirmation | Each auto-file sends a **"Filed ✓" reply** to the forwarder (client, project, folder link); staged items reply "needs a quick review" with a queue link |
+| Launch scope | **Forward-going**; historical items can be **manually forwarded** anytime and are dated by the email's original send date (no bulk-import tooling at launch) |
 
 ## 1. Drive structure & the client→folder map
 
@@ -66,6 +70,7 @@ Shared Drive (AlphaRoc Deliverables)
 - New clients: on first deliverable (or at client creation) the app creates the folder and stores its ID.
 - `survey_projects.drive_folder_id` — new column caching the project subfolder ID once created, so we never re-create or re-search. Subfolder name = `{project_name}_{PR#####}_{YYYY.MM.DD}` (e.g. `Q2 Consumer Tracker_PR00112_2026.06.10`). **The date is derived from the forwarded email** — the original *send* date parsed from the forwarded-message header block when present (correct even if forwarded days later), else the message's own `Date` header. The email is the act of delivery, so this is a more reliable "date delivered" than the manually-kept tracker field. The **upload-only path** (no email) falls back to the tracker's Deliver date, then the upload date. The date is set once by the first deliverable that creates the folder; because routing keys off the stored folder **ID**, the display name can be corrected anytime without breaking anything. Net: every folder is self-identifying and cross-references the tracker via `PR#####`.
 - File naming: `YYYY.MM.DD — {original filename}` (date prefix for sort + collision-safety; date = that file's email/upload date). Original name preserved for recognizability. Folder and file formats live in one helper, so they're trivially configurable.
+- **Link-deliverables** live in the same project folder as a **Drive shortcut** (Google-native targets: Drive/Docs/Sheets) or a small **bookmark file** (external links like Occam/Edwin), so the folder stays the complete picture of what was delivered.
 
 ## 2. Data model
 
@@ -82,10 +87,12 @@ deliverables                         -- one row per filed (or staged/duplicate) 
   id uuid PK,
   client_id uuid FK → clients (nullable until resolved),
   project_id uuid FK → survey_projects (nullable),
-  drive_file_id text, drive_folder_id text,
+  kind enum deliverable_kind ('file','link'),
+  drive_file_id text, drive_folder_id text,   -- drive_file_id = the file, or the shortcut/bookmark for a link
   file_name text, original_file_name text,
-  file_hash text,                    -- SHA-256 of bytes
-  mime_type text, size_bytes bigint,
+  file_hash text,                    -- SHA-256 of bytes (null for links)
+  source_url text,                   -- original link for kind='link' (Occam/Edwin/Google/…)
+  mime_type text, size_bytes bigint, -- null for links
   source enum deliverable_source ('email','upload'),
   status enum deliverable_status ('filed','review','duplicate','unsorted'),
   match_confidence numeric,          -- 0..1
@@ -99,7 +106,7 @@ deliverables                         -- one row per filed (or staged/duplicate) 
   created_at timestamptz default now()
 ```
 
-Constraints/indexes: unique `gmail_message_id` (skip already-processed emails); unique `(file_hash, drive_folder_id)` (prevent re-filing the same bytes to the same folder); indexes on `status`, `client_id`, `project_id`, `filed_at`.
+Constraints/indexes: unique `gmail_message_id` (skip already-processed emails); unique `(file_hash, drive_folder_id)` for files and `(source_url, drive_folder_id)` for links (prevent re-filing the same deliverable to the same folder); indexes on `status`, `client_id`, `project_id`, `filed_at`.
 
 **Staging storage:** files awaiting review live in the Drive `00_Needs Review` folder (not Supabase Storage), so bytes never live in two places. On resolve, the file is **moved** (Drive API parent change) into the correct client/project folder and the row flips to `filed`.
 
@@ -111,11 +118,12 @@ Constraints/indexes: unique `gmail_message_id` (skip already-processed emails); 
 
 Single endpoint `app/api/deliverables/ingest/route.ts`, authenticated with the existing `WEBHOOK_SECRET` HMAC/bearer pattern. Accepts: source (`email`|`upload`), attachment bytes + filename + mime, and context (email headers, or project_id for uploads).
 
-1. **Idempotency:** if `gmail_message_id` already processed, no-op. Compute SHA-256 of each attachment.
+1. **Itemize + idempotency:** if `gmail_message_id` already processed, no-op. Each deliverable in the message becomes an item: every (non-trivial) **attachment** (SHA-256 hashed), plus every **deliverable link** in the body — detected by known domains (`*occam*`, `edwin.alpharoc.ai`, `drive.google.com`, `docs.google.com`) and the AI fallback, ignoring footer/unsubscribe noise.
 2. **Trivial-attachment filter (email path only):** skip inline signature images, logos, and tracking pixels below a size/type threshold (configurable). Uploads are explicitly chosen files and are never filtered.
 3. **Resolve client + project** (§4) — *skipped for uploads*, which carry `project_id` from page context (`match_method='upload_context'`, confidence 1).
-4. **Dedup:** if `(file_hash, target folder)` exists → write a `duplicate` row linked via `duplicate_of`, do not copy. Catches the email-vs-upload double-capture automatically.
-5. **File or stage:** confident → ensure client/project subfolders exist, upload to Drive (service account), write `filed` row + activity-log entry. Uncertain → upload to `00_Needs Review`, write `review` row with `match_candidates`. Right-client/unknown-project → `_Unsorted` subfolder, `unsorted` row, flagged for the weekly report.
+4. **Dedup:** files by `(file_hash, target folder)`, links by `(normalized source_url, target folder)` → if present, write a `duplicate` row linked via `duplicate_of`, don't re-file. Catches the email-vs-upload double-capture automatically.
+5. **File or stage:** confident → ensure client/project subfolders exist, then for a **file** upload the bytes (service account), for a **link** create a Drive **shortcut** (Google-native target) or a small **bookmark file** (external); write `filed` row + activity-log entry. Uncertain → stage in `00_Needs Review`, write `review` row with `match_candidates`. Right-client/unknown-project → `_Unsorted`, `unsorted` row, flagged.
+6. **Confirm:** the Tracker emails (via Resend) one **"Filed ✓" reply** per forwarded message back to the forwarder, listing each item with its client, project, and Drive folder link; anything staged instead says "needs a quick review" with a queue link. The upload path shows the same result inline.
 
 ## 4. The matcher (layered, confidence-scored)
 
@@ -135,17 +143,17 @@ Tiers run in order; each yields a candidate (client, project, confidence, reason
 
 ## 5. Email transport (free Google Apps Script)
 
-A ~40-line Apps Script bound to the `deliverables@alpharoc.ai` mailbox (native `GmailApp`/`UrlFetchApp` — no Google Cloud project, no OAuth dance, no cost):
+`deliverables@alpharoc.ai` is a **free Google Group** (no license seat) with **Collaborative Inbox** enabled, so multiple employees can see and triage what's arrived. The Group delivers every message into one **backing inbox** (an existing account — e.g. an ops mailbox), where a ~40-line Apps Script runs (native `GmailApp`/`UrlFetchApp` — no Google Cloud project, no OAuth dance, no cost):
 
-- Time-driven trigger every ~5 min: query unprocessed messages (e.g. `label:inbox -label:filed`), POST each (subject, from, date, message-id, attachments as base64) to `/api/deliverables/ingest` with the shared secret (stored in Script Properties), then apply a `filed` label.
-- Idempotency is enforced server-side by `gmail_message_id`, so a retried script run is harmless.
-- The script is intentionally dumb and stable — all logic lives in the Tracker. One-time authorization by a Workspace admin.
+- Time-driven trigger every ~5 min: query unprocessed messages (e.g. `label:inbox -label:filed`), POST each (subject, from, date, message-id, body, attachments as base64) to `/api/deliverables/ingest` with the shared secret (in Script Properties), then apply a `filed` label.
+- Anyone on the team can forward to the Group; the endpoint accepts only forwards from internal `@alpharoc.ai` senders (the original client email is still read inside for routing).
+- Idempotency is enforced server-side by `gmail_message_id`, so a retried run is harmless. The script is intentionally dumb and stable — all logic lives in the Tracker. One-time setup by a Workspace admin.
 
 ## 6. In-Tracker upload (internal app)
 
 On `app/(app)/projects/[id]/page.tsx`, an **"Attach deliverable"** action (and a **Deliverables** list on the project page), available to **every analyst**:
 
-- Upload one or more files → server computes hash, runs dedup, files straight to the project's `Client / {Project}_{PR#####}_{date} / …` folder (project/client known from context, so no matching).
+- Upload one or more files **or paste a deliverable link** → server computes hash (or normalizes the URL), runs dedup, files straight to the project's `Client / {Project}_{PR#####}_{date} / …` folder (project/client known from context, so no matching).
 - The project's Deliverables list shows filed items with name, date, size, source badge (email/upload), and a Drive link. Soft-delete consistent with the rest of the app (`deleted_at`).
 
 ## 7. Weekly QA / dedup report
@@ -171,8 +179,8 @@ Delivered as a **Resend digest** to the internal team (a distribution alias, def
 
 ## 9. Build phases (each independently shippable/verifiable)
 
-1. **Core:** migrations (`clients.drive_folder_id`, `survey_projects.drive_folder_id`, `deliverables` + RLS); service-account Drive client; ingest endpoint; matcher tiers 1–4; folder/file creation + dedup; activity-log integration; in-Tracker upload + project Deliverables list; the client→folder backfill script.
-2. **Email + review:** the Apps Script transport; the Review Queue UI + one-click resolve (move).
+1. **Core:** migrations (`clients.drive_folder_id`, `survey_projects.drive_folder_id`, `deliverables` + RLS); service-account Drive client; ingest endpoint; matcher tiers 1–4; folder/file/link creation (shortcut/bookmark) + dedup; activity-log integration; in-Tracker upload + project Deliverables list; the client→folder backfill script.
+2. **Email + review:** the Google Group + backing-inbox Apps Script transport; the "Filed ✓" confirmation reply; the Review Queue UI + one-click resolve (move).
 3. **QA + AI:** the weekly cron report (email + Deliverables QA page); the tier-5 AI fallback.
 
 ## 10. Usability & access (whole internal team)
@@ -195,15 +203,15 @@ The depository is for **every internal employee** — the PM team especially —
 
 ## Testing
 
-- **Unit (Vitest):** matcher tiers + confidence aggregation; threshold/auto-vs-stage logic; project-resolution rules (code/name/single-active/_Unsorted); filename + folder-name builders; SHA-256 dedup and idempotency.
+- **Unit (Vitest):** matcher tiers + confidence aggregation; threshold/auto-vs-stage logic; project-resolution rules (code/name/single-active/_Unsorted); filename + folder-name builders; deliverable-link detection + URL normalization; SHA-256/URL dedup and idempotency.
 - **Integration:** ingest endpoint against a mocked Drive client — file path, dedup skip, review staging, message-id idempotency.
 - **RLS / access:** a `compliance` user cannot read `deliverables` via REST; **any** `analyst` (not just David) has full read/write and sees the same queue/report; analyst access intact (mirror the 030 lockdown tests).
-- **Manual E2E before ship:** forward an email → auto-filed to the right folder + logged; ambiguous email → lands in review queue → resolve → file moved; duplicate (forward + upload same file) → second skipped & linked; weekly report renders with a seeded duplicate and a stuck queue item.
+- **Manual E2E before ship:** forward an email → auto-filed to the right folder + logged + "Filed ✓" reply received; ambiguous email → lands in review queue → resolve → file moved; duplicate (forward + upload same file) → second skipped & linked; a **link-only** deliverable (e.g. an Edwin link) → shortcut/bookmark created in the folder; weekly report renders with a seeded duplicate and a stuck queue item.
 
 ## Out of scope (phase 2+)
 
 - Writing the Drive link back to the legacy sheet's "Deliverable" column (could reuse the existing project-id mapping-sheet flow).
-- Bulk backfill of historical deliverables from past sent mail.
+- **Bulk/automated** backfill of historical deliverables — but **manual** historical forwarding works from day one (each is dated by the email's original send date).
 - Slack alerts for the QA report (Resend + page first).
 - Auto-classifying deliverable *type* (topline vs. row-level vs. case study) or detecting "final vs. draft" — we trust the human's choice to forward/upload.
 - Client-facing access to the depository (internal only for now).
