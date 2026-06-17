@@ -371,19 +371,19 @@ function HealthList({
   empty: string
 }) {
   return (
-    <div>
-      <p className="text-xs text-muted-foreground mb-1.5">
+    <div className="rounded-lg border border-border/60 bg-muted/20 p-2.5 flex flex-col min-w-0">
+      <p className="text-xs text-muted-foreground mb-1.5 shrink-0">
         {label} <span className="text-foreground font-medium">({items.length})</span>
       </p>
       {items.length === 0 ? (
         <p className="text-xs text-muted-foreground/50">✓ {empty}</p>
       ) : (
-        <div className="flex flex-col gap-0.5 max-h-40 overflow-y-auto thin-scroll pr-1">
+        <div className="flex flex-col gap-0.5 max-h-44 overflow-y-auto thin-scroll pr-1 min-w-0">
           {items.map(p => (
             <Link
               key={p.id}
               href={`/projects/${p.id}`}
-              className="text-sm text-blue-600 dark:text-blue-400 hover:underline truncate"
+              className="block text-sm text-blue-600 dark:text-blue-400 hover:underline truncate"
             >
               {p.project_name}
             </Link>

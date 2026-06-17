@@ -76,9 +76,9 @@ export function PipelineProgress({ project }: PipelineProgressProps) {
 
   return (
     <div>
-      {/* Single scrollable line (not flex-wrap) so the left-to-right progression
-          never breaks onto a second row on wide screens. */}
-      <div className="flex items-center gap-2 flex-nowrap overflow-x-auto thin-scroll pb-1">
+      {/* Wrap onto multiple rows (with a row gap) rather than scrolling
+          horizontally — no back-and-forth scrubbing to see later stages. */}
+      <div className="flex items-center gap-2 gap-y-2 flex-wrap">
         {STAGE_ORDER.map((stage, i) => {
           const field = STAGE_TO_FIELD[stage]
           const isDone = field ? project[field] : false
