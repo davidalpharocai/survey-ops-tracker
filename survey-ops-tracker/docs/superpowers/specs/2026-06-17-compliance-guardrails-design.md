@@ -32,9 +32,14 @@ Add to `public.clients` (one migration):
 
 "Not At All" = both booleans false. We store the two booleans (not one flag) so they can drive the two distinct gate points. RLS already covers `clients` (analyst read/write).
 
-**"Requirement met"** reuses the existing compliance submissions/reviewer flow:
-- *Before-fielding met* = the project has an **approved** compliance submission (the portal already does pre-fielding questionnaire review). ✅ existing mechanism.
-- *After-fielding met* = see **Q2** (questionnaire approval vs a separate results sign-off).
+Add a **`phase`** to `question_submissions` to distinguish the two reviews:
+- `phase` enum/text: `before_fielding` | `after_fielding` (default `before_fielding` so existing rows are unaffected).
+
+**"Requirement met"** reuses the existing submission + **portal review** flow (emailed link → reviewer approves/rejects → audited):
+- *Before-fielding met* = an **approved** `before_fielding` submission — the existing questionnaire review, **unchanged**.
+- *After-fielding met* = an **approved** `after_fielding` submission — the **same portal review**, but the reviewer also sees the **results**: the project's existing **deliverable link** (Occam study / data link, stored on the submission as `results_url`). The analyst sends this once **N Actual** is set (data cleaned).
+
+**Recipients:** seed each project's `compliance` recipients from the client's `compliance_contact` so "send to compliance" is one click.
 
 ## Guardrails (block-with-logged-override)
 
@@ -57,13 +62,17 @@ Add to `public.clients` (one migration):
 
 Internal projects have no client and no compliance; they are never gated. Unchanged.
 
-## Open questions (resolve at review)
+## Resolved decisions (2026-06-17)
 
-- **Q1 — Two gates or one?** Gate at **both** Fielding (before-fielding clients) **and** Delivery (after-fielding clients), matching the sheet's intent? *(Recommended: yes, both. The sheet clearly distinguishes them.)* Alternative: a single Delivery gate for any compliance client (simpler, but ignores the before-fielding intent and lets a non-approved survey field).
-- **Q2 — What does "After Fielding" review?** The existing portal reviews the **questionnaire**. "After fielding" implies reviewing **results/data** before delivery, which the portal doesn't model. *(Recommended: for v1, after-fielding is satisfied by a manual **"compliance sign-off"** checkbox on the project — fast to build, auditable — and we revisit a full results-review portal flow later.)*
-- **Q3 — Per-project override?** The Surveys tab has a per-project "Needs to Be Sent to Compliance" column. *(Recommended: drive the requirement from the client, but allow a per-project manual toggle to force/skip compliance in edge cases — covers the BAM-style "if contains open text" condition.)*
+- **D1 — Two gates, each applied only if the client has that requirement.** Before-fielding clients are blocked from entering **Fielding** until the questionnaire review is approved; after-fielding clients are blocked from **Delivery** until the results review is approved. A client with neither is never gated.
+- **D2 — Flow semantics (per David):**
+  - *Before fielding* = send **just the survey questions** to the client's compliance contact; approve before the survey is fielded.
+  - *After fielding* = after responses are received **and cleaned** (this is what **N Actual** represents), send the **questions + answers (results)** to compliance; approve before delivery.
+  - *Both* = both reviews. *Not at all* = no compliance review of any kind.
+- **D3 — Build the real flow, reusing the portal** (not a manual checkbox). Both reviews run through the **existing compliance portal**: the contact gets an emailed link and approves/rejects there (real audit trail). The after-fielding review shows the questions + the project's **deliverable link** as the results artifact (no new file upload for v1).
+- **D4 — Client-driven with a per-project override.** The requirement comes from the client flags, but each project has a manual toggle to force/skip compliance for edge cases (covers conditions like BAM's "if contains open text").
 
 ## Out of scope (for now)
 
-- Auto-deriving the requirement from a client **type = Financial** — that arrives with the separate *Client Entity Upgrade* spec; at that point the manual booleans can be back-filled from type.
-- A full client-facing **results-review** portal (Q2 fallback is a checkbox).
+- Auto-deriving the requirement from a client **type = Financial** — arrives with the separate *Client Entity Upgrade* spec; the manual booleans can then be back-filled from type.
+- Uploading a separate results **file/crosstab** for after-fielding (v1 uses the existing deliverable link; add file upload later only if contacts need more than the link).
