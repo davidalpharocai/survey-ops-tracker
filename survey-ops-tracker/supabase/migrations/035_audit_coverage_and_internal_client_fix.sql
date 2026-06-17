@@ -25,6 +25,7 @@ declare
   -- large JSON blobs, and fields handled specially below (captain_id, deleted_at).
   skip text[] := array[
     'id','created_at','updated_at','sort_order',
+    'client_id',  -- raw uuid; the human-readable 'client' text is audited instead
     'captain_id','captain_assigned_at','captain_assigned_by','co_captain_ids',
     'survey_ids_synced_at','n_last_synced','survey_ids_from_sheet','survey_id_discrepancy',
     'stage_doc_programming','stage_survey_programming','stage_edwin_qa',
