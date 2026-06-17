@@ -153,6 +153,7 @@ export function Board({ projects, teamMembers, onMoveProject, wrapInContext = tr
           isNewFor={isNewForMe}
           onCardClick={id => router.push(`/projects/${id}`)}
           bodyClassName="h-[calc(100vh-15rem)] overflow-y-auto thin-scroll"
+          collapseWhenEmpty
         />
       ))}
     </div>

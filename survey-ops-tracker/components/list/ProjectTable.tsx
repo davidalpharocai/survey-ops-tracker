@@ -1,7 +1,7 @@
 'use client'
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { formatDate, getDueDateStatus, getDueUrgency } from '@/lib/utils/date'
+import { formatDate, getDueUrgency, daysOverdue, urgencyPrefix, BADLY_OVERDUE_DAYS } from '@/lib/utils/date'
 import type { SlimProject } from '@/lib/hooks/useProjects'
 import { useLatestSubmissionStatuses } from '@/lib/hooks/useSubmissions'
 
@@ -24,19 +24,14 @@ const TYPE_BADGE: Record<string, string> = {
   'Rerun': 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400',
 }
 
-// Full-row colored border by due urgency, matching the board cards. Drawn via
-// cell borders (top/bottom on every cell, left on the first, right on the
-// last) because a <tr> border doesn't render under border-collapse: separate,
-// which the sticky header requires.
-const URGENCY_COLOR: Record<string, string> = {
-  overdue: 'border-red-500',
-  tomorrow: 'border-orange-500',
-  twodays: 'border-amber-400 dark:border-amber-400/70',
+// Urgency shows as a strong LEFT accent bar on the row (first cell), matching
+// the board cards — not a full rectangle, which fused adjacent overdue rows
+// into one merged box. Badly-overdue rows additionally get a light red tint.
+const URGENCY_LEFT_BAR: Record<string, string> = {
+  overdue: 'border-l-4 border-l-red-500',
+  tomorrow: 'border-l-4 border-l-orange-500',
+  twodays: 'border-l-4 border-l-amber-400 dark:border-l-amber-400/70',
 }
-// Optional columns in render order, for finding the last visible cell
-const OPTIONAL_CELL_ORDER = [
-  'client', 'type', 'stage', 'captain', 'n', 'nActual', 'long', 'voterQA', 'citation', 'due',
-] as const
 
 interface ProjectTableProps {
   projects: SlimProject[]
@@ -97,7 +92,7 @@ export function ProjectTable({
   }, [projects, sortField, sortDir])
 
   const SortIcon = ({ field }: { field: SortField }) => {
-    if (sortField !== field) return <span className="text-muted-foreground/50 ml-1">↕</span>
+    if (sortField !== field) return <span className="text-muted-foreground ml-1">↕</span>
     return <span className="text-foreground/80 ml-1">{sortDir === 'asc' ? '↑' : '↓'}</span>
   }
 
@@ -179,30 +174,39 @@ export function ProjectTable({
           {sorted.map((p, i) => {
             // Closed/Hold projects drop the due urgency treatment
             const openDue = p.status === 'Open'
-            const dueDateStatus = openDue ? getDueDateStatus(p.due_date) : null
             const urgency = openDue ? getDueUrgency(p.due_date) : null
             const nMet = p.n_target != null && p.n_collected >= p.n_target
             const complianceStatus = complianceStatuses?.get(p.id)
-            // Full-row border: top/bottom on every cell, left on the first cell,
-            // right on the last visible cell — composes into one rectangle.
-            const urgencyColor = urgency ? URGENCY_COLOR[urgency] : null
-            const lastKey = OPTIONAL_CELL_ORDER.filter(k => show(k)).slice(-1)[0] ?? null
-            const edge = (key: 'project' | (typeof OPTIONAL_CELL_ORDER)[number]): string => {
-              if (!urgencyColor) return ''
-              const sides = ['border-y-2']
-              if (key === 'project') sides.push('border-l-2')
-              if (key === lastKey || (key === 'project' && lastKey === null)) sides.push('border-r-2')
-              return `${sides.join(' ')} ${urgencyColor}`
-            }
+            // Left accent on the first cell only (matches the board) — no full
+            // rectangle, so adjacent overdue rows no longer fuse into one box.
+            const badlyOverdue = urgency === 'overdue' && daysOverdue(p.due_date) > BADLY_OVERDUE_DAYS
+            const leftBar = urgency ? URGENCY_LEFT_BAR[urgency] : ''
+            const dueColor =
+              urgency === 'overdue'
+                ? 'text-red-600 dark:text-red-400'
+                : urgency === 'tomorrow' || urgency === 'twodays'
+                ? 'text-amber-600 dark:text-amber-400'
+                : 'text-muted-foreground'
+            // Row background: badly-overdue tint wins over the zebra stripe.
+            const rowBg = badlyOverdue ? 'bg-red-500/5' : i % 2 === 1 ? 'bg-muted/70' : ''
             return (
               <tr
                 key={p.id}
+                role="button"
+                tabIndex={0}
+                aria-label={`Open ${p.project_name}`}
                 onClick={() => router.push(`/projects/${p.id}`)}
-                className={`border-t border-border cursor-pointer hover:bg-accent/50 transition-colors ${
-                  i % 2 === 1 ? 'bg-muted/40' : ''
-                } ${p.status === 'Hold' ? 'opacity-60' : ''}`}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    router.push(`/projects/${p.id}`)
+                  }
+                }}
+                className={`border-t border-border cursor-pointer hover:bg-accent/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring transition-colors ${rowBg} ${
+                  p.status === 'Hold' ? 'opacity-60' : ''
+                }`}
               >
-                <td className={`px-4 py-3 text-sm text-foreground font-medium ${edge('project')}`}>
+                <td className={`px-4 py-3 text-sm text-foreground font-medium ${leftBar}`}>
                   <div className="flex items-center gap-2">
                     <span>
                       {p.status === 'Hold' && <span title="On hold">⏸ </span>}
@@ -233,10 +237,10 @@ export function ProjectTable({
                   </div>
                 </td>
                 {show('client') && (
-                  <td className={`px-4 py-3 text-sm text-muted-foreground ${edge('client')}`}>{p.client}</td>
+                  <td className="px-4 py-3 text-sm text-muted-foreground">{p.client}</td>
                 )}
                 {show('type') && (
-                  <td className={`px-4 py-3 ${edge('type')}`}>
+                  <td className="px-4 py-3">
                     {p.project_type && (
                       <span className={`text-xs px-2 py-0.5 rounded ${TYPE_BADGE[p.project_type] ?? ''}`}>
                         {p.project_type}
@@ -245,14 +249,14 @@ export function ProjectTable({
                   </td>
                 )}
                 {show('stage') && (
-                  <td className={`px-4 py-3 ${edge('stage')}`}>
+                  <td className="px-4 py-3">
                     <span className={`text-xs px-2 py-1 rounded ${STAGE_BADGE[p.board_column] ?? 'bg-muted text-muted-foreground'}`}>
                       {p.board_column}
                     </span>
                   </td>
                 )}
                 {show('captain') && (
-                  <td className={`px-4 py-3 text-sm ${edge('captain')}`}>
+                  <td className="px-4 py-3 text-sm">
                     {p.captain ? (
                       <span className="bg-muted text-foreground/80 text-xs px-2 py-0.5 rounded-full">
                         {p.captain.initials}
@@ -263,25 +267,28 @@ export function ProjectTable({
                   </td>
                 )}
                 {show('n') && (
-                  <td className={`px-4 py-3 text-xs ${edge('n')} ${nMet ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>
-                    {p.n_collected} / {p.n_target ?? '—'}
-                    {nMet && ' ✓'}
+                  <td className={`px-4 py-3 text-xs ${nMet ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>
+                    {p.n_target == null && !p.n_collected ? (
+                      <span className="text-muted-foreground/50">—</span>
+                    ) : (
+                      <>
+                        {p.n_collected} / {p.n_target ?? '—'}
+                        {nMet && ' ✓'}
+                      </>
+                    )}
                   </td>
                 )}
                 {show('nActual') && (
-                  <td className={`px-4 py-3 text-xs text-muted-foreground ${edge('nActual')}`}>
+                  <td className="px-4 py-3 text-xs text-muted-foreground">
                     {p.n_actual ?? '—'}
                   </td>
                 )}
-                {show('long') && <FlagCell value={p.longitudinal ?? false} className={edge('long')} />}
-                {show('voterQA') && <FlagCell value={p.voter_survey_qa ?? false} warn className={edge('voterQA')} />}
-                {show('citation') && <FlagCell value={p.citation_language_needed ?? false} warn className={edge('citation')} />}
+                {show('long') && <FlagCell value={p.longitudinal ?? false} />}
+                {show('voterQA') && <FlagCell value={p.voter_survey_qa ?? false} warn />}
+                {show('citation') && <FlagCell value={p.citation_language_needed ?? false} warn />}
                 {show('due') && (
-                  <td className={`px-4 py-3 text-xs ${edge('due')} ${
-                    dueDateStatus === 'overdue' ? 'text-red-600 dark:text-red-400' :
-                    dueDateStatus === 'soon' ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'
-                  }`}>
-                    {dueDateStatus === 'overdue' && '⚠ '}
+                  <td className={`px-4 py-3 text-xs whitespace-nowrap ${dueColor}`}>
+                    {urgencyPrefix(urgency, p.due_date)}
                     {formatDate(p.due_date)}
                   </td>
                 )}

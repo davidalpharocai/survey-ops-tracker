@@ -313,7 +313,7 @@ export default function ProjectDetailPage() {
               : 'text-muted-foreground hover:text-foreground'
           }`}
         >
-          Links &amp; setup
+          Links &amp; Setup
         </button>
         <button
           onClick={() => setActiveTab('audit')}
@@ -869,7 +869,7 @@ function HeroBudgetLeft({
       )}
       <span className="text-xs text-muted-foreground">
         {remaining == null
-          ? 'set in Money'
+          ? 'Set in the Money card'
           : actualCostPerN != null
           ? `$${actualCostPerN.toLocaleString('en-US', { maximumFractionDigits: 2 })} / N`
           : ' '}

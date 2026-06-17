@@ -1,17 +1,29 @@
 'use client'
-import { getDueDateStatus, getDueUrgency, formatDate } from '@/lib/utils/date'
+import Link from 'next/link'
+import {
+  getDueDateStatus,
+  getDueUrgency,
+  formatDate,
+  daysOverdue,
+  urgencyPrefix,
+  BADLY_OVERDUE_DAYS,
+} from '@/lib/utils/date'
 import { deriveWaitingOn } from '@/lib/utils/waitingOn'
 import { isStale } from '@/lib/utils/stale'
 import { NProgressBar } from '@/components/shared/NProgressBar'
 import type { SlimProject } from '@/lib/hooks/useProjects'
 import { useLatestSubmissionStatuses } from '@/lib/hooks/useSubmissions'
 
-// Full-card border by due-date urgency; overrides the neutral left edge
+// Due-date urgency: a neutral card box plus a strong colored LEFT bar (so a
+// board full of overdue cards doesn't become an undifferentiated wall of red).
 const URGENCY_BORDER: Record<string, string> = {
-  overdue: 'border-2 border-red-500',
-  tomorrow: 'border-2 border-orange-500',
-  twodays: 'border-2 border-amber-300 dark:border-amber-400/70',
+  overdue: 'border border-border border-l-4 border-l-red-500',
+  tomorrow: 'border border-border border-l-4 border-l-orange-500',
+  twodays: 'border border-border border-l-4 border-l-amber-300 dark:border-l-amber-400/70',
 }
+// Badly overdue (> BADLY_OVERDUE_DAYS late): escalate back to a heavy full-red
+// border so the worst projects still shout.
+const BADLY_OVERDUE_BORDER = 'border-2 border-red-500 border-l-4 border-l-red-600'
 
 const TYPE_BADGE: Record<string, string> = {
   'PS': 'bg-blue-500/20 text-blue-600 dark:text-blue-400',
@@ -54,7 +66,12 @@ export function ProjectCard({ project, onClick, isNew }: ProjectCardProps) {
   // Closed and Hold projects drop the due-date urgency treatment — they're
   // done or paused, so red/orange/amber would be misleading.
   const urgency = onHold || closed ? null : getDueUrgency(project.due_date)
-  const urgencyBorder = urgency ? URGENCY_BORDER[urgency] : undefined
+  const badlyOverdue = urgency === 'overdue' && daysOverdue(project.due_date) > BADLY_OVERDUE_DAYS
+  const urgencyBorder = urgency
+    ? badlyOverdue
+      ? BADLY_OVERDUE_BORDER
+      : URGENCY_BORDER[urgency]
+    : undefined
   const border = onHold
     ? 'border-2 border-muted-foreground/40 border-l-4 border-l-muted-foreground/50'
     : closed
@@ -62,7 +79,7 @@ export function ProjectCard({ project, onClick, isNew }: ProjectCardProps) {
     : showNew
     ? 'border-2 border-emerald-500 border-l-4 border-l-emerald-500'
     : urgencyBorder
-    ? `border-l-4 ${urgencyBorder}`
+    ? urgencyBorder
     : 'border border-border border-l-4 border-l-foreground/80'
   const { data: complianceStatuses } = useLatestSubmissionStatuses()
   const complianceStatus = complianceStatuses?.get(project.id)
@@ -106,9 +123,13 @@ export function ProjectCard({ project, onClick, isNew }: ProjectCardProps) {
       {/* Title row — wraps so badges drop to their own line on narrow cards
           instead of crushing the title into one-letter-per-line */}
       <div className="flex items-start justify-between gap-x-2 gap-y-1 mb-1 flex-wrap">
-        <span className="text-foreground text-sm font-semibold leading-tight break-words flex-1 basis-28 min-w-0">
+        <Link
+          href={`/projects/${project.id}`}
+          onClick={e => e.stopPropagation()}
+          className="text-foreground text-sm font-semibold leading-tight break-words flex-1 basis-28 min-w-0 hover:text-blue-600 dark:hover:text-blue-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded transition-colors"
+        >
           {project.project_name}
-        </span>
+        </Link>
         <span className="flex items-center gap-1 flex-wrap justify-end shrink-0">
           {stale && (
             <span
@@ -210,9 +231,7 @@ export function ProjectCard({ project, onClick, isNew }: ProjectCardProps) {
             }`}
           >
             {/* Word label so urgency isn't conveyed by color alone */}
-            {urgency === 'overdue' && '⚠ Overdue · '}
-            {urgency === 'tomorrow' && 'Due tomorrow · '}
-            {urgency === 'twodays' && 'Due in 2d · '}
+            {urgencyPrefix(urgency, project.due_date)}
             {formatDate(project.due_date)}
           </span>
         )}
