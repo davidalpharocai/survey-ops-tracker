@@ -196,6 +196,7 @@ export type Database = {
           category: string | null
           objective: string | null
           sprint_number: number | null
+          compliance_override: boolean | null
           created_at: string
           updated_at: string
         }
@@ -253,6 +254,7 @@ export type Database = {
           category?: string | null
           objective?: string | null
           sprint_number?: number | null
+          compliance_override?: boolean | null
           created_at?: string
           updated_at?: string
         }
@@ -310,6 +312,7 @@ export type Database = {
           category?: string | null
           objective?: string | null
           sprint_number?: number | null
+          compliance_override?: boolean | null
           created_at?: string
           updated_at?: string
         }
@@ -329,6 +332,10 @@ export type Database = {
           name: string
           code: string | null
           drive_folder_id: string | null
+          compliance_before_fielding: boolean
+          compliance_after_fielding: boolean
+          compliance_contact: string | null
+          compliance_notes: string | null
           created_at: string
         }
         Insert: {
@@ -336,6 +343,10 @@ export type Database = {
           name: string
           code?: string | null
           drive_folder_id?: string | null
+          compliance_before_fielding?: boolean
+          compliance_after_fielding?: boolean
+          compliance_contact?: string | null
+          compliance_notes?: string | null
           created_at?: string
         }
         Update: {
@@ -343,6 +354,10 @@ export type Database = {
           name?: string
           code?: string | null
           drive_folder_id?: string | null
+          compliance_before_fielding?: boolean
+          compliance_after_fielding?: boolean
+          compliance_contact?: string | null
+          compliance_notes?: string | null
           created_at?: string
         }
         Relationships: []
@@ -389,6 +404,8 @@ export type Database = {
           review_note: string | null
           analyst_message: string | null
           dispatched_at: string | null
+          phase: string
+          results_url: string | null
           created_at: string
         }
         Insert: {
@@ -405,6 +422,8 @@ export type Database = {
           review_note?: string | null
           analyst_message?: string | null
           dispatched_at?: string | null
+          phase?: string
+          results_url?: string | null
           created_at?: string
         }
         Update: {
@@ -421,6 +440,8 @@ export type Database = {
           review_note?: string | null
           analyst_message?: string | null
           dispatched_at?: string | null
+          phase?: string
+          results_url?: string | null
           created_at?: string
         }
         Relationships: []
