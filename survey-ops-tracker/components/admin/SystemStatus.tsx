@@ -67,7 +67,7 @@ export function SystemStatus() {
           {problems.length > 0 && (
             <div>
               <p className="text-xs text-muted-foreground/70 mb-1">Recent issues</p>
-              <div className="flex flex-col max-h-40 overflow-y-auto thin-scroll pr-1">
+              <div className="flex flex-col max-h-[10rem] overflow-y-auto thin-scroll pr-1">
                 {problems.map(e => (
                   <div key={e.id} className="py-1.5 border-b border-border/40 last:border-0">
                     <span className="text-xs text-foreground">
