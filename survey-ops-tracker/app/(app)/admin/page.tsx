@@ -378,7 +378,7 @@ function HealthList({
       {items.length === 0 ? (
         <p className="text-xs text-muted-foreground/50">✓ {empty}</p>
       ) : (
-        <div className="flex flex-col gap-0.5 max-h-[11rem] overflow-y-auto thin-scroll pr-1 min-w-0">
+        <div className="max-h-[11rem] overflow-y-auto thin-scroll pr-1 min-w-0 space-y-0.5">
           {items.map(p => (
             <Link
               key={p.id}

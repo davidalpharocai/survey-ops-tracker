@@ -547,9 +547,13 @@ git commit -m "feat(compliance): project banner + seed recipients from client co
 **Files:**
 - Modify: `app/(app)/admin/page.tsx`, `app/(app)/clients/[id]/page.tsx`
 
-- [ ] **Step 1: Accounts (admin).** Using `useClients` (now carries the flags), add a "Compliance" badge to client rows where `compliance_before_fielding || compliance_after_fielding` (label e.g. "Compliance: before+after" / "before" / "after"), and a filter chip alongside Client / Former / Prospect that filters to compliance clients. (Follow the existing bucket-chip + badge patterns in the file.)
+- [ ] **Step 1: Accounts (admin).** Using `useClients` (now carries the flags):
+  - **Replace the `Cl#####` code in each Accounts row with a compliance indicator** (per David): show a compliance chip when `compliance_before_fielding || compliance_after_fielding` — label "Compliance: before+after" / "before" / "after" — and nothing (or a muted "—") when not required. The client code no longer appears in the list (it moves to the client page, Step 2).
+  - Add a filter chip alongside Client / Former / Prospect that filters to compliance clients. (Follow the existing bucket-chip + badge patterns in the file.)
 
-- [ ] **Step 2: Client page.** On `clients/[id]`, add a "Compliance" card with three editable controls bound to `useUpdateClient`: two checkboxes (`compliance_before_fielding`, `compliance_after_fielding`) and a text input for `compliance_contact` (+ optional `compliance_notes`). Mirror the toggle/edit affordances used elsewhere (dashed off-state checkbox styling from the FlagChip pattern is a good reference).
+- [ ] **Step 2: Client page.** On `clients/[id]`:
+  - **Show the client's `Cl#####` code here** (relocated off the Accounts list) so it's still visible when you click into a client.
+  - Add a "Compliance" card with editable controls bound to `useUpdateClient`: two checkboxes (`compliance_before_fielding`, `compliance_after_fielding`) and text inputs for `compliance_contact` (+ optional `compliance_notes`). Mirror the toggle/edit affordances used elsewhere (the dashed off-state FlagChip styling is a good reference).
 
 - [ ] **Step 3: Build.** Run `npx next build`; expected pass.
 
