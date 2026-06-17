@@ -14,6 +14,7 @@ function driveClient() {
     email,
     key: key.replace(/\\n/g, '\n'), // tolerate \n stored literally in env vars
     scopes: ['https://www.googleapis.com/auth/drive'],
+    subject: process.env.GOOGLE_IMPERSONATE_SUBJECT || undefined, // domain-wide delegation: act as an internal Drive member
   })
   return google.drive({ version: 'v3', auth })
 }

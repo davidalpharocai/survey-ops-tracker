@@ -14,6 +14,7 @@ const auth = new google.auth.JWT({
   email: process.env.GOOGLE_CLIENT_EMAIL,
   key: (process.env.GOOGLE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
   scopes: ['https://www.googleapis.com/auth/drive'],
+  subject: process.env.GOOGLE_IMPERSONATE_SUBJECT || undefined,
 })
 const drive = google.drive({ version: 'v3', auth })
 
