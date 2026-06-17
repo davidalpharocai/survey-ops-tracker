@@ -9,6 +9,8 @@ import { InfoTooltip } from '@/components/shared/InfoTooltip'
 import { MasterAuditLog } from '@/components/admin/MasterAuditLog'
 import { RecentlyDeleted } from '@/components/admin/RecentlyDeleted'
 import { SprintCadence } from '@/components/admin/SprintCadence'
+import { SystemStatus } from '@/components/admin/SystemStatus'
+import { AiUsagePanel } from '@/components/admin/AiUsagePanel'
 import type { Tables } from '@/lib/supabase/types'
 
 type Client = Tables<'clients'>
@@ -177,6 +179,12 @@ export default function AdminPage() {
             </a>
           ))}
         </div>
+      </div>
+
+      {/* Operational health — backend jobs + AI spend, side by side */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+        <SystemStatus />
+        <AiUsagePanel />
       </div>
 
       {/* Data health */}

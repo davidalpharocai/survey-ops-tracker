@@ -15,6 +15,78 @@ export type Database = {
         Update: { id?: number; anchor_date?: string; length_days?: number }
         Relationships: []
       }
+      app_config: {
+        Row: { id: number; ai_monthly_cap_usd: number; ai_hard_stop: boolean; updated_at: string }
+        Insert: { id?: number; ai_monthly_cap_usd?: number; ai_hard_stop?: boolean; updated_at?: string }
+        Update: { id?: number; ai_monthly_cap_usd?: number; ai_hard_stop?: boolean; updated_at?: string }
+        Relationships: []
+      }
+      ai_usage: {
+        Row: {
+          id: string
+          created_at: string
+          endpoint: string
+          user_email: string | null
+          model: string
+          input_tokens: number
+          output_tokens: number
+          cache_read_tokens: number
+          cache_creation_tokens: number
+          cost_usd: number
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          endpoint: string
+          user_email?: string | null
+          model: string
+          input_tokens?: number
+          output_tokens?: number
+          cache_read_tokens?: number
+          cache_creation_tokens?: number
+          cost_usd?: number
+        }
+        Update: {
+          id?: string
+          created_at?: string
+          endpoint?: string
+          user_email?: string | null
+          model?: string
+          input_tokens?: number
+          output_tokens?: number
+          cache_read_tokens?: number
+          cache_creation_tokens?: number
+          cost_usd?: number
+        }
+        Relationships: []
+      }
+      system_events: {
+        Row: {
+          id: string
+          created_at: string
+          source: string
+          status: string
+          detail: string | null
+          meta: Record<string, unknown> | null
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          source: string
+          status?: string
+          detail?: string | null
+          meta?: Record<string, unknown> | null
+        }
+        Update: {
+          id?: string
+          created_at?: string
+          source?: string
+          status?: string
+          detail?: string | null
+          meta?: Record<string, unknown> | null
+        }
+        Relationships: []
+      }
       project_audit: {
         Row: {
           id: string

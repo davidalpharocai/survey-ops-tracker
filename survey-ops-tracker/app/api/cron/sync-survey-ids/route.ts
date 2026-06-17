@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { extractEdwinSurveyId, findEdwinUrl } from '@/lib/utils/edwin'
+import { logSystemEvent } from '@/lib/server/observability'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -31,7 +32,10 @@ export async function GET(req: NextRequest) {
     // Internal projects share this table but never have Edwin links — skip them.
     .or('project_type.is.null,project_type.neq.Internal')
 
-  if (error) return new Response('Database error', { status: 500 })
+  if (error) {
+    await logSystemEvent({ source: 'sync-survey-ids', status: 'error', detail: `Database error: ${error.message}` })
+    return new Response('Database error', { status: 500 })
+  }
 
   let filled = 0
   let flagged = 0
@@ -91,10 +95,20 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  const checked = projects?.length ?? 0
+  await logSystemEvent({
+    source: 'sync-survey-ids',
+    status: errors.length ? 'partial' : 'ok',
+    detail: errors.length
+      ? `${errors.length} row write(s) failed; filled ${filled}, flagged ${flagged}, cleared ${cleared}.`
+      : `Checked ${checked}; filled ${filled}, flagged ${flagged}, cleared ${cleared}.`,
+    meta: { checked, filled, flagged, cleared, errors },
+  })
+
   // 207 when some rows failed to write, so a monitor can tell a clean run from
   // a partial one; 200 otherwise.
   return Response.json(
-    { checked: projects?.length ?? 0, filled, flagged, cleared, errors, details },
+    { checked, filled, flagged, cleared, errors, details },
     { status: errors.length ? 207 : 200 }
   )
 }

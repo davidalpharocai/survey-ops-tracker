@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@/lib/supabase/server'
 import { isAllowedEmail } from '@/lib/utils/allowedDomain'
+import { getAiBudget, logAiUsage } from '@/lib/server/observability'
 import { NextRequest } from 'next/server'
 
 export const dynamic = 'force-dynamic'
@@ -118,6 +119,16 @@ export async function POST(req: NextRequest) {
     return new Response('Bad request', { status: 400 })
   }
 
+  // Budget guard: only blocks when the owner has turned on hard-stop AND the
+  // monthly cap is reached. Otherwise it's purely advisory (surfaced in Admin).
+  const budget = await getAiBudget()
+  if (budget.blocked) {
+    return new Response(
+      `The AI assistant is paused for this month — the usage budget ($${budget.cap.toFixed(0)}) has been reached. An admin can raise it in Admin → AI usage.`,
+      { status: 503 }
+    )
+  }
+
   const { data: projects, error } = await supabase
     .from('survey_projects')
     .select('*, captain:team_members(name, initials)')
@@ -222,6 +233,18 @@ export async function POST(req: NextRequest) {
           ) {
             controller.enqueue(encoder.encode(event.delta.text))
           }
+        }
+        // Stream finished cleanly — record token usage (best-effort).
+        try {
+          const final = await stream.finalMessage()
+          void logAiUsage({
+            endpoint: 'assistant',
+            userEmail: user.email,
+            model: 'claude-opus-4-8',
+            usage: final.usage,
+          })
+        } catch {
+          /* usage logging must never affect the response */
         }
       } catch (err) {
         let msg = 'Sorry, something went wrong. Please try again.'

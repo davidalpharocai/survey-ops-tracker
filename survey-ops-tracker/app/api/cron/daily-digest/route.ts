@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { safeEqual } from '@/lib/utils/secureCompare'
+import { logSystemEvent } from '@/lib/server/observability'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -53,7 +54,23 @@ export async function GET(req: NextRequest) {
       p.due_date <= soon
   )
 
+  // System-health line: surface any backend job that failed in the last ~26h
+  // (a window slightly over a day so a once-daily run never slips through a gap)
+  // right in the digest the team already reads.
+  const healthSince = new Date(Date.now() - 26 * 3600_000).toISOString()
+  const { data: badEvents } = await supabase
+    .from('system_events')
+    .select('source, status, detail, created_at')
+    .neq('status', 'ok')
+    .gte('created_at', healthSince)
+    .order('created_at', { ascending: false })
+    .limit(8)
+
   const sections: string[] = [`☀️ *Survey Ops daily digest* — ${fmt(today)}`]
+  if (badEvents && badEvents.length) {
+    const lines = badEvents.map(e => `• \`${e.source}\` ${e.status} — ${e.detail ?? ''}`.trim())
+    sections.push(`⚠️ *Backend issues in the last day (${badEvents.length})*\n${lines.join('\n')}`)
+  }
   if (overdue.length) sections.push(`🔴 *Due today or overdue (${overdue.length})*\n${overdue.map(line).join('\n')}`)
   if (dueSoon.length) sections.push(`🟠 *Due in the next 3 days (${dueSoon.length})*\n${dueSoon.map(line).join('\n')}`)
   if (behind.length) sections.push(`📉 *Fielding behind target with deadline near (${behind.length})*\n${behind.map(line).join('\n')}`)
@@ -64,6 +81,7 @@ export async function GET(req: NextRequest) {
 
   const slackUrl = process.env.SLACK_WEBHOOK_URL
   if (!slackUrl) {
+    await logSystemEvent({ source: 'daily-digest', status: 'error', detail: 'SLACK_WEBHOOK_URL not configured' })
     return Response.json({ posted: false, reason: 'SLACK_WEBHOOK_URL not configured', preview: text })
   }
 
@@ -77,9 +95,15 @@ export async function GET(req: NextRequest) {
       signal: AbortSignal.timeout(10_000),
     })
     if (!res.ok) console.error('daily-digest: Slack POST failed', res.status)
+    await logSystemEvent({
+      source: 'daily-digest',
+      status: res.ok ? 'ok' : 'error',
+      detail: res.ok ? 'Digest posted to Slack.' : `Slack POST failed (${res.status}).`,
+    })
     return Response.json({ posted: res.ok, status: res.status })
   } catch (err) {
     console.error('daily-digest: Slack POST error', err)
+    await logSystemEvent({ source: 'daily-digest', status: 'error', detail: 'Slack post threw (timeout or network).' })
     return Response.json({ posted: false, error: 'Slack post failed' })
   }
 }
