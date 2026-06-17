@@ -1092,7 +1092,7 @@ function EditableRow({
   }
 
   return (
-    <div className="flex justify-between items-center text-sm gap-2">
+    <div className={`flex justify-between items-center text-sm gap-2 ${value ? '' : 'opacity-60'}`}>
       <span className="text-muted-foreground flex items-center text-xs shrink-0">
         {label}
         {tooltip && <InfoTooltip text={tooltip} />}
@@ -1105,7 +1105,7 @@ function EditableRow({
         className="text-sm text-foreground hover:bg-accent rounded px-1.5 transition-colors truncate cursor-pointer"
         title="Click to edit"
       >
-        {value || <span className="text-muted-foreground/50">— click to add</span>}
+        {value || <span className="text-muted-foreground/50">— click to set</span>}
       </button>
     </div>
   )
@@ -1223,7 +1223,7 @@ function EditableNumberRow({
   }
 
   return (
-    <div className="flex justify-between items-center text-sm gap-2">
+    <div className={`flex justify-between items-center text-sm gap-2 ${value != null ? '' : 'opacity-60'}`}>
       <span className="text-muted-foreground flex items-center text-xs shrink-0">
         {label}
         {tooltip && <InfoTooltip text={tooltip} />}
@@ -1236,7 +1236,7 @@ function EditableNumberRow({
         className={`text-sm cursor-pointer hover:bg-accent rounded px-1.5 transition-colors ${valueClass}`}
         title="Click to edit"
       >
-        {value != null ? value.toString() : <span className="text-muted-foreground/50">—</span>}
+        {value != null ? value.toString() : <span className="text-muted-foreground/50">— click to set</span>}
       </button>
     </div>
   )
@@ -1294,7 +1294,7 @@ function EditableDateRow({
   }
 
   return (
-    <div className="flex justify-between items-center text-sm gap-2">
+    <div className={`flex justify-between items-center text-sm gap-2 ${value ? '' : 'opacity-60'}`}>
       <span className="text-muted-foreground flex items-center text-xs shrink-0">
         {label}
         {tooltip && <InfoTooltip text={tooltip} />}
@@ -1307,7 +1307,7 @@ function EditableDateRow({
         className={`text-sm cursor-pointer hover:bg-accent rounded px-1.5 transition-colors ${valueClass}`}
         title="Click to edit"
       >
-        {formatDate(value)}
+        {value ? formatDate(value) : <span className="text-muted-foreground/50">— click to set</span>}
       </button>
     </div>
   )
