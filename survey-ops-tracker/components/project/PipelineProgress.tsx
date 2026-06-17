@@ -76,7 +76,9 @@ export function PipelineProgress({ project }: PipelineProgressProps) {
 
   return (
     <div>
-      <div className="flex items-center gap-2 flex-wrap">
+      {/* Single scrollable line (not flex-wrap) so the left-to-right progression
+          never breaks onto a second row on wide screens. */}
+      <div className="flex items-center gap-2 flex-nowrap overflow-x-auto thin-scroll pb-1">
         {STAGE_ORDER.map((stage, i) => {
           const field = STAGE_TO_FIELD[stage]
           const isDone = field ? project[field] : false
@@ -84,7 +86,7 @@ export function PipelineProgress({ project }: PipelineProgressProps) {
           const isClickable = stage !== 'Submitted'
 
           return (
-            <div key={stage} className="flex items-center gap-2">
+            <div key={stage} className="flex items-center gap-2 shrink-0">
               <button
                 onClick={() => isClickable && toggleStage(stage)}
                 disabled={!isClickable}
@@ -93,17 +95,17 @@ export function PipelineProgress({ project }: PipelineProgressProps) {
                     ? `${STAGE_DESCRIPTIONS[stage] ?? stage} Click to toggle this stage done/undone.`
                     : STAGE_DESCRIPTIONS[stage]
                 }
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm border transition-colors ${
                   isDone
-                    ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-600 dark:text-emerald-400'
+                    ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-600 dark:text-emerald-400 font-medium'
                     : isCurrent
-                    ? 'bg-amber-500/15 border-amber-500/60 text-amber-600 dark:text-amber-400'
-                    : 'bg-muted border-border text-muted-foreground'
+                    ? 'bg-amber-500/25 border-amber-500/70 ring-1 ring-amber-500/50 text-amber-700 dark:text-amber-300 font-semibold'
+                    : 'bg-muted border-border text-muted-foreground font-medium'
                 } ${isClickable ? 'hover:border-ring cursor-pointer' : 'cursor-default'}`}
               >
                 <span>{isDone ? '✓' : isCurrent ? '▶' : '○'}</span>
                 <span>{stage}</span>
-                {isCurrent && <span className="text-muted-foreground/50 text-[11px]">(current)</span>}
+                {isCurrent && <span className="text-amber-600/70 dark:text-amber-400/70 text-[11px]">(current)</span>}
               </button>
               {i < STAGE_ORDER.length - 1 && (
                 <span className="text-muted-foreground/50 text-xs select-none">→</span>

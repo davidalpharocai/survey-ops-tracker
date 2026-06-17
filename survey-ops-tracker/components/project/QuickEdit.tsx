@@ -116,7 +116,7 @@ export function QuickEdit({ project }: QuickEditProps) {
     return (
       <button
         onClick={() => setOpen(true)}
-        className="text-xs border border-dashed border-border text-muted-foreground hover:text-foreground hover:border-ring px-3 py-1.5 rounded-lg transition-colors"
+        className="w-full text-left text-xs border border-dashed border-border text-muted-foreground hover:text-foreground hover:border-ring px-3 py-1.5 rounded-lg transition-colors"
         title="Describe changes in plain English and review before saving"
       >
         ✦ Edit by description

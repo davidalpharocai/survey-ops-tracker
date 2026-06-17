@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
-import { useProject, useUpdateProject, useDeleteProject } from '@/lib/hooks/useProjects'
+import { useProject, useUpdateProject, useDeleteProject, type SurveyProject } from '@/lib/hooks/useProjects'
 import { useTeamMembers, assignableMembers, type TeamMember } from '@/lib/hooks/useTeamMembers'
 import { PipelineProgress } from '@/components/project/PipelineProgress'
 import { ScopingProgress } from '@/components/project/ScopingProgress'
@@ -244,7 +244,7 @@ export default function ProjectDetailPage() {
                 onClick={() => setStatus('Closed')}
                 className="text-sm border border-border text-muted-foreground hover:text-foreground hover:border-ring px-3 py-1.5 rounded-lg transition-colors shrink-0"
               >
-                ✕ Close Project
+                ✕ Close
               </button>
             </HelpTip>
           ) : (
@@ -253,18 +253,22 @@ export default function ProjectDetailPage() {
                 onClick={() => setStatus('Open')}
                 className="text-sm border border-border text-muted-foreground hover:text-foreground hover:border-ring px-3 py-1.5 rounded-lg transition-colors shrink-0"
               >
-                ↺ Reopen Project
+                ↺ Reopen
               </button>
             </HelpTip>
           )}
-          <HelpTip text="Removes the project from the board and moves it to Recently Deleted on the Admin page, where you can restore it (it asks you to type 'delete' first). If you just want it off the board, use Close Project instead.">
-            <button
-              onClick={() => setConfirmingDelete(true)}
-              className="text-sm border border-border text-muted-foreground hover:text-red-600 dark:hover:text-red-400 hover:border-red-500/50 px-3 py-1.5 rounded-lg transition-colors shrink-0"
-            >
-              🗑 Delete
-            </button>
-          </HelpTip>
+          {/* Destructive action set apart from Close by a divider + a red tint
+              that's visible at rest, so it can't be hit by reflex. */}
+          <span className="flex items-center border-l border-border pl-2 ml-1">
+            <HelpTip text="Removes the project from the board and moves it to Recently Deleted on the Admin page, where you can restore it (it asks you to type 'delete' first). If you just want it off the board, use Close instead.">
+              <button
+                onClick={() => setConfirmingDelete(true)}
+                className="text-sm border border-border text-red-600/70 dark:text-red-400/70 hover:text-red-600 dark:hover:text-red-400 hover:border-red-500/50 px-3 py-1.5 rounded-lg transition-colors shrink-0"
+              >
+                🗑 Delete
+              </button>
+            </HelpTip>
+          </span>
         </div>
       </div>
 
@@ -399,6 +403,7 @@ export default function ProjectDetailPage() {
 
       {/* Overview tab — kept mounted (hidden) so in-progress edits survive tab switches */}
       <div className={activeTab === 'overview' ? '' : 'hidden'}>
+        <NewProjectSetupBanner project={project} />
         {/* Hero stat strip */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
           <HeroNCollected
@@ -430,9 +435,7 @@ export default function ProjectDetailPage() {
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
           {/* Left column */}
           <div className="flex flex-col gap-4">
-            <div className="flex">
-              <QuickEdit project={project} />
-            </div>
+            <QuickEdit project={project} />
             <div className="bg-card border border-border shadow-sm rounded-xl p-4">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-xs text-muted-foreground uppercase tracking-widest font-medium">
@@ -685,7 +688,11 @@ function HeroNCollected({
           title="Click to edit"
         >
           {collected}
-          <span className="text-base font-normal text-muted-foreground"> / {target ?? '—'}</span>
+          {target != null ? (
+            <span className="text-base font-normal text-muted-foreground"> / {target}</span>
+          ) : (
+            <span className="text-xs font-normal text-muted-foreground/60"> · no target</span>
+          )}
         </button>
       )}
       <div className="mt-1">
@@ -887,11 +894,13 @@ function HeroWaitingOn({
 }) {
   const derived = deriveWaitingOn(project)
   const [main, sub] = derived.split(' — ')
+  const blocked = project.blocked_by === 'client' || project.blocked_by === 'internal'
+  const [picking, setPicking] = useState(false)
   return (
     <div className="bg-card border border-border shadow-sm rounded-xl p-3 flex flex-col gap-1">
       <span className="text-xs text-muted-foreground flex items-center">
         Waiting on
-        <InfoTooltip text="Auto-derived from status, phase, stage checkboxes, and fielding progress. Set the dropdown when the project is blocked to force it to Client or Us." />
+        <InfoTooltip text="Auto-derived from status, phase, stage checkboxes, and fielding progress. Mark the project blocked to force it to Client or Us." />
       </span>
       <span
         className={`text-2xl font-semibold leading-tight truncate ${
@@ -902,16 +911,79 @@ function HeroWaitingOn({
         {main}
       </span>
       <span className="text-xs text-muted-foreground">{sub ?? ' '}</span>
-      <select
-        value={project.blocked_by ?? 'none'}
-        onChange={e => onSetBlockedBy(e.target.value)}
-        className="mt-1 self-start bg-muted border border-border rounded px-1 py-0.5 text-[11px] text-muted-foreground focus:outline-none focus:border-ring cursor-pointer"
-        title="Force the Waiting On value when the project is blocked"
-      >
+      {/* The block override is rare, so it's a small ghost control by default. */}
+      {blocked ? (
+        <button
+          onClick={() => onSetBlockedBy('none')}
+          title="Clear the manual block"
+          className="mt-1 self-start text-[11px] inline-flex items-center gap-1 rounded-full px-2 py-0.5 bg-amber-500/15 text-amber-600 dark:text-amber-400 hover:bg-amber-500/25 transition-colors"
+        >
+          {project.blocked_by === 'client' ? 'Blocked — client' : 'Blocked — us'} ✕
+        </button>
+      ) : picking ? (
+        <select
+          autoFocus
+          value="none"
+          onChange={e => {
+            onSetBlockedBy(e.target.value)
+            setPicking(false)
+          }}
+          onBlur={() => setPicking(false)}
+          className="mt-1 self-start bg-muted border border-border rounded px-1 py-0.5 text-[11px] text-muted-foreground focus:outline-none focus:border-ring cursor-pointer"
+        >
         <option value="none">None</option>
         <option value="client">Blocked — client</option>
         <option value="internal">Blocked — us</option>
-      </select>
+        </select>
+      ) : (
+        <button
+          onClick={() => setPicking(true)}
+          title="Mark this project blocked (forces Waiting On to Client or Us)"
+          className="mt-1 self-start text-[11px] text-muted-foreground/50 hover:text-foreground transition-colors"
+        >
+          + mark blocked
+        </button>
+      )}
+    </div>
+  )
+}
+
+// Brand-new project guidance: a dismissible nudge toward the fields that
+// matter, instead of leaving the owner facing a page of em-dashes. Dismissal
+// is per-project so deliberately-blank fields don't keep nagging.
+function NewProjectSetupBanner({ project }: { project: SurveyProject }) {
+  const key = `sot.setupBannerDismissed.${project.id}`
+  const [dismissed, setDismissed] = useState(true) // hidden until storage read (no flash)
+  const isNew = !project.due_date && project.n_target == null && project.budget == null
+
+  useEffect(() => {
+    setDismissed(localStorage.getItem(key) === '1')
+  }, [key])
+
+  if (!isNew || dismissed) return null
+  return (
+    <div className="mb-4 flex items-start gap-3 bg-blue-500/5 border border-blue-500/30 rounded-xl px-4 py-3">
+      <span className="text-lg leading-none mt-0.5">✦</span>
+      <div className="flex-1 text-sm">
+        <p className="font-medium text-foreground">New project — a few essentials to fill in</p>
+        <p className="text-muted-foreground mt-0.5 leading-relaxed">
+          Set the <span className="text-foreground">Due date</span> and{' '}
+          <span className="text-foreground">N target</span> in the tiles below, add a{' '}
+          <span className="text-foreground">Captain</span> and{' '}
+          <span className="text-foreground">Budget</span> in the side cards — or use{' '}
+          <span className="text-foreground">✦ Edit by description</span> to fill several at once.
+        </p>
+      </div>
+      <button
+        onClick={() => {
+          localStorage.setItem(key, '1')
+          setDismissed(true)
+        }}
+        title="Dismiss this reminder for this project"
+        className="text-muted-foreground/60 hover:text-foreground text-sm shrink-0"
+      >
+        ✕
+      </button>
     </div>
   )
 }
@@ -1062,13 +1134,16 @@ function FlagChip({
     <button
       onClick={() => onToggle(!value)}
       title={tooltip}
+      aria-pressed={value}
       className={`rounded-full px-2.5 py-1 text-xs cursor-pointer transition-colors ${
         value
           ? CHIP_ON[tone]
-          : 'bg-muted text-muted-foreground opacity-60 hover:opacity-100'
+          : 'border border-dashed border-border bg-transparent text-muted-foreground hover:bg-muted'
       }`}
     >
-      {value && tone === 'red' ? `⚠ ${label}` : label}
+      {/* On/off marker so state isn't conveyed by color alone, and the dashed
+          off-state reads as a pressable toggle rather than a disabled chip. */}
+      {value ? (tone === 'red' ? `⚠ ${label}` : `✓ ${label}`) : `○ ${label}`}
     </button>
   )
 }
