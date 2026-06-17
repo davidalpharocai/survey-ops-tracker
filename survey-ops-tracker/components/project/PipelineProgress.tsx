@@ -76,9 +76,10 @@ export function PipelineProgress({ project }: PipelineProgressProps) {
 
   return (
     <div>
-      {/* Wrap onto multiple rows (with a row gap) rather than scrolling
-          horizontally — no back-and-forth scrubbing to see later stages. */}
-      <div className="flex items-center gap-2 gap-y-2 flex-wrap">
+      {/* One row: each bubble shares the width and wraps its own label (e.g.
+          "Survey Programming" stacks to two short lines) so all seven stages
+          fit without horizontal scrolling. */}
+      <div className="flex items-stretch gap-1">
         {STAGE_ORDER.map((stage, i) => {
           const field = STAGE_TO_FIELD[stage]
           const isDone = field ? project[field] : false
@@ -86,16 +87,16 @@ export function PipelineProgress({ project }: PipelineProgressProps) {
           const isClickable = stage !== 'Submitted'
 
           return (
-            <div key={stage} className="flex items-center gap-2 shrink-0">
+            <div key={stage} className="flex items-center gap-1 flex-1 min-w-0">
               <button
                 onClick={() => isClickable && toggleStage(stage)}
                 disabled={!isClickable}
                 title={
                   isClickable
-                    ? `${STAGE_DESCRIPTIONS[stage] ?? stage} Click to toggle this stage done/undone.`
-                    : STAGE_DESCRIPTIONS[stage]
+                    ? `${STAGE_DESCRIPTIONS[stage] ?? stage} Click to toggle this stage done/undone.${isCurrent ? ' (Current stage.)' : ''}`
+                    : `${STAGE_DESCRIPTIONS[stage]}${isCurrent ? ' (Current stage.)' : ''}`
                 }
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm border transition-colors ${
+                className={`w-full min-w-0 flex flex-col items-center justify-center text-center gap-0.5 px-1.5 py-1.5 rounded-lg text-xs leading-tight border transition-colors ${
                   isDone
                     ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-600 dark:text-emerald-400 font-medium'
                     : isCurrent
@@ -103,12 +104,11 @@ export function PipelineProgress({ project }: PipelineProgressProps) {
                     : 'bg-muted border-border text-muted-foreground font-medium'
                 } ${isClickable ? 'hover:border-ring cursor-pointer' : 'cursor-default'}`}
               >
-                <span>{isDone ? '✓' : isCurrent ? '▶' : '○'}</span>
-                <span>{stage}</span>
-                {isCurrent && <span className="text-amber-600/70 dark:text-amber-400/70 text-[11px]">(current)</span>}
+                <span aria-hidden>{isDone ? '✓' : isCurrent ? '▶' : '○'}</span>
+                <span className="break-words">{stage}</span>
               </button>
               {i < STAGE_ORDER.length - 1 && (
-                <span className="text-muted-foreground/50 text-xs select-none">→</span>
+                <span className="shrink-0 text-muted-foreground/40 text-xs select-none">→</span>
               )}
             </div>
           )
