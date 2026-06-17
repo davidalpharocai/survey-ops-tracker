@@ -257,7 +257,7 @@ export default function ProjectDetailPage() {
               </button>
             </HelpTip>
           )}
-          <HelpTip text="Permanently deletes the project and its full history — no undo (it asks you to type 'delete' first). If you just want it off the board, use Close Project instead.">
+          <HelpTip text="Removes the project from the board and moves it to Recently Deleted on the Admin page, where you can restore it (it asks you to type 'delete' first). If you just want it off the board, use Close Project instead.">
             <button
               onClick={() => setConfirmingDelete(true)}
               className="text-sm border border-border text-muted-foreground hover:text-red-600 dark:hover:text-red-400 hover:border-red-500/50 px-3 py-1.5 rounded-lg transition-colors shrink-0"
@@ -1503,7 +1503,7 @@ function DeleteProjectModal({
             disabled={!canDelete}
             className="text-xs bg-red-600 hover:bg-red-500 disabled:opacity-40 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg transition-colors"
           >
-            {isPending ? 'Deleting…' : 'Permanently delete'}
+            {isPending ? 'Deleting…' : 'Move to Recently Deleted'}
           </button>
         </div>
       </div>

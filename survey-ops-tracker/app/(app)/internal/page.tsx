@@ -2,10 +2,9 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd'
-import { useInternalProjects, useUpdateProject, type SlimProject } from '@/lib/hooks/useProjects'
+import { useInternalProjects, useUpdateProject } from '@/lib/hooks/useProjects'
 import { useTeamMembers } from '@/lib/hooks/useTeamMembers'
 import { useSprintConfig } from '@/lib/hooks/useSprintConfig'
-import { useQueryClient } from '@tanstack/react-query'
 import { columnSortRank } from '@/components/board/Board'
 import { InternalCard } from '@/components/internal/InternalCard'
 import { NewInternalProjectModal } from '@/components/internal/NewInternalProjectModal'
@@ -21,7 +20,6 @@ declare global {
 
 export default function InternalProjectsPage() {
   const router = useRouter()
-  const queryClient = useQueryClient()
   const { data: projects = [], isLoading } = useInternalProjects()
   const { data: teamMembers = [] } = useTeamMembers()
   const { data: sprintCfg } = useSprintConfig()
@@ -44,10 +42,10 @@ export default function InternalProjectsPage() {
     const i = result.destination.index
     const sortOrder = sortOrderBetween(destCards[i - 1]?.sort_order, destCards[i]?.sort_order)
 
-    // Same-tick optimistic patch so the drop animation targets the new home
-    queryClient.setQueriesData<SlimProject[]>({ queryKey: ['internal-projects'] }, old =>
-      old?.map(p => (p.id === id ? ({ ...p, board_column: to, sort_order: sortOrder } as SlimProject) : p))
-    )
+    // useUpdateProject.onMutate already patches the ['internal-projects'] cache
+    // synchronously (same tick as the drop) and snapshots it for rollback — so
+    // we just fire the mutation. A manual patch here would run *before* that
+    // snapshot and corrupt the rollback on a failed save.
     updateProject.mutate({ id, updates: { board_column: to, sort_order: sortOrder } })
   }
 

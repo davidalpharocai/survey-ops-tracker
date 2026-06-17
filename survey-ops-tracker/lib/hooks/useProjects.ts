@@ -224,23 +224,38 @@ export function useDeleteProject() {
       if (error) throw error
     },
     onMutate: id => {
+      // A project lives in exactly one of the two list caches (survey →
+      // ['projects'], internal → ['internal-projects']). Optimistically drop
+      // it from both and snapshot both, so the card disappears immediately
+      // wherever it was and a failed delete rolls back cleanly.
       const previousLists = queryClient.getQueriesData<SlimProject[]>({
         queryKey: ['projects'],
+      })
+      const previousInternal = queryClient.getQueriesData<SlimProject[]>({
+        queryKey: ['internal-projects'],
       })
       queryClient.setQueriesData<SlimProject[]>({ queryKey: ['projects'] }, old =>
         old?.filter(p => p.id !== id)
       )
+      queryClient.setQueriesData<SlimProject[]>({ queryKey: ['internal-projects'] }, old =>
+        old?.filter(p => p.id !== id)
+      )
       void queryClient.cancelQueries({ queryKey: ['projects'] })
-      return { previousLists }
+      void queryClient.cancelQueries({ queryKey: ['internal-projects'] })
+      return { previousLists, previousInternal }
     },
     onError: (_err, _id, context) => {
       for (const [key, data] of context?.previousLists ?? []) {
+        queryClient.setQueryData(key, data)
+      }
+      for (const [key, data] of context?.previousInternal ?? []) {
         queryClient.setQueryData(key, data)
       }
       toast("Couldn't delete the project — it was restored.")
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['projects'] })
+      queryClient.invalidateQueries({ queryKey: ['internal-projects'] })
       queryClient.invalidateQueries({ queryKey: ['deleted-projects'] })
     },
   })
@@ -286,7 +301,9 @@ export function useRestoreProject() {
     },
     onError: () => toast("Couldn't restore the project — please try again."),
     onSettled: () => {
+      // Restored project could belong to either section — refresh both.
       queryClient.invalidateQueries({ queryKey: ['projects'] })
+      queryClient.invalidateQueries({ queryKey: ['internal-projects'] })
       queryClient.invalidateQueries({ queryKey: ['deleted-projects'] })
     },
   })
