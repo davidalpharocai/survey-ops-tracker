@@ -1,8 +1,7 @@
 'use client'
 import { useMemo, useState, useEffect } from 'react'
 import Link from 'next/link'
-import { useQuery } from '@tanstack/react-query'
-import { createClient } from '@/lib/supabase/client'
+import { useClients } from '@/lib/hooks/useClients'
 import { useProjects } from '@/lib/hooks/useProjects'
 import { useTeamMembers } from '@/lib/hooks/useTeamMembers'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
@@ -11,9 +10,6 @@ import { RecentlyDeleted } from '@/components/admin/RecentlyDeleted'
 import { SprintCadence } from '@/components/admin/SprintCadence'
 import { SystemStatus } from '@/components/admin/SystemStatus'
 import { AiUsagePanel } from '@/components/admin/AiUsagePanel'
-import type { Tables } from '@/lib/supabase/types'
-
-type Client = Tables<'clients'>
 
 const SUPABASE_PROJECT = 'xcfoyxyxovibltwfydbf'
 
@@ -54,18 +50,6 @@ const LINKS: { label: string; href: string; desc: string }[] = [
     desc: 'Every system, account, and what-to-do-if-it-breaks runbook.',
   },
 ]
-
-function useClients() {
-  const supabase = createClient()
-  return useQuery({
-    queryKey: ['clients'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('clients').select('*').order('name')
-      if (error) throw error
-      return data as Client[]
-    },
-  })
-}
 
 const tile = 'bg-card border border-border shadow-sm rounded-xl p-4'
 const heading =

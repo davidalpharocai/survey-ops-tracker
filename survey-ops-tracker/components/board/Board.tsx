@@ -10,6 +10,9 @@ import { useCurrentMember } from '@/lib/hooks/useCurrentMember'
 import { useIsNewForMe } from '@/lib/hooks/useSeenProjects'
 import { STAGE_ORDER, getCheckboxesForColumn, type BoardColumn as BoardColumnType } from '@/lib/utils/stage'
 import { getDueUrgency } from '@/lib/utils/date'
+import { useComplianceMaps } from '@/lib/hooks/useComplianceState'
+import { complianceGate } from '@/lib/utils/compliance'
+import { toast } from '@/lib/utils/toast'
 import { boardOrder, sortOrderBetween } from '@/lib/utils/ordering'
 import type { SlimProject } from '@/lib/hooks/useProjects'
 import type { TeamMember } from '@/lib/hooks/useTeamMembers'
@@ -37,6 +40,7 @@ export function Board({ projects, teamMembers, onMoveProject, wrapInContext = tr
   const router = useRouter()
   const queryClient = useQueryClient()
   const { data: currentMember, isLoading: memberLoading } = useCurrentMember()
+  const { data: complianceMaps } = useComplianceMaps()
   const isNewForMe = useIsNewForMe()
   const [captainFilter, setCaptainFilter] = useState<string | null>(null)
   const [filterReady, setFilterReady] = useState(false)
@@ -124,6 +128,26 @@ export function Board({ projects, teamMembers, onMoveProject, wrapInContext = tr
     const i = result.destination.index
     const sortOrder = sortOrderBetween(destCards[i - 1]?.sort_order, destCards[i]?.sort_order)
     if (sameColumn && result.destination.index === result.source.index) return
+
+    // Compliance guardrail (before-fielding): block dragging into Fielding or
+    // later when the client's questionnaire review isn't approved. Override is
+    // a project-page action; the board just stops the move and points there.
+    const moved = projects.find(p => p.id === result.draggableId)
+    if (moved && complianceMaps) {
+      const firm = moved.client.split(' - ')[0].trim()
+      const gate = complianceGate({
+        targetColumn: newColumn,
+        willMarkDelivered: false,
+        client: complianceMaps.clientByFirm.get(firm) ?? null,
+        override: moved.compliance_override ?? null,
+        submissions: complianceMaps.approvedByProject.get(moved.id) ?? [],
+      })
+      if (gate.blocked) {
+        toast(gate.message + ' Open the project to review or override.')
+        return
+      }
+    }
+
     // Apply the move to the cache RIGHT HERE, in the same tick as the drop —
     // the drop animation then aims at the card's new home, not its old one.
     queryClient.setQueriesData<SlimProject[]>({ queryKey: ['projects'] }, old =>

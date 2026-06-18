@@ -1,6 +1,12 @@
 'use client'
+import { useState } from 'react'
 import { STAGE_ORDER, STAGE_DESCRIPTIONS } from '@/lib/utils/stage'
 import { useUpdateProject } from '@/lib/hooks/useProjects'
+import { useCurrentMember } from '@/lib/hooks/useCurrentMember'
+import { useComplianceState } from '@/lib/hooks/useComplianceState'
+import { complianceGate } from '@/lib/utils/compliance'
+import { autoStamp } from '@/lib/utils/date'
+import { ComplianceGateModal } from './ComplianceGateModal'
 import type { SurveyProject } from '@/lib/hooks/useProjects'
 import type { BoardColumn } from '@/lib/utils/stage'
 
@@ -31,6 +37,24 @@ interface PipelineProgressProps {
 
 export function PipelineProgress({ project }: PipelineProgressProps) {
   const updateProject = useUpdateProject()
+  const { data: currentMember } = useCurrentMember()
+  const { data: compliance } = useComplianceState(project.id, project.client, project.compliance_override ?? null)
+  const [gate, setGate] = useState<{ message: string; contact: string | null; onOverride: (reason: string) => void } | null>(null)
+
+  // Apply a stage move; `overrideNote`, when present, is stamped into the
+  // project's Latest/Next Steps (attributed + timestamped + captured by the
+  // audit trigger) to record a compliance override.
+  function applyMove(newState: Record<string, boolean>, newColumn: BoardColumn, overrideNote?: string) {
+    const userName = currentMember?.name ?? 'Someone'
+    updateProject.mutate({
+      id: project.id,
+      updates: {
+        ...newState,
+        board_column: newColumn,
+        ...(overrideNote ? { latest_next_steps: autoStamp(userName, project.latest_next_steps, overrideNote) } : {}),
+      },
+    })
+  }
 
   function toggleStage(stage: string) {
     const field = STAGE_TO_FIELD[stage]
@@ -68,10 +92,30 @@ export function PipelineProgress({ project }: PipelineProgressProps) {
     }
 
     const newColumn = deriveColumn(newState)
-    updateProject.mutate({
-      id: project.id,
-      updates: { ...newState, board_column: newColumn },
+
+    // Compliance guardrail: block fielding/delivery when the client's review
+    // isn't approved; allow an explicit, recorded override.
+    const willMarkDelivered = newState.stage_delivery === true && !project.stage_delivery
+    const g = complianceGate({
+      targetColumn: newColumn,
+      willMarkDelivered,
+      client: compliance?.client ?? null,
+      override: project.compliance_override ?? null,
+      submissions: compliance?.submissions ?? [],
     })
+    if (g.blocked) {
+      setGate({
+        message: g.message,
+        contact: compliance?.contact ?? null,
+        onOverride: (reason: string) => {
+          applyMove(newState, newColumn, `⚠ Compliance override (${g.phase}): ${reason}`)
+          setGate(null)
+        },
+      })
+      return
+    }
+
+    applyMove(newState, newColumn)
   }
 
   return (
@@ -117,6 +161,14 @@ export function PipelineProgress({ project }: PipelineProgressProps) {
       <p className="text-xs text-muted-foreground/50 mt-2">
         Checking a stage advances the project card on the board. Uncheck to move it back.
       </p>
+      {gate && (
+        <ComplianceGateModal
+          message={gate.message}
+          contact={gate.contact}
+          onCancel={() => setGate(null)}
+          onOverride={gate.onOverride}
+        />
+      )}
     </div>
   )
 }
