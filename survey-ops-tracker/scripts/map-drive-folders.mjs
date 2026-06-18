@@ -10,11 +10,21 @@ const SHARED_DRIVE_ID = process.env.DELIVERABLES_SHARED_DRIVE_ID
 const apply = process.argv.includes('--apply')
 
 const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
-const auth = new google.auth.JWT({
-  email: process.env.GOOGLE_CLIENT_EMAIL,
-  key: (process.env.GOOGLE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
-  scopes: ['https://www.googleapis.com/auth/drive'],
-})
+function makeAuth() {
+  const refreshToken = process.env.GOOGLE_OAUTH_REFRESH_TOKEN
+  if (refreshToken) {
+    const o = new google.auth.OAuth2(process.env.GOOGLE_OAUTH_CLIENT_ID, process.env.GOOGLE_OAUTH_CLIENT_SECRET)
+    o.setCredentials({ refresh_token: refreshToken })
+    return o
+  }
+  return new google.auth.JWT({
+    email: process.env.GOOGLE_CLIENT_EMAIL,
+    key: (process.env.GOOGLE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
+    scopes: ['https://www.googleapis.com/auth/drive'],
+    subject: process.env.GOOGLE_IMPERSONATE_SUBJECT || undefined,
+  })
+}
+const auth = makeAuth()
 const drive = google.drive({ version: 'v3', auth })
 
 const norm = (s) => s.toLowerCase().replace(/\(.*?\)/g, '').replace(/[^a-z0-9]+/g, ' ').trim()
