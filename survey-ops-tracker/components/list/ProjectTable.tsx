@@ -275,6 +275,9 @@ export function ProjectTable({
                       <>
                         {p.n_collected} / {p.n_target ?? '—'}
                         {nMet && ' ✓'}
+                        {(p.segment_count ?? 0) > 1 && (
+                          <span className="text-muted-foreground/50"> · {p.segment_count} seg</span>
+                        )}
                       </>
                     )}
                   </td>

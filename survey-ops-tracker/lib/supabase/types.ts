@@ -15,6 +15,39 @@ export type Database = {
         Update: { id?: number; anchor_date?: string; length_days?: number }
         Relationships: []
       }
+      project_segments: {
+        Row: {
+          id: string
+          project_id: string
+          label: string
+          n_target: number | null
+          n_collected: number
+          n_actual: number | null
+          sort_order: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          project_id: string
+          label: string
+          n_target?: number | null
+          n_collected?: number
+          n_actual?: number | null
+          sort_order?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          project_id?: string
+          label?: string
+          n_target?: number | null
+          n_collected?: number
+          n_actual?: number | null
+          sort_order?: number
+          created_at?: string
+        }
+        Relationships: []
+      }
       app_config: {
         Row: { id: number; ai_monthly_cap_usd: number; ai_hard_stop: boolean; updated_at: string }
         Insert: { id?: number; ai_monthly_cap_usd?: number; ai_hard_stop?: boolean; updated_at?: string }
@@ -197,6 +230,7 @@ export type Database = {
           objective: string | null
           sprint_number: number | null
           compliance_override: boolean | null
+          segment_count: number
           created_at: string
           updated_at: string
         }
@@ -255,6 +289,7 @@ export type Database = {
           objective?: string | null
           sprint_number?: number | null
           compliance_override?: boolean | null
+          segment_count?: number
           created_at?: string
           updated_at?: string
         }
@@ -313,6 +348,7 @@ export type Database = {
           objective?: string | null
           sprint_number?: number | null
           compliance_override?: boolean | null
+          segment_count?: number
           created_at?: string
           updated_at?: string
         }

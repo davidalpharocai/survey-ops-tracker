@@ -178,6 +178,9 @@ export function ProjectCard({ project, onClick, isNew }: ProjectCardProps) {
       {/* N Progress */}
       <div title="Responses collected so far vs the response goal (N Target)">
         <NProgressBar collected={project.n_collected} target={project.n_target} />
+        {(project.segment_count ?? 0) > 1 && (
+          <p className="text-[10px] text-muted-foreground/60 mt-0.5">{project.segment_count} segments</p>
+        )}
       </div>
 
       {/* Latest/Next Steps snippet */}

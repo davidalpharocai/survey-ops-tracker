@@ -26,6 +26,7 @@ import { BudgetWidget } from '@/components/project/BudgetWidget'
 import { BidWidget } from '@/components/project/BidWidget'
 import { CompliancePanel } from '@/components/compliance/CompliancePanel'
 import { ComplianceBanner } from '@/components/project/ComplianceBanner'
+import { SegmentedNTile } from '@/components/project/SegmentedNTile'
 import { DeliverablesPanel } from '@/components/deliverables/DeliverablesPanel'
 import { salespersonOptions } from '@/lib/utils/salespeople'
 
@@ -408,11 +409,10 @@ export default function ProjectDetailPage() {
         <ComplianceBanner project={project} />
         {/* Hero stat strip */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-          <HeroNCollected
-            collected={project.n_collected}
-            target={project.n_target}
+          <SegmentedNTile
+            project={project}
             tooltip={TOOLTIPS['N Collected']}
-            onSave={v => updateProject.mutate({ id, updates: { n_collected: v ?? 0 } })}
+            onSaveCollected={v => updateProject.mutate({ id, updates: { n_collected: v ?? 0 } })}
           />
           <HeroTiming
             due={project.due_date}
@@ -633,76 +633,6 @@ function SidebarCard({ title, children }: { title: string; children: React.React
 }
 
 /* ---------- Hero stat strip cards ---------- */
-
-function HeroNCollected({
-  collected,
-  target,
-  tooltip,
-  onSave,
-}: {
-  collected: number
-  target: number | null
-  tooltip: string
-  onSave: (next: number | null) => void
-}) {
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState('')
-
-  function save() {
-    const parsed = parseInt(draft, 10)
-    onSave(isNaN(parsed) ? null : parsed)
-    setEditing(false)
-  }
-
-  return (
-    <div className="bg-card border border-border shadow-sm rounded-xl p-3 flex flex-col gap-1">
-      <span className="text-xs text-muted-foreground flex items-center">
-        N collected
-        <InfoTooltip text={tooltip} />
-      </span>
-      {editing ? (
-        <div className="flex gap-1.5 items-center">
-          <input
-            autoFocus
-            type="number"
-            value={draft}
-            onChange={e => setDraft(e.target.value)}
-            className="w-20 min-w-0 bg-muted border border-border rounded px-2 py-1 text-sm text-foreground focus:outline-none focus:border-ring"
-            onKeyDown={e => {
-              if (e.key === 'Enter') save()
-              if (e.key === 'Escape') setEditing(false)
-            }}
-          />
-          <button
-            onClick={save}
-            className="text-xs bg-muted hover:bg-accent text-foreground px-2 py-1 rounded transition-colors"
-          >
-            Save
-          </button>
-        </div>
-      ) : (
-        <button
-          onClick={() => {
-            setDraft(String(collected))
-            setEditing(true)
-          }}
-          className="text-2xl font-semibold text-foreground leading-tight text-left cursor-pointer hover:bg-accent rounded-md px-1.5 -ml-1.5 transition-colors"
-          title="Click to edit"
-        >
-          {collected}
-          {target != null ? (
-            <span className="text-base font-normal text-muted-foreground"> / {target}</span>
-          ) : (
-            <span className="text-xs font-normal text-muted-foreground/60"> · no target</span>
-          )}
-        </button>
-      )}
-      <div className="mt-1">
-        <NProgressBar collected={collected} target={target} showLabel={false} />
-      </div>
-    </div>
-  )
-}
 
 function HeroTiming({
   due,

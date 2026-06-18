@@ -58,6 +58,7 @@ const SLIM_PROJECT_COLUMNS = [
   'category',
   'sprint_number',
   'compliance_override',
+  'segment_count',
   'created_at',
   'updated_at',
 ] as const
