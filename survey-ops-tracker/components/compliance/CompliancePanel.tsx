@@ -1,12 +1,26 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import { useSubmissions, useRecipients, useInvalidateCompliance } from '@/lib/hooks/useSubmissions'
+import { useComplianceState } from '@/lib/hooks/useComplianceState'
+import { afterFieldingRequired } from '@/lib/utils/compliance'
 import { RecipientsManager } from './RecipientsManager'
 import { SubmitQuestionsModal } from './SubmitQuestionsModal'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
 import { Button } from '@/components/ui/button'
 import { formatDate } from '@/lib/utils/date'
 import type { DraftQuestion } from '@/lib/parsing/validate'
+import type { SurveyProject } from '@/lib/hooks/useProjects'
+
+// First linked-document URL (entries are a plain URL or JSON {name,url}) — used
+// to pre-suggest the results link for the after-fielding review.
+function firstDocUrl(docs?: string[] | null): string | null {
+  if (!docs?.length) return null
+  const e = docs[0]
+  if (e.startsWith('{')) {
+    try { return (JSON.parse(e).url as string) ?? null } catch { return e }
+  }
+  return e
+}
 
 const STATUS_BADGE: Record<string, string> = {
   pending_review: 'bg-amber-500/20 text-amber-600 dark:text-amber-400',
@@ -171,12 +185,23 @@ function CountdownRow({
   )
 }
 
-export function CompliancePanel({ projectId }: { projectId: string }) {
+export function CompliancePanel({ projectId, project }: { projectId: string; project?: SurveyProject }) {
   const { data: submissions = [] } = useSubmissions(projectId)
   const { data: recipients = [] } = useRecipients(projectId)
   const hasComplianceContact = recipients.some(r => r.role === 'compliance')
   const invalidate = useInvalidateCompliance(projectId)
   const [modalOpen, setModalOpen] = useState(false)
+  const [modalPhase, setModalPhase] = useState<'before_fielding' | 'after_fielding'>('before_fielding')
+
+  // After-fielding (results) review affordance — only when the client requires
+  // it. Enabled once results exist (N Actual set) and a contact is on file.
+  const cs = useComplianceState(project?.id ?? '', project?.client ?? '', project?.compliance_override ?? null)
+  const requiresAfter = !!project && afterFieldingRequired(cs.data?.client ?? null, project.compliance_override ?? null)
+  const hasAfterSubmission = submissions.some(
+    s => s.phase === 'after_fielding' && (s.status === 'pending_review' || s.status === 'approved')
+  )
+  const resultsSuggestion = firstDocUrl(project?.linked_documents)
+  const canSendResults = requiresAfter && project?.n_actual != null && hasComplianceContact && !hasAfterSubmission
   const [recallData, setRecallData] = useState<{
     questions: DraftQuestion[]
     sourceFileName: string
@@ -194,6 +219,7 @@ export function CompliancePanel({ projectId }: { projectId: string }) {
 
   function handleRecalled(questions: DraftQuestion[], sourceFileName: string, sourceFilePath: string, message: string | null) {
     setRecallData({ questions, sourceFileName, sourceFilePath, message })
+    setModalPhase('before_fielding')
     setModalOpen(true)
     invalidate()
   }
@@ -289,6 +315,7 @@ export function CompliancePanel({ projectId }: { projectId: string }) {
             return
           }
           setRecallData(null)
+          setModalPhase('before_fielding')
           setModalOpen(true)
         }}
         disabled={latest?.status === 'pending_review' || latestIsUndispatched || !hasComplianceContact}
@@ -302,6 +329,28 @@ export function CompliancePanel({ projectId }: { projectId: string }) {
               ? 'Submit revised questions'
               : 'Submit questions for review'}
       </Button>
+
+      {requiresAfter && (
+        <>
+          <Button
+            variant="outline"
+            onClick={() => { setRecallData(null); setModalPhase('after_fielding'); setModalOpen(true) }}
+            disabled={!canSendResults}
+            className="w-full text-xs mb-1"
+          >
+            {hasAfterSubmission ? 'Results sent to compliance' : 'Send results to compliance'}
+          </Button>
+          {!canSendResults && !hasAfterSubmission && (
+            <p className="text-xs text-muted-foreground mb-2">
+              {project?.n_actual == null
+                ? 'After-fielding review: available once N Actual (cleaned responses) is recorded.'
+                : !hasComplianceContact
+                  ? 'Add a client compliance contact below to send the after-fielding review.'
+                  : 'After-fielding results review.'}
+            </p>
+          )}
+        </>
+      )}
       {!hasComplianceContact && (
         <p className="text-xs text-amber-600 dark:text-amber-400 mb-3">
           Add a client compliance contact below before submitting for review.
@@ -321,6 +370,8 @@ export function CompliancePanel({ projectId }: { projectId: string }) {
           initialSourceFileName={recallData?.sourceFileName}
           initialSourceFilePath={recallData?.sourceFilePath}
           initialMessage={recallData?.message ?? undefined}
+          phase={modalPhase}
+          resultsUrl={modalPhase === 'after_fielding' ? (resultsSuggestion ?? undefined) : undefined}
         />
       )}
     </div>

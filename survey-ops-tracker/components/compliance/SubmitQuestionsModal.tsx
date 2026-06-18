@@ -14,6 +14,8 @@ export function SubmitQuestionsModal({
   initialSourceFileName,
   initialSourceFilePath,
   initialMessage,
+  phase = 'before_fielding',
+  resultsUrl,
 }: {
   projectId: string
   onClose: () => void
@@ -21,7 +23,10 @@ export function SubmitQuestionsModal({
   initialSourceFileName?: string
   initialSourceFilePath?: string
   initialMessage?: string
+  phase?: 'before_fielding' | 'after_fielding'
+  resultsUrl?: string
 }) {
+  const isAfter = phase === 'after_fielding'
   // If initial data provided (e.g. from recall), start in preview with that state
   const [stage, setStage] = useState<Stage>(() =>
     initialQuestions && initialQuestions.length > 0 ? 'preview' : 'upload'
@@ -30,6 +35,7 @@ export function SubmitQuestionsModal({
   const [sourceFileName, setSourceFileName] = useState(() => initialSourceFileName ?? '')
   const [sourceFilePath, setSourceFilePath] = useState(() => initialSourceFilePath ?? '')
   const [message, setMessage] = useState(() => initialMessage ?? '')
+  const [results, setResults] = useState(() => resultsUrl ?? '')
   const [error, setError] = useState('')
   const invalidate = useInvalidateCompliance(projectId)
 
@@ -74,13 +80,17 @@ export function SubmitQuestionsModal({
       setError('Every question needs text, and at least one question is required.')
       return
     }
+    if (isAfter && !results.trim()) {
+      setError('Add the results link (the deliverable / data the client should review) before sending.')
+      return
+    }
     setStage('submitting')
     setError('')
     try {
       const res = await fetch('/api/submissions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId, sourceFileName, sourceFilePath, questions, message: message.trim() || undefined }),
+        body: JSON.stringify({ projectId, sourceFileName, sourceFilePath, questions, message: message.trim() || undefined, phase, resultsUrl: isAfter ? results.trim() : undefined }),
       })
       const body = await res.json().catch(() => ({}))
       if (!res.ok) {
@@ -103,7 +113,7 @@ export function SubmitQuestionsModal({
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
       <div role="dialog" aria-modal="true" aria-label="Submit questions for compliance review" className="bg-card border border-border rounded-xl p-5 w-full max-w-2xl">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-bold text-foreground">Submit questions for compliance review</h3>
+          <h3 className="text-sm font-bold text-foreground">{isAfter ? 'Submit questions + results for compliance' : 'Submit questions for compliance review'}</h3>
           <button onClick={onClose} disabled={stage === 'submitting' || stage === 'parsing'} className="text-muted-foreground hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Close">✕</button>
         </div>
 
@@ -139,6 +149,20 @@ export function SubmitQuestionsModal({
               {questions.length} questions · {openCount} open-text — check the AI&apos;s work, especially
               open-text flags, then send to compliance.
             </p>
+            {isAfter && (
+              <div className="mb-3 bg-muted/50 rounded-lg px-3 py-2.5">
+                <label className="block text-xs text-muted-foreground mb-1.5">
+                  Results link <span className="text-muted-foreground/70">(the deliverable / data the client reviews — sent with the questions)</span>
+                </label>
+                <input
+                  value={results}
+                  onChange={e => setResults(e.target.value)}
+                  placeholder="https://…  (Occam study, data link, etc.)"
+                  disabled={stage === 'submitting'}
+                  className="w-full bg-background border border-input text-foreground text-sm rounded-md px-3 py-2 placeholder:text-muted-foreground/60 focus:outline-none focus:border-blue-500 disabled:opacity-50"
+                />
+              </div>
+            )}
             <QuestionPreviewEditor questions={questions} onChange={setQuestions} />
             <div className="mt-4">
               <label className="block text-xs text-muted-foreground mb-1.5">

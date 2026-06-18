@@ -19,7 +19,10 @@ export async function POST(request: Request) {
     sourceFilePath: string
     questions: DraftQuestion[]
     message?: string
+    phase?: 'before_fielding' | 'after_fielding'
+    resultsUrl?: string
   }
+  const phase = body.phase === 'after_fielding' ? 'after_fielding' : 'before_fielding'
   if (!body.projectId || !body.sourceFileName || !body.sourceFilePath) {
     return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
   }
@@ -68,6 +71,8 @@ export async function POST(request: Request) {
       source_file_path: body.sourceFilePath,
       submitted_by: user.id,
       analyst_message: body.message?.trim() || null,
+      phase,
+      results_url: body.resultsUrl?.trim() || null,
     })
     .select()
     .single()

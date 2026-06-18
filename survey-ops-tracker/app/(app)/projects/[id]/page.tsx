@@ -471,7 +471,7 @@ export default function ProjectDetailPage() {
               projectId={project.id}
               documents={project.linked_documents ?? []}
             />
-            <CompliancePanel projectId={project.id} />
+            <CompliancePanel projectId={project.id} project={project} />
             <DeliverablesPanel projectId={project.id} />
             <ActivityLog projectId={project.id} />
           </div>

@@ -87,6 +87,26 @@ export default async function ReviewPage({
           <p className="whitespace-pre-line">{submission.analyst_message}</p>
         </div>
       )}
+      {submission.phase === 'after_fielding' && (
+        <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-300 dark:border-amber-500/30 rounded-xl px-4 py-3 mb-6 text-sm">
+          <p className="text-xs font-medium text-amber-700 dark:text-amber-400 mb-1">After-fielding review — questions + results</p>
+          <p className="text-slate-700 dark:text-slate-300 mb-2">
+            Please review the questions below together with the survey results.
+          </p>
+          {submission.results_url ? (
+            <a
+              href={submission.results_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 dark:text-blue-400 hover:underline break-all"
+            >
+              View results →
+            </a>
+          ) : (
+            <span className="text-slate-500 dark:text-slate-400 text-xs">No results link was provided.</span>
+          )}
+        </div>
+      )}
       <ReviewClient
         submissionId={submission.id}
         status={submission.status}
