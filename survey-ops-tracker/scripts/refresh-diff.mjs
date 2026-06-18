@@ -14,6 +14,15 @@ const dir = path.dirname(fileURLToPath(import.meta.url))
 config({ path: path.join(dir, '..', '.env.local'), quiet: true })
 
 const FILL = process.argv.includes('--fill-blanks')
+// One-time "sheet wins" overwrite: push sheet values into matched app projects,
+// overwriting conflicts. Only fields where the sheet has a value (blank sheet
+// cells never null out app data), and only data fields (not board position /
+// stage checkboxes). Every change is captured by the audit trigger.
+const OVERWRITE = process.argv.includes('--overwrite')
+const OVERWRITE_FIELDS = [
+  'project_type', 'status', 'submitted_date', 'launch_date', 'due_date', 'deliver_date',
+  'n_target', 'n_collected', 'n_actual', 'audience_size', 'salesperson', 'survey_tool_id',
+]
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL
 const key = process.env.SUPABASE_SERVICE_ROLE_KEY
 const headers = {
@@ -109,7 +118,7 @@ function parseRow(r) {
 const COMPARE = ['project_type', 'submitted_date', 'launch_date', 'due_date', 'deliver_date',
   'n_target', 'n_actual', 'audience_size', 'salesperson', 'survey_tool_id']
 
-const newRows = [], conflicts = [], fillables = [], matchedCodes = new Set()
+const newRows = [], conflicts = [], fillables = [], overwrites = [], matchedCodes = new Set()
 let matched = 0
 
 for (const r of sheetRows) {
@@ -123,6 +132,16 @@ for (const r of sheetRows) {
   if (!p) { newRows.push(s); continue }
   matched++
   matchedCodes.add(p.project_code)
+
+  if (OVERWRITE) {
+    const diff = {}
+    for (const f of OVERWRITE_FIELDS) {
+      const sv = s[f]
+      if (sv == null || sv === '') continue
+      if (String(sv) !== String(p[f] ?? '')) diff[f] = sv
+    }
+    if (Object.keys(diff).length) overwrites.push({ code: p.project_code, name: p.project_name, updates: diff })
+  }
 
   for (const f of COMPARE) {
     const sv = s[f], dv = p[f]
@@ -154,6 +173,15 @@ console.log(`\n=== BLANK-FILLS (sheet has data, app field empty${FILL ? ' — AP
 for (const f of fillables) console.log(`  ${f.code} ${f.name}: ${f.field} <- ${JSON.stringify(f.value)}`)
 console.log(`\n=== CONFLICTS (both have values — app kept, listed for David) ===`)
 for (const c of conflicts) console.log(`  ${c.code} ${c.name}: ${c.field} sheet=${JSON.stringify(c.sheet)} app=${JSON.stringify(c.app)}`)
+
+if (OVERWRITE) {
+  console.log(`\n=== OVERWRITE (sheet → app, matched projects, differing fields only) ===`)
+  for (const o of overwrites) console.log(`  ${o.code} ${o.name}: ${JSON.stringify(o.updates)}`)
+  for (const o of overwrites) {
+    await rest('PATCH', `survey_projects?project_code=eq.${o.code}`, o.updates)
+  }
+  console.log(`\nOVERWROTE ${overwrites.length} projects with sheet values`)
+}
 
 if (FILL && fillables.length) {
   const byProject = new Map()
