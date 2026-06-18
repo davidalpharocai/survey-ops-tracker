@@ -378,7 +378,7 @@ export function LatestNextSteps({ projectId, notes }: LatestNextStepsProps) {
             <textarea
               value={newText}
               onChange={e => setNewText(e.target.value)}
-              placeholder="Add next step..."
+              placeholder="Add next step…"
               rows={2}
               className="flex-1 bg-muted border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:border-ring transition-colors"
               onKeyDown={saveOnCtrlEnter(handleAdd)}

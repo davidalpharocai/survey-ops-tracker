@@ -36,10 +36,13 @@ function useInsights() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('survey_projects')
-        .select(COLS)
+        .select(COLS + ', project_type')
         .is('deleted_at', null)
       if (error) throw error
-      return data as unknown as InsightProject[]
+      // Survey-focused insights — internal projects have their own section
+      return (data as unknown as (InsightProject & { project_type: string | null })[]).filter(
+        p => p.project_type !== 'Internal'
+      )
     },
     staleTime: 60_000,
   })

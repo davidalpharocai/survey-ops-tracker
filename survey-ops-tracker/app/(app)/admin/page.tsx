@@ -1,5 +1,5 @@
 'use client'
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useQuery } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
@@ -8,6 +8,9 @@ import { useTeamMembers } from '@/lib/hooks/useTeamMembers'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
 import { MasterAuditLog } from '@/components/admin/MasterAuditLog'
 import { RecentlyDeleted } from '@/components/admin/RecentlyDeleted'
+import { SprintCadence } from '@/components/admin/SprintCadence'
+import { SystemStatus } from '@/components/admin/SystemStatus'
+import { AiUsagePanel } from '@/components/admin/AiUsagePanel'
 import type { Tables } from '@/lib/supabase/types'
 
 type Client = Tables<'clients'>
@@ -67,6 +70,16 @@ function useClients() {
 const tile = 'bg-card border border-border shadow-sm rounded-xl p-4'
 const heading =
   'text-xs text-muted-foreground uppercase tracking-widest mb-3 font-medium flex items-center'
+
+// The Admin page groups many sections; tabs keep it scannable as it grows.
+const ADMIN_TABS = [
+  { key: 'overview', label: 'Overview' },
+  { key: 'accounts', label: 'Accounts & Team' },
+  { key: 'operations', label: 'Operations' },
+  { key: 'audit', label: 'Audit Log' },
+] as const
+type AdminTab = (typeof ADMIN_TABS)[number]['key']
+const ADMIN_TAB_KEY = 'sot.adminTab'
 
 export default function AdminPage() {
   const { data: projects = [] } = useProjects()
@@ -144,6 +157,16 @@ export default function AdminPage() {
     }
   }, [projects])
 
+  const [tab, setTab] = useState<AdminTab>('overview')
+  useEffect(() => {
+    const saved = localStorage.getItem(ADMIN_TAB_KEY)
+    if (saved && ADMIN_TABS.some(t => t.key === saved)) setTab(saved as AdminTab)
+  }, [])
+  function changeTab(t: AdminTab) {
+    setTab(t)
+    localStorage.setItem(ADMIN_TAB_KEY, t)
+  }
+
   return (
     <div className="max-w-5xl mx-auto flex flex-col gap-4">
       <div className="flex items-center gap-3">
@@ -153,6 +176,23 @@ export default function AdminPage() {
         </span>
       </div>
 
+      {/* Tabs — keep the growing page scannable */}
+      <div className="flex bg-muted border border-border rounded-lg p-1 gap-1 w-fit flex-wrap">
+        {ADMIN_TABS.map(t => (
+          <button
+            key={t.key}
+            onClick={() => changeTab(t.key)}
+            className={`text-sm px-3 py-1.5 rounded font-medium transition-colors ${
+              tab === t.key ? 'bg-background text-foreground' : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'overview' && (
+        <>
       {/* Quick links */}
       <div className={tile}>
         <h3 className={heading}>
@@ -178,25 +218,38 @@ export default function AdminPage() {
         </div>
       </div>
 
+      {/* Operational health — backend jobs + AI spend, side by side */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+        <SystemStatus />
+        <AiUsagePanel />
+      </div>
+
       {/* Data health */}
       <div className={tile}>
         <h3 className={heading}>
           Data health
           <InfoTooltip text="Open pipeline projects with gaps worth fixing. Click a name to open it." />
         </h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-start">
           <HealthList label="No captain" items={health.noCaptain} empty="Every open project has a captain" />
           <HealthList label="No due date" items={health.noDue} empty="Every open project has a due date" />
           <HealthList label="On hold" items={health.onHold} empty="Nothing on hold" />
         </div>
       </div>
+        </>
+      )}
 
-      {/* Recently deleted (restore) */}
-      <RecentlyDeleted />
+      {tab === 'operations' && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+          <SprintCadence />
+          <RecentlyDeleted />
+        </div>
+      )}
 
-      {/* Master audit log */}
-      <MasterAuditLog />
+      {tab === 'audit' && <MasterAuditLog />}
 
+      {tab === 'accounts' && (
+        <>
       {/* Accounts */}
       <div className={tile}>
         <h3 className={heading}>
@@ -241,7 +294,7 @@ export default function AdminPage() {
         {clientsLoading ? (
           <p className="text-xs text-muted-foreground/50">Loading…</p>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 max-h-[20rem] overflow-y-auto thin-scroll pr-1">
             {visibleClients.length === 0 && (
               <p className="text-xs text-muted-foreground/50">No accounts in this status.</p>
             )}
@@ -283,7 +336,7 @@ export default function AdminPage() {
           Team roster
           <InfoTooltip text="Everyone the tracker knows. Members marked (former employee) stay for history but can't be assigned to projects. Logins are managed in Supabase — Users." />
         </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 max-h-[16rem] overflow-y-auto thin-scroll pr-1">
           {teamMembers.map(m => (
             <div
               key={m.id}
@@ -298,6 +351,8 @@ export default function AdminPage() {
           ))}
         </div>
       </div>
+        </>
+      )}
 
       <p className="text-xs text-muted-foreground/60">
         Looking for something else here? Tell Claude — this page is meant to grow.
@@ -316,19 +371,19 @@ function HealthList({
   empty: string
 }) {
   return (
-    <div>
-      <p className="text-xs text-muted-foreground mb-1.5">
+    <div className="rounded-lg border border-border/60 bg-muted/20 p-2.5 flex flex-col min-w-0">
+      <p className="text-xs text-muted-foreground mb-1.5 shrink-0">
         {label} <span className="text-foreground font-medium">({items.length})</span>
       </p>
       {items.length === 0 ? (
         <p className="text-xs text-muted-foreground/50">✓ {empty}</p>
       ) : (
-        <div className="flex flex-col gap-0.5 max-h-40 overflow-y-auto">
+        <div className="max-h-[11rem] overflow-y-auto thin-scroll pr-1 min-w-0 space-y-0.5">
           {items.map(p => (
             <Link
               key={p.id}
               href={`/projects/${p.id}`}
-              className="text-sm text-blue-600 dark:text-blue-400 hover:underline truncate"
+              className="block text-sm text-blue-600 dark:text-blue-400 hover:underline truncate"
             >
               {p.project_name}
             </Link>

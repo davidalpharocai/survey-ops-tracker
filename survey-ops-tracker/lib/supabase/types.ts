@@ -9,6 +9,84 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      sprint_config: {
+        Row: { id: number; anchor_date: string; length_days: number }
+        Insert: { id?: number; anchor_date: string; length_days?: number }
+        Update: { id?: number; anchor_date?: string; length_days?: number }
+        Relationships: []
+      }
+      app_config: {
+        Row: { id: number; ai_monthly_cap_usd: number; ai_hard_stop: boolean; updated_at: string }
+        Insert: { id?: number; ai_monthly_cap_usd?: number; ai_hard_stop?: boolean; updated_at?: string }
+        Update: { id?: number; ai_monthly_cap_usd?: number; ai_hard_stop?: boolean; updated_at?: string }
+        Relationships: []
+      }
+      ai_usage: {
+        Row: {
+          id: string
+          created_at: string
+          endpoint: string
+          user_email: string | null
+          model: string
+          input_tokens: number
+          output_tokens: number
+          cache_read_tokens: number
+          cache_creation_tokens: number
+          cost_usd: number
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          endpoint: string
+          user_email?: string | null
+          model: string
+          input_tokens?: number
+          output_tokens?: number
+          cache_read_tokens?: number
+          cache_creation_tokens?: number
+          cost_usd?: number
+        }
+        Update: {
+          id?: string
+          created_at?: string
+          endpoint?: string
+          user_email?: string | null
+          model?: string
+          input_tokens?: number
+          output_tokens?: number
+          cache_read_tokens?: number
+          cache_creation_tokens?: number
+          cost_usd?: number
+        }
+        Relationships: []
+      }
+      system_events: {
+        Row: {
+          id: string
+          created_at: string
+          source: string
+          status: string
+          detail: string | null
+          meta: Record<string, unknown> | null
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          source: string
+          status?: string
+          detail?: string | null
+          meta?: Record<string, unknown> | null
+        }
+        Update: {
+          id?: string
+          created_at?: string
+          source?: string
+          status?: string
+          detail?: string | null
+          meta?: Record<string, unknown> | null
+        }
+        Relationships: []
+      }
       project_audit: {
         Row: {
           id: string
@@ -115,6 +193,10 @@ export type Database = {
           project_code: string | null
           drive_folder_id: string | null
           deleted_at: string | null
+          category: string | null
+          objective: string | null
+          sprint_number: number | null
+          compliance_override: boolean | null
           created_at: string
           updated_at: string
         }
@@ -169,6 +251,10 @@ export type Database = {
           project_code?: string | null
           drive_folder_id?: string | null
           deleted_at?: string | null
+          category?: string | null
+          objective?: string | null
+          sprint_number?: number | null
+          compliance_override?: boolean | null
           created_at?: string
           updated_at?: string
         }
@@ -223,6 +309,10 @@ export type Database = {
           project_code?: string | null
           drive_folder_id?: string | null
           deleted_at?: string | null
+          category?: string | null
+          objective?: string | null
+          sprint_number?: number | null
+          compliance_override?: boolean | null
           created_at?: string
           updated_at?: string
         }
@@ -242,6 +332,10 @@ export type Database = {
           name: string
           code: string | null
           drive_folder_id: string | null
+          compliance_before_fielding: boolean
+          compliance_after_fielding: boolean
+          compliance_contact: string | null
+          compliance_notes: string | null
           created_at: string
         }
         Insert: {
@@ -249,6 +343,10 @@ export type Database = {
           name: string
           code?: string | null
           drive_folder_id?: string | null
+          compliance_before_fielding?: boolean
+          compliance_after_fielding?: boolean
+          compliance_contact?: string | null
+          compliance_notes?: string | null
           created_at?: string
         }
         Update: {
@@ -256,6 +354,10 @@ export type Database = {
           name?: string
           code?: string | null
           drive_folder_id?: string | null
+          compliance_before_fielding?: boolean
+          compliance_after_fielding?: boolean
+          compliance_contact?: string | null
+          compliance_notes?: string | null
           created_at?: string
         }
         Relationships: []
@@ -302,6 +404,8 @@ export type Database = {
           review_note: string | null
           analyst_message: string | null
           dispatched_at: string | null
+          phase: string
+          results_url: string | null
           created_at: string
         }
         Insert: {
@@ -318,6 +422,8 @@ export type Database = {
           review_note?: string | null
           analyst_message?: string | null
           dispatched_at?: string | null
+          phase?: string
+          results_url?: string | null
           created_at?: string
         }
         Update: {
@@ -334,6 +440,8 @@ export type Database = {
           review_note?: string | null
           analyst_message?: string | null
           dispatched_at?: string | null
+          phase?: string
+          results_url?: string | null
           created_at?: string
         }
         Relationships: []
@@ -708,7 +816,7 @@ export type Database = {
       submission_status: 'pending_review' | 'approved' | 'rejected'
       question_type: 'open_text' | 'single_select' | 'multi_select' | 'scale' | 'other'
       recipient_role: 'alpharoc' | 'compliance'
-      project_type: 'PS' | 'B2B' | 'Rerun'
+      project_type: 'PS' | 'B2B' | 'Rerun' | 'Internal'
       project_status: 'Open' | 'Closed' | 'Hold'
       project_phase: 'Scoping' | 'Active'
       board_column:
@@ -719,6 +827,10 @@ export type Database = {
         | 'Fielding'
         | 'Data QA'
         | 'Delivery'
+        | 'Backlog'
+        | 'In Progress'
+        | 'Review'
+        | 'Done'
       scoping_stage:
         | 'New Inquiry'
         | 'Proposal Sent'

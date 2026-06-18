@@ -1,5 +1,6 @@
 // lib/drive/fake.ts
 import type { DriveChild, DriveClient } from './types'
+import { assertHttpUrl } from './url'
 
 type Node = { id: string; name: string; mimeType: string; parentId: string }
 const FOLDER = 'application/vnd.google-apps.folder'
@@ -38,7 +39,7 @@ export class FakeDrive implements DriveClient {
     return id
   }
   async createBookmark(parentId: string, name: string, url: string): Promise<string> {
-    void url // fake: URL not stored in-memory
+    assertHttpUrl(url) // contract parity with GoogleDrive: reject invalid/dangerous urls (url not stored in-memory)
     const id = this.id()
     this.nodes.set(id, { id, name, mimeType: 'text/uri-list', parentId })
     return id

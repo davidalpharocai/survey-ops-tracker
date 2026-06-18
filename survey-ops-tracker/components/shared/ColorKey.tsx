@@ -1,7 +1,7 @@
 const URGENCY_ITEMS = [
-  { classes: 'border-2 border-red-500', label: 'Due today / overdue' },
-  { classes: 'border-2 border-orange-500', label: 'Due tomorrow' },
-  { classes: 'border-2 border-amber-300 dark:border-amber-400/70', label: 'Due in 2 days' },
+  { classes: 'border border-border border-l-4 border-l-red-500', label: 'Due today / overdue' },
+  { classes: 'border border-border border-l-4 border-l-orange-500', label: 'Due tomorrow' },
+  { classes: 'border border-border border-l-4 border-l-amber-300 dark:border-l-amber-400/70', label: 'Due in 2 days' },
 ]
 
 const TYPE_ITEMS = [
@@ -25,10 +25,10 @@ export function ColorKey() {
         On hold
       </span>
       <span className="text-border">|</span>
+      <span className="font-medium uppercase tracking-wider text-[11px]">Type</span>
       {TYPE_ITEMS.map(item => (
-        <span key={item.label} className="flex items-center gap-1.5">
-          <span className={`text-[11px] px-1.5 py-0.5 rounded ${item.classes}`}>{item.label}</span>
-          type
+        <span key={item.label} className={`text-[11px] px-1.5 py-0.5 rounded ${item.classes}`}>
+          {item.label}
         </span>
       ))}
       <span className="text-border">|</span>

@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@/lib/supabase/server'
 import { isAllowedEmail } from '@/lib/utils/allowedDomain'
+import { getAiBudget, logAiUsage } from '@/lib/server/observability'
 import { NextRequest } from 'next/server'
 
 export const dynamic = 'force-dynamic'
@@ -95,6 +96,14 @@ export async function POST(req: NextRequest) {
     )
   }
 
+  const budget = await getAiBudget()
+  if (budget.blocked) {
+    return Response.json(
+      { error: `AI entry is paused for this month — the usage budget ($${budget.cap.toFixed(0)}) has been reached. An admin can raise it in Admin → AI usage.` },
+      { status: 503 }
+    )
+  }
+
   const { description, mode, current } = await req.json()
   if (typeof description !== 'string' || !description.trim()) {
     return new Response('Bad request', { status: 400 })
@@ -127,6 +136,12 @@ ${mode === 'edit'
       system,
       output_config: { format: { type: 'json_schema', schema: FIELDS_SCHEMA } },
       messages: [{ role: 'user', content: description }],
+    })
+    void logAiUsage({
+      endpoint: 'parse-project',
+      userEmail: user.email,
+      model: 'claude-opus-4-8',
+      usage: response.usage,
     })
     if (response.stop_reason === 'refusal') {
       return Response.json({ error: 'The request was declined. Try rephrasing without sensitive content.' }, { status: 400 })

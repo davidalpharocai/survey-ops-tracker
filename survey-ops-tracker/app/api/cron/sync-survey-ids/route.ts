@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { extractEdwinSurveyId, findEdwinUrl } from '@/lib/utils/edwin'
+import { logSystemEvent } from '@/lib/server/observability'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -28,13 +29,21 @@ export async function GET(req: NextRequest) {
     .select('id, project_name, linked_documents, survey_tool_id, survey_id_discrepancy')
     .eq('status', 'Open')
     .is('deleted_at', null)
+    // Internal projects share this table but never have Edwin links — skip them.
+    .or('project_type.is.null,project_type.neq.Internal')
 
-  if (error) return new Response('Database error', { status: 500 })
+  if (error) {
+    await logSystemEvent({ source: 'sync-survey-ids', status: 'error', detail: `Database error: ${error.message}` })
+    return new Response('Database error', { status: 500 })
+  }
 
   let filled = 0
   let flagged = 0
   let cleared = 0
   const details: string[] = []
+  // Per-row write failures must NOT be swallowed — otherwise a partial sync
+  // reports clean success and the discrepancy goes unnoticed.
+  const errors: string[] = []
 
   for (const p of projects ?? []) {
     const edwinUrl = findEdwinUrl(p.linked_documents)
@@ -46,7 +55,7 @@ export async function GET(req: NextRequest) {
     const ids = current.split(',').map(s => s.trim().toLowerCase()).filter(Boolean)
 
     if (!current) {
-      await supabase
+      const { error: wErr } = await supabase
         .from('survey_projects')
         .update({
           survey_tool_id: edwinId,
@@ -54,28 +63,52 @@ export async function GET(req: NextRequest) {
           survey_ids_synced_at: new Date().toISOString(),
         })
         .eq('id', p.id)
-      filled++
-      details.push(`filled ${p.project_name}: ${edwinId}`)
+      if (wErr) {
+        errors.push(`fill ${p.project_name}: ${wErr.message}`)
+      } else {
+        filled++
+        details.push(`filled ${p.project_name}: ${edwinId}`)
+      }
     } else if (ids.includes(edwinId.toLowerCase())) {
       if (p.survey_id_discrepancy) {
-        await supabase
+        const { error: wErr } = await supabase
           .from('survey_projects')
           .update({ survey_id_discrepancy: null })
           .eq('id', p.id)
-        cleared++
+        if (wErr) errors.push(`clear ${p.project_name}: ${wErr.message}`)
+        else cleared++
       }
     } else {
       const flag = `Edwin link reports "${edwinId}" but Survey IDs says "${current}" — review which is right.`
       if (p.survey_id_discrepancy !== flag) {
-        await supabase
+        const { error: wErr } = await supabase
           .from('survey_projects')
           .update({ survey_id_discrepancy: flag })
           .eq('id', p.id)
-        flagged++
-        details.push(`flagged ${p.project_name}`)
+        if (wErr) {
+          errors.push(`flag ${p.project_name}: ${wErr.message}`)
+        } else {
+          flagged++
+          details.push(`flagged ${p.project_name}`)
+        }
       }
     }
   }
 
-  return Response.json({ checked: projects?.length ?? 0, filled, flagged, cleared, details })
+  const checked = projects?.length ?? 0
+  await logSystemEvent({
+    source: 'sync-survey-ids',
+    status: errors.length ? 'partial' : 'ok',
+    detail: errors.length
+      ? `${errors.length} row write(s) failed; filled ${filled}, flagged ${flagged}, cleared ${cleared}.`
+      : `Checked ${checked}; filled ${filled}, flagged ${flagged}, cleared ${cleared}.`,
+    meta: { checked, filled, flagged, cleared, errors },
+  })
+
+  // 207 when some rows failed to write, so a monitor can tell a clean run from
+  // a partial one; 200 otherwise.
+  return Response.json(
+    { checked, filled, flagged, cleared, errors, details },
+    { status: errors.length ? 207 : 200 }
+  )
 }

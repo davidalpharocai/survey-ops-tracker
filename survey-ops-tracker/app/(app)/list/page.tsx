@@ -53,7 +53,18 @@ export default function ListView() {
   useEffect(() => {
     sessionStorage.setItem('sot.cameFrom', '/list')
     try {
-      setHiddenCols(new Set(JSON.parse(localStorage.getItem(HIDDEN_COLS_KEY) ?? '[]')))
+      const storedHidden = localStorage.getItem(HIDDEN_COLS_KEY)
+      if (storedHidden == null) {
+        // First visit only: start with the rarely-filled columns hidden so the
+        // default table is clean (Project, Client, Type, Stage, Captain,
+        // N/Target, Due). Fully reversible via the ⚙ Columns menu, and any
+        // explicit choice (including showing them) is honored thereafter.
+        const seed = ['nActual', 'long', 'voterQA', 'citation']
+        setHiddenCols(new Set(seed))
+        localStorage.setItem(HIDDEN_COLS_KEY, JSON.stringify(seed))
+      } else {
+        setHiddenCols(new Set(JSON.parse(storedHidden)))
+      }
       const s = JSON.parse(localStorage.getItem(SORT_KEY) ?? 'null')
       if (s?.field) {
         setSortField(s.field)

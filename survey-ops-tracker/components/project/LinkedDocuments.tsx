@@ -41,7 +41,28 @@ export function LinkedDocuments({ projectId, documents }: LinkedDocumentsProps) 
   const [adding, setAdding] = useState(false)
   const [renaming, setRenaming] = useState<number | null>(null)
   const [renameDraft, setRenameDraft] = useState('')
+  const [expanded, setExpanded] = useState(false)
   const updateProject = useUpdateProject()
+
+  // On a project with no docs yet, collapse to a one-line stub so the empty
+  // panel doesn't pad out the page; clicking "+ add" reveals the input.
+  if (documents.length === 0 && !expanded) {
+    return (
+      <div className="bg-card border border-border shadow-sm rounded-xl p-4 flex items-center justify-between gap-2">
+        <span className="text-xs text-muted-foreground uppercase tracking-widest font-medium flex items-center">
+          Linked Documents
+          <span className="ml-1 normal-case tracking-normal text-muted-foreground/50">(0)</span>
+          <InfoTooltip text="Links to this project's docs (questionnaire, data files, etc.). Titles are fetched automatically when you add a link; hover a link to rename or remove it." />
+        </span>
+        <button
+          onClick={() => setExpanded(true)}
+          className="text-xs text-blue-600 dark:text-blue-400 hover:underline shrink-0"
+        >
+          + add a Google Doc
+        </button>
+      </div>
+    )
+  }
 
   async function handleAdd() {
     const url = newUrl.trim()

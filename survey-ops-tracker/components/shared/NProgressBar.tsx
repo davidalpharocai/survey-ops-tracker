@@ -5,6 +5,18 @@ interface NProgressBarProps {
 }
 
 export function NProgressBar({ collected, target, showLabel = true }: NProgressBarProps) {
+  // No goal set yet: don't draw an empty grey track (which reads as "failing to
+  // collect" and clutters a board of brand-new cards). Show a single muted line
+  // when labeled, nothing when the bar is used bare (e.g. the detail hero).
+  if (target == null || target <= 0) {
+    if (!showLabel) return null
+    return (
+      <div className="text-xs text-muted-foreground/70">
+        {collected != null && collected > 0 ? `${collected} collected · no target` : 'No target set'}
+      </div>
+    )
+  }
+
   const pct =
     collected != null && target != null && target > 0
       ? Math.min((collected / target) * 100, 100)

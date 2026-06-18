@@ -56,7 +56,9 @@ export async function POST(req: NextRequest) {
     .from('survey_projects')
     .select('id, survey_tool_id, survey_ids_from_sheet')
     .eq('id', body.project_id)
-    .single()
+    // Don't resurrect data on a soft-deleted project — treat it as gone.
+    .is('deleted_at', null)
+    .maybeSingle()
 
   if (fetchError || !project) return new Response('Project not found', { status: 404 })
 
