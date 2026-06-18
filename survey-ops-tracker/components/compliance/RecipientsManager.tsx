@@ -4,13 +4,36 @@ import { useRecipients, useInvalidateCompliance, type Recipient } from '@/lib/ho
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 
-export function RecipientsManager({ projectId }: { projectId: string }) {
+export function RecipientsManager({ projectId, suggestedContact }: { projectId: string; suggestedContact?: string | null }) {
   const { data: recipients = [] } = useRecipients(projectId)
   const invalidate = useInvalidateCompliance(projectId)
   const [email, setEmail] = useState('')
   const [role, setRole] = useState<'compliance' | 'alpharoc'>('compliance')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+
+  // One-click seed of the client's compliance contact(s) from the Compliance tab.
+  async function seedFromClient() {
+    if (!suggestedContact || busy) return
+    setBusy(true)
+    setError('')
+    const emails = suggestedContact.split(/[,;]/).map(s => s.trim()).filter(Boolean)
+    try {
+      for (const em of emails) {
+        await fetch(`/api/projects/${projectId}/recipients`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: em, role: 'compliance' }),
+        })
+      }
+      invalidate()
+    } catch {
+      setError('Network error — please try again.')
+    } finally {
+      setBusy(false)
+    }
+  }
+  const noComplianceRecipients = recipients.filter(r => r.role === 'compliance').length === 0
 
   async function addRecipient(e: React.FormEvent) {
     e.preventDefault()
@@ -82,6 +105,16 @@ export function RecipientsManager({ projectId }: { projectId: string }) {
   return (
     <div>
       {group('compliance', 'Client compliance reviewers')}
+      {noComplianceRecipients && suggestedContact && (
+        <button
+          onClick={seedFromClient}
+          disabled={busy}
+          className="text-xs text-blue-600 dark:text-blue-400 hover:underline mb-3 disabled:opacity-50 text-left"
+          title="Add this client's compliance contact from the Compliance tab"
+        >
+          + Add {suggestedContact} as compliance contact
+        </button>
+      )}
       <div className="mb-3">
         <p className="text-xs text-muted-foreground mb-1">AlphaRoc notify list</p>
         <p className="text-xs text-muted-foreground">

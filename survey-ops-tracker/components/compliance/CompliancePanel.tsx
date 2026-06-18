@@ -359,7 +359,7 @@ export function CompliancePanel({ projectId, project }: { projectId: string; pro
       <div className="mb-3" />
 
       <div className="border-t border-border pt-3">
-        <RecipientsManager projectId={projectId} />
+        <RecipientsManager projectId={projectId} suggestedContact={cs.data?.contact} />
       </div>
 
       {modalOpen && (

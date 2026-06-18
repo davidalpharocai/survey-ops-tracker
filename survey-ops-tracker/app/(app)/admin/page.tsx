@@ -128,9 +128,15 @@ export default function AdminPage() {
   }
 
   const [accountFilter, setAccountFilter] = useState<Bucket | null>(null)
-  const visibleClients = accountFilter
-    ? clients.filter(c => bucketOf(c.name) === accountFilter)
-    : clients
+  const [complianceOnly, setComplianceOnly] = useState(false)
+  const requiresCompliance = (c: { compliance_before_fielding?: boolean; compliance_after_fielding?: boolean }) =>
+    !!c.compliance_before_fielding || !!c.compliance_after_fielding
+  const complianceCount = clients.filter(requiresCompliance).length
+  const visibleClients = clients.filter(c => {
+    if (accountFilter && bucketOf(c.name) !== accountFilter) return false
+    if (complianceOnly && !requiresCompliance(c)) return false
+    return true
+  })
 
   const health = useMemo(() => {
     const open = projects.filter(p => p.status === 'Open')
@@ -265,9 +271,22 @@ export default function AdminPage() {
               </button>
             )
           })}
-          {accountFilter && (
+          {complianceCount > 0 && (
             <button
-              onClick={() => setAccountFilter(null)}
+              onClick={() => setComplianceOnly(v => !v)}
+              title={`Clients with a compliance requirement. Click to ${complianceOnly ? 'show all accounts' : 'filter to these'}.`}
+              className={`text-sm flex items-center gap-1 px-2 py-1 rounded-lg border transition-colors ${
+                complianceOnly
+                  ? 'border-amber-500/60 bg-amber-500/15 text-amber-700 dark:text-amber-300'
+                  : 'border-border text-muted-foreground hover:text-foreground hover:border-ring'
+              }`}
+            >
+              <span className="font-semibold">{complianceCount}</span> 🛡 Compliance
+            </button>
+          )}
+          {(accountFilter || complianceOnly) && (
+            <button
+              onClick={() => { setAccountFilter(null); setComplianceOnly(false) }}
               className="text-xs text-muted-foreground hover:text-foreground px-1 transition-colors"
               title="Clear the account filter"
             >
@@ -286,6 +305,13 @@ export default function AdminPage() {
               const count = firmStats.get(c.name.trim().toLowerCase())?.total ?? 0
               const bucket = bucketOf(c.name)
               const badge = BUCKET_BADGE[bucket]
+              const compLabel = c.compliance_before_fielding && c.compliance_after_fielding
+                ? 'before + after fielding'
+                : c.compliance_before_fielding
+                  ? 'before fielding'
+                  : c.compliance_after_fielding
+                    ? 'after fielding'
+                    : null
               return (
                 <Link
                   key={c.id}
@@ -303,9 +329,14 @@ export default function AdminPage() {
                     {count > 0 && (
                       <span className="text-xs text-muted-foreground">{count} project{count > 1 ? 's' : ''}</span>
                     )}
-                    <span className="text-xs font-mono text-muted-foreground w-16 text-right">
-                      {c.code ?? '—'}
-                    </span>
+                    {compLabel && (
+                      <span
+                        className="text-xs px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 whitespace-nowrap"
+                        title={`Compliance review required: ${compLabel}. Client ID is on the client page.`}
+                      >
+                        🛡 Compliance
+                      </span>
+                    )}
                   </span>
                 </Link>
               )

@@ -25,6 +25,7 @@ import { deriveWaitingOn } from '@/lib/utils/waitingOn'
 import { BudgetWidget } from '@/components/project/BudgetWidget'
 import { BidWidget } from '@/components/project/BidWidget'
 import { CompliancePanel } from '@/components/compliance/CompliancePanel'
+import { ComplianceBanner } from '@/components/project/ComplianceBanner'
 import { DeliverablesPanel } from '@/components/deliverables/DeliverablesPanel'
 import { salespersonOptions } from '@/lib/utils/salespeople'
 
@@ -404,6 +405,7 @@ export default function ProjectDetailPage() {
       {/* Overview tab — kept mounted (hidden) so in-progress edits survive tab switches */}
       <div className={activeTab === 'overview' ? '' : 'hidden'}>
         <NewProjectSetupBanner project={project} />
+        <ComplianceBanner project={project} />
         {/* Hero stat strip */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
           <HeroNCollected

@@ -1,9 +1,10 @@
 'use client'
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
+import { useUpdateClient } from '@/lib/hooks/useClients'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
 import { Skeleton } from '@/components/shared/Skeleton'
 import { formatDate } from '@/lib/utils/date'
@@ -73,6 +74,68 @@ function useClientPage(clientId: string) {
 function money(v: number | null): string {
   if (v == null) return '—'
   return '$' + v.toLocaleString('en-US', { maximumFractionDigits: 0 })
+}
+
+// Editable compliance requirement for the client. Sourced initially from the
+// sheet's Compliance tab; the app is the source of truth thereafter.
+function ClientComplianceCard({ client }: { client: Client }) {
+  const update = useUpdateClient()
+  const [contact, setContact] = useState(client.compliance_contact ?? '')
+  const [notes, setNotes] = useState(client.compliance_notes ?? '')
+  return (
+    <div className="bg-card border border-border shadow-sm rounded-xl p-4 flex flex-col gap-3">
+      <h3 className="text-xs text-muted-foreground uppercase tracking-widest font-medium flex items-center">
+        Compliance
+        <InfoTooltip text="When set, this client's surveys are blocked from being fielded (before) or delivered (after) until the matching compliance review is approved. Seeded from the sheet's Compliance tab; editable here." />
+      </h3>
+      <div className="flex flex-col gap-2 text-sm">
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={client.compliance_before_fielding}
+            onChange={e => update.mutate({ id: client.id, updates: { compliance_before_fielding: e.target.checked } })}
+            className="accent-blue-600"
+          />
+          <span className="text-foreground">Review required <span className="text-muted-foreground">before fielding</span> — questions only</span>
+        </label>
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={client.compliance_after_fielding}
+            onChange={e => update.mutate({ id: client.id, updates: { compliance_after_fielding: e.target.checked } })}
+            className="accent-blue-600"
+          />
+          <span className="text-foreground">Review required <span className="text-muted-foreground">after fielding</span> — questions + results</span>
+        </label>
+      </div>
+      <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+        Compliance contact email(s)
+        <input
+          value={contact}
+          onChange={e => setContact(e.target.value)}
+          onBlur={() => {
+            if (contact !== (client.compliance_contact ?? ''))
+              update.mutate({ id: client.id, updates: { compliance_contact: contact.trim() || null } })
+          }}
+          placeholder="compliance@client.com, reviewer@client.com"
+          className="bg-muted border border-border rounded px-2 py-1 text-sm text-foreground focus:outline-none focus:border-ring"
+        />
+      </label>
+      <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+        Notes <span className="text-muted-foreground/70">(advisory — e.g. conditions)</span>
+        <input
+          value={notes}
+          onChange={e => setNotes(e.target.value)}
+          onBlur={() => {
+            if (notes !== (client.compliance_notes ?? ''))
+              update.mutate({ id: client.id, updates: { compliance_notes: notes.trim() || null } })
+          }}
+          placeholder="e.g. only if the survey contains open-text questions"
+          className="bg-muted border border-border rounded px-2 py-1 text-sm text-foreground focus:outline-none focus:border-ring"
+        />
+      </label>
+    </div>
+  )
 }
 
 /** Earliest meaningful date for a project — submitted if known, else record creation. */
@@ -178,6 +241,8 @@ export default function ClientPage() {
           All clients →
         </Link>
       </div>
+
+      <ClientComplianceCard client={c} />
 
       {rows.length === 0 ? (
         <div className="bg-card border border-border shadow-sm rounded-xl p-6 text-sm text-muted-foreground">
