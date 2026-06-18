@@ -10,6 +10,10 @@ import * as XLSX from 'xlsx'
 XLSX.set_fs(fs)
 
 const EXECUTE = process.argv.includes('--execute')
+// Safe incremental mode: insert ONLY sheet rows whose project name isn't already
+// in the app — never deletes anything. (The default --execute path wipes and
+// re-imports everything; --new-only is for adding new projects to live data.)
+const NEW_ONLY = process.argv.includes('--new-only')
 
 const env = Object.fromEntries(
   readFileSync(new URL('../.env.local', import.meta.url), 'utf8')
@@ -148,6 +152,24 @@ for (const p of open) byCol[p.board_column] = (byCol[p.board_column] || 0) + 1
 console.log(' ', JSON.stringify(byCol))
 console.log(`With survey IDs: ${projects.filter(p => p.survey_tool_id).length}, with linked docs: ${projects.filter(p => p.linked_documents.length).length}`)
 if (warnings.length) console.log('Warnings:\n  ' + warnings.slice(0, 10).join('\n  ') + (warnings.length > 10 ? `\n  ...and ${warnings.length - 10} more` : ''))
+
+if (NEW_ONLY) {
+  const existing = await api('GET', '/survey_projects?select=project_name&deleted_at=is.null')
+  const have = new Set((existing ?? []).map(p => p.project_name.trim().toLowerCase()))
+  const newOnes = projects.filter(p => !have.has(p.project_name.trim().toLowerCase()))
+  console.log(`\n=== NEW-ONLY: ${newOnes.length} sheet projects not already in the app ===`)
+  for (const p of newOnes) console.log(`  + ${p.client} | ${p.project_name}  (${p.status}, ${p.board_column})`)
+  if (!EXECUTE) {
+    console.log('\nDRY RUN — run with `--new-only --execute` to insert these (no deletes, no existing data touched).')
+    process.exit(0)
+  }
+  for (let i = 0; i < newOnes.length; i += 50) {
+    await api('POST', '/survey_projects', newOnes.slice(i, i + 50))
+    console.log(`Inserted ${Math.min(i + 50, newOnes.length)}/${newOnes.length}`)
+  }
+  console.log(`\nInserted ${newOnes.length} new projects. Existing projects untouched.`)
+  process.exit(0)
+}
 
 if (!EXECUTE) {
   console.log('\nDRY RUN — nothing written. Sample Open project:')
