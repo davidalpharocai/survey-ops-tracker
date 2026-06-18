@@ -2,6 +2,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { formatDate, getDueUrgency, daysOverdue, urgencyPrefix, BADLY_OVERDUE_DAYS } from '@/lib/utils/date'
+import { stageLabel } from '@/lib/utils/stage'
 import type { SlimProject } from '@/lib/hooks/useProjects'
 import { useLatestSubmissionStatuses } from '@/lib/hooks/useSubmissions'
 
@@ -251,7 +252,7 @@ export function ProjectTable({
                 {show('stage') && (
                   <td className="px-4 py-3">
                     <span className={`text-xs px-2 py-1 rounded ${STAGE_BADGE[p.board_column] ?? 'bg-muted text-muted-foreground'}`}>
-                      {p.board_column}
+                      {stageLabel(p.board_column)}
                     </span>
                   </td>
                 )}

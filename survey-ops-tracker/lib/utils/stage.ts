@@ -34,6 +34,12 @@ export const STAGE_DESCRIPTIONS: Record<string, string> = {
   'Awaiting Approval': 'Waiting on client approval — approval moves the project into operations at Submitted.',
 }
 
+/** User-facing label for a board column. The final stage reads as "Delivered"
+ * (the deliverable is sent) while the underlying enum value stays 'Delivery'. */
+export function stageLabel(column: string): string {
+  return column === 'Delivery' ? 'Delivered' : column
+}
+
 export type StageFields = {
   stage_doc_programming: boolean
   stage_survey_programming: boolean

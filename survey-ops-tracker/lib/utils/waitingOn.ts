@@ -27,10 +27,15 @@ export function deriveWaitingOn(p: WaitingOnInput): string {
   if (!p.stage_survey_programming) return 'Us — survey programming'
   if (!p.stage_edwin_qa) return 'Us — EdWin QA'
   if (!p.stage_fielding) return 'Us — launch'
-  if (p.n_target != null && p.n_target > 0 && p.n_collected < p.n_target) {
-    return 'Field — collecting'
+  // Still in fielding (data QA not started): collecting if under target,
+  // otherwise it's on us to start data QA. Once data QA/delivery are done we're
+  // past fielding, so never report "collecting" for a delivered project.
+  if (!p.stage_data_qa) {
+    if (p.n_target != null && p.n_target > 0 && p.n_collected < p.n_target) {
+      return 'Field — collecting'
+    }
+    return 'Us — data QA'
   }
-  if (!p.stage_data_qa) return 'Us — data QA'
   if (!p.stage_delivery) return 'Us — delivery'
   return '—'
 }

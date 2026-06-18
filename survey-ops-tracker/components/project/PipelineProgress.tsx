@@ -1,6 +1,6 @@
 'use client'
 import { useState } from 'react'
-import { STAGE_ORDER, STAGE_DESCRIPTIONS } from '@/lib/utils/stage'
+import { STAGE_ORDER, STAGE_DESCRIPTIONS, stageLabel } from '@/lib/utils/stage'
 import { useUpdateProject } from '@/lib/hooks/useProjects'
 import { useCurrentMember } from '@/lib/hooks/useCurrentMember'
 import { useComplianceState } from '@/lib/hooks/useComplianceState'
@@ -149,7 +149,7 @@ export function PipelineProgress({ project }: PipelineProgressProps) {
                 } ${isClickable ? 'hover:border-ring cursor-pointer' : 'cursor-default'}`}
               >
                 <span aria-hidden>{isDone ? '✓' : isCurrent ? '▶' : '○'}</span>
-                <span className="break-words">{stage}</span>
+                <span className="break-words">{stageLabel(stage)}</span>
               </button>
               {i < STAGE_ORDER.length - 1 && (
                 <span className="shrink-0 text-muted-foreground/40 text-xs select-none">→</span>

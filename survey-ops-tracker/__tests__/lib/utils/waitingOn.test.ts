@@ -116,6 +116,20 @@ describe('deriveWaitingOn', () => {
     })).toBe('—')
   })
 
+  it('does not report "collecting" once past fielding — even if under target (delivered)', () => {
+    expect(deriveWaitingOn({
+      ...base,
+      stage_doc_programming: true,
+      stage_survey_programming: true,
+      stage_edwin_qa: true,
+      stage_fielding: true,
+      stage_data_qa: true,
+      stage_delivery: true,
+      n_target: 50,
+      n_collected: 27,
+    })).toBe('—')
+  })
+
   it('treats missing blocked_by (pre-migration) as not blocked', () => {
     expect(deriveWaitingOn({ ...base, blocked_by: undefined })).toBe('Us — doc programming')
   })

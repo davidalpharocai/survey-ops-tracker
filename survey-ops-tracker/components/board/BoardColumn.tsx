@@ -1,7 +1,7 @@
 'use client'
 import { Droppable, Draggable } from '@hello-pangea/dnd'
 import { ProjectCard } from './ProjectCard'
-import { STAGE_DESCRIPTIONS } from '@/lib/utils/stage'
+import { STAGE_DESCRIPTIONS, stageLabel } from '@/lib/utils/stage'
 import type { SlimProject } from '@/lib/hooks/useProjects'
 
 interface BoardColumnProps {
@@ -33,7 +33,7 @@ export function BoardColumn({ id, title, projects, onCardClick, isNewFor, bodyCl
           className={`text-xs uppercase tracking-widest font-medium ${collapsed ? 'text-muted-foreground/60' : 'text-muted-foreground'}`}
           title={STAGE_DESCRIPTIONS[title]}
         >
-          {title}
+          {stageLabel(title)}
         </span>
         <span
           className={`text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full ${collapsed ? 'opacity-50' : ''}`}
