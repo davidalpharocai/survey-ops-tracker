@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useUpdateProject } from '@/lib/hooks/useProjects'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
@@ -129,6 +129,9 @@ export function LatestNextSteps({ projectId, notes }: LatestNextStepsProps) {
   const [newText, setNewText] = useState('')
   const [editingStepId, setEditingStepId] = useState<string | null>(null)
   const [stepDraft, setStepDraft] = useState('')
+  // Escape must cancel a step edit, but it unmounts the input, whose blur would
+  // otherwise fire saveStepEdit and commit the draft. This flag makes that blur no-op.
+  const cancelEditRef = useRef(false)
   const [showAllCompleted, setShowAllCompleted] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [editingNotes, setEditingNotes] = useState(false)
@@ -175,10 +178,19 @@ export function LatestNextSteps({ projectId, notes }: LatestNextStepsProps) {
   }
 
   function saveStepEdit() {
+    if (cancelEditRef.current) {
+      cancelEditRef.current = false
+      setEditingStepId(null)
+      return
+    }
     if (!editingStepId) return
     if (stepDraft.trim()) {
       updateStep.mutate({ id: editingStepId, updates: { text: stepDraft.trim() } })
     }
+    setEditingStepId(null)
+  }
+  function cancelStepEdit() {
+    cancelEditRef.current = true
     setEditingStepId(null)
   }
 
@@ -240,7 +252,7 @@ export function LatestNextSteps({ projectId, notes }: LatestNextStepsProps) {
                         onChange={e => setStepDraft(e.target.value)}
                         onKeyDown={e => {
                           if (e.key === 'Enter') saveStepEdit()
-                          if (e.key === 'Escape') setEditingStepId(null)
+                          if (e.key === 'Escape') cancelStepEdit()
                         }}
                         onBlur={saveStepEdit}
                         className="flex-1 bg-muted border border-border rounded px-2 py-0.5 text-sm text-foreground focus:outline-none focus:border-ring"
