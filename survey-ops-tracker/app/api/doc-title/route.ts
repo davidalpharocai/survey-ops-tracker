@@ -1,6 +1,8 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { isAllowedEmail } from '@/lib/utils/allowedDomain'
+import { extractDriveFileId } from '@/lib/drive/url'
+import { GoogleDrive } from '@/lib/drive/google'
 
 export const dynamic = 'force-dynamic'
 
@@ -34,6 +36,21 @@ export async function GET(req: NextRequest) {
     return Response.json({ title: null })
   }
 
+  // 1) Preferred: the authenticated Drive API. Our OAuth identity is an AlphaRoc
+  //    member, so it can read docs shared only within the org — which the
+  //    anonymous scrape (step 2) can't, since Google bounces it to a sign-in page.
+  const fileId = extractDriveFileId(parsed.toString())
+  if (fileId) {
+    try {
+      const name = await new GoogleDrive().getName(fileId)
+      if (name) return Response.json({ title: name })
+    } catch {
+      // Drive API not configured, or our identity lacks access — fall through.
+    }
+  }
+
+  // 2) Fallback: scrape the public <title>. Works only for "anyone with the link"
+  //    docs; private/org-restricted ones return a sign-in page (-> null).
   try {
     const res = await fetch(parsed.toString(), {
       // Don't follow redirects — a 3xx could bounce to an internal host (SSRF).

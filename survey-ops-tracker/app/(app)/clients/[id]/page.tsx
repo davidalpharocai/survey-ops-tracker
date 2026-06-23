@@ -5,6 +5,8 @@ import { useParams, useRouter } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { useUpdateClient } from '@/lib/hooks/useClients'
+import { ClientContacts } from '@/components/client/ClientContacts'
+import { ClientNotes } from '@/components/client/ClientNotes'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
 import { Skeleton } from '@/components/shared/Skeleton'
 import { formatDate } from '@/lib/utils/date'
@@ -165,12 +167,6 @@ export default function ClientPage() {
       const ms = dates.map(d => new Date(d).getTime())
       avgGapDays = Math.round((ms[ms.length - 1] - ms[0]) / (dates.length - 1) / 86_400_000)
     }
-    // contacts seen in the free-text client field ("FIRM - Contact")
-    const contacts = [...new Set(
-      rows
-        .map(p => p.client.includes(' - ') ? p.client.split(' - ').slice(1).join(' - ').trim() : null)
-        .filter((c): c is string => !!c)
-    )]
     return {
       since: dates[0],
       last: dates[dates.length - 1],
@@ -182,7 +178,6 @@ export default function ClientPage() {
       spendCount: withSpend.length,
       totalBudget,
       avgGapDays,
-      contacts,
     }
   }, [rows])
 
@@ -244,6 +239,10 @@ export default function ClientPage() {
 
       <ClientComplianceCard client={c} />
 
+      <ClientContacts clientId={clientId} />
+
+      <ClientNotes clientId={clientId} />
+
       {rows.length === 0 ? (
         <div className="bg-card border border-border shadow-sm rounded-xl p-6 text-sm text-muted-foreground">
           No projects yet for this client — it&apos;s on the approved client list, ready for its first project.
@@ -299,21 +298,6 @@ export default function ClientPage() {
               </span>
             </div>
           </div>
-
-          {/* Contacts */}
-          {stats!.contacts.length > 0 && (
-            <div className="bg-card border border-border shadow-sm rounded-xl px-4 py-3 flex items-center gap-2 flex-wrap">
-              <span className="text-xs text-muted-foreground uppercase tracking-widest font-medium flex items-center">
-                Contacts
-                <InfoTooltip text="People who've brought us projects at this client, pulled from project records." />
-              </span>
-              {stats!.contacts.map(name => (
-                <span key={name} className="text-sm bg-muted text-foreground/90 px-2.5 py-0.5 rounded-full">
-                  {name}
-                </span>
-              ))}
-            </div>
-          )}
 
           {/* Projects table */}
           <div className="bg-card border border-border shadow-sm rounded-xl overflow-hidden">

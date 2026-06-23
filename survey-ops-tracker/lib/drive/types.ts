@@ -12,4 +12,6 @@ export interface DriveClient {
   /** A small bookmark file for an external URL. */
   createBookmark(parentId: string, name: string, url: string): Promise<string>
   moveFile(fileId: string, newParentId: string): Promise<void>
+  /** The file/folder's display name, or null if not found. */
+  getName(fileId: string): Promise<string | null>
 }

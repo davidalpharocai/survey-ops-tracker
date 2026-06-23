@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { assertHttpUrl, InvalidUrlError } from './url'
+import { assertHttpUrl, InvalidUrlError, extractDriveFileId } from './url'
 
 const NUL = String.fromCharCode(0)
 const TAB = String.fromCharCode(9)
@@ -58,5 +58,37 @@ describe('assertHttpUrl', () => {
   it('rejects unparseable input', () => {
     expect(() => assertHttpUrl('not a url')).toThrow(InvalidUrlError)
     expect(() => assertHttpUrl('')).toThrow(InvalidUrlError)
+  })
+})
+
+describe('extractDriveFileId', () => {
+  it('pulls the id from a Google Doc edit URL', () => {
+    expect(extractDriveFileId('https://docs.google.com/document/d/1AbC_def-123/edit')).toBe('1AbC_def-123')
+  })
+
+  it('handles Sheets, Slides, and Forms /d/ paths', () => {
+    expect(extractDriveFileId('https://docs.google.com/spreadsheets/d/SHEET1/edit#gid=0')).toBe('SHEET1')
+    expect(extractDriveFileId('https://docs.google.com/presentation/d/SLIDES1/edit')).toBe('SLIDES1')
+    expect(extractDriveFileId('https://docs.google.com/forms/d/FORM1/viewform')).toBe('FORM1')
+  })
+
+  it('handles drive.google.com /file/d/ and /drive/folders/', () => {
+    expect(extractDriveFileId('https://drive.google.com/file/d/FILE1/view?usp=sharing')).toBe('FILE1')
+    expect(extractDriveFileId('https://drive.google.com/drive/folders/FOLDER1')).toBe('FOLDER1')
+  })
+
+  it('handles ?id= style links', () => {
+    expect(extractDriveFileId('https://drive.google.com/open?id=OPEN1')).toBe('OPEN1')
+    expect(extractDriveFileId('https://drive.google.com/uc?id=UC1&export=download')).toBe('UC1')
+  })
+
+  it('returns null for non-Google, unparseable, or id-less URLs', () => {
+    expect(extractDriveFileId('https://example.com/document/d/x/edit')).toBeNull()
+    expect(extractDriveFileId('not a url')).toBeNull()
+    expect(extractDriveFileId('https://docs.google.com/')).toBeNull()
+  })
+
+  it('is not fooled by a lookalike host', () => {
+    expect(extractDriveFileId('https://docs.google.com.evil.com/document/d/x/edit')).toBeNull()
   })
 })

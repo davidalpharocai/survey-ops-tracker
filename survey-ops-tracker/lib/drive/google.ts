@@ -105,4 +105,9 @@ export class GoogleDrive implements DriveClient {
     const prev = (cur.data.parents ?? []).join(',')
     await this.drive.files.update({ fileId, addParents: newParentId, removeParents: prev, fields: 'id', supportsAllDrives: true })
   }
+
+  async getName(fileId: string): Promise<string | null> {
+    const res = await this.drive.files.get({ fileId, fields: 'name', supportsAllDrives: true })
+    return res.data.name ?? null
+  }
 }

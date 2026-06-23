@@ -46,3 +46,31 @@ export function assertHttpUrl(raw: string): string {
   }
   return parsed.href
 }
+
+/**
+ * Pull the Drive file/folder ID out of a Google Docs/Drive URL, or null if the
+ * URL isn't a recognizable Google Drive link. Used to look up a document's real
+ * title via the authenticated Drive API — an anonymous fetch can't read docs
+ * shared only within the org (Google bounces it to a sign-in page).
+ *
+ * Handles: /document|spreadsheets|presentation|forms/d/<id>, /file/d/<id>,
+ * /drive/folders/<id>, and ?id=<id> (open?id=, uc?id=). Host-anchored so a
+ * lookalike like docs.google.com.evil.com is rejected.
+ */
+export function extractDriveFileId(raw: string): string | null {
+  let url: URL
+  try {
+    url = new URL(raw.trim())
+  } catch {
+    return null
+  }
+  if (!/(?:^|\.)(?:docs|drive)\.google\.com$/.test(url.hostname.toLowerCase())) return null
+
+  const byPath = url.pathname.match(/\/(?:d|folders)\/([A-Za-z0-9_-]+)/)
+  if (byPath) return byPath[1]
+
+  const byQuery = url.searchParams.get('id')
+  if (byQuery && /^[A-Za-z0-9_-]+$/.test(byQuery)) return byQuery
+
+  return null
+}

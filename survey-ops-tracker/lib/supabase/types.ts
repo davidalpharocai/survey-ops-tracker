@@ -231,6 +231,12 @@ export type Database = {
           sprint_number: number | null
           compliance_override: boolean | null
           segment_count: number
+          rerun_date: string | null
+          rerun_number: number
+          rerun_series_id: string | null
+          rerun_spawned_at: string | null
+          requested_by_contact_id: string | null
+          requested_by_name: string | null
           created_at: string
           updated_at: string
         }
@@ -290,6 +296,12 @@ export type Database = {
           sprint_number?: number | null
           compliance_override?: boolean | null
           segment_count?: number
+          rerun_date?: string | null
+          rerun_number?: number
+          rerun_series_id?: string | null
+          rerun_spawned_at?: string | null
+          requested_by_contact_id?: string | null
+          requested_by_name?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -349,6 +361,12 @@ export type Database = {
           sprint_number?: number | null
           compliance_override?: boolean | null
           segment_count?: number
+          rerun_date?: string | null
+          rerun_number?: number
+          rerun_series_id?: string | null
+          rerun_spawned_at?: string | null
+          requested_by_contact_id?: string | null
+          requested_by_name?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -394,6 +412,66 @@ export type Database = {
           compliance_after_fielding?: boolean
           compliance_contact?: string | null
           compliance_notes?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      client_contacts: {
+        Row: {
+          id: string
+          client_id: string
+          first_name: string
+          last_name: string
+          email: string | null
+          title: string | null
+          phone: string | null
+          archived: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          client_id: string
+          first_name: string
+          last_name: string
+          email?: string | null
+          title?: string | null
+          phone?: string | null
+          archived?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          client_id?: string
+          first_name?: string
+          last_name?: string
+          email?: string | null
+          title?: string | null
+          phone?: string | null
+          archived?: boolean
+          created_at?: string
+        }
+        Relationships: []
+      }
+      client_notes: {
+        Row: {
+          id: string
+          client_id: string
+          body: string
+          created_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          client_id: string
+          body: string
+          created_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          client_id?: string
+          body?: string
+          created_by?: string | null
           created_at?: string
         }
         Relationships: []

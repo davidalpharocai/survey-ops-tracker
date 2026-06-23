@@ -27,6 +27,8 @@ import { BidWidget } from '@/components/project/BidWidget'
 import { CompliancePanel } from '@/components/compliance/CompliancePanel'
 import { ComplianceBanner } from '@/components/project/ComplianceBanner'
 import { SegmentedNTile } from '@/components/project/SegmentedNTile'
+import { RequestedByRow } from '@/components/project/RequestedByRow'
+import { ordinal } from '@/lib/utils/rerun'
 import { DeliverablesPanel } from '@/components/deliverables/DeliverablesPanel'
 import { salespersonOptions } from '@/lib/utils/salespeople'
 
@@ -40,6 +42,7 @@ const TOOLTIPS: Record<string, string> = {
   'Project Captain': 'The team member responsible for this project end-to-end. Add co-captains below when a project is shared.',
   'Co-Captains': 'Additional captains sharing this project. Most projects have none — the main captain stays the primary owner.',
   'Salesperson': 'The sales lead for this project.',
+  'Requested by': "The client contact who requested this survey. Pick from this client's people or add a new one; click the name to view or edit their details.",
   'N Actual': 'Final usable response count after cleaning N Collected.',
   'Longitudinal': 'Whether this is a longitudinal study tracked across multiple waves.',
   'Voter Survey QA': 'Voter surveys need an additional QA pass. Auto-set to Yes when the salesperson is Jenna or the project/client mentions "vote". Click to override.',
@@ -498,6 +501,15 @@ export default function ProjectDetailPage() {
               ) : (
                 <DetailRow label="Client" value={project.client} tooltip={TOOLTIPS['Client']} />
               )}
+              {project.client_id && (
+                <RequestedByRow
+                  clientId={project.client_id}
+                  contactId={project.requested_by_contact_id ?? null}
+                  snapshotName={project.requested_by_name ?? null}
+                  tooltip={TOOLTIPS['Requested by']}
+                  onChange={updates => updateProject.mutate({ id, updates })}
+                />
+              )}
               <CaptainRow
                 label="Project Captain"
                 captain={project.captain}
@@ -540,6 +552,25 @@ export default function ProjectDetailPage() {
                 tooltip={TOOLTIPS['Deliver Date']}
                 onSave={v => updateProject.mutate({ id, updates: { deliver_date: v } })}
               />
+              {project.longitudinal && (
+                <>
+                  <EditableDateRow
+                    label="Rerun date"
+                    value={project.rerun_date ?? null}
+                    tooltip="When the next wave of this longitudinal survey should run. A week before this date the system auto-creates the next wave (in Submitted), setup carried over and run-data reset."
+                    onSave={v => updateProject.mutate({ id, updates: { rerun_date: v, rerun_spawned_at: null } })}
+                  />
+                  {(project.rerun_number ?? 1) > 1 && (
+                    <div className="flex justify-between items-center text-sm gap-2">
+                      <span className="text-muted-foreground text-xs">Rerun wave</span>
+                      <span className="text-sm text-foreground">{ordinal(project.rerun_number)} wave</span>
+                    </div>
+                  )}
+                  {project.rerun_spawned_at && (
+                    <p className="text-[11px] text-muted-foreground/70">↻ Next wave already created.</p>
+                  )}
+                </>
+              )}
             </SidebarCard>
 
             <SidebarCard title="Sample">
