@@ -23,7 +23,8 @@ import { formatDate, getDueUrgency } from '@/lib/utils/date'
 import { differenceInCalendarDays, parseISO, startOfDay } from 'date-fns'
 import { deriveWaitingOn } from '@/lib/utils/waitingOn'
 import { BudgetWidget } from '@/components/project/BudgetWidget'
-import { BidWidget } from '@/components/project/BidWidget'
+import { BidBudgetWidget } from '@/components/project/BidBudgetWidget'
+import { BlastsWidget } from '@/components/project/BlastsWidget'
 import { CompliancePanel } from '@/components/compliance/CompliancePanel'
 import { ComplianceBanner } from '@/components/project/ComplianceBanner'
 import { SegmentedNTile } from '@/components/project/SegmentedNTile'
@@ -37,6 +38,7 @@ const TOOLTIPS: Record<string, string> = {
   'N Target': "Total number of survey responses you're aiming to collect.",
   'N Collected': 'Responses collected so far. Auto-synced every 15 minutes — manual edits may be overwritten by the next sync.',
   'Audience Size': 'Total size of the panel or population being surveyed. Different from N (target responses).',
+  'N Internal Target': 'Your internal collection goal — usually a cushion above N Target to cover cleaning and terminations.',
   'Row-Level Data': 'Whether individual respondent-level data is included in the deliverable.',
   'Terminations': 'Whether any survey participants have been terminated (screened out) from the study.',
   'Project Captain': 'The team member responsible for this project end-to-end. Add co-captains below when a project is shared.',
@@ -573,12 +575,23 @@ export default function ProjectDetailPage() {
               )}
             </SidebarCard>
 
-            <SidebarCard title="Sample">
+            <SidebarCard title="Sample N & Audience">
               <EditableNumberRow
                 label="N Target"
                 value={project.n_target}
                 tooltip={TOOLTIPS['N Target']}
                 onSave={v => updateProject.mutate({ id, updates: { n_target: v } })}
+              />
+              <EditableNumberRow
+                label="N Internal Target"
+                value={project.n_internal_target ?? null}
+                tooltip={TOOLTIPS['N Internal Target']}
+                onSave={v => updateProject.mutate({ id, updates: { n_internal_target: v } })}
+              />
+              <DetailRow
+                label="N Collected"
+                value={(project.n_collected ?? 0).toLocaleString()}
+                tooltip={TOOLTIPS['N Collected']}
               />
               <EditableNumberRow
                 label="N Actual"
@@ -638,12 +651,13 @@ export default function ProjectDetailPage() {
               <BudgetWidget
                 projectId={project.id}
                 budget={project.budget ?? null}
-                actualSpend={project.actual_spend ?? null}
-                nTarget={project.n_target}
                 nCollected={project.n_collected}
-                nActual={project.n_actual ?? null}
               />
-              <BidWidget projectId={project.id} />
+              <BidBudgetWidget projectId={project.id} />
+              <BlastsWidget projectId={project.id} />
+              <div className="border-t border-border pt-3 mt-1 flex items-center gap-1.5 text-xs text-muted-foreground/50">
+                <span aria-hidden="true">＋</span> Add cost line — other costs &amp; unit economics (coming soon)
+              </div>
             </SidebarCard>
           </div>
         </div>

@@ -237,6 +237,7 @@ export type Database = {
           rerun_spawned_at: string | null
           requested_by_contact_id: string | null
           requested_by_name: string | null
+          n_internal_target: number | null
           created_at: string
           updated_at: string
         }
@@ -302,6 +303,7 @@ export type Database = {
           rerun_spawned_at?: string | null
           requested_by_contact_id?: string | null
           requested_by_name?: string | null
+          n_internal_target?: number | null
           created_at?: string
           updated_at?: string
         }
@@ -367,6 +369,7 @@ export type Database = {
           rerun_spawned_at?: string | null
           requested_by_contact_id?: string | null
           requested_by_name?: string | null
+          n_internal_target?: number | null
           created_at?: string
           updated_at?: string
         }
@@ -678,6 +681,7 @@ export type Database = {
           amount: number
           blasts: number | null
           note: string | null
+          created_by: string | null
           created_at: string
         }
         Insert: {
@@ -686,6 +690,7 @@ export type Database = {
           amount: number
           blasts?: number | null
           note?: string | null
+          created_by?: string | null
           created_at?: string
         }
         Update: {
@@ -694,6 +699,7 @@ export type Database = {
           amount?: number
           blasts?: number | null
           note?: string | null
+          created_by?: string | null
           created_at?: string
         }
         Relationships: [
@@ -705,6 +711,39 @@ export type Database = {
             referencedColumns: ['id']
           }
         ]
+      }
+      project_blasts: {
+        Row: {
+          id: string
+          project_id: string
+          delivered: number
+          bid: number
+          blast_cost: number
+          note: string | null
+          created_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          project_id: string
+          delivered?: number
+          bid?: number
+          blast_cost?: number
+          note?: string | null
+          created_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          project_id?: string
+          delivered?: number
+          bid?: number
+          blast_cost?: number
+          note?: string | null
+          created_by?: string | null
+          created_at?: string
+        }
+        Relationships: []
       }
       project_steps: {
         Row: {

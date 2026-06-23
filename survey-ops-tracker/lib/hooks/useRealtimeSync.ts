@@ -14,7 +14,8 @@ const DEBOUNCE_MS = 250
 // scoped as [prefix, projectId].
 const PROJECT_SCOPED_TABLES: Record<string, string> = {
   project_steps: 'steps',
-  project_bids: 'bids',
+  project_bids: 'bid-budget',
+  project_blasts: 'blasts',
   project_activity: 'activity',
   project_data_changes: 'data-changes',
 }
