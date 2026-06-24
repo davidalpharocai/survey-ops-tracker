@@ -1,5 +1,5 @@
 // lib/deliverables/confidence.ts
-import type { Candidate, MatchResult } from './types'
+import type { Candidate, MatchResult, ClientRec, ProjectRec } from './types'
 
 export const AUTO_FILE_THRESHOLD = 0.85
 
@@ -23,10 +23,7 @@ export function routeMatch(match: MatchResult): Routing {
 
 export type LabeledCandidate = { clientId: string | null; projectId: string | null; confidence: number; band: ConfidenceBand; label: string }
 
-type NameData = {
-  clients: { id: string; name: string; code: string | null }[]
-  projects: { id: string; client_id: string | null; project_code: string; project_name: string }[]
-}
+type NameData = { clients: ClientRec[]; projects: ProjectRec[] }
 
 /** Turn matcher candidates into self-describing rows for the review queue (stored in match_candidates). */
 export function describeCandidates(candidates: Candidate[], data: NameData): LabeledCandidate[] {

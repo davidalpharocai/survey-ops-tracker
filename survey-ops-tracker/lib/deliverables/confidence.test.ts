@@ -45,4 +45,8 @@ describe('describeCandidates', () => {
     expect(labeled[0].label).toBe('Coatue')
     expect(labeled[0].band).toBe('Med')
   })
+  it('labels a low-confidence, client-less candidate as Unknown / Low', () => {
+    const labeled = describeCandidates([{ clientId: null, projectId: null, confidence: 0.2, reason: 'x', method: 'none' }], matchData)
+    expect(labeled[0]).toMatchObject({ band: 'Low', label: 'Unknown' })
+  })
 })
