@@ -61,4 +61,16 @@ describe('ensureClientFolder', () => {
     expect(await drive.findChildFolder('root', 'Coatue (CL001)')).toBe(id)
     expect(written).toEqual({ drive_folder_id: id })
   })
+
+  it('uses the name alone when the client has no code', async () => {
+    const drive = new FakeDrive('root')
+    const id = await ensureClientFolder(fakeAdmin({ drive_folder_id: null, name: 'Coatue', code: null }), drive, 'root', 'c1')
+    expect(await drive.findChildFolder('root', 'Coatue')).toBe(id)
+  })
+
+  it('falls back to the clientId as the folder name when the row is missing', async () => {
+    const drive = new FakeDrive('root')
+    const id = await ensureClientFolder(fakeAdmin(null), drive, 'root', 'c1')
+    expect(await drive.findChildFolder('root', 'c1')).toBe(id)
+  })
 })

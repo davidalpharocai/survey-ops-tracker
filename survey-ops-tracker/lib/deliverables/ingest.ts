@@ -1,5 +1,6 @@
 import 'server-only'
 import type { DriveClient } from '@/lib/drive/types'
+import { ensureChildFolder } from './folders'
 import { deliverableFileName } from './naming'
 import { isGoogleNative } from './links'
 import type { Enums } from '@/lib/supabase/types'
@@ -33,10 +34,6 @@ export type FiledRecord = {
   drive_file_id: string
   drive_folder_id: string
   file_name: string
-}
-
-async function ensureChildFolder(drive: DriveClient, parentId: string, name: string): Promise<string> {
-  return (await drive.findChildFolder(parentId, name)) ?? (await drive.createFolder(parentId, name))
 }
 
 /** Decide the destination folder, then file the item there. */
