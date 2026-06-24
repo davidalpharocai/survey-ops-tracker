@@ -59,7 +59,14 @@ describe('clientSignalEmail', () => {
     expect(clientSignalEmail({ to: 'pm@coatue.com', cc: '', body: '' })).toBe('pm@coatue.com')
   })
   it('falls back to the forwarded original recipient (forward case)', () => {
-    const body = '---------- Forwarded message ---------\nTo: person@bam.com'
+    const body = [
+      'Passing this along.',
+      '---------- Forwarded message ---------',
+      'From: Analyst <analyst@alpharoc.ai>',
+      'Date: Mon, Jun 15, 2026 at 9:02 AM',
+      'Subject: Deliverable',
+      'To: Client <person@bam.com>',
+    ].join('\n')
     expect(clientSignalEmail({ to: 'analyst@alpharoc.ai', cc: '', body })).toBe('person@bam.com')
   })
   it('returns null when nothing external is found', () => {

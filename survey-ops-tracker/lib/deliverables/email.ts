@@ -22,6 +22,7 @@ const EMAIL_RE = /[^\s<>,;"]+@[^\s<>,;"]+/g
 
 /** Lowercased domain after the @, or '' if there is no address. */
 export function emailDomain(addr: string): string {
+  // A display name never contains '@', so the first EMAIL_RE match is always the real address.
   const m = addr.match(EMAIL_RE)
   const email = m?.[0]?.toLowerCase() ?? ''
   return email.split('@')[1] ?? ''
@@ -54,7 +55,9 @@ export function externalRecipient(to: string | string[] | undefined, cc: string 
 
 /** For a forward, the original recipient parsed from the forwarded-message header block. */
 export function forwardedOriginalRecipient(body: string): string | null {
-  const m = body.match(/Forwarded message[\s\S]{0,600}?\n\s*To:\s*(.+)/i)
+  // Capture the To: line within ~1000 chars of the marker; a very long Subject could push it
+  // out of range, in which case we return null and the message lands in the review queue.
+  const m = body.match(/Forwarded message[\s\S]{0,1000}?\n\s*To:\s*(.+)/i)
   if (!m) return null
   for (const a of parseAddressList(m[1])) {
     if (!a.endsWith(`@${ALPHAROC_DOMAIN}`)) return a
