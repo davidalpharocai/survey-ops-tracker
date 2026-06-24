@@ -20,6 +20,10 @@ describe('replySubject', () => {
   it('tolerates a missing original subject', () => {
     expect(replySubject(undefined, filedSummary)).toBe('Filed ✓')
   })
+  it('says Already filed when every item is a duplicate', () => {
+    const dupSummary: ReplySummary = { queueUrl: 'https://app.example.com/deliverables', items: [{ name: 'x.pdf', status: 'duplicate' }] }
+    expect(replySubject('Final topline', dupSummary)).toBe('Already filed — Final topline')
+  })
 })
 
 describe('renderReplyHtml', () => {

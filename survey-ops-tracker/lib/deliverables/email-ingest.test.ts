@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { FakeDrive } from '@/lib/drive/fake'
 import { ingestEmail, type IngestDeps, type EmailDeliverableRow, type MatchData } from './email-ingest'
 import type { IngestPayload } from './email'
+import { sha256 } from './dedup'
 
 const matchData: MatchData = {
   clients: [{ id: 'c1', name: 'Coatue', code: 'CL001' }],
@@ -109,5 +110,37 @@ describe('ingestEmail', () => {
     const { deps } = makeDeps(drive)
     const out = await ingestEmail({ ...pdfPayload, messageId: 'msg-6', attachments: [], body: 'just a note, no links' }, deps)
     expect(out).toEqual({ action: 'ignored', reason: 'no_items' })
+  })
+
+  it('files multiple items from one email into the same folder', async () => {
+    const drive = new FakeDrive('root')
+    const { deps, rows } = makeDeps(drive)
+    const out = await ingestEmail({
+      ...pdfPayload, messageId: 'msg-multi',
+      attachments: [
+        { filename: 'Topline.pdf', mimeType: 'application/pdf', base64: Buffer.from('aaa').toString('base64') },
+        { filename: 'Crosstabs.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', base64: Buffer.from('bbb').toString('base64') },
+      ],
+      body: 'See attached, plus https://docs.google.com/spreadsheets/d/zzz/edit',
+    }, deps)
+    expect(out).toEqual({ action: 'processed', filed: 3, queued: 0, duplicates: 0 })
+    expect(rows).toHaveLength(3)
+    expect(new Set(rows.map((r) => r.drive_folder_id)).size).toBe(1)
+  })
+
+  it('skips a duplicate item but files its new sibling in the same email', async () => {
+    const drive = new FakeDrive('root')
+    const dupHash = sha256(Buffer.from('dupe'))
+    const { deps, rows } = makeDeps(drive, { findDup: async (_f, opts) => (opts.fileHash === dupHash ? 'existing-id' : null) })
+    const out = await ingestEmail({
+      ...pdfPayload, messageId: 'msg-mixed',
+      attachments: [
+        { filename: 'Old.pdf', mimeType: 'application/pdf', base64: Buffer.from('dupe').toString('base64') },
+        { filename: 'New.pdf', mimeType: 'application/pdf', base64: Buffer.from('fresh').toString('base64') },
+      ],
+    }, deps)
+    expect(out).toEqual({ action: 'processed', filed: 1, queued: 0, duplicates: 1 })
+    expect(rows).toHaveLength(1)
+    expect(rows[0].original_file_name).toBe('New.pdf')
   })
 })

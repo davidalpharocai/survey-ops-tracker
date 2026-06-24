@@ -13,7 +13,8 @@ const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replac
 
 export function replySubject(originalSubject: string | undefined, summary: ReplySummary): string {
   const needsReview = summary.items.some((i) => i.status === 'review' || i.status === 'unsorted')
-  const prefix = needsReview ? 'Needs a quick review' : 'Filed ✓'
+  const allDuplicate = summary.items.length > 0 && summary.items.every((i) => i.status === 'duplicate')
+  const prefix = needsReview ? 'Needs a quick review' : allDuplicate ? 'Already filed' : 'Filed ✓'
   return originalSubject ? `${prefix} — ${originalSubject}` : prefix
 }
 
