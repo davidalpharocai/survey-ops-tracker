@@ -22,6 +22,8 @@ export async function resolveDeliverable(deps: ResolveDeps, input: { id: string;
   const p = await deps.getProject(input.projectId)
   if (!p || !p.client_id || !p.project_code) return { ok: false, error: 'Project must have a client and code', status: 422 }
 
+  // v1 known gap: if moveFile succeeds but updateDeliverable then throws, the file is moved while
+  // the row still reads its prior status. A retry re-moves to the same folder (harmless) and re-updates.
   const folderId = await deps.projectFolderId(p)
   if (d.drive_file_id) await deps.moveFile(d.drive_file_id, folderId)
   await deps.updateDeliverable(input.id, {

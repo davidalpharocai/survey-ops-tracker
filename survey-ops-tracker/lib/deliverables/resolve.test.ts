@@ -43,6 +43,20 @@ describe('resolveDeliverable', () => {
     const { deps } = makeDeps({ getProject: async () => ({ ...project, client_id: null }) })
     expect(await resolveDeliverable(deps, { id: 'd1', projectId: 'p1', userId: 'u1' })).toMatchObject({ ok: false, status: 422 })
   })
+
+  it('also resolves an unsorted deliverable', async () => {
+    const { deps, calls } = makeDeps({ getDeliverable: async () => ({ ...queued, status: 'unsorted' }) })
+    const res = await resolveDeliverable(deps, { id: 'd1', projectId: 'p1', userId: 'u1' })
+    expect(res.ok).toBe(true)
+    expect(calls.update[0][1]).toMatchObject({ status: 'filed' })
+  })
+
+  it('skips the file move when there is no drive_file_id', async () => {
+    const { deps, calls } = makeDeps({ getDeliverable: async () => ({ ...queued, drive_file_id: null }) })
+    const res = await resolveDeliverable(deps, { id: 'd1', projectId: 'p1', userId: 'u1' })
+    expect(res.ok).toBe(true)
+    expect(calls.move).toEqual([])
+  })
 })
 
 describe('dismissDeliverable', () => {
