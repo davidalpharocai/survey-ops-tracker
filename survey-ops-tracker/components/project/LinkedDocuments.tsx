@@ -143,7 +143,7 @@ export function LinkedDocuments({ projectId, documents }: LinkedDocumentsProps) 
                 <span>📄</span>
                 <span className="truncate">{name ?? fallbackName(url)}</span>
               </a>
-              <span className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center bg-muted rounded opacity-0 group-hover:opacity-100 transition-opacity">
+              <span className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center bg-muted rounded">
                 <button
                   onClick={() => {
                     setRenameDraft(name ?? '')

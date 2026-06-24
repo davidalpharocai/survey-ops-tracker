@@ -115,8 +115,8 @@ export function BidBudgetWidget({ projectId }: { projectId: string }) {
                       {e.created_by ? ` · ${e.created_by}` : ''}
                       {e.note ? ` — ${e.note}` : ''}
                     </p>
-                    <button onClick={() => startEdit(e)} title="Edit" className="text-muted-foreground/50 hover:text-foreground text-xs px-0.5 opacity-0 group-hover:opacity-100 transition-opacity">✎</button>
-                    <button onClick={() => del.mutate(e.id)} title="Delete" className="text-muted-foreground/50 hover:text-red-600 dark:hover:text-red-400 text-xs px-0.5 opacity-0 group-hover:opacity-100 transition-opacity">✕</button>
+                    <button onClick={() => startEdit(e)} title="Edit" className="text-muted-foreground/50 hover:text-foreground text-xs px-0.5">✎</button>
+                    <button onClick={() => del.mutate(e.id)} title="Delete" className="text-muted-foreground/50 hover:text-red-600 dark:hover:text-red-400 text-xs px-0.5">✕</button>
                   </div>
                 )
               )}

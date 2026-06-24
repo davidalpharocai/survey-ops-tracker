@@ -268,14 +268,14 @@ export function LatestNextSteps({ projectId, notes }: LatestNextStepsProps) {
                         </span>
                         <button
                           onClick={() => startStepEdit(step)}
-                          className="opacity-0 group-hover:opacity-100 text-xs text-muted-foreground hover:text-foreground transition-opacity shrink-0"
+                          className="text-xs text-muted-foreground hover:text-foreground transition-opacity shrink-0"
                           title="Edit step"
                         >
                           ✎
                         </button>
                         <button
                           onClick={() => deleteStep.mutate(step.id)}
-                          className="opacity-0 group-hover:opacity-100 text-xs text-muted-foreground hover:text-red-600 dark:hover:text-red-400 transition-opacity shrink-0"
+                          className="text-xs text-muted-foreground hover:text-red-600 dark:hover:text-red-400 transition-opacity shrink-0"
                           title="Delete step"
                         >
                           ✕

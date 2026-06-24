@@ -106,8 +106,8 @@ export function BlastsWidget({ projectId }: { projectId: string }) {
               <span className="text-right text-foreground">{money(bl.blast_cost)}</span>
               <span className="text-right text-foreground font-medium">{money(blastTotal(bl))}</span>
               <span className="flex">
-                <button onClick={() => startEdit(bl)} title="Edit" className="text-muted-foreground/50 hover:text-foreground px-0.5 opacity-0 group-hover:opacity-100 transition-opacity">✎</button>
-                <button onClick={() => del.mutate(bl.id)} title="Delete" className="text-muted-foreground/50 hover:text-red-600 dark:hover:text-red-400 px-0.5 opacity-0 group-hover:opacity-100 transition-opacity">✕</button>
+                <button onClick={() => startEdit(bl)} title="Edit" className="text-muted-foreground/50 hover:text-foreground px-0.5">✎</button>
+                <button onClick={() => del.mutate(bl.id)} title="Delete" className="text-muted-foreground/50 hover:text-red-600 dark:hover:text-red-400 px-0.5">✕</button>
               </span>
             </div>
           )
