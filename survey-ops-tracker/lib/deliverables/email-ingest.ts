@@ -26,7 +26,8 @@ export type EmailDeliverableRow = {
   mime_type: string | null
   size_bytes: number | null
   source: 'email'
-  status: 'filed' | 'review' | 'unsorted'
+  // Matches the deliverable_status enum / FiledRecord.status; at runtime only filed|review|unsorted are persisted (dups are skipped before fileDeliverable).
+  status: 'filed' | 'review' | 'duplicate' | 'unsorted'
   match_confidence: number
   match_method: string
   match_candidates: LabeledCandidate[]
