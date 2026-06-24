@@ -35,3 +35,15 @@ export function extractDeliverableLinks(body: string): string[] {
   }
   return out
 }
+
+/** A readable name for a link's Drive shortcut/bookmark: "host — final-path-segment". */
+export function linkDisplayName(url: string): string {
+  try {
+    const u = new URL(url.trim())
+    const segs = u.pathname.split('/').filter(Boolean)
+    const last = segs.length ? segs.slice(-1).join(' ').replace(/[-_]+/g, ' ').trim() : ''
+    return last ? `${u.hostname} — ${last}` : u.hostname
+  } catch {
+    return url.trim()
+  }
+}
