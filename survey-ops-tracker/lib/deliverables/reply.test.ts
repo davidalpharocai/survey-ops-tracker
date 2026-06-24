@@ -35,4 +35,20 @@ describe('renderReplyHtml', () => {
     expect(html).toContain('https://app.example.com/deliverables')
     expect(html.toLowerCase()).toContain('review')
   })
+  it('shows the client name and queue link for an unsorted (no-project) item', () => {
+    const html = renderReplyHtml({
+      queueUrl: 'https://app.example.com/deliverables',
+      items: [{ name: 'topline.pdf', status: 'unsorted', clientName: 'Coatue' }],
+    })
+    expect(html).toContain('Coatue')
+    expect(html).toContain('_Unsorted')
+    expect(html).toContain('https://app.example.com/deliverables')
+  })
+  it('marks a duplicate item as already filed', () => {
+    const html = renderReplyHtml({
+      queueUrl: 'https://app.example.com/deliverables',
+      items: [{ name: 'dupe.pdf', status: 'duplicate' }],
+    })
+    expect(html.toLowerCase()).toContain('already filed')
+  })
 })
