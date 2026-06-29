@@ -37,11 +37,12 @@ function processInbox() {
       var atts = msg.getAttachments({ includeInlineImages: false, includeAttachments: true });
       for (var a = 0; a < atts.length; a++) {
         var blob = atts[a];
-        if (blob.getBytes().length > MAX_ATTACHMENT_BYTES) continue;
+        var bytes = blob.getBytes();
+        if (bytes.length > MAX_ATTACHMENT_BYTES) continue;
         attachments.push({
           filename: blob.getName(),
           mimeType: blob.getContentType(),
-          base64: Utilities.base64Encode(blob.getBytes())
+          base64: Utilities.base64Encode(bytes)
         });
       }
 

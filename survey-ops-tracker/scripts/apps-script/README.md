@@ -7,7 +7,7 @@ review queue) and replies "Filed ✓".
 ## What you set up (one time)
 
 1. **Create the Google Group `deliverables@alpharoc.ai`** (groups.google.com -> Create group).
-   - Allowing external posting is harmless because the app only processes messages **from @alpharoc.ai**.
+   - **Posting permissions:** in group settings set **Who can post → "Anyone in the organization"** so any AlphaRoc analyst can cc/bcc/forward to the address. You do **not** need to allow external (public) posting — the app only processes messages **from @alpharoc.ai** and ignores the rest — though allowing it is harmless if you prefer.
    - Set the group to **deliver messages to a backing inbox**: add a Workspace user (e.g. an ops
      mailbox you control) as a member with "Each email" delivery. The simplest reliable option:
      add one Workspace user as a member so every group message also lands in that user's Gmail inbox.
