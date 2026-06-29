@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { useReviewQueue, useProjectOptions, useResolveDeliverable, useDismissDeliverable, type QueueRow } from '@/lib/hooks/useReviewQueue'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
 import { Badge } from '@/components/ui/badge'
+import { toast } from '@/lib/utils/toast'
 
 const driveUrl = (id: string) => `https://drive.google.com/file/d/${id}/view`
 
@@ -14,7 +15,10 @@ function QueueCard({ row }: { row: QueueRow }) {
   const busy = resolve.isPending || dismiss.isPending
 
   function file(projectId: string) {
-    resolve.mutate({ id: row.id, projectId })
+    resolve.mutate({ id: row.id, projectId }, {
+      onSuccess: () => toast('Filed ✓', 'success'),
+      onError: (e) => toast(String((e as Error).message)),
+    })
   }
 
   const href = row.source_url ?? (row.drive_file_id ? driveUrl(row.drive_file_id) : '#')
@@ -70,7 +74,7 @@ function QueueCard({ row }: { row: QueueRow }) {
         </button>
         <button
           disabled={busy}
-          onClick={() => dismiss.mutate({ id: row.id })}
+          onClick={() => dismiss.mutate({ id: row.id }, { onSuccess: () => toast('Dismissed', 'success'), onError: (e) => toast(String((e as Error).message)) })}
           className="text-xs px-3 py-1.5 rounded-lg border border-border hover:bg-muted transition-colors disabled:opacity-40 text-muted-foreground"
         >
           Not a deliverable

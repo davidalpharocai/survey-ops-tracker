@@ -37,12 +37,12 @@ describe('ReviewQueue', () => {
   it('files the chosen candidate via the resolve mutation', () => {
     render(wrap(<ReviewQueue />))
     fireEvent.click(screen.getByRole('button', { name: /Coatue → B2B Tracker \(PR00003\)/ }))
-    expect(resolveMutate).toHaveBeenCalledWith({ id: 'd1', projectId: 'p1' })
+    expect(resolveMutate).toHaveBeenCalledWith({ id: 'd1', projectId: 'p1' }, expect.anything())
   })
 
   it('dismisses non-deliverables', () => {
     render(wrap(<ReviewQueue />))
     fireEvent.click(screen.getByRole('button', { name: /not a deliverable/i }))
-    expect(dismissMutate).toHaveBeenCalledWith({ id: 'd1' })
+    expect(dismissMutate).toHaveBeenCalledWith({ id: 'd1' }, expect.anything())
   })
 })
