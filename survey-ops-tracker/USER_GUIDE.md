@@ -144,10 +144,26 @@ Client name (ClXXXXX) / ProjectName_PR#####_YYYY.MM.DD
 
 The date is the project's delivery date (or today if none is set). Low-confidence items (not yet tied to a project) are staged in `00_Needs Review` at the drive root until resolved.
 
-### Coming in later phases
+### Emailing deliverables (bcc / cc / forward)
 
-- **Email forwarding:** forward a deliverable email to `deliverables@alpharoc.ai` — it routes and files automatically.
-- **Weekly QA report:** a digest of what was filed, near-duplicates, and items still in the review queue.
+You don't have to open the app to file a deliverable. When you send the final files/links to a
+client, just **bcc, cc, or forward** that email to **deliverables@alpharoc.ai**.
+
+- The system reads the **client you sent to** (the external recipient) plus the subject/body to
+  figure out the client and project, then files every attachment and deliverable link into the
+  client's `Client / {Project}_{PR#####}_{date}` Shared Drive folder.
+- Put the **project code (e.g. PR00003) in the subject** for a near-certain match.
+- You'll get a quick **"Filed ✓"** reply listing each item and its Drive link. If we couldn't tell
+  which client/project it belonged to, the reply says **"Needs a quick review"** with a link to the
+  **Deliverables → Review queue**.
+
+### The Review queue
+
+Open **Deliverables** in the top menu. Anything emailed in that we couldn't auto-file to a single
+client + project shows here with our best guesses (High / Med / Low confidence). Click a guess to
+file it, pick another project from the dropdown, or mark it **"Not a deliverable"** to dismiss it.
+Items already filed under the right client but with no project show as **unsorted** — assign a
+project the same way.
 
 ---
 

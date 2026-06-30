@@ -7,6 +7,7 @@ import { findDuplicate } from '@/lib/deliverables/persist'
 import { sha256 } from '@/lib/deliverables/dedup'
 import { projectFolderName } from '@/lib/deliverables/naming'
 import { normalizeUrl } from '@/lib/deliverables/links'
+import { ensureClientFolder, ensureProjectFolder } from '@/lib/deliverables/folders'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -110,19 +111,4 @@ export async function POST(req: Request) {
   })
 
   return NextResponse.json({ status: rec.status, id: inserted!.id, drive_file_id: rec.drive_file_id })
-}
-
-// helpers
-async function ensureClientFolder(admin: ReturnType<typeof createAdminClient>, drive: GoogleDrive, sharedDriveId: string, clientId: string): Promise<string> {
-  const { data: client } = await admin.from('clients').select('drive_folder_id, name, code').eq('id', clientId).single()
-  if (client?.drive_folder_id) return client.drive_folder_id
-  const name = client?.code ? `${client.name} (${client.code})` : (client?.name ?? clientId)
-  const created = (await drive.findChildFolder(sharedDriveId, name)) ?? (await drive.createFolder(sharedDriveId, name))
-  await admin.from('clients').update({ drive_folder_id: created }).eq('id', clientId)
-  return created
-}
-
-async function ensureProjectFolder(drive: GoogleDrive, r: FolderResolver): Promise<string> {
-  const clientFolder = await r.clientFolderId()
-  return (await drive.findChildFolder(clientFolder, r.projectFolderName())) ?? (await drive.createFolder(clientFolder, r.projectFolderName()))
 }
