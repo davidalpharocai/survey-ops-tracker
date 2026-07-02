@@ -16,7 +16,16 @@ export async function GET(request: Request) {
   if (token_hash && type) {
     const supabase = await createClient()
     const { error } = await supabase.auth.verifyOtp({ type, token_hash })
-    if (!error) return NextResponse.redirect(`${origin}${safeNext}`)
+    if (!error) {
+      // Invite + password recovery: have them set a password first, then continue
+      // to their destination. (Magic-link/email confirmation just proceed.)
+      if (type === 'invite' || type === 'recovery') {
+        return NextResponse.redirect(
+          `${origin}/auth/update-password?next=${encodeURIComponent(safeNext)}`
+        )
+      }
+      return NextResponse.redirect(`${origin}${safeNext}`)
+    }
   }
   // Expired/used link: fall back to the matching login flow, preserving the destination
   return NextResponse.redirect(
