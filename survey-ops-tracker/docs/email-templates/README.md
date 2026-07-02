@@ -24,11 +24,15 @@ tab → paste the file's contents. Set the **Subject** from the table below.
 | Reset password | `reset-password.html` | Reset your AlphaROC Survey Ops password |
 | Magic Link | `magic-link.html` | Your AlphaROC Survey Ops sign-in link |
 
-## `{{ .ConfirmationURL }}`
-This is a **Supabase template variable**, not a value to fill in. Leave the literal text
-`{{ .ConfirmationURL }}` in place — Supabase replaces it with the recipient's unique action
-link at send time. It appears **twice** in each file (the button `href` and the fallback URL
-line); leave both.
+## The action link
+Each template's button (and the fallback URL line) uses:
+`{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=<type>&next=/`
+where `type` is invite / signup / recovery / magiclink per template. `{{ .SiteURL }}` and
+`{{ .TokenHash }}` are Supabase variables — leave them literal; Supabase fills them per
+recipient. `next=/` sends the user to the Command Center after they authenticate (the app's
+`/auth/confirm` route reads `next`; it defaults to `/` for main-app links and portal flows pass
+their own `next=/portal…`). **Set Supabase → Authentication → URL Configuration → Site URL to the
+app root** (`https://survey-ops-tracker.vercel.app`) so `{{ .SiteURL }}` resolves correctly.
 
 ## Expiry wording
 The "expires in N hours" line should match **Authentication → Settings → Email OTP
