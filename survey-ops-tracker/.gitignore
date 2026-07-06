@@ -46,3 +46,6 @@ next-env.d.ts
 # downloaded company data
 scripts/*.xlsx
 scripts/project-id-mapping.csv
+
+# generated data exports
+exports/
