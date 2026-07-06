@@ -10,7 +10,11 @@ export function useClients() {
   return useQuery({
     queryKey: ['clients'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('clients').select('*').order('name')
+      const { data, error } = await supabase
+        .from('clients')
+        .select('*')
+        .is('deleted_at', null)
+        .order('name')
       if (error) throw error
       return data as Client[]
     },
