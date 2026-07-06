@@ -966,7 +966,16 @@ export type Database = {
         Relationships: []
       }
     }
-    Functions: Record<string, never>
+    Functions: {
+      merge_projects: {
+        Args: { p_survivor: string; p_loser: string }
+        Returns: undefined
+      }
+      merge_clients: {
+        Args: { p_survivor: string; p_loser: string }
+        Returns: undefined
+      }
+    }
     Enums: {
       profile_role: 'analyst' | 'compliance'
       submission_status: 'pending_review' | 'approved' | 'rejected'
