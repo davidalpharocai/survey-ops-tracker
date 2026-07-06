@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useUpdateClient } from '@/lib/hooks/useClients'
 import { ClientContacts } from '@/components/client/ClientContacts'
 import { ClientNotes } from '@/components/client/ClientNotes'
+import { ClientNameHeading } from '@/components/client/ClientNameHeading'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
 import { Skeleton } from '@/components/shared/Skeleton'
 import { formatDate } from '@/lib/utils/date'
@@ -219,7 +220,7 @@ export default function ClientPage() {
           ← Board
         </Link>
         <span className="text-muted-foreground/50">/</span>
-        <h1 className="text-2xl font-bold text-foreground">{c.name}</h1>
+        <ClientNameHeading id={c.id} name={c.name} />
         {c.code && (
           <span
             className="text-xs font-mono text-muted-foreground border border-border rounded px-1.5 py-0.5"
