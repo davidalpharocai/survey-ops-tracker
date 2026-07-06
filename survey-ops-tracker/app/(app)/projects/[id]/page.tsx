@@ -32,6 +32,7 @@ import { RequestedByRow } from '@/components/project/RequestedByRow'
 import { ordinal } from '@/lib/utils/rerun'
 import { DeliverablesPanel } from '@/components/deliverables/DeliverablesPanel'
 import { salespersonOptions } from '@/lib/utils/salespeople'
+import { MergeButton } from '@/components/merge/MergeButton'
 
 const TOOLTIPS: Record<string, string> = {
   'Client': 'The client this project is for.',
@@ -266,7 +267,7 @@ export default function ProjectDetailPage() {
           )}
           {/* Destructive action set apart from Close by a divider + a red tint
               that's visible at rest, so it can't be hit by reflex. */}
-          <span className="flex items-center border-l border-border pl-2 ml-1">
+          <span className="flex items-center border-l border-border pl-2 ml-1 gap-2">
             <HelpTip text="Removes the project from the board and moves it to Recently Deleted on the Admin page, where you can restore it (it asks you to type 'delete' first). If you just want it off the board, use Close instead.">
               <button
                 onClick={() => setConfirmingDelete(true)}
@@ -275,6 +276,7 @@ export default function ProjectDetailPage() {
                 🗑 Delete
               </button>
             </HelpTip>
+            <MergeButton kind="project" record={project} />
           </span>
         </div>
       </div>

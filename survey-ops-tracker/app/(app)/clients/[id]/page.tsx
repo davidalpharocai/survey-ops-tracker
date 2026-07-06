@@ -8,6 +8,7 @@ import { useUpdateClient } from '@/lib/hooks/useClients'
 import { ClientContacts } from '@/components/client/ClientContacts'
 import { ClientNotes } from '@/components/client/ClientNotes'
 import { ClientNameHeading } from '@/components/client/ClientNameHeading'
+import { MergeButton } from '@/components/merge/MergeButton'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
 import { Skeleton } from '@/components/shared/Skeleton'
 import { formatDate } from '@/lib/utils/date'
@@ -229,13 +230,16 @@ export default function ClientPage() {
             {c.code}
           </span>
         )}
-        <Link
-          href="/admin"
-          className="ml-auto text-sm text-muted-foreground hover:text-foreground transition-colors"
-          title="All clients live on the Admin page"
-        >
-          All clients →
-        </Link>
+        <span className="ml-auto flex items-center gap-3">
+          <MergeButton kind="client" record={c} />
+          <Link
+            href="/admin"
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            title="All clients live on the Admin page"
+          >
+            All clients →
+          </Link>
+        </span>
       </div>
 
       <ClientComplianceCard client={c} />
