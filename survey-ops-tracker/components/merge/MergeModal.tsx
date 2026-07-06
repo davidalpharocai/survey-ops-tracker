@@ -1,5 +1,6 @@
 'use client'
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { conflicts, buildSurvivorUpdate, PROJECT_MERGE_FIELDS, CLIENT_MERGE_FIELDS } from '@/lib/utils/merge'
 import { useMergeProjects, useMergeClients } from '@/lib/hooks/useMerge'
 
@@ -25,6 +26,7 @@ export function MergeModal({ kind, a, b, open, onClose }: Props) {
   const mergeProjects = useMergeProjects()
   const mergeClients = useMergeClients()
   const merge = kind === 'project' ? mergeProjects : mergeClients
+  const router = useRouter()
 
   const [survivorId, setSurvivorId] = useState<string>(a.id)
   const [picks, setPicks] = useState<Record<string, 'survivor' | 'loser'>>({})
@@ -38,7 +40,18 @@ export function MergeModal({ kind, a, b, open, onClose }: Props) {
     const survivorUpdate = buildSurvivorUpdate(survivor, loser, picks)
     merge.mutate(
       { survivorId: survivor.id, loserId: loser.id, survivorUpdate },
-      { onSuccess: onClose }
+      {
+        onSuccess: () => {
+          onClose()
+          // If the record whose page we're on became the loser, it's now
+          // soft-deleted — send the user to the survivor, not a dead page.
+          if (survivor.id !== a.id) {
+            router.push(kind === 'project' ? `/projects/${survivor.id}` : `/clients/${survivor.id}`)
+          } else {
+            router.refresh()
+          }
+        },
+      }
     )
   }
 

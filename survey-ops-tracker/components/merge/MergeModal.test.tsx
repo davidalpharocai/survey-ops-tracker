@@ -7,6 +7,9 @@ vi.mock('@/lib/hooks/useMerge', () => ({
   useMergeProjects: () => ({ mutate, isPending: false }),
   useMergeClients: () => ({ mutate, isPending: false }),
 }))
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
+}))
 
 const a = { id: 'A', project_name: 'Tracker', due_date: '2026-07-20', budget: 6000, project_code: 'PR001' }
 const b = { id: 'B', project_name: 'Tracker', due_date: '2026-07-25', budget: 6000, project_code: 'PR002' }

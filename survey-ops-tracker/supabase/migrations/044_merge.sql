@@ -33,8 +33,15 @@ begin
 
   select coalesce(max(version), 0) into ver_offset
     from question_submissions where project_id = p_survivor;
-  update question_submissions set project_id = p_survivor, version = version + ver_offset
-    where project_id = p_loser;
+  -- Renumber the loser's submissions into a clean contiguous block above the
+  -- survivor's max, so a version gap or a version=0 row cannot collide.
+  update question_submissions qs
+    set project_id = p_survivor, version = ver_offset + r.rn
+    from (
+      select id, row_number() over (order by version, id) as rn
+      from question_submissions where project_id = p_loser
+    ) r
+    where qs.id = r.id;
 
   delete from project_recipients l
     where l.project_id = p_loser
