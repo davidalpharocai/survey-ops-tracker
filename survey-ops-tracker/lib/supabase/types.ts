@@ -951,6 +951,177 @@ export type Database = {
         }
         Relationships: []
       }
+      oauth_clients: {
+        Row: {
+          id: string
+          name: string
+          redirect_uris: Json
+          created_at: string
+        }
+        Insert: {
+          id: string
+          name?: string
+          redirect_uris: Json
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          redirect_uris?: Json
+          created_at?: string
+        }
+        Relationships: []
+      }
+      oauth_codes: {
+        Row: {
+          code_hash: string
+          client_id: string
+          user_id: string
+          redirect_uri: string
+          code_challenge: string
+          scope: string
+          expires_at: string
+          consumed_at: string | null
+        }
+        Insert: {
+          code_hash: string
+          client_id: string
+          user_id: string
+          redirect_uri: string
+          code_challenge: string
+          scope: string
+          expires_at: string
+          consumed_at?: string | null
+        }
+        Update: {
+          code_hash?: string
+          client_id?: string
+          user_id?: string
+          redirect_uri?: string
+          code_challenge?: string
+          scope?: string
+          expires_at?: string
+          consumed_at?: string | null
+        }
+        Relationships: []
+      }
+      oauth_tokens: {
+        Row: {
+          id: string
+          token_hash: string
+          refresh_hash: string | null
+          client_id: string
+          user_id: string
+          user_email: string
+          scope: string
+          expires_at: string
+          refresh_expires_at: string
+          rotated_at: string | null
+          replaced_by: string | null
+          revoked_at: string | null
+          last_used_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          token_hash: string
+          refresh_hash?: string | null
+          client_id: string
+          user_id: string
+          user_email: string
+          scope?: string
+          expires_at: string
+          refresh_expires_at: string
+          rotated_at?: string | null
+          replaced_by?: string | null
+          revoked_at?: string | null
+          last_used_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          token_hash?: string
+          refresh_hash?: string | null
+          client_id?: string
+          user_id?: string
+          user_email?: string
+          scope?: string
+          expires_at?: string
+          refresh_expires_at?: string
+          rotated_at?: string | null
+          replaced_by?: string | null
+          revoked_at?: string | null
+          last_used_at?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      reminders: {
+        Row: {
+          id: string
+          user_id: string
+          user_email: string
+          text: string
+          due_date: string
+          project_id: string | null
+          done: boolean
+          done_at: string | null
+          notified_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          user_email: string
+          text: string
+          due_date: string
+          project_id?: string | null
+          done?: boolean
+          done_at?: string | null
+          notified_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          user_email?: string
+          text?: string
+          due_date?: string
+          project_id?: string | null
+          done?: boolean
+          done_at?: string | null
+          notified_at?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      mcp_tool_calls: {
+        Row: {
+          id: string
+          user_email: string
+          tool: string
+          duration_ms: number | null
+          ok: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_email: string
+          tool: string
+          duration_ms?: number | null
+          ok: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_email?: string
+          tool?: string
+          duration_ms?: number | null
+          ok?: boolean
+          created_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       portal_projects: {
