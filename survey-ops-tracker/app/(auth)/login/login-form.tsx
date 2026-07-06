@@ -29,6 +29,10 @@ export default function LoginForm() {
   }, [])
 
   const linkExpired = searchParams.get('error') === 'link'
+  const nextParam = searchParams.get('next')
+  const safeNext = nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//') && !nextParam.includes('\\')
+    ? nextParam
+    : '/'
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
@@ -44,7 +48,7 @@ export default function LoginForm() {
       setLoading(false)
       return
     }
-    router.push('/')
+    router.push(safeNext)
     router.refresh()
   }
 
