@@ -6,6 +6,7 @@ import { InfoTooltip } from '@/components/shared/InfoTooltip'
 import { Skeleton } from '@/components/shared/Skeleton'
 import { STAGE_ORDER } from '@/lib/utils/stage'
 import { differenceInCalendarDays, parseISO } from 'date-fns'
+import { fmtNum } from '@/lib/utils/number'
 
 // Read-only analytics derived from data already captured — no new tables.
 interface InsightProject {
@@ -196,7 +197,7 @@ export default function InsightsPage() {
         </div>
         {collectionPct != null && (
           <p className="text-xs text-muted-foreground mt-3">
-            Collection across active projects: <span className="text-foreground font-medium">{m.totalCollected.toLocaleString()}</span> of {m.totalTarget.toLocaleString()} responses ({collectionPct}%) · {m.behind} behind target in Fielding
+            Collection across active projects: <span className="text-foreground font-medium">{fmtNum(m.totalCollected)}</span> of {fmtNum(m.totalTarget)} responses ({collectionPct}%) · {m.behind} behind target in Fielding
           </p>
         )}
       </div>

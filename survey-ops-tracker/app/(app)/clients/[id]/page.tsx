@@ -12,6 +12,7 @@ import { MergeButton } from '@/components/merge/MergeButton'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
 import { Skeleton } from '@/components/shared/Skeleton'
 import { formatDate } from '@/lib/utils/date'
+import { fmtNum } from '@/lib/utils/number'
 import type { Tables } from '@/lib/supabase/types'
 
 type Client = Tables<'clients'>
@@ -361,7 +362,7 @@ export default function ClientPage() {
                       {formatDate(p.submitted_date)}
                     </td>
                     <td className="px-4 py-3 text-sm text-muted-foreground whitespace-nowrap">
-                      {p.n_collected}{p.n_target != null ? ` / ${p.n_target}` : ''}
+                      {fmtNum(p.n_collected)}{p.n_target != null ? ` / ${fmtNum(p.n_target)}` : ''}
                     </td>
                     <td className="px-4 py-3 text-sm text-muted-foreground whitespace-nowrap">
                       {money(p.actual_spend)}

@@ -3,6 +3,7 @@ import { useState, useMemo, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { formatDate, getDueUrgency, daysOverdue, urgencyPrefix, BADLY_OVERDUE_DAYS } from '@/lib/utils/date'
 import { stageLabel } from '@/lib/utils/stage'
+import { fmtNum } from '@/lib/utils/number'
 import type { SlimProject } from '@/lib/hooks/useProjects'
 import { useLatestSubmissionStatuses } from '@/lib/hooks/useSubmissions'
 
@@ -273,7 +274,7 @@ export function ProjectTable({
                       <span className="text-muted-foreground/50">—</span>
                     ) : (
                       <>
-                        {p.n_collected} / {p.n_target ?? '—'}
+                        {fmtNum(p.n_collected)} / {fmtNum(p.n_target)}
                         {nMet && ' ✓'}
                         {(p.segment_count ?? 0) > 1 && (
                           <span className="text-muted-foreground/50"> · {p.segment_count} seg</span>
@@ -284,7 +285,7 @@ export function ProjectTable({
                 )}
                 {show('nActual') && (
                   <td className="px-4 py-3 text-xs text-muted-foreground">
-                    {p.n_actual ?? '—'}
+                    {fmtNum(p.n_actual)}
                   </td>
                 )}
                 {show('long') && <FlagCell value={p.longitudinal ?? false} />}

@@ -33,6 +33,7 @@ import { ordinal } from '@/lib/utils/rerun'
 import { DeliverablesPanel } from '@/components/deliverables/DeliverablesPanel'
 import { salespersonOptions } from '@/lib/utils/salespeople'
 import { MergeButton } from '@/components/merge/MergeButton'
+import { fmtNum } from '@/lib/utils/number'
 
 const TOOLTIPS: Record<string, string> = {
   'Client': 'The client this project is for.',
@@ -592,7 +593,7 @@ export default function ProjectDetailPage() {
               />
               <DetailRow
                 label="N Collected"
-                value={(project.n_collected ?? 0).toLocaleString()}
+                value={fmtNum(project.n_collected ?? 0)}
                 tooltip={TOOLTIPS['N Collected']}
               />
               <EditableNumberRow
@@ -1215,7 +1216,7 @@ function EditableNumberRow({
         className={`text-sm cursor-pointer hover:bg-accent rounded px-1.5 transition-colors ${valueClass}`}
         title="Click to edit"
       >
-        {value != null ? value.toString() : <span className="text-muted-foreground/50">— click to set</span>}
+        {value != null ? fmtNum(value) : <span className="text-muted-foreground/50">— click to set</span>}
       </button>
     </div>
   )

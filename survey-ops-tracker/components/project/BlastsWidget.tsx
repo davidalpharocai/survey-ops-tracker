@@ -6,6 +6,7 @@ import { InfoTooltip } from '@/components/shared/InfoTooltip'
 import { useProjectBlasts, useAddBlast, useUpdateBlast, useDeleteBlast, type Blast } from '@/lib/hooks/useProjectBlasts'
 import { useBidBudget, currentBidBudget } from '@/lib/hooks/useBidBudget'
 import { blastTotal, totalBidDollars, totalBlastFees, totalDelivered, weightedAvgBid, avgBid } from '@/lib/utils/blast'
+import { fmtNum } from '@/lib/utils/number'
 
 function money(v: number): string {
   return '$' + v.toLocaleString('en-US', { maximumFractionDigits: 0 })
@@ -96,7 +97,7 @@ export function BlastsWidget({ projectId }: { projectId: string }) {
             </div>
           ) : (
             <div key={bl.id} className={`group ${ROW}`}>
-              <span className="text-foreground">{bl.delivered.toLocaleString()}</span>
+              <span className="text-foreground">{fmtNum(bl.delivered)}</span>
               <span
                 className={`text-right ${cap != null && bl.bid > cap ? 'text-amber-600 dark:text-amber-400' : 'text-foreground'}`}
                 title={cap != null && bl.bid > cap ? `Over the ${rate(cap)} bid budget` : undefined}
@@ -116,7 +117,7 @@ export function BlastsWidget({ projectId }: { projectId: string }) {
         {list.length > 0 && (
           <>
             <div className={`${ROW} border-t border-border pt-1 mt-0.5 font-medium text-foreground`}>
-              <span>{totalDelivered(list).toLocaleString()}</span>
+              <span>{fmtNum(totalDelivered(list))}</span>
               <span className="text-right text-muted-foreground">—</span>
               <span className="text-right">{money(totalBlastFees(list))}</span>
               <span className="text-right">{money(total)}</span>

@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
 import { NProgressBar } from '@/components/shared/NProgressBar'
+import { fmtNum } from '@/lib/utils/number'
 import {
   useProjectSegments,
   useSplitProject,
@@ -41,9 +42,9 @@ export function SegmentedNTile({
 
   const TotalNumber = (
     <span className="text-2xl font-semibold text-foreground leading-tight">
-      {project.n_collected}
+      {fmtNum(project.n_collected)}
       {project.n_target != null ? (
-        <span className="text-base font-normal text-muted-foreground"> / {project.n_target}</span>
+        <span className="text-base font-normal text-muted-foreground"> / {fmtNum(project.n_target)}</span>
       ) : (
         <span className="text-xs font-normal text-muted-foreground/60"> · no target</span>
       )}
@@ -121,9 +122,9 @@ export function SegmentedNTile({
           className="text-2xl font-semibold text-foreground leading-tight text-left cursor-pointer hover:bg-accent rounded-md px-1.5 -ml-1.5 transition-colors"
           title="Click to edit"
         >
-          {project.n_collected}
+          {fmtNum(project.n_collected)}
           {project.n_target != null ? (
-            <span className="text-base font-normal text-muted-foreground"> / {project.n_target}</span>
+            <span className="text-base font-normal text-muted-foreground"> / {fmtNum(project.n_target)}</span>
           ) : (
             <span className="text-xs font-normal text-muted-foreground/60"> · no target</span>
           )}

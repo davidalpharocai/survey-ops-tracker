@@ -1,3 +1,5 @@
+import { fmtNum } from '@/lib/utils/number'
+
 interface NProgressBarProps {
   collected: number | null
   target: number | null
@@ -12,7 +14,7 @@ export function NProgressBar({ collected, target, showLabel = true }: NProgressB
     if (!showLabel) return null
     return (
       <div className="text-xs text-muted-foreground/70">
-        {collected != null && collected > 0 ? `${collected} collected · no target` : 'No target set'}
+        {collected != null && collected > 0 ? `${fmtNum(collected)} collected · no target` : 'No target set'}
       </div>
     )
   }
@@ -29,7 +31,7 @@ export function NProgressBar({ collected, target, showLabel = true }: NProgressB
         <div className="flex justify-between text-xs mb-1">
           <span className="text-muted-foreground">N Collected</span>
           <span className={met ? 'text-emerald-600 dark:text-emerald-400 font-medium' : 'text-foreground/80'}>
-            {collected != null ? collected : '—'} / {target != null ? target : '—'}
+            {fmtNum(collected)} / {fmtNum(target)}
             {met && ' ✓'}
           </span>
         </div>
