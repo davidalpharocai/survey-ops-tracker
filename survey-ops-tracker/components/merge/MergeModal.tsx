@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { conflicts, buildSurvivorUpdate, PROJECT_MERGE_FIELDS, CLIENT_MERGE_FIELDS } from '@/lib/utils/merge'
 import { useMergeProjects, useMergeClients } from '@/lib/hooks/useMerge'
 
-type Row = Record<string, any>
+type Row = { id: string } & Record<string, unknown>
 type Props = { kind: 'project' | 'client'; a: Row; b: Row; open: boolean; onClose: () => void }
 
 const COMBINES: Record<'project' | 'client', string[]> = {
