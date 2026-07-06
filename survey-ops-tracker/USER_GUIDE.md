@@ -121,6 +121,7 @@ Some clients (the financial ones) require their compliance team to sign off befo
 - Light/dark/system theme: the toggle at the top right
 - Works on phones at the same address with the same login
 - Made a mess? Nothing here is truly lost: closed projects reopen, deleted bids have ↺ Undo, checked steps uncheck, and the data change log keeps the paper trail
+- Signing in for the first time (or forgot your password)? Click "First time here or forgot your password?" on the login page to email yourself a set-password link
 
 ## 9. Deliverables
 
