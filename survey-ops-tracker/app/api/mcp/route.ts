@@ -691,6 +691,224 @@ const handler = createMcpHandler(
         }, meta))
       }
     )
+
+    // -------- write tools: status / stage (preview-then-confirm + compliance gate) --------
+
+    server.tool(
+      'advance_project',
+      'Move an Active project to a pipeline column, or mark it delivered (preview first; confirm to apply). Enforces the compliance gate.',
+      {
+        project: z.string(),
+        to_column: z.string().optional(),
+        mark_delivered: z.boolean().optional(),
+        override_reason: z.string().optional(),
+        confirm: z.boolean().optional(),
+      },
+      async (args, extra) => {
+        const meta: LoggedMeta = {}
+        return json(await logged(extra, 'advance_project', async () => {
+          const { userEmail } = authIdentity(extra)
+          const p = await resolveProjectWritable(args.project)
+          if (!p) return { error: 'Project not found.' }
+          if ('error' in p) return p
+          if ('ambiguous' in p) return p
+          meta.project_id = p.id as string
+
+          if (p.phase !== 'Active') {
+            return { error: 'This project is still in Scoping — approve it first (approve_scoping).' }
+          }
+          if (args.to_column && args.mark_delivered) {
+            return { error: 'Specify either to_column or mark_delivered, not both.' }
+          }
+          if (!args.to_column && !args.mark_delivered) {
+            return { error: 'Specify to_column (a pipeline column) or mark_delivered:true.' }
+          }
+          if (args.to_column && !STAGE_ORDER.includes(args.to_column as BoardColumn)) {
+            return { error: `"${args.to_column}" is not a valid pipeline column. Valid columns: ${STAGE_ORDER.join(', ')}.` }
+          }
+
+          const stage = stageColumnsFor({ toColumn: args.to_column as BoardColumn, markDelivered: args.mark_delivered })
+          const willMarkDelivered = !!args.mark_delivered && !p.stage_delivery
+          const gi = await loadGateInput(p.id as string)
+          const gate = complianceGate({
+            targetColumn: stage.board_column, willMarkDelivered,
+            client: gi.client, override: gi.override, submissions: gi.submissions,
+          })
+          if (gate.blocked && !args.override_reason) return { blocked: true, reason: gate.message }
+
+          const patch: Record<string, unknown> = { ...stage }
+          if (gate.blocked && args.override_reason) {
+            patch.latest_next_steps = autoStamp(
+              userEmail.split('@')[0],
+              p.latest_next_steps as string | null,
+              `⚠ Compliance override (${gate.phase}): ${args.override_reason}`
+            )
+          }
+
+          return confirmable(
+            args,
+            async () => ({
+              project_code: p.project_code, to: stage.board_column, delivered: willMarkDelivered,
+              override: gate.blocked ? args.override_reason ?? null : null, updated_at: p.updated_at,
+            }),
+            async () => {
+              const supabase = createAdminClient()
+              const result = await runProjectWrite(supabase, { id: p.id as string, patch, actor: `${userEmail} via Claude` })
+              if ('error' in result) return result
+              meta.detail = {
+                to_column: result.board_column, delivered: willMarkDelivered,
+                override_reason: gate.blocked ? args.override_reason ?? null : null,
+              }
+              return { ok: true, project_code: result.project_code, board_column: result.board_column }
+            }
+          )
+        }, meta))
+      }
+    )
+
+    server.tool(
+      'set_project_status',
+      "Set a project's status — Open, Hold, or Closed (preview first; confirm to apply).",
+      { project: z.string(), status: z.enum(['Open', 'Hold', 'Closed']), confirm: z.boolean().optional() },
+      async (args, extra) => {
+        const meta: LoggedMeta = {}
+        return json(await logged(extra, 'set_project_status', async () => {
+          const { userEmail } = authIdentity(extra)
+          const p = await resolveProjectWritable(args.project)
+          if (!p) return { error: 'Project not found.' }
+          if ('error' in p) return p
+          if ('ambiguous' in p) return p
+          meta.project_id = p.id as string
+
+          return confirmable(
+            args,
+            async () => ({ summary: `Status ${fmtChangeVal(p.status)} → ${args.status}`, from: p.status, to: args.status, updated_at: p.updated_at }),
+            async () => {
+              const supabase = createAdminClient()
+              const result = await runProjectWrite(supabase, { id: p.id as string, patch: { status: args.status }, actor: `${userEmail} via Claude` })
+              if ('error' in result) return result
+              meta.detail = { changed: { status: [p.status, result.status] } }
+              return { ok: true, project_code: result.project_code, status: result.status }
+            }
+          )
+        }, meta))
+      }
+    )
+
+    server.tool(
+      'approve_scoping',
+      'Approve a Scoping project into the Active pipeline at Submitted (preview first; confirm to apply).',
+      { project: z.string(), confirm: z.boolean().optional() },
+      async (args, extra) => {
+        const meta: LoggedMeta = {}
+        return json(await logged(extra, 'approve_scoping', async () => {
+          const { userEmail } = authIdentity(extra)
+          const p = await resolveProjectWritable(args.project)
+          if (!p) return { error: 'Project not found.' }
+          if ('error' in p) return p
+          if ('ambiguous' in p) return p
+          meta.project_id = p.id as string
+
+          if (p.phase !== 'Scoping') return { error: 'This project is already Active.' }
+
+          const submittedDate = todayEastern()
+          const patch: Record<string, unknown> = {
+            phase: 'Active', board_column: 'Submitted', submitted_date: submittedDate,
+            ...getCheckboxesForColumn('Submitted'),
+          }
+
+          return confirmable(
+            args,
+            async () => ({ summary: `Approve "${p.project_name}" into Active / Submitted`, submitted_date: submittedDate, updated_at: p.updated_at }),
+            async () => {
+              const supabase = createAdminClient()
+              const result = await runProjectWrite(supabase, { id: p.id as string, patch, actor: `${userEmail} via Claude` })
+              if ('error' in result) return result
+              meta.detail = { approved: { submitted_date: submittedDate } }
+              return { ok: true, project_code: result.project_code, phase: result.phase, board_column: result.board_column }
+            }
+          )
+        }, meta))
+      }
+    )
+
+    server.tool(
+      'move_to_scoping',
+      'Move an Active project back into Scoping (preview first; confirm to apply). Leaves board_column and stage checkboxes untouched.',
+      { project: z.string(), confirm: z.boolean().optional() },
+      async (args, extra) => {
+        const meta: LoggedMeta = {}
+        return json(await logged(extra, 'move_to_scoping', async () => {
+          const { userEmail } = authIdentity(extra)
+          const p = await resolveProjectWritable(args.project)
+          if (!p) return { error: 'Project not found.' }
+          if ('error' in p) return p
+          if ('ambiguous' in p) return p
+          meta.project_id = p.id as string
+
+          if (p.phase !== 'Active') return { error: 'This project is already in Scoping.' }
+
+          const scopingStage = (p.scoping_stage as string | null) ?? 'Awaiting Approval'
+          const patch = { phase: 'Scoping', scoping_stage: scopingStage }
+
+          return confirmable(
+            args,
+            async () => ({ summary: `Move "${p.project_name}" back to Scoping (${scopingStage})`, updated_at: p.updated_at }),
+            async () => {
+              const supabase = createAdminClient()
+              const result = await runProjectWrite(supabase, { id: p.id as string, patch, actor: `${userEmail} via Claude` })
+              if ('error' in result) return result
+              meta.detail = { changed: { phase: [p.phase, result.phase], scoping_stage: [p.scoping_stage, result.scoping_stage] } }
+              return { ok: true, project_code: result.project_code, phase: result.phase, scoping_stage: result.scoping_stage }
+            }
+          )
+        }, meta))
+      }
+    )
+
+    server.tool(
+      'set_compliance_override',
+      "Override a project's compliance requirement — on, off, or auto (client default) — with a reason (preview first; confirm to apply).",
+      {
+        project: z.string(),
+        value: z.enum(['on', 'off', 'auto']),
+        reason: z.string().min(1).max(1000),
+        confirm: z.boolean().optional(),
+      },
+      async (args, extra) => {
+        const meta: LoggedMeta = {}
+        return json(await logged(extra, 'set_compliance_override', async () => {
+          const { userEmail } = authIdentity(extra)
+          const p = await resolveProjectWritable(args.project)
+          if (!p) return { error: 'Project not found.' }
+          if ('error' in p) return p
+          if ('ambiguous' in p) return p
+          meta.project_id = p.id as string
+
+          const overrideValue = args.value === 'on' ? true : args.value === 'off' ? false : null
+          const patch = {
+            compliance_override: overrideValue,
+            latest_next_steps: autoStamp(
+              userEmail.split('@')[0],
+              p.latest_next_steps as string | null,
+              `Compliance override → ${args.value}: ${args.reason}`
+            ),
+          }
+
+          return confirmable(
+            args,
+            async () => ({ summary: `Compliance override → ${args.value} (${args.reason})`, updated_at: p.updated_at }),
+            async () => {
+              const supabase = createAdminClient()
+              const result = await runProjectWrite(supabase, { id: p.id as string, patch, actor: `${userEmail} via Claude` })
+              if ('error' in result) return result
+              meta.detail = { compliance_override: overrideValue, reason: args.reason }
+              return { ok: true, project_code: result.project_code, compliance_override: result.compliance_override }
+            }
+          )
+        }, meta))
+      }
+    )
   },
   {},
   { basePath: '/api', maxDuration: 60, verboseLogs: false, disableSse: true }
