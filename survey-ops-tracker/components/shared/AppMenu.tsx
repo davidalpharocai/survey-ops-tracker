@@ -82,6 +82,13 @@ export function AppMenu() {
             <span>📦</span> Deliverables
           </Link>
           <div className="border-t border-border my-1.5" />
+          <Link
+            href="/connect"
+            className={itemClass}
+            title="Connect your Claude — link claude.ai, Claude Desktop, or Claude Code to ask about projects and set reminders (analyst-only)"
+          >
+            <span>🔌</span> Connect your Claude
+          </Link>
           <a
             href={USER_GUIDE_URL}
             target="_blank"

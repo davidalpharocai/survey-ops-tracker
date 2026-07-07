@@ -167,6 +167,32 @@ file it, pick another project from the dropdown, or mark it **"Not a deliverable
 Items already filed under the right client but with no project show as **unsorted** — assign a
 project the same way.
 
+## 10. Connect your Claude
+
+The **☰ menu → Connect your Claude** page (`/connect`) links Survey Ops to Claude — claude.ai,
+Claude Desktop, or Claude Code — so you can ask about your projects and set reminders straight
+from a chat, using your own login. Analyst-only.
+
+**Connector URL:** `https://survey-ops-tracker.vercel.app/api/mcp`
+
+**Connecting, per device:**
+- **claude.ai (web & mobile):** Settings → Connectors → Add custom connector → paste the URL →
+  log in with your @alpharoc.ai account. Requires a paid Claude plan; on a Team/Enterprise plan
+  an admin may need to add the connector organization-wide first.
+- **Claude Desktop:** Settings → Connectors → Add custom connector → same steps.
+- **Claude Code:** run `claude mcp add --transport http survey-ops https://survey-ops-tracker.vercel.app/api/mcp` from a terminal.
+
+**What you can ask:** *"What's due this week?"* · *"Give me the status on SPCX"* ·
+*"Remind me Friday to chase the deliverable"* · *"What are my open reminders?"* — it reads live
+project data the same way the in-app Assistant does, plus your personal reminders.
+
+**Reminders:** anything you set through Claude shows up as an emailed reminder on the morning
+it's due — nothing to check manually.
+
+**Revoking access:** the Connect page lists every Claude currently connected (device/client name,
+when it connected, when it was last used) with a **Revoke** button — click it to sign that Claude
+out immediately; it'll need to log in again to reconnect.
+
 ---
 
 *Maintained by Claude alongside the app — when features change, this guide changes. Source of truth lives in the project repo (USER_GUIDE.md).*
