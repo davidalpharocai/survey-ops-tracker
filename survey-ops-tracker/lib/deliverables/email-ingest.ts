@@ -5,7 +5,6 @@ import { matchDeliverable } from './matcher'
 import { fileDeliverable, type FolderResolver } from './ingest'
 import { ensureChildFolder } from './folders'
 import { projectFolderName, originalSendDate } from './naming'
-import { extractDeliverableLinks, normalizeUrl, linkDisplayName } from './links'
 import { routeMatch, describeCandidates, type LabeledCandidate, type Routing } from './confidence'
 import { clientSignalEmail, emailDateISO, itemizeAttachments, isInternalSender, type IngestPayload } from './email'
 import { replySubject, renderReplyHtml, type ReplyItem } from './reply'
@@ -68,8 +67,8 @@ export async function ingestEmail(payload: IngestPayload, deps: IngestDeps): Pro
   if (await deps.isProcessed(payload.messageId)) return { action: 'ignored', reason: 'duplicate_message' }
 
   const files = itemizeAttachments(payload.attachments)
-  const links = extractDeliverableLinks(payload.body ?? '')
-  if (files.length === 0 && links.length === 0) return { action: 'ignored', reason: 'no_items' }
+  // Attachments only — deliverable links in the body are intentionally NOT auto-filed.
+  if (files.length === 0) return { action: 'ignored', reason: 'no_items' }
 
   const signalEmail = clientSignalEmail({ to: payload.to, cc: payload.cc, body: payload.body }) ?? ''
   const match = matchDeliverable({
@@ -146,10 +145,6 @@ export async function ingestEmail(payload: IngestPayload, deps: IngestDeps): Pro
 
   for (const f of files) {
     await handle({ kind: 'file', name: f.filename, dedup: { fileHash: f.hash }, file: { mimeType: f.mimeType, bytes: f.bytes } })
-  }
-  for (const raw of links) {
-    const normalized = normalizeUrl(raw)
-    await handle({ kind: 'link', name: linkDisplayName(raw), dedup: { sourceUrl: normalized }, sourceUrl: normalized })
   }
 
   if (replyItems.length > 0) {
