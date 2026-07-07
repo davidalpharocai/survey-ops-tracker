@@ -65,6 +65,16 @@ export default async function ConnectPage() {
 
       <div className={card}>
         <h3 className={heading}>Set it up</h3>
+
+        <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-300 dark:border-amber-500/30 rounded-lg px-3 py-2 mb-3 text-sm">
+          <p className="text-amber-700 dark:text-amber-400">
+            <strong>Sign in with your @alpharoc.ai analyst account.</strong> Wrong account?
+            Click &quot;Sign in with a different account&quot; on the consent screen. If your
+            browser keeps autofilling the wrong one, open an incognito/private window and sign
+            in fresh there.
+          </p>
+        </div>
+
         <div className="flex flex-col gap-2">
           <details className="border border-border/60 rounded-lg p-3 group">
             <summary className="text-sm font-medium text-foreground cursor-pointer">
@@ -75,7 +85,8 @@ export default async function ConnectPage() {
                 <li>Go to Settings → Connectors</li>
                 <li>Click &quot;Add custom connector&quot;</li>
                 <li>Paste the connector URL above</li>
-                <li>Log in with your @alpharoc.ai account when prompted</li>
+                <li>Click &quot;Log in&quot; and sign in with your @alpharoc.ai account when prompted</li>
+                <li>Click &quot;Allow&quot; on the consent screen</li>
               </ol>
               <p className="mt-2 text-xs text-muted-foreground/80">
                 Note: custom connectors require a paid Claude plan. On a Team or Enterprise
@@ -94,7 +105,8 @@ export default async function ConnectPage() {
                 <li>Go to Settings → Connectors</li>
                 <li>Click &quot;Add custom connector&quot;</li>
                 <li>Paste the connector URL above</li>
-                <li>Log in with your @alpharoc.ai account when prompted</li>
+                <li>Click &quot;Log in&quot; and sign in with your @alpharoc.ai account when prompted</li>
+                <li>Click &quot;Allow&quot; on the consent screen</li>
               </ol>
             </div>
           </details>

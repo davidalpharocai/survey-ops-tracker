@@ -175,12 +175,49 @@ from a chat, using your own login. Analyst-only.
 
 **Connector URL:** `https://survey-ops-tracker.vercel.app/api/mcp`
 
-**Connecting, per device:**
-- **claude.ai (web & mobile):** Settings → Connectors → Add custom connector → paste the URL →
-  log in with your @alpharoc.ai account. Requires a paid Claude plan; on a Team/Enterprise plan
-  an admin may need to add the connector organization-wide first.
-- **Claude Desktop:** Settings → Connectors → Add custom connector → same steps.
-- **Claude Code:** run `claude mcp add --transport http survey-ops https://survey-ops-tracker.vercel.app/api/mcp` from a terminal.
+**⚠ The account gotcha:** the connector only works with your **@alpharoc.ai analyst account** —
+not a personal Gmail, and not a compliance/client portal login. When you click "Log in" during
+setup, make sure the Survey Ops sign-in step uses your @alpharoc.ai email. See "If you see 'Wrong
+account'" below if you get stuck.
+
+### claude.ai (web & mobile)
+
+1. Go to **Settings → Connectors**.
+2. Click **"Add custom connector"**.
+3. Paste in the connector URL above.
+4. Click **"Log in"** — this opens the Survey Ops login screen.
+5. Sign in with your **@alpharoc.ai analyst account**.
+6. On the consent screen, click **"Allow"**.
+
+Requires a paid Claude plan (Pro, Max, Team, or Enterprise). On a Team or Enterprise plan, an
+admin may need to add the connector organization-wide before you can use it.
+
+### Claude Desktop
+
+Same flow as claude.ai: **Settings → Connectors → Add custom connector**, paste in the same
+connector URL, click **"Log in"**, sign in with your @alpharoc.ai account, then **"Allow"**.
+
+### Claude Code
+
+Run this from a terminal:
+
+```
+claude mcp add --transport http survey-ops https://survey-ops-tracker.vercel.app/api/mcp
+```
+
+It'll open a browser to log in the same way — sign in with your @alpharoc.ai account and click
+"Allow".
+
+### If you see "Wrong account"
+
+If you're already signed into a browser as a personal Gmail or a compliance login, the consent
+screen will show a **"Wrong account"** page instead of the normal "Allow" prompt. To fix it:
+
+- Click **"Sign in with a different account"** on that page, then sign in as your @alpharoc.ai
+  analyst account.
+- If your browser keeps **autofilling the wrong account** and you can't shake it, the reliable
+  fix is to open an **incognito/private window**, go to claude.ai there, and sign in fresh as
+  your @alpharoc.ai account before retrying the connector setup.
 
 **What you can ask:** *"What's due this week?"* · *"Give me the status on SPCX"* ·
 *"Remind me Friday to chase the deliverable"* · *"What are my open reminders?"* — it reads live
