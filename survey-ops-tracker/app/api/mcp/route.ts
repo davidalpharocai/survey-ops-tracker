@@ -174,6 +174,8 @@ const CONTACT_WRITE_FIELDS = ['first_name', 'last_name', 'email', 'title', 'phon
  */
 const MCP_INSTRUCTIONS = `Survey Ops Command Center — connector guidance.
 
+Answer efficiently: answer in as FEW tool calls as possible — prefer one targeted call over several exploratory ones. For "how many/list <person>'s <status> projects" (e.g. "how many open surveys does Bryan have"), make ONE search_projects call with captain set to that person and status set to the asked status, then count/list the result yourself — do NOT call get_me first (that's only for "me/my/mine"), and do NOT fetch each project's details just to count or list them. For pipeline/status/overview questions or "what's overdue," one pipeline_summary call is enough (add mine:true only for "my/me"). Only call get_project, get_client_history, or get_project_history when the user asks for specifics or history — never just to answer a simple count or list.
+
 Before mutating: every create/update/status/stage tool follows preview-then-confirm — a call without confirm:true only returns a preview and never writes. Read the preview back to the user in plain language and get their explicit OK before calling again with confirm:true. Never set confirm:true unless the user has clearly approved the specific change shown in the preview.
 
 Duplicates: create_project checks for likely duplicate projects and returns them instead of writing. Ask the user whether to proceed before retrying with proceed_despite_duplicate:true — don't assume they want to.

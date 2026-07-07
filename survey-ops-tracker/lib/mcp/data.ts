@@ -343,7 +343,7 @@ export async function getClientHistory(clientRef: string) {
 
   const { data: allRows, error } = await supabase.from('survey_projects')
     .select(
-      'id, project_code, project_name, project_type, status, phase, objective, category, ' +
+      'id, project_code, project_name, project_type, status, phase, ' +
       'n_target, n_collected, n_actual, budget, actual_spend, launch_date, deliver_date, due_date, ' +
       'salesperson, linked_documents, created_at, captain:team_members(name, initials)'
     )
@@ -371,7 +371,7 @@ export async function getClientHistory(clientRef: string) {
     const cap = r.captain as { name?: string; initials?: string } | null
     return {
       project_code: r.project_code, project_name: r.project_name, project_type: r.project_type,
-      status: r.status, phase: r.phase, objective: r.objective, category: r.category,
+      status: r.status, phase: r.phase,
       n_target: r.n_target, n_collected: r.n_collected, n_actual: r.n_actual,
       budget: r.budget, actual_spend: r.actual_spend,
       launch_date: r.launch_date, deliver_date: r.deliver_date, due_date: r.due_date,
