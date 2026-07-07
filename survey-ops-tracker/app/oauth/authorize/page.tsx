@@ -5,7 +5,6 @@ import { getClient } from '@/lib/oauth/store'
 import { MCP_RESOURCE } from '@/lib/oauth/http'
 import { Button } from '@/components/ui/button'
 import { redirect } from 'next/navigation'
-import Link from 'next/link'
 import { allowAction, denyAction, reauthAction } from './actions'
 
 export const dynamic = 'force-dynamic'
@@ -42,15 +41,13 @@ function NotAvailableCard({ selfUrl }: { selfUrl: string }) {
       <div className="w-full max-w-sm p-8 bg-card rounded-xl border border-border text-center">
         <h1 className="text-lg font-bold text-foreground mb-2">Wrong account</h1>
         <p className="text-sm text-muted-foreground mb-4">
-          You&apos;re signed in with an account that can&apos;t use this connector — it&apos;s for
-          internal AlphaROC analysts. Sign in with your @alpharoc.ai analyst account to continue.
+          This browser is signed into Survey Ops with an account that can&apos;t use the connector —
+          it&apos;s for internal AlphaROC analysts only. Sign in with your @alpharoc.ai analyst
+          account to continue.
         </p>
         <form action={reauthAction.bind(null, selfUrl)}>
-          <Button type="submit" className="w-full mb-2">Sign in with a different account</Button>
+          <Button type="submit" className="w-full">Sign in with your analyst account</Button>
         </form>
-        <Link href="/" className="text-sm text-muted-foreground hover:text-foreground underline">
-          Return to Survey Ops
-        </Link>
       </div>
     </div>
   )
@@ -140,7 +137,11 @@ export default async function AuthorizePage({
         <div className="mb-6 flex flex-col gap-2 text-sm text-foreground">
           <div className="flex items-start gap-2">
             <span aria-hidden className="mt-0.5 text-muted-foreground">-</span>
-            <span>Read your Survey Ops projects</span>
+            <span>Read your projects, clients, and past-survey history</span>
+          </div>
+          <div className="flex items-start gap-2">
+            <span aria-hidden className="mt-0.5 text-muted-foreground">-</span>
+            <span>Create &amp; update projects, records, notes, and money entries — each change is previewed for your approval first</span>
           </div>
           <div className="flex items-start gap-2">
             <span aria-hidden className="mt-0.5 text-muted-foreground">-</span>
