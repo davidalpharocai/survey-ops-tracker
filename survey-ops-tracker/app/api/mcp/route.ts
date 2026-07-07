@@ -3,7 +3,12 @@ import { z } from 'zod'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { isAllowedEmail } from '@/lib/utils/allowedDomain'
 import { findAccessToken, revokeTokenById } from '@/lib/oauth/store'
+import { baseUrl } from '@/lib/oauth/http'
+import type { Database, Json } from '@/lib/supabase/types'
 import * as data from '@/lib/mcp/data'
+import {
+  resolveProjectWritable, resolveStep, runAddStep, runCompleteStep, runEditStep, runProjectWrite,
+} from '@/lib/mcp/writes'
 
 export const maxDuration = 60
 
@@ -36,34 +41,88 @@ function cleanErrorMessage(err: unknown): string {
   return 'Something went wrong handling that request. Please try again.'
 }
 
+/** A short, queryable failure category for mcp_tool_calls.error_code (never shown to the model). */
+function errorCode(err: unknown): string {
+  const raw = err instanceof Error ? err.message : String(err)
+  if (/stale_write/i.test(raw)) return 'stale_write'
+  if (/relation .* does not exist/i.test(raw) || /schema cache/i.test(raw)) return 'missing_table'
+  return 'unknown'
+}
+
+/**
+ * Metadata a tool handler can attribute to its own mcp_tool_calls row. Declare an empty
+ * object at the top of the handler and mutate it (e.g. `meta.project_id = p.id`) once the
+ * target is resolved inside `fn` — `logged` reads whatever is on it after `fn` settles
+ * (success or throw), so a failed write still gets attributed to the right project/client.
+ */
+type LoggedMeta = { project_id?: string; client_id?: string; detail?: unknown }
+
 /**
  * Wraps a tool call: measures duration, logs to mcp_tool_calls (fire-and-forget,
  * never breaks the response, never logs argument payloads), and converts thrown
  * errors into a clean user-safe message.
  */
-async function logged<T>(extra: ToolExtra, tool: string, fn: () => Promise<T>): Promise<T> {
+async function logged<T>(extra: ToolExtra, tool: string, fn: () => Promise<T>, meta?: LoggedMeta): Promise<T> {
   const start = Date.now()
   const userEmail = extra.authInfo?.extra?.userEmail as string | undefined
   try {
     const result = await fn()
-    void logToolCall(userEmail, tool, Date.now() - start, true)
+    void logToolCall(userEmail, tool, Date.now() - start, true, meta)
     return result
   } catch (err) {
-    void logToolCall(userEmail, tool, Date.now() - start, false)
+    void logToolCall(userEmail, tool, Date.now() - start, false, meta, err)
     console.error(`mcp tool ${tool} failed:`, err)
     throw new Error(cleanErrorMessage(err))
   }
 }
 
-function logToolCall(userEmail: string | undefined, tool: string, durationMs: number, ok: boolean) {
+function logToolCall(
+  userEmail: string | undefined, tool: string, durationMs: number, ok: boolean,
+  meta?: LoggedMeta, err?: unknown
+) {
   if (!userEmail) return
   const supabase = createAdminClient()
+  const row: Database['public']['Tables']['mcp_tool_calls']['Insert'] = {
+    user_email: userEmail, tool, duration_ms: durationMs, ok,
+  }
+  if (meta?.project_id) row.project_id = meta.project_id
+  if (meta?.client_id) row.client_id = meta.client_id
+  if (meta?.detail !== undefined) row.detail = meta.detail as Json
+  if (err !== undefined) {
+    row.error_code = errorCode(err)
+    row.error_message = (err instanceof Error ? err.message : String(err)).slice(0, 500)
+  }
   return supabase.from('mcp_tool_calls')
-    .insert({ user_email: userEmail, tool, duration_ms: durationMs, ok })
+    .insert(row)
     .then(
       () => {},
       () => {}
     )
+}
+
+/**
+ * Preview-then-confirm gate for a mutating tool: `args.confirm !== true` runs `previewFn`
+ * and wraps its result as `{ preview }` (no write); `confirm: true` runs `commitFn`.
+ */
+async function confirmable<P, C>(
+  args: { confirm?: boolean },
+  previewFn: () => Promise<P>,
+  commitFn: () => Promise<C>
+): Promise<{ preview: P } | C> {
+  if (args.confirm !== true) return { preview: await previewFn() }
+  return commitFn()
+}
+
+/** Best-effort document title lookup via the app's own /api/doc-title (Drive API, else a public scrape). */
+async function fetchDocTitle(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(`${baseUrl()}/api/doc-title?url=${encodeURIComponent(url)}`)
+    if (!res.ok) return null
+    const body = (await res.json()) as { title?: string | null }
+    return body.title ?? null
+  } catch {
+    return null
+  }
 }
 
 const DUE_DATE_RE = /^\d{4}-\d{2}-\d{2}$/
