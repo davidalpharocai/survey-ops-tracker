@@ -60,7 +60,14 @@ export async function POST(req: NextRequest) {
     return corsJson({ error: 'invalid_redirect_uri' }, 400)
   }
 
-  const clientId = await registerClient(clientName, uris)
+  let clientId: string
+  try {
+    clientId = await registerClient(clientName, uris)
+  } catch {
+    // Degrade gracefully if migration 045 hasn't been applied yet (oauth
+    // tables missing) or any other storage error — never crash unhandled.
+    return corsJson({ error: 'temporarily_unavailable' }, 503)
+  }
 
   return corsJson(
     {
