@@ -6,7 +6,7 @@ import { MCP_RESOURCE } from '@/lib/oauth/http'
 import { Button } from '@/components/ui/button'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { allowAction, denyAction } from './actions'
+import { allowAction, denyAction, reauthAction } from './actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,6 +28,29 @@ function ErrorCard({ title, message }: { title: string; message: string }) {
       <div className="w-full max-w-sm p-8 bg-card rounded-xl border border-border text-center">
         <h1 className="text-lg font-bold text-foreground mb-2">{title}</h1>
         <p className="text-sm text-muted-foreground">{message}</p>
+      </div>
+    </div>
+  )
+}
+
+// Signed in, but not with an @alpharoc.ai analyst account. Instead of a dead end,
+// offer a one-click switch: sign this account out and return to the same connect
+// request after logging in as an analyst.
+function NotAvailableCard({ selfUrl }: { selfUrl: string }) {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+      <div className="w-full max-w-sm p-8 bg-card rounded-xl border border-border text-center">
+        <h1 className="text-lg font-bold text-foreground mb-2">Wrong account</h1>
+        <p className="text-sm text-muted-foreground mb-4">
+          You&apos;re signed in with an account that can&apos;t use this connector — it&apos;s for
+          internal AlphaROC analysts. Sign in with your @alpharoc.ai analyst account to continue.
+        </p>
+        <form action={reauthAction.bind(null, selfUrl)}>
+          <Button type="submit" className="w-full mb-2">Sign in with a different account</Button>
+        </form>
+        <Link href="/" className="text-sm text-muted-foreground hover:text-foreground underline">
+          Return to Survey Ops
+        </Link>
       </div>
     </div>
   )
@@ -76,42 +99,30 @@ export default async function AuthorizePage({
   }
 
   // ---- Session gate ----
+  // The full current authorize request (path + query) — used to return here after
+  // a login or an account switch, so the connect flow resumes exactly where it was.
+  const selfQs = new URLSearchParams(
+    Object.entries(params).filter((e): e is [string, string] => typeof e[1] === 'string')
+  ).toString()
+  const selfUrl = `/oauth/authorize${selfQs ? `?${selfQs}` : ''}`
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
-    const qs = new URLSearchParams(
-      Object.entries(params).filter((e): e is [string, string] => typeof e[1] === 'string')
-    ).toString()
-    const path = `/oauth/authorize${qs ? `?${qs}` : ''}`
-    redirect(`/login?next=${encodeURIComponent(path)}`)
+    redirect(`/login?next=${encodeURIComponent(selfUrl)}`)
   }
 
+  // Signed in with a non-@alpharoc.ai account (e.g. a compliance/portal login or
+  // the wrong Google account) → offer a one-click switch rather than a dead end.
   if (!isAllowedEmail(user.email)) {
-    return (
-      <ErrorCard
-        title="Not available"
-        message="This connector is for internal AlphaROC analysts only."
-      />
-    )
+    return <NotAvailableCard selfUrl={selfUrl} />
   }
 
   const admin = createAdminClient()
   const { data: profile } = await admin.from('profiles').select('role').eq('id', user.id).maybeSingle()
   if (!profile || profile.role !== 'analyst') {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background p-4">
-        <div className="w-full max-w-sm p-8 bg-card rounded-xl border border-border text-center">
-          <h1 className="text-lg font-bold text-foreground mb-2">Not available</h1>
-          <p className="text-sm text-muted-foreground mb-4">
-            This connector is for internal AlphaROC analysts only.
-          </p>
-          <Link href="/" className="text-sm text-muted-foreground hover:text-foreground underline">
-            Return to Survey Ops
-          </Link>
-        </div>
-      </div>
-    )
+    return <NotAvailableCard selfUrl={selfUrl} />
   }
 
   const redirectHost = new URL(redirectUri).host

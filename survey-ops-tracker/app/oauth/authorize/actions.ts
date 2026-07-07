@@ -42,6 +42,18 @@ export async function allowAction(params: AuthorizeParams) {
   redirect(url.toString())
 }
 
+// Shown on the "not an analyst" refusal: sign the current (wrong-role) account
+// out and send the user to the login page, returning to this exact authorize
+// request afterward — so someone stuck on the wrong session (e.g. a compliance
+// login) can switch to their analyst account without a manual logout.
+export async function reauthAction(nextUrl: string) {
+  const supabase = await createClient()
+  await supabase.auth.signOut()
+  const safe = nextUrl.startsWith('/') && !nextUrl.startsWith('//') && !nextUrl.includes('\\')
+    ? nextUrl : '/'
+  redirect(`/login?next=${encodeURIComponent(safe)}`)
+}
+
 export async function denyAction(params: Pick<AuthorizeParams, 'client_id' | 'redirect_uri' | 'state'>) {
   const client = await getClient(params.client_id)
   const uris = (client?.redirect_uris ?? []) as string[]
