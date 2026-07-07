@@ -47,6 +47,7 @@ export function Board({ projects, teamMembers, onMoveProject, wrapInContext = tr
   const [typeFilter, setTypeFilter] = useState<string | null>(null)
   const [dueFilter, setDueFilter] = useState<string | null>(null)
   const [stageFilter, setStageFilter] = useState<string | null>(null)
+  const [clientFilter, setClientFilter] = useState<string | null>(null)
   const [search, setSearch] = useState('')
 
   // Default the board to "my projects": last choice wins, otherwise the
@@ -92,6 +93,11 @@ export function Board({ projects, teamMembers, onMoveProject, wrapInContext = tr
         }
       }
       if (
+        clientFilter &&
+        p.client.split(' - ')[0].trim().toLowerCase() !== clientFilter.toLowerCase()
+      )
+        return false
+      if (
         q &&
         !p.project_name.toLowerCase().includes(q) &&
         !p.client.toLowerCase().includes(q) &&
@@ -101,14 +107,15 @@ export function Board({ projects, teamMembers, onMoveProject, wrapInContext = tr
       }
       return true
     })
-  }, [projects, captainFilter, typeFilter, dueFilter, stageFilter, search])
+  }, [projects, captainFilter, typeFilter, dueFilter, stageFilter, clientFilter, search])
 
-  const hasActiveFilters = !!(captainFilter || typeFilter || dueFilter || stageFilter || search)
+  const hasActiveFilters = !!(captainFilter || typeFilter || dueFilter || stageFilter || clientFilter || search)
   function clearAllFilters() {
     handleCaptainChange(null)
     setTypeFilter(null)
     setDueFilter(null)
     setStageFilter(null)
+    setClientFilter(null)
     setSearch('')
   }
 
@@ -206,11 +213,13 @@ export function Board({ projects, teamMembers, onMoveProject, wrapInContext = tr
           typeFilter={typeFilter}
           dueFilter={dueFilter}
           stageFilter={stageFilter}
+          clientFilter={clientFilter}
           search={search}
           onCaptainChange={handleCaptainChange}
           onTypeChange={setTypeFilter}
           onDueChange={setDueFilter}
           onStageChange={setStageFilter}
+          onClientChange={setClientFilter}
           onSearchChange={setSearch}
         />
         <SavedViews<BoardViewConfig>

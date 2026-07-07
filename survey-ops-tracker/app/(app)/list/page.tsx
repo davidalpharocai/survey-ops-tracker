@@ -43,6 +43,7 @@ export default function ListView() {
   const [typeFilter, setTypeFilter] = useState<string | null>(null)
   const [dueFilter, setDueFilter] = useState<string | null>(null)
   const [stageFilter, setStageFilter] = useState<string | null>(null)
+  const [clientFilter, setClientFilter] = useState<string | null>(null)
 
   // Column visibility + sort live here so saved views can capture them; both
   // persist on their own so they survive a reload independent of views.
@@ -135,6 +136,11 @@ export default function ListView() {
       }
     }
     if (
+      clientFilter &&
+      p.client.split(' - ')[0].trim().toLowerCase() !== clientFilter.toLowerCase()
+    )
+      return false
+    if (
       q &&
       !p.project_name.toLowerCase().includes(q) &&
       !p.client.toLowerCase().includes(q) &&
@@ -193,11 +199,13 @@ export default function ListView() {
           typeFilter={typeFilter}
           dueFilter={dueFilter}
           stageFilter={stageFilter}
+          clientFilter={clientFilter}
           search={search}
           onCaptainChange={setCaptainFilter}
           onTypeChange={setTypeFilter}
           onDueChange={setDueFilter}
           onStageChange={setStageFilter}
+          onClientChange={setClientFilter}
           onSearchChange={setSearch}
         />
         <SavedViews<ListViewConfig>

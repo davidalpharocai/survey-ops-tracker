@@ -4,19 +4,20 @@ import { useCreateClient, type Client } from '@/lib/hooks/useClients'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
 
 interface NewClientModalProps {
+  initialName?: string
   onCreated?: (client: Client) => void
   onClose: () => void
 }
 
 /**
- * Create a client directly (Admin's Accounts section for now; the New-Project
- * client field becomes a pick-or-create picker in a follow-up). The client's
+ * Create a client directly — from Admin's Accounts section, the New-Project
+ * client picker's "+ New Client", or the board's client filter. The client's
  * Cl##### code is assigned automatically on insert once migration 047 is
  * applied — until then the row is created without one.
  */
-export function NewClientModal({ onCreated, onClose }: NewClientModalProps) {
+export function NewClientModal({ initialName = '', onCreated, onClose }: NewClientModalProps) {
   const createClient = useCreateClient()
-  const [name, setName] = useState('')
+  const [name, setName] = useState(initialName)
   const [beforeFielding, setBeforeFielding] = useState(false)
   const [afterFielding, setAfterFielding] = useState(false)
   const [contact, setContact] = useState('')

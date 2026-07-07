@@ -1,6 +1,8 @@
 'use client'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useCreateProject } from '@/lib/hooks/useProjects'
+import { useClients } from '@/lib/hooks/useClients'
+import { NewClientModal } from '@/components/client/NewClientModal'
 import { useRouter } from 'next/navigation'
 import { FIELD_LABELS, formatFieldValue, fieldsToUpdates } from '@/lib/utils/quickFields'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
@@ -17,11 +19,17 @@ interface NewProjectModalProps {
   onClose: () => void
 }
 
-export function NewProjectModal({ teamMembers, knownClients = [], onClose }: NewProjectModalProps) {
+// NewProjectModal accepts `knownClients` for backward compatibility with its
+// caller, but the client field's dropdown is now powered by useClients()
+// (the actual clients table) rather than that free-text project-history list.
+export function NewProjectModal({ teamMembers, onClose }: NewProjectModalProps) {
   const router = useRouter()
   const createProject = useCreateProject()
+  const { data: clients = [] } = useClients()
   const [name, setName] = useState('')
   const [client, setClient] = useState('')
+  const [showClientDropdown, setShowClientDropdown] = useState(false)
+  const [showNewClientModal, setShowNewClientModal] = useState(false)
   const [projectType, setProjectType] = useState<string>('')
   const [captainId, setCaptainId] = useState<string>('')
   const [salesperson, setSalesperson] = useState('')
@@ -30,6 +38,17 @@ export function NewProjectModal({ teamMembers, knownClients = [], onClose }: New
   const [describe, setDescribe] = useState('')
   const [parsing, setParsing] = useState(false)
   const [extras, setExtras] = useState<Record<string, unknown>>({})
+
+  // Client combobox: pick an existing client (fills the firm name) or keep
+  // typing free text ("FIRM - Contact" is still accepted verbatim).
+  const clientQuery = client.trim().toLowerCase()
+  const clientMatches = useMemo(() => {
+    const pool = clientQuery
+      ? clients.filter(c => c.name.toLowerCase().includes(clientQuery))
+      : clients
+    return pool.slice(0, 8)
+  }, [clients, clientQuery])
+  const exactClientMatch = clients.some(c => c.name.toLowerCase() === clientQuery)
 
   const canSubmit = name.trim() && client.trim() && !createProject.isPending
 
@@ -100,6 +119,7 @@ export function NewProjectModal({ teamMembers, knownClients = [], onClose }: New
     'bg-muted border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring transition-colors'
 
   return (
+    <>
     <div
       className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
       onClick={onClose}
@@ -159,18 +179,56 @@ export function NewProjectModal({ teamMembers, knownClients = [], onClose }: New
 
         <label className="flex flex-col gap-1 text-xs text-muted-foreground">
           Client *
-          <input
-            value={client}
-            onChange={e => setClient(e.target.value)}
-            placeholder="e.g. Meridian Capital"
-            list="known-clients"
-            className={inputClass}
-          />
-          <datalist id="known-clients">
-            {knownClients.map(c => (
-              <option key={c} value={c} />
-            ))}
-          </datalist>
+          <div
+            className="relative"
+            onBlur={e => {
+              if (!e.currentTarget.contains(e.relatedTarget as Node)) setShowClientDropdown(false)
+            }}
+          >
+            <input
+              value={client}
+              onChange={e => {
+                setClient(e.target.value)
+                setShowClientDropdown(true)
+              }}
+              onFocus={() => setShowClientDropdown(true)}
+              placeholder="e.g. Meridian Capital, or Meridian Capital - Jane Doe"
+              autoComplete="off"
+              className={`${inputClass} w-full`}
+            />
+            {showClientDropdown && (clientMatches.length > 0 || client.trim() !== '') && (
+              <div className="absolute z-10 mt-1 w-full bg-card border border-border rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                {clientMatches.map(c => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => {
+                      setClient(c.name)
+                      setShowClientDropdown(false)
+                    }}
+                    className="w-full text-left px-3 py-2 text-sm text-foreground hover:bg-accent transition-colors"
+                  >
+                    {c.name}
+                  </button>
+                ))}
+                {clientMatches.length === 0 && (
+                  <p className="px-3 py-2 text-xs text-muted-foreground/70">No matching clients</p>
+                )}
+                {client.trim() !== '' && !exactClientMatch && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowClientDropdown(false)
+                      setShowNewClientModal(true)
+                    }}
+                    className="w-full text-left px-3 py-2 text-sm text-blue-600 dark:text-blue-400 hover:bg-accent transition-colors border-t border-border"
+                  >
+                    + New Client &quot;{client.trim()}&quot;
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
         </label>
 
         <div className="grid grid-cols-2 gap-3">
@@ -263,5 +321,16 @@ export function NewProjectModal({ teamMembers, knownClients = [], onClose }: New
         </div>
       </div>
     </div>
+    {showNewClientModal && (
+      <NewClientModal
+        initialName={client.trim()}
+        onClose={() => setShowNewClientModal(false)}
+        onCreated={created => {
+          setClient(created.name)
+          setShowNewClientModal(false)
+        }}
+      />
+    )}
+    </>
   )
 }

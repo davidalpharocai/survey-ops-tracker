@@ -1,6 +1,11 @@
 'use client'
+import { useState } from 'react'
 import { STAGE_ORDER } from '@/lib/utils/stage'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
+import { useClients } from '@/lib/hooks/useClients'
+import { NewClientModal } from '@/components/client/NewClientModal'
+
+const NEW_CLIENT_VALUE = '__new__'
 
 const SELECT_CLASSES =
   'bg-muted border border-border text-foreground/80 text-xs rounded-lg px-3 py-1.5 focus:outline-none focus:border-ring'
@@ -32,11 +37,13 @@ interface BoardFiltersProps {
   typeFilter: string | null
   dueFilter: string | null
   stageFilter: string | null
+  clientFilter: string | null
   search: string
   onCaptainChange: (id: string | null) => void
   onTypeChange: (type: string | null) => void
   onDueChange: (due: string | null) => void
   onStageChange: (stage: string | null) => void
+  onClientChange: (client: string | null) => void
   onSearchChange: (q: string) => void
 }
 
@@ -47,14 +54,20 @@ export function BoardFilters({
   typeFilter,
   dueFilter,
   stageFilter,
+  clientFilter,
   search,
   onCaptainChange,
   onTypeChange,
   onDueChange,
   onStageChange,
+  onClientChange,
   onSearchChange,
 }: BoardFiltersProps) {
+  const { data: clients = [] } = useClients()
+  const [showNewClient, setShowNewClient] = useState(false)
+
   return (
+    <>
     <div className="flex items-end gap-3 flex-wrap">
       <Field label="Captain" tooltip="Show only projects led by this captain — the team member responsible end-to-end.">
         <select
@@ -68,6 +81,28 @@ export function BoardFilters({
               {c.id === currentMemberId ? `${c.initials} (me)` : c.initials}
             </option>
           ))}
+        </select>
+      </Field>
+      <Field label="Client" tooltip="Filter by client (firm). Pick + New Client at the bottom to add one without leaving the board.">
+        <select
+          value={clientFilter ?? ''}
+          onChange={e => {
+            const value = e.target.value
+            if (value === NEW_CLIENT_VALUE) {
+              setShowNewClient(true)
+              return
+            }
+            onClientChange(value || null)
+          }}
+          className={SELECT_CLASSES}
+        >
+          <option value="">All Clients</option>
+          {clients.map(c => (
+            <option key={c.id} value={c.name}>
+              {c.name}
+            </option>
+          ))}
+          <option value={NEW_CLIENT_VALUE}>+ New Client</option>
         </select>
       </Field>
       <Field label="Type" tooltip="Filter by project type: PS (PureSpectrum consumer panel), B2B (expert/business panel), or Rerun (repeat wave of an earlier study).">
@@ -120,5 +155,7 @@ export function BoardFilters({
         />
       </Field>
     </div>
+    {showNewClient && <NewClientModal onClose={() => setShowNewClient(false)} />}
+    </>
   )
 }
