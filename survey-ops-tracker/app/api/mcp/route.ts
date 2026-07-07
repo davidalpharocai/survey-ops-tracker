@@ -166,6 +166,32 @@ const CLIENT_WRITE_FIELDS = [
 
 const CONTACT_WRITE_FIELDS = ['first_name', 'last_name', 'email', 'title', 'phone'] as const
 
+/**
+ * Server instructions (2nd `createMcpHandler` arg, `ServerOptions.instructions` from
+ * `@modelcontextprotocol/sdk`) — surfaced to the model as system-level guidance for using
+ * this connector well. See docs/superpowers/specs/2026-07-07-mcp-writes-phase2-design.md
+ * ("Teaching Claude to use it well").
+ */
+const MCP_INSTRUCTIONS = `Survey Ops Command Center — connector guidance.
+
+Before mutating: every create/update/status/stage tool follows preview-then-confirm — a call without confirm:true only returns a preview and never writes. Read the preview back to the user in plain language and get their explicit OK before calling again with confirm:true. Never set confirm:true unless the user has clearly approved the specific change shown in the preview.
+
+Duplicates: create_project checks for likely duplicate projects and returns them instead of writing. Ask the user whether to proceed before retrying with proceed_despite_duplicate:true — don't assume they want to.
+
+History & "what did we do last time": for "what did we do last time for <client>" or when planning a new project for a client you've served before, call get_client_history first — it returns past projects, derived patterns (typical N, common project type, typical fielding duration, cadence, recurring contacts), and any explicitly stated preferences. Use those patterns to offer sensible defaults when creating a new project for that client. get_project_history returns a project's sibling waves when it's part of a longitudinal/rerun series.
+
+Questionnaire content: the actual questions asked live in Google Docs/Sheets, not this database. get_project and get_client_history return linked document URLs — hand those to the user's Drive connector if they ask what was asked last time, rather than guessing at question content.
+
+Resolving "me"/"my": call get_me to resolve the caller's own name/initials/role, then pass mine:true to search_projects/pipeline_summary (or the resolved initials as captain) to answer "what's overdue for me" or "my projects."
+
+Recording interactions: to log that something happened outside the app (e.g. "we emailed the client about timeline"), use add_note (project-scoped) or add_client_note (client-scoped) — there is deliberately no tool to write a project_activity entry directly.
+
+Corrections: logged blasts and bids can't be edited or deleted via the connector. If a user needs to correct one, tell them to do it in the app.
+
+Segmented N: if update_project refuses because a project's N is segmented, don't try to work around it — tell the user to edit the segment breakdown in the app.
+
+Learning preferences: if a user explicitly overrides a suggestion "going forward" (e.g. "always use PS not B2B for this client"), offer to save it with set_client_preference so it's visible to the whole team, not just remembered for this conversation.`
+
 const handler = createMcpHandler(
   server => {
     // -------- read tools --------
@@ -1355,8 +1381,55 @@ const handler = createMcpHandler(
         }, meta))
       }
     )
+
+    // -------- prompts (best-effort workflow starters; server.prompt is available on the
+    // installed @modelcontextprotocol/sdk's McpServer as of this writing) --------
+
+    server.prompt(
+      'morning-pipeline-review',
+      "Morning digest of my pipeline: overdue, due soon, and fielding behind pace.",
+      async () => ({
+        messages: [{
+          role: 'user' as const,
+          content: {
+            type: 'text' as const,
+            text: "Give me my morning pipeline review: call get_me, then pipeline_summary with mine:true. Summarize what's overdue, due within 3 days, and fielding behind pace among my projects, and flag anything that needs attention today.",
+          },
+        }],
+      })
+    )
+
+    server.prompt(
+      'log-blast',
+      "Log this week's blast send for a project (asks for the numbers, previews before writing).",
+      { project: z.string().describe('The project code or name to log a blast against') },
+      async ({ project }) => ({
+        messages: [{
+          role: 'user' as const,
+          content: {
+            type: 'text' as const,
+            text: `I want to log a blast send for ${project}. Ask me for the number delivered, the $/bid used, and the blast fee if I haven't already given them, then call log_blast with a preview before confirming.`,
+          },
+        }],
+      })
+    )
+
+    server.prompt(
+      'create-from-brief',
+      'Create a new project from a pasted client brief or email — extracts the fields and previews create_project.',
+      { brief: z.string().describe('The client brief or email text to extract a project from') },
+      async ({ brief }) => ({
+        messages: [{
+          role: 'user' as const,
+          content: {
+            type: 'text' as const,
+            text: `Read this brief and set up a new project from it: extract the client, project name, project type, target N, due date, and requester if present. Call get_client_history for that client to fill in sensible defaults for anything the brief doesn't specify, then call create_project with a preview before confirming.\n\nBrief:\n${brief}`,
+          },
+        }],
+      })
+    )
   },
-  {},
+  { instructions: MCP_INSTRUCTIONS },
   { basePath: '/api', maxDuration: 60, verboseLogs: false, disableSse: true }
 )
 
