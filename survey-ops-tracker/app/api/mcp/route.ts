@@ -15,7 +15,7 @@ import * as data from '@/lib/mcp/data'
 import {
   resolveProjectWritable, resolveStep, resolveContact, loadGateInput,
   runAddStep, runCompleteStep, runEditStep, runProjectWrite, runSetBidBudget, runLogBlast,
-  runRenameClient,
+  runRenameClient, runCreateProject,
   pickProjectPatch, diffSummary, stageColumnsFor,
 } from '@/lib/mcp/writes'
 
@@ -1218,6 +1218,108 @@ const handler = createMcpHandler(
       }
     )
 
+    // -------- write tools: create_project (conversational duplicate handling) --------
+
+    server.tool(
+      'create_project',
+      'Create a new survey project (preview first; confirm to apply). Warns about possible duplicate projects before creating.',
+      {
+        project_name: z.string(),
+        client: z.string(),
+        project_type: z.enum(['PS', 'B2B', 'Rerun', 'Internal']).optional(),
+        captain: z.string().optional(),
+        salesperson: z.string().optional(),
+        due_date: z.string().optional(),
+        n_target: z.number().int().positive().optional(),
+        skip_scoping: z.boolean().optional(),
+        confirm: z.boolean().optional(),
+        proceed_despite_duplicate: z.boolean().optional(),
+      },
+      async (args, extra) => {
+        const meta: LoggedMeta = {}
+        return json(await logged(extra, 'create_project', async () => {
+          const { userEmail } = authIdentity(extra)
+
+          const projectName = args.project_name.trim()
+          const clientText = args.client.trim()
+          if (!projectName || !clientText) return { error: 'project_name and client are both required.' }
+          if (args.due_date && !DUE_DATE_RE.test(args.due_date)) {
+            return { error: 'due_date must be in YYYY-MM-DD format.' }
+          }
+
+          const supabase = createAdminClient()
+
+          let captainId: string | null = null
+          let captainNote: string | null = null
+          if (args.captain) {
+            const { data: members, error: memErr } = await supabase.from('team_members').select('id, name, initials')
+            if (memErr) throw memErr
+            const s = args.captain.trim().toLowerCase()
+            const match =
+              (members ?? []).find(m => m.initials.toLowerCase() === s) ??
+              (members ?? []).find(m => m.name.toLowerCase() === s) ??
+              (members ?? []).find(m => m.name.toLowerCase().includes(s))
+            if (match) captainId = match.id
+            else captainNote = `Captain "${args.captain}" didn't match a team member — left unassigned.`
+          }
+
+          // Duplicate check: same client firm, or a similarly-named project already on file.
+          const firm = firmNameFrom(clientText)
+          const sFirm = data.sanitizeQuery(firm)
+          const sName = data.sanitizeQuery(projectName)
+          const { data: dupRows, error: dupErr } = await supabase.from('survey_projects')
+            .select('project_code, project_name, client')
+            .is('deleted_at', null)
+            .or(`client.ilike.%${sFirm}%,project_name.ilike.%${sName}%`)
+            .limit(10)
+          if (dupErr) throw dupErr
+          if (dupRows && dupRows.length > 0 && args.proceed_despite_duplicate !== true) {
+            return {
+              possible_duplicates: dupRows.map(d => ({ project_code: d.project_code, project_name: d.project_name, client: d.client })),
+              needs: 'proceed_despite_duplicate',
+              message: 'There is already a project under this client that looks like a possible duplicate.',
+            }
+          }
+
+          const patch: Record<string, unknown> = {
+            project_name: projectName,
+            client: normalizeClientText(clientText),
+          }
+          if (args.project_type) patch.project_type = args.project_type
+          if (captainId) patch.captain_id = captainId
+          if (args.salesperson) patch.salesperson = args.salesperson
+          if (args.due_date) patch.due_date = args.due_date
+          if (args.n_target !== undefined) patch.n_target = args.n_target
+          if (args.skip_scoping) {
+            patch.phase = 'Active'
+            patch.board_column = 'Submitted'
+            patch.submitted_date = todayEastern()
+          }
+
+          return confirmable(
+            args,
+            async () => ({
+              summary: `Create "${projectName}" for ${normalizeClientText(clientText)}${args.skip_scoping ? ' (skip scoping — Active/Submitted)' : ''}`,
+              fields: patch,
+              captain_note: captainNote,
+              duplicate_warning: dupRows && dupRows.length > 0
+                ? `${dupRows.length} similar project(s) already exist for this client/name — proceeding anyway.`
+                : null,
+            }),
+            async () => {
+              const row = await runCreateProject(patch, `${userEmail} via Claude`)
+              meta.project_id = row.id
+              if (row.client_id) meta.client_id = row.client_id
+              meta.detail = { created: { project_code: row.project_code, project_name: row.project_name, client: row.client } }
+              return {
+                ok: true, project_code: row.project_code, id: row.id,
+                client: row.client, client_id: row.client_id, phase: row.phase, board_column: row.board_column,
+              }
+            }
+          )
+        }, meta))
+      }
+    )
   },
   {},
   { basePath: '/api', maxDuration: 60, verboseLogs: false, disableSse: true }
