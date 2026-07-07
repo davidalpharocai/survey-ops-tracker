@@ -432,6 +432,7 @@ export type Database = {
           title: string | null
           phone: string | null
           archived: boolean
+          created_by: string | null
           created_at: string
         }
         Insert: {
@@ -443,6 +444,7 @@ export type Database = {
           title?: string | null
           phone?: string | null
           archived?: boolean
+          created_by?: string | null
           created_at?: string
         }
         Update: {
@@ -454,6 +456,7 @@ export type Database = {
           title?: string | null
           phone?: string | null
           archived?: boolean
+          created_by?: string | null
           created_at?: string
         }
         Relationships: []
@@ -685,6 +688,7 @@ export type Database = {
           blasts: number | null
           note: string | null
           created_by: string | null
+          idem_key: string | null
           created_at: string
         }
         Insert: {
@@ -694,6 +698,7 @@ export type Database = {
           blasts?: number | null
           note?: string | null
           created_by?: string | null
+          idem_key?: string | null
           created_at?: string
         }
         Update: {
@@ -703,6 +708,7 @@ export type Database = {
           blasts?: number | null
           note?: string | null
           created_by?: string | null
+          idem_key?: string | null
           created_at?: string
         }
         Relationships: [
@@ -724,6 +730,7 @@ export type Database = {
           blast_cost: number
           note: string | null
           created_by: string | null
+          idem_key: string | null
           created_at: string
         }
         Insert: {
@@ -734,6 +741,7 @@ export type Database = {
           blast_cost?: number
           note?: string | null
           created_by?: string | null
+          idem_key?: string | null
           created_at?: string
         }
         Update: {
@@ -744,6 +752,7 @@ export type Database = {
           blast_cost?: number
           note?: string | null
           created_by?: string | null
+          idem_key?: string | null
           created_at?: string
         }
         Relationships: []
@@ -1105,6 +1114,11 @@ export type Database = {
           tool: string
           duration_ms: number | null
           ok: boolean
+          detail: Json | null
+          project_id: string | null
+          client_id: string | null
+          error_code: string | null
+          error_message: string | null
           created_at: string
         }
         Insert: {
@@ -1113,6 +1127,11 @@ export type Database = {
           tool: string
           duration_ms?: number | null
           ok: boolean
+          detail?: Json | null
+          project_id?: string | null
+          client_id?: string | null
+          error_code?: string | null
+          error_message?: string | null
           created_at?: string
         }
         Update: {
@@ -1121,6 +1140,11 @@ export type Database = {
           tool?: string
           duration_ms?: number | null
           ok?: boolean
+          detail?: Json | null
+          project_id?: string | null
+          client_id?: string | null
+          error_code?: string | null
+          error_message?: string | null
           created_at?: string
         }
         Relationships: []
@@ -1147,6 +1171,59 @@ export type Database = {
       }
       merge_clients: {
         Args: { p_survivor: string; p_loser: string }
+        Returns: undefined
+      }
+      mcp_write_project: {
+        Args: {
+          p_id: string
+          p_patch: Json
+          p_actor: string
+          p_expected_updated_at?: string | null
+        }
+        Returns: unknown
+      }
+      mcp_create_project: {
+        Args: { p_patch: Json; p_actor: string }
+        Returns: unknown
+      }
+      mcp_add_step: {
+        Args: { p_project: string; p_text: string; p_created_by: string; p_actor: string }
+        Returns: unknown
+      }
+      mcp_complete_step: {
+        Args: { p_step: string; p_done: boolean; p_by: string; p_actor: string }
+        Returns: unknown
+      }
+      mcp_edit_step: {
+        Args: { p_step: string; p_text: string; p_actor: string }
+        Returns: unknown
+      }
+      mcp_set_bid_budget: {
+        Args: {
+          p_project: string
+          p_amount: number
+          p_note: string
+          p_created_by: string
+          p_idem: string
+          p_actor: string
+        }
+        Returns: unknown
+      }
+      mcp_log_blast: {
+        Args: {
+          p_project: string
+          p_delivered: number
+          p_bid: number
+          p_blast_cost: number
+          p_note: string
+          p_created_by: string
+          p_idem: string
+          p_actor: string
+        }
+        Returns: unknown
+      }
+      mcp_rename_client: {
+        Args: { p_id: string; p_new_name: string; p_actor: string }
         Returns: undefined
       }
     }
