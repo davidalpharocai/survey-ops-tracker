@@ -298,6 +298,176 @@ const handler = createMcpHandler(
         return { deleted: true, id: args.id }
       }))
     )
+
+    // -------- write tools: append (add_next_step/complete_next_step/add_note/add_client_note
+    // commit directly; edit_next_step/link_document preview-then-confirm) --------
+
+    server.tool(
+      'add_next_step',
+      'Add a to-do/next step to a project.',
+      { project: z.string(), text: z.string().min(1).max(1000) },
+      async (args, extra) => {
+        const meta: LoggedMeta = {}
+        return json(await logged(extra, 'add_next_step', async () => {
+          const { userEmail } = authIdentity(extra)
+          const p = await resolveProjectWritable(args.project)
+          if (!p) return { error: 'Project not found.' }
+          if ('error' in p) return p
+          if ('ambiguous' in p) return p
+          meta.project_id = p.id as string
+          const row = await runAddStep(p.id as string, args.text, userEmail.split('@')[0], `${userEmail} via Claude`)
+          meta.detail = { created: { id: row.id, text: row.text } }
+          return { ok: true, step: { id: row.id, text: row.text } }
+        }, meta))
+      }
+    )
+
+    server.tool(
+      'complete_next_step',
+      'Mark a project next step done or not done (mirrors the checkbox in the app).',
+      { project: z.string(), step_ref: z.string(), done: z.boolean() },
+      async (args, extra) => {
+        const meta: LoggedMeta = {}
+        return json(await logged(extra, 'complete_next_step', async () => {
+          const { userEmail } = authIdentity(extra)
+          const p = await resolveProjectWritable(args.project)
+          if (!p) return { error: 'Project not found.' }
+          if ('error' in p) return p
+          if ('ambiguous' in p) return p
+          meta.project_id = p.id as string
+          const step = await resolveStep(p.id as string, args.step_ref)
+          if (!step) return { error: `No step found matching "${args.step_ref}" on this project.` }
+          if ('ambiguous' in step) {
+            return { note: 'Multiple steps match — be more specific.', candidates: step.ambiguous }
+          }
+          const row = await runCompleteStep(step.id as string, args.done, userEmail.split('@')[0], `${userEmail} via Claude`)
+          meta.detail = { step_id: row.id, changed: { done: [step.done, row.done] } }
+          return { ok: true, step: { id: row.id, text: row.text, done: row.done } }
+        }, meta))
+      }
+    )
+
+    server.tool(
+      'edit_next_step',
+      "Edit a project next step's text (preview first; confirm to apply).",
+      { project: z.string(), step_ref: z.string(), text: z.string().min(1).max(1000), confirm: z.boolean().optional() },
+      async (args, extra) => {
+        const meta: LoggedMeta = {}
+        return json(await logged(extra, 'edit_next_step', async () => {
+          const { userEmail } = authIdentity(extra)
+          const p = await resolveProjectWritable(args.project)
+          if (!p) return { error: 'Project not found.' }
+          if ('error' in p) return p
+          if ('ambiguous' in p) return p
+          meta.project_id = p.id as string
+          const step = await resolveStep(p.id as string, args.step_ref)
+          if (!step) return { error: `No step found matching "${args.step_ref}" on this project.` }
+          if ('ambiguous' in step) {
+            return { note: 'Multiple steps match — be more specific.', candidates: step.ambiguous }
+          }
+          return confirmable(
+            args,
+            async () => ({ summary: `"${step.text}" → "${args.text}"`, from: step.text as string, to: args.text }),
+            async () => {
+              const row = await runEditStep(step.id as string, args.text, `${userEmail} via Claude`)
+              meta.detail = { step_id: row.id, changed: { text: [step.text, row.text] } }
+              return { ok: true, step: { id: row.id, text: row.text } }
+            }
+          )
+        }, meta))
+      }
+    )
+
+    server.tool(
+      'add_note',
+      'Log a manual data-change note on a project (paper trail of edits to the survey data).',
+      { project: z.string(), text: z.string().min(1).max(2000) },
+      async (args, extra) => {
+        const meta: LoggedMeta = {}
+        return json(await logged(extra, 'add_note', async () => {
+          const { userEmail } = authIdentity(extra)
+          const p = await resolveProjectWritable(args.project)
+          if (!p) return { error: 'Project not found.' }
+          if ('error' in p) return p
+          if ('ambiguous' in p) return p
+          meta.project_id = p.id as string
+          const createdBy = userEmail.split('@')[0]
+          const supabase = createAdminClient()
+          const { data: row, error } = await supabase.from('project_data_changes')
+            .insert({ project_id: p.id as string, text: args.text, created_by: createdBy })
+            .select().single()
+          if (error) throw error
+          meta.detail = { created: { id: row.id, text: args.text } }
+          return { ok: true, note: row }
+        }, meta))
+      }
+    )
+
+    server.tool(
+      'add_client_note',
+      'Add a dated note to a client profile.',
+      { client: z.string(), text: z.string().min(1).max(2000) },
+      async (args, extra) => {
+        const meta: LoggedMeta = {}
+        return json(await logged(extra, 'add_client_note', async () => {
+          const { userEmail } = authIdentity(extra)
+          const c = await data.resolveClient(args.client)
+          if (c === null) return { error: `No client found matching "${args.client}".` }
+          if ('ambiguous' in c) {
+            return { note: 'Multiple clients match — specify the client code.', candidates: c.ambiguous }
+          }
+          meta.client_id = c.id as string
+          const createdBy = userEmail.split('@')[0]
+          const supabase = createAdminClient()
+          const { data: row, error } = await supabase.from('client_notes')
+            .insert({ client_id: c.id as string, body: args.text, created_by: createdBy })
+            .select().single()
+          if (error) throw error
+          meta.detail = { created: { id: row.id, body: args.text } }
+          return { ok: true, note: row }
+        }, meta))
+      }
+    )
+
+    server.tool(
+      'link_document',
+      'Link a document (Google Doc/Sheet/Slides/Drive file, etc.) to a project (preview first; confirm to apply).',
+      { project: z.string(), url: z.string().min(1), name: z.string().optional(), confirm: z.boolean().optional() },
+      async (args, extra) => {
+        const meta: LoggedMeta = {}
+        return json(await logged(extra, 'link_document', async () => {
+          const { userEmail } = authIdentity(extra)
+          const p = await resolveProjectWritable(args.project)
+          if (!p) return { error: 'Project not found.' }
+          if ('error' in p) return p
+          if ('ambiguous' in p) return p
+          meta.project_id = p.id as string
+          const existing = (p.linked_documents as string[] | null) ?? []
+          return confirmable(
+            args,
+            async () => {
+              const title = await fetchDocTitle(args.url)
+              const name = title ?? args.name ?? null
+              return { summary: `Add "${name ?? args.url}" to linked documents`, name, url: args.url }
+            },
+            async () => {
+              const title = await fetchDocTitle(args.url)
+              const name = title ?? args.name ?? null
+              const entry = name ? JSON.stringify({ name, url: args.url }) : args.url
+              const supabase = createAdminClient()
+              const result = await runProjectWrite(supabase, {
+                id: p.id as string,
+                patch: { linked_documents: [...existing, entry] },
+                actor: `${userEmail} via Claude`,
+              })
+              if ('error' in result) return result
+              meta.detail = { added: { name, url: args.url } }
+              return { ok: true, linked_documents: result.linked_documents }
+            }
+          )
+        }, meta))
+      }
+    )
   },
   {},
   { basePath: '/api', maxDuration: 60, verboseLogs: false, disableSse: true }
