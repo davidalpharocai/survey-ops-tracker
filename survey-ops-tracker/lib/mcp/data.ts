@@ -57,11 +57,40 @@ export function slimProject(p: Row): Row {
 
 // ---- query helpers (service-role; caller has already passed the analyst gate) ----
 
+/** The caller's own team_members {name, initials} + profiles.role, resolved via profiles.email
+ *  -> team_members.email. Powers get_me and mine:true on search_projects/pipeline_summary.
+ *  Returns null if the profile or a matching team_members row can't be found (no throw). */
+export async function getMe(
+  userId: string
+): Promise<{ name: string; initials: string; role: string } | null> {
+  const supabase = createAdminClient()
+  const { data: profile, error: profErr } = await supabase.from('profiles')
+    .select('email, role').eq('id', userId).maybeSingle()
+  if (profErr) throw profErr
+  if (!profile) return null
+
+  const { data: member, error: memErr } = await supabase.from('team_members')
+    .select('name, initials').eq('email', profile.email).maybeSingle()
+  if (memErr) throw memErr
+  if (!member) return null
+
+  return { name: member.name, initials: member.initials, role: profile.role }
+}
+
 export async function searchProjects(args: {
   query?: string; status?: string; phase?: string; captain?: string;
-  due_before?: string; due_after?: string; limit?: number
+  due_before?: string; due_after?: string; limit?: number; mine?: boolean; userId?: string
 }) {
   const supabase = createAdminClient()
+
+  // mine:true resolves the caller's own initials and filters by them, same as an explicit
+  // captain filter — an explicit `captain` still wins if somehow both are passed.
+  let captainFilter = args.captain ?? null
+  if (args.mine && args.userId) {
+    const me = await getMe(args.userId)
+    if (me) captainFilter = captainFilter ?? me.initials
+  }
+
   let q = supabase.from('survey_projects')
     .select('project_code, project_name, client, status, phase, scoping_stage, board_column, due_date, n_collected, n_target, salesperson, captain:team_members(name, initials)')
     .is('deleted_at', null)
@@ -77,12 +106,12 @@ export async function searchProjects(args: {
   q = q.order('due_date', { ascending: true, nullsFirst: false })
   // When filtering by captain, the SQL limit would cap the pre-filter set and could
   // drop matches — fetch all matching rows, filter in JS, THEN slice to the limit.
-  if (!args.captain) q = q.limit(Math.min(args.limit ?? 20, 50))
+  if (!captainFilter) q = q.limit(Math.min(args.limit ?? 20, 50))
   const { data, error } = await q
   if (error) throw error
   let rows = (data ?? []) as unknown as Row[]
-  if (args.captain) {
-    const c = args.captain.toLowerCase()
+  if (captainFilter) {
+    const c = captainFilter.toLowerCase()
     rows = rows.filter(r => {
       const cap = r.captain as { name?: string; initials?: string } | null
       return cap?.name?.toLowerCase().includes(c) || cap?.initials?.toLowerCase() === c
@@ -125,6 +154,25 @@ export async function resolveProject(
   }
 }
 
+/** linked_documents elements are either a JSON string `{name,url}` (has a title) or a bare
+ *  url string (no title found at link time) — normalize both into {name,url} objects. */
+export function parseLinkedDocuments(raw: unknown): { name: string | null; url: string }[] {
+  if (!Array.isArray(raw)) return []
+  return raw.map(entry => {
+    if (typeof entry !== 'string') return { name: null, url: String(entry) }
+    try {
+      const parsed = JSON.parse(entry) as unknown
+      if (parsed && typeof parsed === 'object' && typeof (parsed as Row).url === 'string') {
+        const name = (parsed as Row).name
+        return { name: typeof name === 'string' ? name : null, url: (parsed as Row).url as string }
+      }
+    } catch {
+      // Not JSON — it's a bare url string, fall through.
+    }
+    return { name: null, url: entry }
+  })
+}
+
 export async function getProjectDetail(id: string, userId: string) {
   const supabase = createAdminClient()
 
@@ -142,7 +190,7 @@ export async function getProjectDetail(id: string, userId: string) {
   ] = await Promise.all([
     supabase.from('project_bids').select('amount, blasts, note, created_at').eq('project_id', id).order('created_at', { ascending: false }),
     supabase.from('project_blasts').select('delivered, bid, blast_cost, note, created_at').eq('project_id', id).order('created_at', { ascending: false }),
-    supabase.from('project_steps').select('text, done, completed_at, created_at').eq('project_id', id).order('created_at', { ascending: false }).limit(50),
+    supabase.from('project_steps').select('id, text, done, completed_at, created_at').eq('project_id', id).order('created_at', { ascending: false }).limit(50),
     supabase.from('project_activity').select('type, direction, sender, subject, snippet, occurred_at').eq('project_id', id).order('occurred_at', { ascending: false }).limit(10),
     supabase.from('deliverables').select('file_name, status, source_url, kind, created_at').eq('project_id', id).is('deleted_at', null).order('created_at', { ascending: false }),
     supabase.from('project_segments').select('label, n_target, n_collected, n_actual, sort_order').eq('project_id', id).order('sort_order', { ascending: true }),
@@ -164,6 +212,7 @@ export async function getProjectDetail(id: string, userId: string) {
 
   return {
     ...slimProject(p),
+    linked_documents: parseLinkedDocuments(p.linked_documents),
     bids: bidsRes.data ?? [],
     blasts,
     blast_spend_total: totalBidDollars(blasts as never),
@@ -174,6 +223,36 @@ export async function getProjectDetail(id: string, userId: string) {
     compliance,
     reminders: remindersRes.data ?? [],
   }
+}
+
+/** A project's prior/sibling waves in a longitudinal/rerun series, ordered by wave number.
+ *  A spawned wave's own rerun_series_id points at the original wave's id; the original
+ *  itself has rerun_series_id = null, so the "effective" series id is
+ *  `rerun_series_id ?? id` and the family is `id = seriesId OR rerun_series_id = seriesId`.
+ *  This lets the tool work whether asked from the original or from a later wave — the plan's
+ *  literal spec only covers the "has rerun_series_id" case; this is a superset of that. */
+export async function getProjectHistory(projectRef: string) {
+  const resolved = await resolveProject(projectRef)
+  if (resolved === null) return { error: `No project found matching "${projectRef}".` }
+  if ('ambiguous' in resolved) {
+    return { note: 'Multiple projects match — specify the project code.', candidates: resolved.ambiguous }
+  }
+  const p = resolved as Row
+  const seriesId = (p.rerun_series_id as string | null) ?? (p.id as string)
+
+  const supabase = createAdminClient()
+  const { data, error } = await supabase.from('survey_projects')
+    .select('project_code, project_name, status, phase, board_column, rerun_number, launch_date, deliver_date, due_date, n_target, n_collected, n_actual, budget, actual_spend')
+    .is('deleted_at', null)
+    .or(`id.eq.${seriesId},rerun_series_id.eq.${seriesId}`)
+    .order('rerun_number', { ascending: true })
+  if (error) throw error
+
+  const waves = data ?? []
+  if (waves.length <= 1) {
+    return { waves: [], note: 'not a longitudinal/rerun series' }
+  }
+  return { waves }
 }
 
 type ClientCandidate = { code: string | null; name: string }
@@ -226,8 +305,134 @@ export async function getClientDetail(id: string) {
   }
 }
 
-/** Port of the daily-digest logic (overdue / due<=3d / fielding-behind-pace) plus counts. */
-export async function pipelineSummary() {
+function median(nums: number[]): number | null {
+  if (nums.length === 0) return null
+  const sorted = [...nums].sort((a, b) => a - b)
+  const mid = Math.floor(sorted.length / 2)
+  return sorted.length % 2 === 1 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2
+}
+
+function mode<T>(vals: T[]): T | null {
+  if (vals.length === 0) return null
+  const counts = new Map<T, number>()
+  for (const v of vals) counts.set(v, (counts.get(v) ?? 0) + 1)
+  let best: T | null = null
+  let bestCount = 0
+  for (const [v, c] of counts) {
+    if (c > bestCount) { best = v; bestCount = c }
+  }
+  return best
+}
+
+/**
+ * "What did we do last time for this client?" — past & current projects (most-recent 50) plus
+ * derived patterns computed over the client's FULL non-deleted history (not just the capped
+ * page — cheap since this is one extra query, and a client with >50 projects shouldn't have
+ * its typical-N/cadence skewed by the cap) and any explicitly stated preferences.
+ */
+export async function getClientHistory(clientRef: string) {
+  const resolved = await resolveClient(clientRef)
+  if (resolved === null) return { error: `No client found matching "${clientRef}".` }
+  if ('ambiguous' in resolved) {
+    return { note: 'Multiple clients match — specify the client code.', candidates: resolved.ambiguous }
+  }
+  const client = resolved as Row
+  const clientId = client.id as string
+
+  const supabase = createAdminClient()
+
+  const { data: allRows, error } = await supabase.from('survey_projects')
+    .select(
+      'id, project_code, project_name, project_type, status, phase, objective, category, ' +
+      'n_target, n_collected, n_actual, budget, actual_spend, launch_date, deliver_date, due_date, ' +
+      'salesperson, linked_documents, created_at, captain:team_members(name, initials)'
+    )
+    .eq('client_id', clientId)
+    .is('deleted_at', null)
+    .order('created_at', { ascending: false })
+  if (error) throw error
+
+  const rows = (allRows ?? []) as unknown as Row[]
+  const recent = rows.slice(0, 50)
+
+  const ids = recent.map(r => r.id as string)
+  const deliverableCounts = new Map<string, number>()
+  if (ids.length > 0) {
+    const { data: delivRows, error: delivErr } = await supabase.from('deliverables')
+      .select('project_id').in('project_id', ids).is('deleted_at', null)
+    if (delivErr) throw delivErr
+    for (const d of delivRows ?? []) {
+      const pid = d.project_id
+      if (pid) deliverableCounts.set(pid, (deliverableCounts.get(pid) ?? 0) + 1)
+    }
+  }
+
+  const projects = recent.map(r => {
+    const cap = r.captain as { name?: string; initials?: string } | null
+    return {
+      project_code: r.project_code, project_name: r.project_name, project_type: r.project_type,
+      status: r.status, phase: r.phase, objective: r.objective, category: r.category,
+      n_target: r.n_target, n_collected: r.n_collected, n_actual: r.n_actual,
+      budget: r.budget, actual_spend: r.actual_spend,
+      launch_date: r.launch_date, deliver_date: r.deliver_date, due_date: r.due_date,
+      captain: cap ? { initials: cap.initials ?? null, name: cap.name ?? null } : null,
+      salesperson: r.salesperson,
+      linked_documents: parseLinkedDocuments(r.linked_documents),
+      deliverables_count: deliverableCounts.get(r.id as string) ?? 0,
+    }
+  })
+
+  // ---- patterns (over the full history) ----
+  const nTargets = rows.map(r => r.n_target).filter((n): n is number => typeof n === 'number')
+  const types = rows.map(r => r.project_type).filter((t): t is string => typeof t === 'string')
+  const fieldingDays = rows
+    .filter(r => typeof r.launch_date === 'string' && typeof r.deliver_date === 'string')
+    .map(r => (new Date(r.deliver_date as string).getTime() - new Date(r.launch_date as string).getTime()) / 86_400_000)
+    .filter(d => Number.isFinite(d) && d >= 0)
+  const createdTimes = rows
+    .map(r => (typeof r.created_at === 'string' ? new Date(r.created_at).getTime() : NaN))
+    .filter(t => Number.isFinite(t))
+
+  let cadencePerYear: number | null = null
+  if (createdTimes.length >= 2) {
+    const spanYears = (Math.max(...createdTimes) - Math.min(...createdTimes)) / (365.25 * 86_400_000)
+    cadencePerYear = spanYears > 0 ? Math.round((rows.length / spanYears) * 10) / 10 : rows.length
+  }
+
+  const avgFieldingDaysRaw = median(fieldingDays)
+
+  const [contactsRes, notesRes] = await Promise.all([
+    supabase.from('client_contacts').select('first_name, last_name, email, title, phone')
+      .eq('client_id', clientId).eq('archived', false),
+    supabase.from('client_notes').select('body, created_by, created_at')
+      .eq('client_id', clientId).like('body', 'PREF:%').order('created_at', { ascending: false }),
+  ])
+
+  const recurringContacts = (contactsRes.data ?? []).map(c => ({
+    name: `${c.first_name} ${c.last_name}`.trim(), title: c.title, email: c.email, phone: c.phone,
+  }))
+  const statedPreferences = (notesRes.data ?? []).map(n => ({
+    text: n.body.replace(/^PREF:\s*/, ''), created_by: n.created_by, created_at: n.created_at,
+  }))
+
+  return {
+    client: { code: client.code as string | null, name: client.name as string },
+    projects,
+    patterns: {
+      typical_n_target: median(nTargets),
+      common_project_type: mode(types),
+      avg_fielding_days: avgFieldingDaysRaw === null ? null : Math.round(avgFieldingDaysRaw),
+      cadence_per_year: cadencePerYear,
+      recurring_contacts: recurringContacts,
+    },
+    stated_preferences: statedPreferences,
+  }
+}
+
+/** Port of the daily-digest logic (overdue / due<=3d / fielding-behind-pace) plus counts.
+ *  mine:true scopes everything (overdue/due-soon/fielding-behind AND the counts) to the
+ *  caller's own captained projects, resolved via getMe(userId). */
+export async function pipelineSummary(args: { mine?: boolean; userId?: string } = {}) {
   const supabase = createAdminClient()
   const { data, error } = await supabase.from('survey_projects')
     .select('project_code, project_name, client, board_column, due_date, n_target, n_collected, status, phase, captain:team_members(name, initials)')
@@ -237,7 +442,18 @@ export async function pipelineSummary() {
     .or('project_type.is.null,project_type.neq.Internal')
   if (error) throw error
 
-  const rows = (data ?? []) as unknown as Row[]
+  let rows = (data ?? []) as unknown as Row[]
+
+  let myInitials: string | null = null
+  if (args.mine && args.userId) {
+    const me = await getMe(args.userId)
+    myInitials = me?.initials ?? null
+  }
+  if (myInitials) {
+    const ci = myInitials.toLowerCase()
+    rows = rows.filter(r => ((r.captain as { initials?: string } | null)?.initials ?? '').toLowerCase() === ci)
+  }
+
   const today = new Date().toISOString().split('T')[0]
   const soon = new Date(Date.now() + 3 * 86400_000).toISOString().split('T')[0]
 
@@ -252,18 +468,27 @@ export async function pipelineSummary() {
   )
 
   const { data: allOpen } = await supabase.from('survey_projects')
-    .select('board_column, status, phase')
+    .select('board_column, status, phase, captain:team_members(initials)')
     .is('deleted_at', null)
     .or('project_type.is.null,project_type.neq.Internal')
     .neq('status', 'Closed')
 
+  let allOpenRows = (allOpen ?? []) as unknown as Row[]
+  if (myInitials) {
+    const ci = myInitials.toLowerCase()
+    allOpenRows = allOpenRows.filter(r => ((r.captain as { initials?: string } | null)?.initials ?? '').toLowerCase() === ci)
+  }
+
   const countsByColumn: Record<string, number> = {}
   const countsByStatus: Record<string, number> = {}
   const countsByPhase: Record<string, number> = {}
-  for (const r of allOpen ?? []) {
-    countsByColumn[r.board_column] = (countsByColumn[r.board_column] ?? 0) + 1
-    countsByStatus[r.status] = (countsByStatus[r.status] ?? 0) + 1
-    countsByPhase[r.phase] = (countsByPhase[r.phase] ?? 0) + 1
+  for (const r of allOpenRows) {
+    const col = r.board_column as string
+    const status = r.status as string
+    const phase = r.phase as string
+    countsByColumn[col] = (countsByColumn[col] ?? 0) + 1
+    countsByStatus[status] = (countsByStatus[status] ?? 0) + 1
+    countsByPhase[phase] = (countsByPhase[phase] ?? 0) + 1
   }
 
   return {

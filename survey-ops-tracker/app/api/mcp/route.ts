@@ -172,7 +172,7 @@ const handler = createMcpHandler(
 
     server.tool(
       'search_projects',
-      'Search survey projects by name/code/client with optional filters.',
+      'Search survey projects by name/code/client with optional filters. Pass mine:true to scope to your own captained projects.',
       {
         query: z.string().optional(),
         status: z.enum(['Open', 'Hold', 'Closed']).optional(),
@@ -181,8 +181,12 @@ const handler = createMcpHandler(
         due_before: z.string().optional(),
         due_after: z.string().optional(),
         limit: z.number().int().min(1).max(50).optional(),
+        mine: z.boolean().optional(),
       },
-      async (args, extra) => json(await logged(extra, 'search_projects', () => data.searchProjects(args)))
+      async (args, extra) => json(await logged(extra, 'search_projects', () => {
+        const { userId } = authIdentity(extra)
+        return data.searchProjects({ ...args, userId })
+      }))
     )
 
     server.tool(
@@ -202,9 +206,40 @@ const handler = createMcpHandler(
 
     server.tool(
       'pipeline_summary',
-      'Digest of the active pipeline: overdue, due within 3 days, fielding behind pace, plus counts by stage/status/phase.',
+      'Digest of the active pipeline: overdue, due within 3 days, fielding behind pace, plus counts by stage/status/phase. Pass mine:true to scope to your own captained projects.',
+      { mine: z.boolean().optional() },
+      async (args, extra) => json(await logged(extra, 'pipeline_summary', () => {
+        const { userId } = authIdentity(extra)
+        return data.pipelineSummary({ ...args, userId })
+      }))
+    )
+
+    server.tool(
+      'get_me',
+      "Resolve the caller's own name, initials, and role — use this to answer 'me'/'my' questions (e.g. \"what's overdue for me\") before filtering other tools with mine:true or a captain name.",
       {},
-      async (_args, extra) => json(await logged(extra, 'pipeline_summary', () => data.pipelineSummary()))
+      async (_args, extra) => json(await logged(extra, 'get_me', async () => {
+        const { userId } = authIdentity(extra)
+        const me = await data.getMe(userId)
+        if (!me) {
+          return { error: "Could not resolve your team-member record (profiles.email has no matching team_members row) — ask David to add you to Team Members." }
+        }
+        return me
+      }))
+    )
+
+    server.tool(
+      'get_client_history',
+      'What did we do last time for this client? Past & current projects, derived patterns (typical N, common project type, avg fielding time, cadence, recurring contacts), and any stated preferences.',
+      { client: z.string() },
+      async (args, extra) => json(await logged(extra, 'get_client_history', () => data.getClientHistory(args.client)))
+    )
+
+    server.tool(
+      'get_project_history',
+      "A project's prior/sibling waves if it's part of a longitudinal/rerun series (key stats per wave, ordered).",
+      { project: z.string() },
+      async (args, extra) => json(await logged(extra, 'get_project_history', () => data.getProjectHistory(args.project)))
     )
 
     server.tool(
