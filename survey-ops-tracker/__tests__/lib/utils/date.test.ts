@@ -62,10 +62,11 @@ describe('matchesDuePreset', () => {
       expect(matchesDuePreset(null, preset)).toBe(false)
     }
   })
-  it('overdue matches strictly before today, not today itself', () => {
+  it('overdue matches today or earlier (aligns with the overdue card badge)', () => {
     expect(matchesDuePreset('2020-01-01', 'overdue')).toBe(true)
     expect(matchesDuePreset(daysFromNow(-1), 'overdue')).toBe(true)
-    expect(matchesDuePreset(daysFromNow(0), 'overdue')).toBe(false)
+    expect(matchesDuePreset(daysFromNow(0), 'overdue')).toBe(true)
+    expect(matchesDuePreset(daysFromNow(1), 'overdue')).toBe(false)
   })
   it('today matches only the current day', () => {
     expect(matchesDuePreset(daysFromNow(0), 'today')).toBe(true)

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { sanitizeQuery, decodeSurveyId } from './data'
+import { sanitizeQuery, decodeSurveyId, isActiveOperational } from './data'
 
 describe('sanitizeQuery', () => {
   it('strips PostgREST-reserved and escapes LIKE wildcards', () => {
@@ -33,5 +33,19 @@ describe('decodeSurveyId', () => {
   })
   it('returns null when no date anchor', () => {
     expect(decodeSurveyId('NODATEHERE', initials)).toBeNull()
+  })
+})
+
+describe('isActiveOperational', () => {
+  it('accepts an in-flight Open/Active project', () => {
+    expect(isActiveOperational({ status: 'Open', phase: 'Active', board_column: 'Fielding' })).toBe(true)
+  })
+  it('rejects Closed, On-Hold (Hold), and pre-sale Scoping', () => {
+    expect(isActiveOperational({ status: 'Closed', phase: 'Active', board_column: 'Fielding' })).toBe(false)
+    expect(isActiveOperational({ status: 'Hold', phase: 'Active', board_column: 'Fielding' })).toBe(false)
+    expect(isActiveOperational({ status: 'Open', phase: 'Scoping', board_column: 'Submitted' })).toBe(false)
+  })
+  it('rejects a delivered project even while status is still Open', () => {
+    expect(isActiveOperational({ status: 'Open', phase: 'Active', board_column: 'Delivery' })).toBe(false)
   })
 })

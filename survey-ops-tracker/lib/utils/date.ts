@@ -56,7 +56,10 @@ export function matchesDuePreset(
   const days = differenceInCalendarDays(due, today)
   switch (preset) {
     case 'overdue':
-      return days < 0
+      // Today or earlier — matches getDueUrgency's overdue bucket and the
+      // "⚠ Overdue" card badge, so the filter and the card colors agree. The
+      // separate 'today' preset narrows to just today.
+      return days <= 0
     case 'today':
       return days === 0
     case 'tomorrow':

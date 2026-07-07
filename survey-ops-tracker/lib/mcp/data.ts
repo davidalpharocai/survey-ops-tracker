@@ -77,9 +77,21 @@ export async function getMe(
   return { name: member.name, initials: member.initials, role: profile.role }
 }
 
+/** The only projects that can be "due", "overdue", or "open/active": in-flight
+ *  operational surveys. Excludes Closed & On-Hold (status='Hold'), pre-sale
+ *  Scoping (phase), and Delivered — the final 'Delivery' board column, shown in
+ *  the UI as "Delivered". A delivered project can still carry status='Open' until
+ *  it's manually closed, so board_column must be checked, not status alone. */
+export function isActiveOperational(p: {
+  status?: unknown; phase?: unknown; board_column?: unknown
+}): boolean {
+  return p.status === 'Open' && p.phase === 'Active' && p.board_column !== 'Delivery'
+}
+
 export async function searchProjects(args: {
   query?: string; status?: string; phase?: string; captain?: string;
-  due_before?: string; due_after?: string; limit?: number; mine?: boolean; userId?: string
+  due_before?: string; due_after?: string; limit?: number; mine?: boolean; userId?: string;
+  active_only?: boolean
 }) {
   const supabase = createAdminClient()
 
@@ -95,6 +107,15 @@ export async function searchProjects(args: {
     .select('project_code, project_name, client, status, phase, scoping_stage, board_column, due_date, n_collected, n_target, salesperson, captain:team_members(name, initials)')
     .is('deleted_at', null)
     .or('project_type.is.null,project_type.neq.Internal')
+  // Default to only in-flight operational projects (see isActiveOperational) so
+  // "due this week", "open surveys for <captain>", etc. never surface Closed,
+  // On-Hold, Delivered, or pre-sale Scoping work. If the caller explicitly asks
+  // for a Closed/Hold status or the Scoping phase, honor that instead; a passed
+  // active_only always wins.
+  const asksInactive =
+    args.status === 'Closed' || args.status === 'Hold' || args.phase === 'Scoping'
+  const wantsActive = args.active_only ?? !asksInactive
+  if (wantsActive) q = q.eq('status', 'Open').eq('phase', 'Active').neq('board_column', 'Delivery')
   if (args.query) {
     const s = sanitizeQuery(args.query)
     q = q.or(`project_name.ilike.%${s}%,client.ilike.%${s}%,project_code.ilike.%${s}%`)
@@ -443,6 +464,10 @@ export async function pipelineSummary(args: { mine?: boolean; userId?: string } 
   if (error) throw error
 
   let rows = (data ?? []) as unknown as Row[]
+  // SQL already restricts to Open+Active, but a delivered project can sit in the
+  // 'Delivery' (Delivered) column with status still Open — drop those so the
+  // overdue / due-soon buckets never flag finished work as due.
+  rows = rows.filter(isActiveOperational)
 
   let myInitials: string | null = null
   if (args.mine && args.userId) {
@@ -510,8 +535,10 @@ export async function searchClients(args: { query?: string; limit?: number }) {
 
   const results = await Promise.all(clients.map(async c => {
     const { data: projects } = await supabase.from('survey_projects')
-      .select('status').eq('client_id', c.id as string).is('deleted_at', null)
-    const open = (projects ?? []).filter(p => p.status !== 'Closed').length
+      .select('status, phase, board_column').eq('client_id', c.id as string).is('deleted_at', null)
+    // "open" = in-flight/active (excludes Closed, On-Hold, and Delivered), matching
+    // how the rest of the connector treats "open"/"active".
+    const open = (projects ?? []).filter(isActiveOperational).length
     const closed = (projects ?? []).filter(p => p.status === 'Closed').length
     return {
       code: c.code, name: c.name,

@@ -174,7 +174,9 @@ const CONTACT_WRITE_FIELDS = ['first_name', 'last_name', 'email', 'title', 'phon
  */
 const MCP_INSTRUCTIONS = `Survey Ops Command Center — connector guidance.
 
-Answer efficiently: answer in as FEW tool calls as possible — prefer one targeted call over several exploratory ones. For "how many/list <person>'s <status> projects" (e.g. "how many open surveys does Bryan have"), make ONE search_projects call with captain set to that person and status set to the asked status, then count/list the result yourself — do NOT call get_me first (that's only for "me/my/mine"), and do NOT fetch each project's details just to count or list them. For pipeline/status/overview questions or "what's overdue," one pipeline_summary call is enough (add mine:true only for "my/me"). Only call get_project, get_client_history, or get_project_history when the user asks for specifics or history — never just to answer a simple count or list.
+What counts as "open"/"due" (read first): a project's status is Open, Closed, or Hold (Hold = on hold/paused); its phase is Scoping (pre-sale) or Active (in operations); its board column runs Submitted → Doc Programming → Survey Programming → EdWin QA → Fielding → Data QA → Delivery (the last shows as "Delivered"). A project is open/active and can be "due" or "overdue" ONLY when status is Open AND phase is Active AND it is NOT in the Delivered column. NEVER describe a Closed, On-Hold, or Delivered project as due, overdue, due soon, open, or active — Closed and Delivered are finished; Hold is paused. A delivered project may still read status "Open" until someone closes it, so trust the board column. search_projects returns only active projects by default; pass active_only:false only to look up a specific or past/closed project. In pipeline_summary, only the overdue, due-soon, and fielding-behind LISTS are scoped to active work; its counts (by_status / by_phase / by_board_column) are a full breakdown that still includes On-Hold, Scoping, and Delivered — so never report counts.by_status.Open as the number of open/active projects. To count open/active work, use search_projects (active-scoped by default) and count the result.
+
+Answer efficiently: answer in as FEW tool calls as possible — prefer one targeted call over several exploratory ones. For "how many/list <person>'s open/active projects" (e.g. "how many open surveys does Bryan have"), make ONE search_projects call with captain set to that person — active projects are returned by default, so don't pass a status — then count/list the result yourself. For closed or past projects, add active_only:false (plus status:'Closed' if you want only closed ones). Do NOT call get_me first (that's only for "me/my/mine"), and do NOT fetch each project's details just to count or list them. For pipeline/status/overview questions or "what's overdue," one pipeline_summary call is enough (add mine:true only for "my/me"). Only call get_project, get_client_history, or get_project_history when the user asks for specifics or history — never just to answer a simple count or list.
 
 Before mutating: every create/update/status/stage tool follows preview-then-confirm — a call without confirm:true only returns a preview and never writes. Read the preview back to the user in plain language and get their explicit OK before calling again with confirm:true. Never set confirm:true unless the user has clearly approved the specific change shown in the preview.
 
@@ -202,7 +204,7 @@ const handler = createMcpHandler(
 
     server.tool(
       'search_projects',
-      'Search survey projects by name/code/client with optional filters. Pass mine:true to scope to your own captained projects.',
+      'Search survey projects by name/code/client with optional filters. Returns only in-flight active projects by default (excludes Closed, On-Hold, Delivered, and pre-sale Scoping); pass active_only:false to search ALL projects regardless of status — e.g. to find a specific past or closed project. Pass mine:true to scope to your own captained projects.',
       {
         query: z.string().optional(),
         status: z.enum(['Open', 'Hold', 'Closed']).optional(),
@@ -212,6 +214,7 @@ const handler = createMcpHandler(
         due_after: z.string().optional(),
         limit: z.number().int().min(1).max(50).optional(),
         mine: z.boolean().optional(),
+        active_only: z.boolean().optional(),
       },
       async (args, extra) => json(await logged(extra, 'search_projects', () => {
         const { userId } = authIdentity(extra)
@@ -236,7 +239,7 @@ const handler = createMcpHandler(
 
     server.tool(
       'pipeline_summary',
-      'Digest of the active pipeline: overdue, due within 3 days, fielding behind pace, plus counts by stage/status/phase. Pass mine:true to scope to your own captained projects.',
+      'Digest of the active pipeline — overdue, due within 3 days, and fielding behind pace, all limited to in-flight work (Closed, On-Hold, and Delivered projects are excluded) — plus counts by stage/status/phase. Pass mine:true to scope to your own captained projects.',
       { mine: z.boolean().optional() },
       async (args, extra) => json(await logged(extra, 'pipeline_summary', () => {
         const { userId } = authIdentity(extra)
