@@ -15,3 +15,14 @@ export function normalizeClientText(raw: string): string {
     .replace(/(^|[\s./&(-])([a-z])/g, (_m, pre: string, ch: string) => pre + ch.toUpperCase())
   return `${firm} - ${contact}`
 }
+
+/**
+ * Extract just the firm name from a project's free-text client field
+ * ("FIRM - Contact"), stripping any " - Contact" suffix. Mirrors the
+ * `.split(' - ')[0].trim()` idiom used throughout the UI (Board.tsx,
+ * ComplianceBanner.tsx, useComplianceState.ts, etc.) as a single reusable
+ * export for new code.
+ */
+export function firmNameFrom(raw: string): string {
+  return raw.split(' - ')[0].trim()
+}

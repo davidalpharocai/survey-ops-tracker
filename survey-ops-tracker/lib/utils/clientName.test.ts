@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { normalizeClientText } from './clientName'
+import { normalizeClientText, firmNameFrom } from './clientName'
 
 describe('normalizeClientText', () => {
   it('capitalizes each word of the contact part', () => {
@@ -20,5 +20,17 @@ describe('normalizeClientText', () => {
   })
   it('collapses stray whitespace', () => {
     expect(normalizeClientText('  BAM -  jeff cumming ')).toBe('BAM - Jeff Cumming')
+  })
+})
+
+describe('firmNameFrom', () => {
+  it('strips a " - Contact" suffix to get just the firm', () => {
+    expect(firmNameFrom('BAM - Jared Khoo')).toBe('BAM')
+  })
+  it('leaves a bare firm name alone', () => {
+    expect(firmNameFrom('Sportclips')).toBe('Sportclips')
+  })
+  it('trims stray whitespace', () => {
+    expect(firmNameFrom('  Coatue  - John Smith')).toBe('Coatue')
   })
 })

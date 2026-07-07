@@ -8,13 +8,14 @@ import { baseUrl } from '@/lib/oauth/http'
 import { getCheckboxesForColumn, STAGE_ORDER, type BoardColumn } from '@/lib/utils/stage'
 import { complianceGate } from '@/lib/utils/compliance'
 import { autoStamp } from '@/lib/utils/date'
-import { normalizeClientText } from '@/lib/utils/clientName'
+import { normalizeClientText, firmNameFrom } from '@/lib/utils/clientName'
 import { blastTotal } from '@/lib/utils/blast'
 import type { Database, Json } from '@/lib/supabase/types'
 import * as data from '@/lib/mcp/data'
 import {
   resolveProjectWritable, resolveStep, resolveContact, loadGateInput,
   runAddStep, runCompleteStep, runEditStep, runProjectWrite, runSetBidBudget, runLogBlast,
+  runRenameClient,
   pickProjectPatch, diffSummary, stageColumnsFor,
 } from '@/lib/mcp/writes'
 
@@ -158,6 +159,12 @@ async function fetchDocTitle(url: string): Promise<string | null> {
 }
 
 const DUE_DATE_RE = /^\d{4}-\d{2}-\d{2}$/
+
+const CLIENT_WRITE_FIELDS = [
+  'compliance_before_fielding', 'compliance_after_fielding', 'compliance_contact', 'compliance_notes', 'drive_folder_id',
+] as const
+
+const CONTACT_WRITE_FIELDS = ['first_name', 'last_name', 'email', 'title', 'phone'] as const
 
 const handler = createMcpHandler(
   server => {
@@ -909,6 +916,308 @@ const handler = createMcpHandler(
         }, meta))
       }
     )
+
+    // -------- write tools: client & contact (preview-then-confirm) --------
+
+    server.tool(
+      'update_client',
+      "Update a client's compliance settings (preview first; confirm to apply). Use rename_client to change the name.",
+      { client: z.string(), fields: z.record(z.unknown()), confirm: z.boolean().optional() },
+      async (args, extra) => {
+        const meta: LoggedMeta = {}
+        return json(await logged(extra, 'update_client', async () => {
+          const c = await data.resolveClient(args.client)
+          if (c === null) return { error: `No client found matching "${args.client}".` }
+          if ('ambiguous' in c) return { note: 'Multiple clients match — specify the client code.', candidates: c.ambiguous }
+          meta.client_id = c.id as string
+
+          if ('name' in args.fields) {
+            return { error: "Client name can't be changed here — use rename_client instead." }
+          }
+
+          const allow = new Set<string>(CLIENT_WRITE_FIELDS)
+          const patch: Record<string, unknown> = {}
+          const rejected: string[] = []
+          for (const k of Object.keys(args.fields)) {
+            if (allow.has(k)) patch[k] = args.fields[k]
+            else rejected.push(k)
+          }
+          if (rejected.length) {
+            return { error: `These fields can't be set here: ${rejected.join(', ')}.` }
+          }
+
+          const changed = diffSummary(c, patch)
+
+          return confirmable(
+            args,
+            async () => ({ summary: describeChanges(changed), changed }),
+            async () => {
+              const supabase = createAdminClient()
+              const { data: row, error } = await supabase.from('clients')
+                .update(patch as Database['public']['Tables']['clients']['Update'])
+                .eq('id', c.id as string).select().single()
+              if (error) throw error
+              meta.detail = { changed }
+              return { ok: true, client: { id: row.id, name: row.name }, changed }
+            }
+          )
+        }, meta))
+      }
+    )
+
+    server.tool(
+      'rename_client',
+      "Rename a client and keep every one of its projects' denormalized client text in sync (preview first; confirm to apply).",
+      { client: z.string(), new_name: z.string().min(1), confirm: z.boolean().optional() },
+      async (args, extra) => {
+        const meta: LoggedMeta = {}
+        return json(await logged(extra, 'rename_client', async () => {
+          const { userEmail } = authIdentity(extra)
+          const c = await data.resolveClient(args.client)
+          if (c === null) return { error: `No client found matching "${args.client}".` }
+          if ('ambiguous' in c) return { note: 'Multiple clients match — specify the client code.', candidates: c.ambiguous }
+          meta.client_id = c.id as string
+
+          const newName = args.new_name.trim()
+          if (!newName) return { error: 'new_name is required.' }
+
+          const supabase = createAdminClient()
+          const { count, error: countErr } = await supabase.from('survey_projects')
+            .select('id', { count: 'exact', head: true })
+            .eq('client_id', c.id as string).is('deleted_at', null)
+          if (countErr) throw countErr
+
+          return confirmable(
+            args,
+            async () => ({
+              summary: `Rename "${String(c.name)}" → "${newName}" (${count ?? 0} project${count === 1 ? '' : 's'} will update)`,
+              from: c.name, to: newName, projects_affected: count ?? 0,
+            }),
+            async () => {
+              await runRenameClient(c.id as string, newName, `${userEmail} via Claude`)
+              meta.detail = { changed: { name: [c.name, newName] }, projects_affected: count ?? 0 }
+              return { ok: true, client: { id: c.id, name: newName }, projects_affected: count ?? 0 }
+            }
+          )
+        }, meta))
+      }
+    )
+
+    server.tool(
+      'create_client',
+      'Create a new client (preview first; confirm to apply). If a client with that name already exists, returns it instead of creating a duplicate.',
+      {
+        name: z.string().min(1),
+        compliance_before_fielding: z.boolean().optional(),
+        compliance_after_fielding: z.boolean().optional(),
+        compliance_contact: z.string().optional(),
+        compliance_notes: z.string().optional(),
+        confirm: z.boolean().optional(),
+      },
+      async (args, extra) => {
+        const meta: LoggedMeta = {}
+        return json(await logged(extra, 'create_client', async () => {
+          const firmName = firmNameFrom(args.name)
+          if (!firmName) return { error: 'name is required.' }
+
+          const supabase = createAdminClient()
+          const { data: existing, error: exErr } = await supabase.from('clients')
+            .select('*').eq('name', firmName).maybeSingle()
+          if (exErr) throw exErr
+          if (existing) meta.client_id = existing.id as string
+
+          return confirmable(
+            args,
+            async () => existing
+              ? {
+                  summary: `A client named "${firmName}" already exists — no new client will be created.`,
+                  existing: true, client: { id: existing.id, code: existing.code, name: existing.name },
+                }
+              : { summary: `Create client "${firmName}"`, existing: false, name: firmName },
+            async () => {
+              if (existing) {
+                return { ok: true, existing: true, client: { id: existing.id, code: existing.code, name: existing.name } }
+              }
+              const insert: Record<string, unknown> = { name: firmName }
+              if (args.compliance_before_fielding !== undefined) insert.compliance_before_fielding = args.compliance_before_fielding
+              if (args.compliance_after_fielding !== undefined) insert.compliance_after_fielding = args.compliance_after_fielding
+              if (args.compliance_contact !== undefined) insert.compliance_contact = args.compliance_contact
+              if (args.compliance_notes !== undefined) insert.compliance_notes = args.compliance_notes
+              const { data: row, error } = await supabase.from('clients')
+                .insert(insert as Database['public']['Tables']['clients']['Insert'])
+                .select().single()
+              if (error) throw error
+              meta.client_id = row.id as string
+              meta.detail = { created: { id: row.id, name: row.name } }
+              return { ok: true, existing: false, client: { id: row.id, code: row.code, name: row.name } }
+            }
+          )
+        }, meta))
+      }
+    )
+
+    server.tool(
+      'add_contact',
+      'Add a contact to a client (preview first; confirm to apply).',
+      {
+        client: z.string(), first_name: z.string(), last_name: z.string(),
+        email: z.string().optional(), title: z.string().optional(), phone: z.string().optional(),
+        confirm: z.boolean().optional(),
+      },
+      async (args, extra) => {
+        const meta: LoggedMeta = {}
+        return json(await logged(extra, 'add_contact', async () => {
+          const { userEmail } = authIdentity(extra)
+          const c = await data.resolveClient(args.client)
+          if (c === null) return { error: `No client found matching "${args.client}".` }
+          if ('ambiguous' in c) return { note: 'Multiple clients match — specify the client code.', candidates: c.ambiguous }
+          meta.client_id = c.id as string
+
+          const firstName = args.first_name.trim()
+          const lastName = args.last_name.trim()
+          if (!firstName || !lastName) return { error: 'first_name and last_name are both required.' }
+          const t = (s?: string) => (s && s.trim() ? s.trim() : null)
+          const email = t(args.email)
+          const title = t(args.title)
+          const phone = t(args.phone)
+
+          return confirmable(
+            args,
+            async () => ({
+              summary: `Add contact "${firstName} ${lastName}" to ${String(c.name)}`,
+              first_name: firstName, last_name: lastName, email, title, phone,
+            }),
+            async () => {
+              const supabase = createAdminClient()
+              const { data: row, error } = await supabase.from('client_contacts').insert({
+                client_id: c.id as string, first_name: firstName, last_name: lastName,
+                email, title, phone, created_by: userEmail.split('@')[0],
+              }).select().single()
+              if (error) throw error
+              meta.detail = { created: { id: row.id, first_name: row.first_name, last_name: row.last_name } }
+              return {
+                ok: true,
+                contact: { id: row.id, first_name: row.first_name, last_name: row.last_name, email: row.email, title: row.title, phone: row.phone },
+              }
+            }
+          )
+        }, meta))
+      }
+    )
+
+    server.tool(
+      'edit_contact',
+      "Edit a client contact's fields (preview first; confirm to apply).",
+      { client: z.string(), contact_ref: z.string(), fields: z.record(z.unknown()), confirm: z.boolean().optional() },
+      async (args, extra) => {
+        const meta: LoggedMeta = {}
+        return json(await logged(extra, 'edit_contact', async () => {
+          const c = await data.resolveClient(args.client)
+          if (c === null) return { error: `No client found matching "${args.client}".` }
+          if ('ambiguous' in c) return { note: 'Multiple clients match — specify the client code.', candidates: c.ambiguous }
+          meta.client_id = c.id as string
+
+          const contact = await resolveContact(c.id as string, args.contact_ref)
+          if (!contact) return { error: `No contact found matching "${args.contact_ref}" for this client.` }
+          if ('ambiguous' in contact) return { note: 'Multiple contacts match — be more specific.', candidates: contact.ambiguous }
+
+          const allow = new Set<string>(CONTACT_WRITE_FIELDS)
+          const patch: Record<string, unknown> = {}
+          const rejected: string[] = []
+          for (const k of Object.keys(args.fields)) {
+            if (allow.has(k)) patch[k] = args.fields[k]
+            else rejected.push(k)
+          }
+          if (rejected.length) {
+            return { error: `These fields can't be set here: ${rejected.join(', ')}.` }
+          }
+
+          const changed = diffSummary(contact, patch)
+
+          return confirmable(
+            args,
+            async () => ({ summary: describeChanges(changed), changed }),
+            async () => {
+              const supabase = createAdminClient()
+              const { data: row, error } = await supabase.from('client_contacts')
+                .update(patch as Database['public']['Tables']['client_contacts']['Update'])
+                .eq('id', contact.id as string).select().single()
+              if (error) throw error
+              meta.detail = { contact_id: row.id, changed }
+              return {
+                ok: true,
+                contact: { id: row.id, first_name: row.first_name, last_name: row.last_name, email: row.email, title: row.title, phone: row.phone },
+              }
+            }
+          )
+        }, meta))
+      }
+    )
+
+    server.tool(
+      'archive_contact',
+      'Archive or unarchive a client contact (preview first; confirm to apply).',
+      { client: z.string(), contact_ref: z.string(), archived: z.boolean(), confirm: z.boolean().optional() },
+      async (args, extra) => {
+        const meta: LoggedMeta = {}
+        return json(await logged(extra, 'archive_contact', async () => {
+          const c = await data.resolveClient(args.client)
+          if (c === null) return { error: `No client found matching "${args.client}".` }
+          if ('ambiguous' in c) return { note: 'Multiple clients match — specify the client code.', candidates: c.ambiguous }
+          meta.client_id = c.id as string
+
+          const contact = await resolveContact(c.id as string, args.contact_ref)
+          if (!contact) return { error: `No contact found matching "${args.contact_ref}" for this client.` }
+          if ('ambiguous' in contact) return { note: 'Multiple contacts match — be more specific.', candidates: contact.ambiguous }
+
+          return confirmable(
+            args,
+            async () => ({ summary: `${args.archived ? 'Archive' : 'Unarchive'} "${String(contact.first_name)} ${String(contact.last_name)}"` }),
+            async () => {
+              const supabase = createAdminClient()
+              const { data: row, error } = await supabase.from('client_contacts')
+                .update({ archived: args.archived }).eq('id', contact.id as string).select().single()
+              if (error) throw error
+              meta.detail = { contact_id: row.id, changed: { archived: [contact.archived, row.archived] } }
+              return { ok: true, contact: { id: row.id, first_name: row.first_name, last_name: row.last_name, archived: row.archived } }
+            }
+          )
+        }, meta))
+      }
+    )
+
+    server.tool(
+      'set_client_preference',
+      'Save a stated client preference as a tagged, searchable client note (preview first; confirm to apply).',
+      { client: z.string(), preference: z.string().min(1), reason: z.string().optional(), confirm: z.boolean().optional() },
+      async (args, extra) => {
+        const meta: LoggedMeta = {}
+        return json(await logged(extra, 'set_client_preference', async () => {
+          const { userEmail } = authIdentity(extra)
+          const c = await data.resolveClient(args.client)
+          if (c === null) return { error: `No client found matching "${args.client}".` }
+          if ('ambiguous' in c) return { note: 'Multiple clients match — specify the client code.', candidates: c.ambiguous }
+          meta.client_id = c.id as string
+
+          const body = `PREF: ${args.preference}${args.reason ? ` — ${args.reason}` : ''}`
+
+          return confirmable(
+            args,
+            async () => ({ summary: body }),
+            async () => {
+              const supabase = createAdminClient()
+              const { data: row, error } = await supabase.from('client_notes')
+                .insert({ client_id: c.id as string, body, created_by: userEmail.split('@')[0] })
+                .select().single()
+              if (error) throw error
+              meta.detail = { created: { id: row.id, body: row.body } }
+              return { ok: true, note: { id: row.id, body: row.body } }
+            }
+          )
+        }, meta))
+      }
+    )
+
   },
   {},
   { basePath: '/api', maxDuration: 60, verboseLogs: false, disableSse: true }
