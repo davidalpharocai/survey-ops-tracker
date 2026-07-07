@@ -45,7 +45,7 @@ function authIdentity(extra: ToolExtra): AuthExtra {
 function cleanErrorMessage(err: unknown): string {
   const raw = err instanceof Error ? err.message : String(err)
   if (/relation .* does not exist/i.test(raw) || /schema cache/i.test(raw)) {
-    return 'The Survey Ops database tables for this feature are not set up yet — ask David to run migration 045.'
+    return "The Survey Ops database tables for this feature aren't set up yet — ask David to run the latest database migration in Supabase."
   }
   return 'Something went wrong handling that request. Please try again.'
 }
@@ -161,7 +161,7 @@ async function fetchDocTitle(url: string): Promise<string | null> {
 const DUE_DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 
 const CLIENT_WRITE_FIELDS = [
-  'compliance_before_fielding', 'compliance_after_fielding', 'compliance_contact', 'compliance_notes', 'drive_folder_id',
+  'compliance_before_fielding', 'compliance_after_fielding', 'compliance_contact', 'compliance_notes',
 ] as const
 
 const CONTACT_WRITE_FIELDS = ['first_name', 'last_name', 'email', 'title', 'phone'] as const
@@ -187,6 +187,8 @@ Resolving "me"/"my": call get_me to resolve the caller's own name/initials/role,
 Recording interactions: to log that something happened outside the app (e.g. "we emailed the client about timeline"), use add_note (project-scoped) or add_client_note (client-scoped) — there is deliberately no tool to write a project_activity entry directly.
 
 Corrections: logged blasts and bids can't be edited or deleted via the connector. If a user needs to correct one, tell them to do it in the app.
+
+Money idempotency: log_blast and set_bid_budget affect spend, so a retried confirm must not double-count. Pass a stable idem_key for each blast/bid you intend to log (e.g. derived from the conversation turn) and reuse that same idem_key if you retry the same confirm call — don't generate a new one on retry. Only use a different idem_key when the user genuinely means a new, separate blast or bid.
 
 Segmented N: if update_project refuses because a project's N is segmented, don't try to work around it — tell the user to edit the segment breakdown in the app.
 
@@ -603,6 +605,13 @@ const handler = createMcpHandler(
             return { error: "This project's N is segmented — edit the segments in the app." }
           }
           if ('client' in patch) patch.client = normalizeClientText(String(patch.client))
+          if ('latest_next_steps' in patch) {
+            patch.latest_next_steps = autoStamp(
+              userEmail.split('@')[0],
+              p.latest_next_steps as string | null,
+              String(patch.latest_next_steps)
+            )
+          }
 
           const changed = diffSummary(p, patch)
           return confirmable(
@@ -1227,7 +1236,7 @@ const handler = createMcpHandler(
           if ('ambiguous' in c) return { note: 'Multiple clients match — specify the client code.', candidates: c.ambiguous }
           meta.client_id = c.id as string
 
-          const contact = await resolveContact(c.id as string, args.contact_ref)
+          const contact = await resolveContact(c.id as string, args.contact_ref, true)
           if (!contact) return { error: `No contact found matching "${args.contact_ref}" for this client.` }
           if ('ambiguous' in contact) return { note: 'Multiple contacts match — be more specific.', candidates: contact.ambiguous }
 
@@ -1287,7 +1296,7 @@ const handler = createMcpHandler(
       {
         project_name: z.string(),
         client: z.string(),
-        project_type: z.enum(['PS', 'B2B', 'Rerun', 'Internal']).optional(),
+        project_type: z.enum(['PS', 'B2B', 'Rerun']).optional(),
         captain: z.string().optional(),
         salesperson: z.string().optional(),
         due_date: z.string().optional(),

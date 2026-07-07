@@ -42,11 +42,13 @@ export function stageColumnsFor(opts: { toColumn?: BoardColumn; markDelivered?: 
   return { board_column: col, ...getCheckboxesForColumn(col) }
 }
 
-/** {field:[old,new]} for only the fields whose value changed. */
+/** {field:[old,new]} for only the fields whose value changed. Value-aware (JSON-compared) so
+ *  array fields like co_captain_ids/linked_documents don't always show as "changed" due to
+ *  reference inequality. */
 export function diffSummary(before: Patch, patch: Patch): Record<string, [unknown, unknown]> {
   const out: Record<string, [unknown, unknown]> = {}
   for (const k of Object.keys(patch)) {
-    if ((before[k] ?? null) !== (patch[k] ?? null)) out[k] = [before[k] ?? null, patch[k] ?? null]
+    if (JSON.stringify(before[k] ?? null) !== JSON.stringify(patch[k] ?? null)) out[k] = [before[k] ?? null, patch[k] ?? null]
   }
   return out
 }
@@ -148,16 +150,19 @@ export async function resolveStep(
 }
 
 /** Resolve a contact within a client: exact id match, else a case-insensitive match on
- *  "First Last" or email. Archived contacts are excluded. 0 -> null, 1 -> row, >1 -> ambiguous. */
+ *  "First Last" or email. Archived contacts are excluded by default — pass includeArchived:true
+ *  (e.g. to let archive_contact find an already-archived contact so it can restore it).
+ *  0 -> null, 1 -> row, >1 -> ambiguous. */
 export async function resolveContact(
-  clientId: string, ref: string
+  clientId: string, ref: string, includeArchived = false
 ): Promise<Row | { ambiguous: Candidate[] } | null> {
   const supabase = createAdminClient()
-  const { data, error } = await supabase
+  let q = supabase
     .from('client_contacts')
     .select('*')
     .eq('client_id', clientId)
-    .eq('archived', false)
+  if (!includeArchived) q = q.eq('archived', false)
+  const { data, error } = await q
   if (error) throw error
   const rows = (data ?? []) as unknown as Row[]
 
