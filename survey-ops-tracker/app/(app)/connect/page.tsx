@@ -126,6 +126,22 @@ export default async function ConnectPage() {
       </div>
 
       <div className={card}>
+        <h3 className={heading}>What you can ask</h3>
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          <strong className="text-foreground">Do:</strong> &quot;Log a 500-count blast on
+          PR00123&quot; · &quot;Push PR00119&apos;s due date to next Friday&quot; · &quot;Create
+          a B2B project for Coatue, 500 responses, due July 20&quot;. Every change or new record
+          gets previewed before anything writes — nothing changes silently, and it can&apos;t
+          bypass a compliance gate, touch internal projects, delete, or merge.
+        </p>
+        <p className="text-sm text-muted-foreground leading-relaxed mt-2">
+          <strong className="text-foreground">Recall:</strong> &quot;What did we do last time
+          for Coatue?&quot; · &quot;What&apos;s overdue for me?&quot; Corrections to a logged
+          blast or bid happen in the app, not here.
+        </p>
+      </div>
+
+      <div className={card}>
         <h3 className={heading}>Active connections</h3>
         {connections.length === 0 ? (
           <p className="text-xs text-muted-foreground/50">No Claudes connected yet.</p>

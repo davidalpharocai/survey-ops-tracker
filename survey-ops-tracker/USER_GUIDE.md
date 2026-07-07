@@ -226,6 +226,31 @@ project data the same way the in-app Assistant does, plus your personal reminder
 **Reminders:** anything you set through Claude shows up as an emailed reminder on the morning
 it's due — nothing to check manually.
 
+### What you can ask Claude to do & recall
+
+Beyond reading, Claude can now make changes and pull up history for you — still only with your
+**@alpharoc.ai analyst account**.
+
+**Things you can ask it to do:** *"Log a 500-count blast on PR00123"* · *"Push PR00119's due date
+to next Friday"* · *"Mark the questionnaire next-step done on the Coatue tracker"* · *"Create a
+B2B project for Coatue, 500 responses, due July 20"* · *"Add Jane Smith as a contact at
+Meridian."*
+
+- **Nothing changes silently.** Any ask that would change or create a record gets a preview
+  first — the exact fields, old → new — and Claude waits for your explicit OK before it writes
+  anything.
+- **It can't get around the rules.** A compliance gate stops it the same way it stops the app —
+  it'll tell you and ask for an override reason rather than push through. It also can't touch
+  **internal projects**, and it can't **delete** or **merge** anything.
+
+**Things you can ask it to recall:** *"What did we do last time for Coatue?"* · *"What's overdue
+for me?"* · *"How did last quarter's wave compare?"* If you ask what questions were asked last
+time, Claude hands the linked questionnaire doc over to your Drive connector rather than guess
+at the content.
+
+**Corrections:** if a logged blast or bid needs fixing, do that in the app — Claude can log new
+ones but won't edit or delete an existing entry.
+
 **Revoking access:** the Connect page lists every Claude currently connected (device/client name,
 when it connected, when it was last used) with a **Revoke** button — click it to sign that Claude
 out immediately; it'll need to log in again to reconnect.
