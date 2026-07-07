@@ -2,6 +2,7 @@ import 'server-only'
 import { Resend } from 'resend'
 import nodemailer, { type Transporter } from 'nodemailer'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { logSystemEvent } from '@/lib/server/observability'
 
 export type SendArgs = {
   to: string
@@ -66,12 +67,22 @@ export async function sendAndLog(args: SendArgs): Promise<boolean> {
         // Log insert failure is non-fatal — swallow silently.
       }
       return true
-    } catch {
+    } catch (err) {
+      // Capture WHY the SMTP send failed — this used to be swallowed, leaving
+      // "reminders don't email" undiagnosable. Surface it in system_events (which
+      // the daily digest's health line reads) and the function logs.
+      const detail = err instanceof Error ? err.message : String(err)
+      console.error('SMTP send failed:', detail)
       try {
         await admin.from('notification_log').insert({
           submission_id: args.submissionId,
           recipient_email: args.to,
           template: `${args.template}:failed`,
+        })
+        await logSystemEvent({
+          source: 'email',
+          status: 'error',
+          detail: `SMTP send to ${args.to} failed: ${detail}`.slice(0, 500),
         })
       } catch {
         // Log insert failure is non-fatal — swallow silently.
