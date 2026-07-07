@@ -31,7 +31,12 @@ function lineFor(item: ReplyItem, queueUrl: string): string {
   if (item.status === 'duplicate') {
     return `<li>${icon} ${name} → Already filed — skipped</li>`
   }
-  return `<li>${icon} ${name} → Needs a quick review — <a href="${esc(queueUrl)}">open the queue</a></li>`
+  // review — surface the system's best guess (most emails have no PR code, so this is the common case)
+  const guess = item.clientName && item.projectLabel
+    ? `${item.clientName} → ${item.projectLabel}`
+    : item.projectLabel || item.clientName || null
+  const guessText = guess ? ` — best guess: <strong>${esc(guess)}</strong>` : ` — couldn't auto-match it`
+  return `<li>${icon} ${name} → Needs a quick review${guessText}. <a href="${esc(queueUrl)}">Confirm or pick a project</a></li>`
 }
 
 export function renderReplyHtml(summary: ReplySummary): string {

@@ -55,4 +55,16 @@ describe('renderReplyHtml', () => {
     })
     expect(html.toLowerCase()).toContain('already filed')
   })
+  it('surfaces the best guess in a needs-review line when the matcher had one', () => {
+    const html = renderReplyHtml({
+      queueUrl: 'https://app.example.com/deliverables',
+      items: [{ name: 'topline.pdf', status: 'review', clientName: 'Coatue', projectLabel: 'B2B Tracker (PR00003)' }],
+    })
+    expect(html).toContain('best guess')
+    expect(html).toContain('Coatue → B2B Tracker (PR00003)')
+  })
+  it('says it could not auto-match when there is no guess', () => {
+    const html = renderReplyHtml(reviewSummary)
+    expect(html.toLowerCase()).toContain("couldn't auto-match")
+  })
 })
