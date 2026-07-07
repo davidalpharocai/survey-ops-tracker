@@ -1,13 +1,21 @@
 import { createMcpHandler, experimental_withMcpAuth as withMcpAuth } from 'mcp-handler'
+import { randomUUID } from 'crypto'
 import { z } from 'zod'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { isAllowedEmail } from '@/lib/utils/allowedDomain'
 import { findAccessToken, revokeTokenById } from '@/lib/oauth/store'
 import { baseUrl } from '@/lib/oauth/http'
+import { getCheckboxesForColumn, STAGE_ORDER, type BoardColumn } from '@/lib/utils/stage'
+import { complianceGate } from '@/lib/utils/compliance'
+import { autoStamp } from '@/lib/utils/date'
+import { normalizeClientText } from '@/lib/utils/clientName'
+import { blastTotal } from '@/lib/utils/blast'
 import type { Database, Json } from '@/lib/supabase/types'
 import * as data from '@/lib/mcp/data'
 import {
-  resolveProjectWritable, resolveStep, runAddStep, runCompleteStep, runEditStep, runProjectWrite,
+  resolveProjectWritable, resolveStep, resolveContact, loadGateInput,
+  runAddStep, runCompleteStep, runEditStep, runProjectWrite, runSetBidBudget, runLogBlast,
+  pickProjectPatch, diffSummary, stageColumnsFor,
 } from '@/lib/mcp/writes'
 
 export const maxDuration = 60
@@ -111,6 +119,30 @@ async function confirmable<P, C>(
 ): Promise<{ preview: P } | C> {
   if (args.confirm !== true) return { preview: await previewFn() }
   return commitFn()
+}
+
+/** "n_target" -> "N target" — a generic, good-enough label for a diff line. */
+function fieldLabel(field: string): string {
+  const s = field.replace(/_/g, ' ')
+  return s.charAt(0).toUpperCase() + s.slice(1)
+}
+
+function fmtChangeVal(v: unknown): string {
+  return v === null || v === undefined || v === '' ? '—' : String(v)
+}
+
+/** {field:[old,new]} -> "N target 500 → 900; Due date 2026-07-01 → 2026-07-20". */
+function describeChanges(changed: Record<string, [unknown, unknown]>): string {
+  const entries = Object.entries(changed)
+  if (entries.length === 0) return 'No changes.'
+  return entries
+    .map(([field, [oldV, newV]]) => `${fieldLabel(field)} ${fmtChangeVal(oldV)} → ${fmtChangeVal(newV)}`)
+    .join('; ')
+}
+
+/** Today's date (YYYY-MM-DD) in the team's local timezone — matches the reminders-due cron. */
+function todayEastern(): string {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' })
 }
 
 /** Best-effort document title lookup via the app's own /api/doc-title (Drive API, else a public scrape). */
@@ -463,6 +495,197 @@ const handler = createMcpHandler(
               if ('error' in result) return result
               meta.detail = { added: { name, url: args.url } }
               return { ok: true, linked_documents: result.linked_documents }
+            }
+          )
+        }, meta))
+      }
+    )
+
+    // -------- write tools: field edits (preview-then-confirm) --------
+
+    server.tool(
+      'update_project',
+      "Update a project's fields (preview first; confirm to apply).",
+      {
+        project: z.string(),
+        fields: z.record(z.unknown()),
+        confirm: z.boolean().optional(),
+        expected_updated_at: z.string().optional(),
+      },
+      async (args, extra) => {
+        const meta: LoggedMeta = {}
+        return json(await logged(extra, 'update_project', async () => {
+          const { userEmail } = authIdentity(extra)
+          const p = await resolveProjectWritable(args.project)
+          if (!p) return { error: 'Project not found.' }
+          if ('error' in p) return p
+          if ('ambiguous' in p) return p
+          meta.project_id = p.id as string
+
+          const { patch, rejected } = pickProjectPatch(args.fields)
+          if (rejected.length) {
+            return {
+              error: `These fields can't be set here: ${rejected.join(', ')}. Use the dedicated tools for status, stage, compliance override, requested-by, or linked documents.`,
+            }
+          }
+          if (
+            ('n_target' in patch || 'n_collected' in patch || 'n_actual' in patch) &&
+            ((p.segment_count as number | null) ?? 0) > 0
+          ) {
+            return { error: "This project's N is segmented — edit the segments in the app." }
+          }
+          if ('client' in patch) patch.client = normalizeClientText(String(patch.client))
+
+          const changed = diffSummary(p, patch)
+          return confirmable(
+            args,
+            async () => ({
+              project_code: p.project_code,
+              changed,
+              summary: describeChanges(changed),
+              updated_at: p.updated_at,
+            }),
+            async () => {
+              const supabase = createAdminClient()
+              const result = await runProjectWrite(supabase, {
+                id: p.id as string,
+                patch,
+                actor: `${userEmail} via Claude`,
+                expectedUpdatedAt: args.expected_updated_at,
+              })
+              if ('error' in result) return result
+              meta.detail = { changed }
+              return { ok: true, project_code: result.project_code, changed }
+            }
+          )
+        }, meta))
+      }
+    )
+
+    server.tool(
+      'set_requested_by',
+      "Set who requested a project, from among the project's client's contacts (preview first; confirm to apply).",
+      { project: z.string(), contact_ref: z.string(), confirm: z.boolean().optional() },
+      async (args, extra) => {
+        const meta: LoggedMeta = {}
+        return json(await logged(extra, 'set_requested_by', async () => {
+          const { userEmail } = authIdentity(extra)
+          const p = await resolveProjectWritable(args.project)
+          if (!p) return { error: 'Project not found.' }
+          if ('error' in p) return p
+          if ('ambiguous' in p) return p
+          meta.project_id = p.id as string
+
+          const clientId = p.client_id as string | null
+          if (!clientId) return { error: 'This project has no linked client yet — cannot set requested-by.' }
+
+          const contact = await resolveContact(clientId, args.contact_ref)
+          if (!contact) return { error: `No contact found matching "${args.contact_ref}" for this project's client.` }
+          if ('ambiguous' in contact) {
+            return { note: 'Multiple contacts match — be more specific.', candidates: contact.ambiguous }
+          }
+          const name = `${String(contact.first_name)} ${String(contact.last_name)}`
+
+          return confirmable(
+            args,
+            async () => ({ summary: `Requested by → ${name}`, contact_id: contact.id, name, updated_at: p.updated_at }),
+            async () => {
+              const supabase = createAdminClient()
+              const result = await runProjectWrite(supabase, {
+                id: p.id as string,
+                patch: { requested_by_contact_id: contact.id as string, requested_by_name: name },
+                actor: `${userEmail} via Claude`,
+              })
+              if ('error' in result) return result
+              meta.detail = { requested_by: { contact_id: contact.id, name } }
+              return { ok: true, project_code: result.project_code, requested_by_name: result.requested_by_name }
+            }
+          )
+        }, meta))
+      }
+    )
+
+    server.tool(
+      'set_bid_budget',
+      'Log a new allowed $/bid for a project — the most recent entry is the current bid budget (preview first; confirm to apply).',
+      {
+        project: z.string(),
+        amount: z.number().positive(),
+        note: z.string().max(1000).optional(),
+        confirm: z.boolean().optional(),
+        idem_key: z.string().optional(),
+      },
+      async (args, extra) => {
+        const meta: LoggedMeta = {}
+        return json(await logged(extra, 'set_bid_budget', async () => {
+          const { userEmail } = authIdentity(extra)
+          const p = await resolveProjectWritable(args.project)
+          if (!p) return { error: 'Project not found.' }
+          if ('error' in p) return p
+          if ('ambiguous' in p) return p
+          meta.project_id = p.id as string
+
+          return confirmable(
+            args,
+            async () => ({
+              summary: `New bid budget: $${args.amount}${args.note ? ` (${args.note})` : ''}`,
+              amount: args.amount, note: args.note ?? null,
+            }),
+            async () => {
+              const row = await runSetBidBudget({
+                projectId: p.id as string, amount: args.amount, note: args.note ?? null,
+                createdBy: userEmail.split('@')[0], idemKey: args.idem_key ?? randomUUID(),
+                actor: `${userEmail} via Claude`,
+              })
+              meta.detail = { created: { id: row.id, amount: row.amount, note: row.note } }
+              return { ok: true, bid: { id: row.id, amount: row.amount, note: row.note } }
+            }
+          )
+        }, meta))
+      }
+    )
+
+    server.tool(
+      'log_blast',
+      'Log a blast send (# delivered, $/bid used, fixed blast fee) against a project (preview first; confirm to apply).',
+      {
+        project: z.string(),
+        delivered: z.number().int().min(0),
+        bid: z.number().min(0),
+        blast_cost: z.number().min(0),
+        note: z.string().max(1000).optional(),
+        confirm: z.boolean().optional(),
+        idem_key: z.string().optional(),
+      },
+      async (args, extra) => {
+        const meta: LoggedMeta = {}
+        return json(await logged(extra, 'log_blast', async () => {
+          const { userEmail } = authIdentity(extra)
+          const p = await resolveProjectWritable(args.project)
+          if (!p) return { error: 'Project not found.' }
+          if ('error' in p) return p
+          if ('ambiguous' in p) return p
+          meta.project_id = p.id as string
+
+          const thisBlastTotal = blastTotal({ delivered: args.delivered, bid: args.bid, blast_cost: args.blast_cost })
+          const currentSpend = (p.actual_spend as number | null) ?? 0
+          const projectedSpend = currentSpend + thisBlastTotal
+
+          return confirmable(
+            args,
+            async () => ({
+              summary: `Log blast: ${args.delivered} delivered @ $${args.bid} + $${args.blast_cost} blast fee → projected spend $${projectedSpend}`,
+              delivered: args.delivered, bid: args.bid, blast_cost: args.blast_cost,
+              projected_actual_spend: projectedSpend,
+            }),
+            async () => {
+              const row = await runLogBlast({
+                projectId: p.id as string, delivered: args.delivered, bid: args.bid, blastCost: args.blast_cost,
+                note: args.note ?? null, createdBy: userEmail.split('@')[0], idemKey: args.idem_key ?? randomUUID(),
+                actor: `${userEmail} via Claude`,
+              })
+              meta.detail = { created: { id: row.id, delivered: row.delivered, bid: row.bid, blast_cost: row.blast_cost } }
+              return { ok: true, blast: { id: row.id, delivered: row.delivered, bid: row.bid, blast_cost: row.blast_cost } }
             }
           )
         }, meta))
