@@ -165,11 +165,15 @@ const handler = createMcpHandler(
     server.tool(
       'create_reminder',
       'Create a personal reminder, optionally linked to a project. due_date must be YYYY-MM-DD.',
-      { text: z.string(), due_date: z.string(), project: z.string().optional() },
+      { text: z.string().min(1).max(500), due_date: z.string(), project: z.string().optional() },
       async (args, extra) => json(await logged(extra, 'create_reminder', async () => {
         const { userId, userEmail } = authIdentity(extra)
         if (!DUE_DATE_RE.test(args.due_date)) {
           return { error: 'due_date must be in YYYY-MM-DD format.' }
+        }
+        const d = new Date(args.due_date + 'T00:00:00Z')
+        if (d.toISOString().slice(0, 10) !== args.due_date) {
+          return { error: 'due_date must be a valid date (YYYY-MM-DD).' }
         }
         let projectId: string | null = null
         if (args.project) {
@@ -248,8 +252,11 @@ const authed = withMcpAuth(
     if (!row) return undefined
     // LIVE gate: never trust the denormalized snapshot on the token row.
     const admin = createAdminClient()
-    const { data: profile } = await admin.from('profiles')
+    const { data: profile, error } = await admin.from('profiles')
       .select('role, email').eq('id', row.user_id).maybeSingle()
+    // A transient DB failure is not proof the user is gone — fail this request closed
+    // (401) WITHOUT revoking, so a blip doesn't force a re-login.
+    if (error) return undefined
     if (!profile || profile.role !== 'analyst' || !isAllowedEmail(profile.email)) {
       await revokeTokenById(row.id)
       return undefined

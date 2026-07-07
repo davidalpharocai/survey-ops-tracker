@@ -30,6 +30,7 @@ create table public.oauth_tokens (
   refresh_expires_at timestamptz not null,
   rotated_at timestamptz,
   replaced_by uuid,
+  grace_used boolean not null default false,
   revoked_at timestamptz,
   last_used_at timestamptz,
   created_at timestamptz not null default now()

@@ -51,9 +51,11 @@ export async function consumeCode(code: string) {
     .select().maybeSingle()
   if (data) return data
   // Reuse of a consumed code is a theft signal: revoke tokens issued to that user+client.
-  const { data: burnt } = await supabase.from('oauth_codes').select('user_id, client_id')
+  // A merely-expired-but-never-consumed code is NOT a theft signal — only act when
+  // the code was actually consumed before (consumed_at is non-null).
+  const { data: burnt } = await supabase.from('oauth_codes').select('user_id, client_id, consumed_at')
     .eq('code_hash', hash).maybeSingle()
-  if (burnt) {
+  if (burnt && burnt.consumed_at) {
     await supabase.from('oauth_tokens')
       .update({ revoked_at: new Date().toISOString() })
       .eq('user_id', burnt.user_id).eq('client_id', burnt.client_id).is('revoked_at', null)
@@ -100,7 +102,7 @@ export async function exchangeRefresh(refreshToken: string): Promise<TokenPair |
         .eq('user_id', row.user_id).eq('client_id', row.client_id).is('revoked_at', null)
       return null
     }
-    return mint(row) // grace retry: fresh pair, family stays alive
+    return claimGraceAndMint(row) // grace retry: one-shot, fresh pair, family stays alive
   }
 
   // First use: atomically claim the rotation (guards concurrent refreshes).
@@ -110,17 +112,33 @@ export async function exchangeRefresh(refreshToken: string): Promise<TokenPair |
     .select().maybeSingle()
   if (!claimed) {
     // Lost the race — treat like a grace retry.
-    return mint(row)
+    return claimGraceAndMint(row)
   }
   const pair = await mint(claimed)
   return pair
+
+  /** One-shot grace claim: atomically flips grace_used so only one retry ever mints. */
+  async function claimGraceAndMint(from: { id: string; client_id: string; user_id: string; user_email: string }): Promise<TokenPair | null> {
+    const { data: claimed } = await supabase.from('oauth_tokens')
+      .update({ grace_used: true })
+      .eq('id', from.id).eq('grace_used', false)
+      .select().maybeSingle()
+    if (!claimed) return null // already used the one-shot retry: invalid_grant
+    return mint(claimed)
+  }
 
   async function mint(from: { client_id: string; user_id: string; user_email: string; id: string }): Promise<TokenPair> {
     const pair2 = await issueTokens({ clientId: from.client_id, userId: from.user_id, userEmail: from.user_email })
     const { data: newRow } = await supabase.from('oauth_tokens').select('id')
       .eq('token_hash', sha256(pair2.accessToken)).maybeSingle()
     if (newRow) {
-      await supabase.from('oauth_tokens').update({ replaced_by: newRow.id }).eq('id', from.id)
+      // Retire the superseded row's ACCESS token by expiring it (findAccessToken's
+      // gt('expires_at', now) filter then excludes it) WITHOUT setting revoked_at —
+      // the grace-retry path above keys off revoked_at to detect a dead family, and
+      // rotation alone must not trip that.
+      await supabase.from('oauth_tokens')
+        .update({ replaced_by: newRow.id, expires_at: new Date().toISOString() })
+        .eq('id', from.id)
     }
     return pair2
   }
@@ -140,10 +158,15 @@ export async function findAccessToken(accessToken: string) {
   return data
 }
 
+/** User-initiated revoke from the Connect page: kills the WHOLE token family (client_id + user_id),
+ *  including any pre-rotation access tokens still floating around, not just the one row shown in the UI. */
 export async function revokeToken(id: string, userId: string): Promise<void> {
   const supabase = createAdminClient()
+  const { data: row } = await supabase.from('oauth_tokens').select('client_id')
+    .eq('id', id).eq('user_id', userId).maybeSingle()
+  if (!row) return
   await supabase.from('oauth_tokens').update({ revoked_at: new Date().toISOString() })
-    .eq('id', id).eq('user_id', userId)
+    .eq('user_id', userId).eq('client_id', row.client_id).is('revoked_at', null)
 }
 
 export async function revokeTokenById(id: string): Promise<void> {

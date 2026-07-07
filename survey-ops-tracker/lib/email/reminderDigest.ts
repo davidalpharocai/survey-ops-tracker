@@ -7,7 +7,7 @@ export type ReminderRow = {
   user_email: string
   text: string
   due_date: string // YYYY-MM-DD
-  survey_projects: { project_code: string; project_name: string } | null
+  survey_projects: { project_code: string | null; project_name: string } | null
 }
 
 export type UserDigest = {
@@ -38,8 +38,10 @@ export function groupByUser(rows: ReminderRow[]): Map<string, ReminderRow[]> {
 /** Build the subject + HTML body for one user's digest email. */
 export function buildDigest(userEmail: string, rows: ReminderRow[]): UserDigest {
   const lines = rows.map(r => {
+    // Project fields are HTML-escaped like the reminder text; project_code can be
+    // null for projects that haven't been assigned a PR-code yet.
     const project = r.survey_projects
-      ? ` — <a href="https://survey-ops-tracker.vercel.app">${r.survey_projects.project_code} ${r.survey_projects.project_name}</a>`
+      ? ` — <a href="https://survey-ops-tracker.vercel.app">${r.survey_projects.project_code ? escapeHtml(r.survey_projects.project_code) + ' ' : ''}${escapeHtml(r.survey_projects.project_name)}</a>`
       : ''
     return `<li>${escapeHtml(r.text)} — due ${fmtDue(r.due_date)}${project}</li>`
   })

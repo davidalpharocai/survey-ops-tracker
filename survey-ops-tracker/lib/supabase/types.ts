@@ -1018,6 +1018,7 @@ export type Database = {
           refresh_expires_at: string
           rotated_at: string | null
           replaced_by: string | null
+          grace_used: boolean
           revoked_at: string | null
           last_used_at: string | null
           created_at: string
@@ -1034,6 +1035,7 @@ export type Database = {
           refresh_expires_at: string
           rotated_at?: string | null
           replaced_by?: string | null
+          grace_used?: boolean
           revoked_at?: string | null
           last_used_at?: string | null
           created_at?: string
@@ -1050,6 +1052,7 @@ export type Database = {
           refresh_expires_at?: string
           rotated_at?: string | null
           replaced_by?: string | null
+          grace_used?: boolean
           revoked_at?: string | null
           last_used_at?: string | null
           created_at?: string

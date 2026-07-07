@@ -76,5 +76,30 @@ export async function GET(req: NextRequest) {
   if (groups.size > 0 && failed === 0) {
     await logSystemEvent({ source: 'reminders-due', status: 'ok', detail: `Sent ${sent} reminder digest(s).` })
   }
+
+  // Best-effort OAuth housekeeping (spec's 30-day rule), piggybacked on this daily
+  // cron: expired auth codes and never-used registered clients accumulate otherwise.
+  // Must never affect the reminders response — tables may not even exist pre-045.
+  try {
+    const dayAgo = new Date(Date.now() - 86_400_000).toISOString()
+    await supabase.from('oauth_codes').delete().lt('expires_at', dayAgo)
+
+    const monthAgo = new Date(Date.now() - 30 * 86_400_000).toISOString()
+    const { data: staleClients } = await supabase
+      .from('oauth_clients').select('id').lt('created_at', monthAgo)
+    if (staleClients && staleClients.length > 0) {
+      const ids = staleClients.map(c => c.id)
+      const { data: used } = await supabase
+        .from('oauth_tokens').select('client_id').in('client_id', ids)
+      const usedIds = new Set((used ?? []).map(t => t.client_id))
+      const orphans = ids.filter(id => !usedIds.has(id))
+      if (orphans.length > 0) {
+        await supabase.from('oauth_clients').delete().in('id', orphans)
+      }
+    }
+  } catch {
+    /* housekeeping is best-effort */
+  }
+
   return Response.json(result)
 }

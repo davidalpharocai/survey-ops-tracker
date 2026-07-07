@@ -14,16 +14,22 @@ describe('decodeSurveyId', () => {
   const initials = ['AL', 'SR', 'JC']
   it('parses owner + abbreviation + date + region', () => {
     expect(decodeSurveyId('ALBNFOF20260529UK', initials)).toEqual({
-      owner: 'AL', abbreviation: 'BNFOF', date: '2026-05-29', region: 'UK',
+      owner: 'AL', abbreviation: 'BNFOF', date: '2026-05-29', region: 'UK', note: null,
     })
   })
   it('handles no region and unknown owner', () => {
     expect(decodeSurveyId('SRACME20260601', initials)).toEqual({
-      owner: 'SR', abbreviation: 'ACME', date: '2026-06-01', region: null,
+      owner: 'SR', abbreviation: 'ACME', date: '2026-06-01', region: null, note: null,
     })
     const r = decodeSurveyId('ZZACME20260601', initials)
     expect(r?.owner).toBeNull()
     expect(r?.abbreviation).toBe('ZZACME')
+    expect(r?.note).toBe('owner initials not recognized')
+  })
+  it('parses abbreviations containing digits', () => {
+    expect(decodeSurveyId('ALB2B20260529US', ['AL'])).toEqual({
+      owner: 'AL', abbreviation: 'B2B', date: '2026-05-29', region: 'US', note: null,
+    })
   })
   it('returns null when no date anchor', () => {
     expect(decodeSurveyId('NODATEHERE', initials)).toBeNull()

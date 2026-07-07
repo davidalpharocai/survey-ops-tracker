@@ -61,4 +61,17 @@ describe('buildDigest', () => {
     expect(digest.html).not.toContain('<script>')
     expect(digest.html).toContain('&lt;script&gt;')
   })
+
+  it('escapes project fields and tolerates a null project_code', () => {
+    const rows = [
+      row({
+        id: '1',
+        survey_projects: { project_code: null, project_name: 'R&D <Panel> study' },
+      }),
+    ]
+    const digest = buildDigest('a@alpharoc.ai', rows)
+    expect(digest.html).toContain('R&amp;D &lt;Panel&gt; study')
+    expect(digest.html).not.toContain('null')
+    expect(digest.html).not.toContain('<Panel>')
+  })
 })

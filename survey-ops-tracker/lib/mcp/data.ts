@@ -5,15 +5,19 @@ import { beforeFieldingRequired, afterFieldingRequired, beforeFieldingMet, after
 
 /** Tool args are user-controlled: strip PostgREST-reserved chars, escape LIKE wildcards, cap length. */
 export function sanitizeQuery(q: string): string {
+  // Slice to length BEFORE escaping wildcards: escaping first could truncate mid-escape
+  // and leave a dangling backslash that breaks the LIKE pattern.
   return q.replace(/[,().]/g, ' ').replace(/\s+/g, ' ').trim()
-    .replace(/([%_\\])/g, '\\$1').slice(0, 100)
+    .slice(0, 100).replace(/([%_\\])/g, '\\$1')
 }
 
 /** [owner initials][client+project abbrev][YYYYMMDD][region?] — anchor on the 8-digit date. */
 export function decodeSurveyId(
   id: string, teamInitials: string[]
-): { owner: string | null; abbreviation: string; date: string; region: string | null } | null {
-  const m = id.toUpperCase().match(/^([A-Z]+)(\d{8})([A-Z]*)$/)
+): { owner: string | null; abbreviation: string; date: string; region: string | null; note: string | null } | null {
+  // Lazy prefix so an abbreviation containing digits (e.g. "B2B") still parses —
+  // the anchor is the first run of 8 consecutive digits (the YYYYMMDD).
+  const m = id.toUpperCase().match(/^(.+?)(\d{8})([A-Z]*)$/)
   if (!m) return null
   const [, prefix, ymd, region] = m
   const date = `${ymd.slice(0, 4)}-${ymd.slice(4, 6)}-${ymd.slice(6, 8)}`
@@ -25,6 +29,7 @@ export function decodeSurveyId(
     abbreviation: owner ? prefix.slice(owner.length) : prefix,
     date,
     region: region || null,
+    note: owner ? null : 'owner initials not recognized',
   }
 }
 
@@ -69,8 +74,11 @@ export async function searchProjects(args: {
   if (args.phase) q = q.eq('phase', args.phase as never)
   if (args.due_before) q = q.lte('due_date', args.due_before)
   if (args.due_after) q = q.gte('due_date', args.due_after)
-  const { data, error } = await q.order('due_date', { ascending: true, nullsFirst: false })
-    .limit(Math.min(args.limit ?? 20, 50))
+  q = q.order('due_date', { ascending: true, nullsFirst: false })
+  // When filtering by captain, the SQL limit would cap the pre-filter set and could
+  // drop matches — fetch all matching rows, filter in JS, THEN slice to the limit.
+  if (!args.captain) q = q.limit(Math.min(args.limit ?? 20, 50))
+  const { data, error } = await q
   if (error) throw error
   let rows = (data ?? []) as unknown as Row[]
   if (args.captain) {
@@ -79,6 +87,7 @@ export async function searchProjects(args: {
       const cap = r.captain as { name?: string; initials?: string } | null
       return cap?.name?.toLowerCase().includes(c) || cap?.initials?.toLowerCase() === c
     })
+    rows = rows.slice(0, Math.min(args.limit ?? 20, 50))
   }
   return rows
 }
@@ -93,7 +102,7 @@ export async function resolveProject(
   const byCode = await supabase.from('survey_projects')
     .select('*, captain:team_members(name, initials)')
     .is('deleted_at', null)
-    .ilike('project_code', ref.trim())
+    .ilike('project_code', ref.trim().replace(/([%_\\])/g, '\\$1'))
     .maybeSingle()
   if (byCode.data) return byCode.data as unknown as Row
 
@@ -177,7 +186,7 @@ export async function resolveClient(
   const byCode = await supabase.from('clients')
     .select('*')
     .is('deleted_at', null)
-    .ilike('code', ref.trim())
+    .ilike('code', ref.trim().replace(/([%_\\])/g, '\\$1'))
     .maybeSingle()
   if (byCode.data) return byCode.data as unknown as Row
 
