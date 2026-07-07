@@ -190,7 +190,7 @@ begin
     client             = case when p_patch ? 'client'             then p_patch->>'client' else client end,
     project_type       = case when p_patch ? 'project_type'       then (p_patch->>'project_type')::project_type else project_type end,
     captain_id         = case when p_patch ? 'captain_id'         then nullif(p_patch->>'captain_id','')::uuid else captain_id end,
-    co_captain_ids     = case when p_patch ? 'co_captain_ids'     then (select array_agg(x)::uuid[] from jsonb_array_elements_text(p_patch->'co_captain_ids') x) else co_captain_ids end,
+    co_captain_ids     = case when p_patch ? 'co_captain_ids'     then coalesce((select array_agg(x)::uuid[] from jsonb_array_elements_text(p_patch->'co_captain_ids') x), '{}'::uuid[]) else co_captain_ids end,
     salesperson        = case when p_patch ? 'salesperson'        then p_patch->>'salesperson' else salesperson end,
     priority           = case when p_patch ? 'priority'           then p_patch->>'priority' else priority end,
     blocked_by         = case when p_patch ? 'blocked_by'         then p_patch->>'blocked_by' else blocked_by end,
@@ -323,15 +323,27 @@ begin
   where client_id = p_id and deleted_at is null;
 end $$;
 
--- 6) Grants — service_role invokes these via the connector's server-side
--- Supabase client; authenticated is granted too since the RPCs are the real
--- security boundary (SECURITY DEFINER, whitelisted columns, no dynamic SQL)
--- and re-run their own checks (found/stale_write/idempotent no-op).
-grant execute on function public.mcp_write_project(uuid, jsonb, text, timestamptz) to authenticated, service_role;
-grant execute on function public.mcp_create_project(jsonb, text) to authenticated, service_role;
-grant execute on function public.mcp_add_step(uuid, text, text, text) to authenticated, service_role;
-grant execute on function public.mcp_complete_step(uuid, boolean, text, text) to authenticated, service_role;
-grant execute on function public.mcp_edit_step(uuid, text, text) to authenticated, service_role;
-grant execute on function public.mcp_set_bid_budget(uuid, numeric, text, text, text, text) to authenticated, service_role;
-grant execute on function public.mcp_log_blast(uuid, int, numeric, numeric, text, text, text, text) to authenticated, service_role;
-grant execute on function public.mcp_rename_client(uuid, text, text) to authenticated, service_role;
+-- 6) Grants — SERVICE ROLE ONLY. The connector always invokes these with the
+-- service-role key (createAdminClient); the analyst authorization is enforced in
+-- the app layer (withMcpAuth). These are SECURITY DEFINER (bypass RLS) with NO
+-- in-function role check, so they must NOT be reachable by `authenticated`/`anon`/
+-- PUBLIC — otherwise a compliance-portal user (or any non-analyst holding a
+-- Supabase session) could POST /rest/v1/rpc/mcp_* directly and mutate any record,
+-- bypassing every guardrail. Revoke the default PUBLIC execute, then grant only
+-- service_role.
+revoke execute on function public.mcp_write_project(uuid, jsonb, text, timestamptz) from public, anon, authenticated;
+grant  execute on function public.mcp_write_project(uuid, jsonb, text, timestamptz) to service_role;
+revoke execute on function public.mcp_create_project(jsonb, text) from public, anon, authenticated;
+grant  execute on function public.mcp_create_project(jsonb, text) to service_role;
+revoke execute on function public.mcp_add_step(uuid, text, text, text) from public, anon, authenticated;
+grant  execute on function public.mcp_add_step(uuid, text, text, text) to service_role;
+revoke execute on function public.mcp_complete_step(uuid, boolean, text, text) from public, anon, authenticated;
+grant  execute on function public.mcp_complete_step(uuid, boolean, text, text) to service_role;
+revoke execute on function public.mcp_edit_step(uuid, text, text) from public, anon, authenticated;
+grant  execute on function public.mcp_edit_step(uuid, text, text) to service_role;
+revoke execute on function public.mcp_set_bid_budget(uuid, numeric, text, text, text, text) from public, anon, authenticated;
+grant  execute on function public.mcp_set_bid_budget(uuid, numeric, text, text, text, text) to service_role;
+revoke execute on function public.mcp_log_blast(uuid, int, numeric, numeric, text, text, text, text) from public, anon, authenticated;
+grant  execute on function public.mcp_log_blast(uuid, int, numeric, numeric, text, text, text, text) to service_role;
+revoke execute on function public.mcp_rename_client(uuid, text, text) from public, anon, authenticated;
+grant  execute on function public.mcp_rename_client(uuid, text, text) to service_role;
