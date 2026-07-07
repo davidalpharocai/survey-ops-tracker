@@ -1,9 +1,17 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from '@/lib/utils/toast'
+import { firmNameFrom } from '@/lib/utils/clientName'
 import type { Database } from '@/lib/supabase/types'
 
 export type Client = Database['public']['Tables']['clients']['Row']
+export type NewClientInput = {
+  name: string
+  compliance_before_fielding?: boolean
+  compliance_after_fielding?: boolean
+  compliance_contact?: string | null
+  compliance_notes?: string | null
+}
 
 export function useClients() {
   const supabase = createClient()
@@ -89,6 +97,42 @@ export function useRenameClient() {
       queryClient.invalidateQueries({ queryKey: ['client-projects', id] })
       queryClient.invalidateQueries({ queryKey: ['projects'] })
       queryClient.invalidateQueries({ queryKey: ['internal-projects'] })
+    },
+  })
+}
+
+/**
+ * Create a client directly (the "+ New Client" modal, and any future
+ * pick-or-create pickers). Deliberately does NOT set `code` — migration
+ * 047's `assign_client_code` trigger assigns the next "Cl#####" on insert.
+ * Until that migration is applied, the insert still succeeds; the row just
+ * has a null code until it's applied.
+ */
+export function useCreateClient() {
+  const supabase = createClient()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: NewClientInput) => {
+      const name = firmNameFrom(input.name)
+      const { data, error } = await supabase
+        .from('clients')
+        .insert({
+          name,
+          compliance_before_fielding: input.compliance_before_fielding,
+          compliance_after_fielding: input.compliance_after_fielding,
+          compliance_contact: input.compliance_contact ?? null,
+          compliance_notes: input.compliance_notes ?? null,
+        })
+        .select()
+        .single()
+      if (error) {
+        if (error.code === '23505') throw new Error(`A client named "${name}" already exists.`)
+        throw error
+      }
+      return data as Client
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['clients'] })
     },
   })
 }

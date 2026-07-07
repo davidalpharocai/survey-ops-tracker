@@ -1,6 +1,7 @@
 'use client'
 import { useMemo, useState, useEffect } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useClients } from '@/lib/hooks/useClients'
 import { useProjects } from '@/lib/hooks/useProjects'
 import { useTeamMembers } from '@/lib/hooks/useTeamMembers'
@@ -10,6 +11,7 @@ import { RecentlyDeleted } from '@/components/admin/RecentlyDeleted'
 import { SprintCadence } from '@/components/admin/SprintCadence'
 import { SystemStatus } from '@/components/admin/SystemStatus'
 import { AiUsagePanel } from '@/components/admin/AiUsagePanel'
+import { NewClientModal } from '@/components/client/NewClientModal'
 
 const SUPABASE_PROJECT = 'xcfoyxyxovibltwfydbf'
 
@@ -66,9 +68,11 @@ type AdminTab = (typeof ADMIN_TABS)[number]['key']
 const ADMIN_TAB_KEY = 'sot.adminTab'
 
 export default function AdminPage() {
+  const router = useRouter()
   const { data: projects = [] } = useProjects()
   const { data: clients = [], isLoading: clientsLoading } = useClients()
   const { data: teamMembers = [] } = useTeamMembers()
+  const [showNewClient, setShowNewClient] = useState(false)
 
   // Slim projects carry the contact-level text ("BAM - Jeff Cummings");
   // clients are firm-level, so group by the firm prefix before " - ".
@@ -158,6 +162,7 @@ export default function AdminPage() {
   }
 
   return (
+    <>
     <div className="max-w-5xl mx-auto flex flex-col gap-4">
       <div className="flex items-center gap-3">
         <h1 className="text-2xl font-bold text-foreground">Admin</h1>
@@ -242,10 +247,19 @@ export default function AdminPage() {
         <>
       {/* Accounts */}
       <div className={tile}>
-        <h3 className={heading}>
-          Accounts ({clients.length})
-          <InfoTooltip text="Every approved account with its Cl##### id (same ids as the sheet's Unique Clients tab). Click one for its client page — projects, spend, and history." />
-        </h3>
+        <div className="flex items-center justify-between gap-2 mb-3">
+          <h3 className={`${heading} mb-0`}>
+            Accounts ({clients.length})
+            <InfoTooltip text="Every approved account with its Cl##### id (same ids as the sheet's Unique Clients tab). Click one for its client page — projects, spend, and history." />
+          </h3>
+          <button
+            onClick={() => setShowNewClient(true)}
+            title="Add a new client directly. It gets a Cl##### id automatically."
+            className="text-xs bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg transition-colors shrink-0"
+          >
+            + New Client
+          </button>
+        </div>
         <div className="flex items-center gap-2 mb-3 flex-wrap">
           {([
             { key: 'client' as Bucket, label: 'Clients', count: bucketCounts.client },
@@ -373,6 +387,13 @@ export default function AdminPage() {
         Looking for something else here? Tell Claude — this page is meant to grow.
       </p>
     </div>
+    {showNewClient && (
+      <NewClientModal
+        onClose={() => setShowNewClient(false)}
+        onCreated={created => router.push(`/clients/${created.id}`)}
+      />
+    )}
+    </>
   )
 }
 
