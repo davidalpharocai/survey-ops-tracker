@@ -75,15 +75,15 @@ describe('ingestEmail', () => {
     expect(rows).toHaveLength(0)
   })
 
-  it('files a Google-native link-only email as a shortcut', async () => {
+  it('ignores a link-only email — links are not auto-filed (attachments only)', async () => {
     const drive = new FakeDrive('root')
     const { deps, rows } = makeDeps(drive)
     const out = await ingestEmail({
       ...pdfPayload, messageId: 'msg-4', attachments: [],
       body: 'Here is the dashboard: https://docs.google.com/spreadsheets/d/abc/edit',
     }, deps)
-    expect(out.action).toBe('processed')
-    expect(rows[0]).toMatchObject({ kind: 'link', status: 'filed', source_url: 'https://docs.google.com/spreadsheets/d/abc/edit' })
+    expect(out).toEqual({ action: 'ignored', reason: 'no_items' })
+    expect(rows).toHaveLength(0)
   })
 
   it('ignores a non-alpharoc sender (no Drive writes, no persist, no reply)', async () => {
@@ -112,7 +112,7 @@ describe('ingestEmail', () => {
     expect(out).toEqual({ action: 'ignored', reason: 'no_items' })
   })
 
-  it('files multiple items from one email into the same folder', async () => {
+  it('files multiple attachments from one email into the same folder (ignoring any body link)', async () => {
     const drive = new FakeDrive('root')
     const { deps, rows } = makeDeps(drive)
     const out = await ingestEmail({
@@ -123,8 +123,8 @@ describe('ingestEmail', () => {
       ],
       body: 'See attached, plus https://docs.google.com/spreadsheets/d/zzz/edit',
     }, deps)
-    expect(out).toEqual({ action: 'processed', filed: 3, queued: 0, duplicates: 0 })
-    expect(rows).toHaveLength(3)
+    expect(out).toEqual({ action: 'processed', filed: 2, queued: 0, duplicates: 0 })
+    expect(rows).toHaveLength(2)
     expect(new Set(rows.map((r) => r.drive_folder_id)).size).toBe(1)
   })
 
