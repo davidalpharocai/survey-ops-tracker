@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { getDueDateStatus, getDueUrgency, formatDate, autoStamp } from '@/lib/utils/date'
+import { getDueDateStatus, getDueUrgency, formatDate, autoStamp, matchesDuePreset } from '@/lib/utils/date'
 
 // Format in *local* time — toISOString() shifts to UTC, which is a different
 // calendar day in the evening/morning depending on the machine's timezone,
@@ -44,6 +44,79 @@ describe('getDueDateStatus', () => {
   })
   it('returns normal for date 10 days from now', () => {
     expect(getDueDateStatus(daysFromNow(10))).toBe('normal')
+  })
+})
+
+describe('matchesDuePreset', () => {
+  it('returns true for every date when preset is null (All)', () => {
+    expect(matchesDuePreset(null, null)).toBe(true)
+    expect(matchesDuePreset(daysFromNow(0), null)).toBe(true)
+    expect(matchesDuePreset('2020-01-01', null)).toBe(true)
+  })
+  it('none matches only null due dates', () => {
+    expect(matchesDuePreset(null, 'none')).toBe(true)
+    expect(matchesDuePreset(daysFromNow(0), 'none')).toBe(false)
+  })
+  it('excludes null due dates from every other preset', () => {
+    for (const preset of ['overdue', 'today', 'tomorrow', 'twodays', 'week', 'month', 'custom']) {
+      expect(matchesDuePreset(null, preset)).toBe(false)
+    }
+  })
+  it('overdue matches strictly before today, not today itself', () => {
+    expect(matchesDuePreset('2020-01-01', 'overdue')).toBe(true)
+    expect(matchesDuePreset(daysFromNow(-1), 'overdue')).toBe(true)
+    expect(matchesDuePreset(daysFromNow(0), 'overdue')).toBe(false)
+  })
+  it('today matches only the current day', () => {
+    expect(matchesDuePreset(daysFromNow(0), 'today')).toBe(true)
+    expect(matchesDuePreset(daysFromNow(-1), 'today')).toBe(false)
+    expect(matchesDuePreset(daysFromNow(1), 'today')).toBe(false)
+  })
+  it('tomorrow matches exactly 1 day out', () => {
+    expect(matchesDuePreset(daysFromNow(1), 'tomorrow')).toBe(true)
+    expect(matchesDuePreset(daysFromNow(0), 'tomorrow')).toBe(false)
+    expect(matchesDuePreset(daysFromNow(2), 'tomorrow')).toBe(false)
+  })
+  it('twodays matches exactly 2 days out', () => {
+    expect(matchesDuePreset(daysFromNow(2), 'twodays')).toBe(true)
+    expect(matchesDuePreset(daysFromNow(1), 'twodays')).toBe(false)
+    expect(matchesDuePreset(daysFromNow(3), 'twodays')).toBe(false)
+  })
+  it('week matches today through 6 days out, inclusive', () => {
+    expect(matchesDuePreset(daysFromNow(0), 'week')).toBe(true)
+    expect(matchesDuePreset(daysFromNow(6), 'week')).toBe(true)
+    expect(matchesDuePreset(daysFromNow(7), 'week')).toBe(false)
+    expect(matchesDuePreset(daysFromNow(-1), 'week')).toBe(false)
+  })
+  it('month matches today through the end of the current calendar month', () => {
+    expect(matchesDuePreset(daysFromNow(0), 'month')).toBe(true)
+    const endOfMonthStr = (() => {
+      const d = new Date()
+      const end = new Date(d.getFullYear(), d.getMonth() + 1, 0)
+      const pad = (x: number) => String(x).padStart(2, '0')
+      return `${end.getFullYear()}-${pad(end.getMonth() + 1)}-${pad(end.getDate())}`
+    })()
+    expect(matchesDuePreset(endOfMonthStr, 'month')).toBe(true)
+    expect(matchesDuePreset(daysFromNow(-1), 'month')).toBe(false)
+  })
+  it('custom range respects both bounds, inclusive', () => {
+    expect(matchesDuePreset(daysFromNow(5), 'custom', daysFromNow(3), daysFromNow(7))).toBe(true)
+    expect(matchesDuePreset(daysFromNow(3), 'custom', daysFromNow(3), daysFromNow(7))).toBe(true)
+    expect(matchesDuePreset(daysFromNow(7), 'custom', daysFromNow(3), daysFromNow(7))).toBe(true)
+    expect(matchesDuePreset(daysFromNow(2), 'custom', daysFromNow(3), daysFromNow(7))).toBe(false)
+    expect(matchesDuePreset(daysFromNow(8), 'custom', daysFromNow(3), daysFromNow(7))).toBe(false)
+  })
+  it('custom range handles a from-only bound (on/after)', () => {
+    expect(matchesDuePreset(daysFromNow(10), 'custom', daysFromNow(3), null)).toBe(true)
+    expect(matchesDuePreset(daysFromNow(1), 'custom', daysFromNow(3), null)).toBe(false)
+  })
+  it('custom range handles a to-only bound (on/before)', () => {
+    expect(matchesDuePreset(daysFromNow(1), 'custom', null, daysFromNow(3))).toBe(true)
+    expect(matchesDuePreset(daysFromNow(10), 'custom', null, daysFromNow(3))).toBe(false)
+  })
+  it('custom range with neither bound imposes no constraint', () => {
+    expect(matchesDuePreset(daysFromNow(0), 'custom', null, null)).toBe(true)
+    expect(matchesDuePreset('2020-01-01', 'custom', null, null)).toBe(true)
   })
 })
 

@@ -10,7 +10,7 @@ import { useTeamMembers } from '@/lib/hooks/useTeamMembers'
 import { useCurrentMember } from '@/lib/hooks/useCurrentMember'
 import { useViewMode } from '@/lib/hooks/useViewMode'
 import { exportProjectsCsv } from '@/lib/utils/exportCsv'
-import { getDueUrgency } from '@/lib/utils/date'
+import { matchesDuePreset } from '@/lib/utils/date'
 import { isTypingTarget } from '@/lib/utils/keyboard'
 import Link from 'next/link'
 
@@ -24,6 +24,8 @@ interface ListViewConfig {
   captain: string | null
   type: string | null
   due: string | null
+  dueFrom?: string | null
+  dueTo?: string | null
   stage: string | null
   hiddenCols: string[]
   sortField: SortField
@@ -42,6 +44,8 @@ export default function ListView() {
   const [captainFilter, setCaptainFilter] = useState<string | null>(null)
   const [typeFilter, setTypeFilter] = useState<string | null>(null)
   const [dueFilter, setDueFilter] = useState<string | null>(null)
+  const [dueFrom, setDueFrom] = useState<string | null>(null)
+  const [dueTo, setDueTo] = useState<string | null>(null)
   const [stageFilter, setStageFilter] = useState<string | null>(null)
   const [clientFilter, setClientFilter] = useState<string | null>(null)
 
@@ -96,6 +100,8 @@ export default function ListView() {
     setCaptainFilter(c.captain)
     setTypeFilter(c.type)
     setDueFilter(c.due)
+    setDueFrom(c.dueFrom ?? null)
+    setDueTo(c.dueTo ?? null)
     setStageFilter(c.stage)
     const cols = new Set(c.hiddenCols)
     setHiddenCols(cols)
@@ -127,7 +133,7 @@ export default function ListView() {
     )
       return false
     if (typeFilter && p.project_type !== typeFilter) return false
-    if (dueFilter && getDueUrgency(p.due_date) !== dueFilter) return false
+    if (!matchesDuePreset(p.due_date, dueFilter, dueFrom, dueTo)) return false
     if (stageFilter) {
       if (stageFilter === 'Closed') {
         if (p.status !== 'Closed') return false
@@ -198,12 +204,16 @@ export default function ListView() {
           currentMemberId={currentMember?.id ?? null}
           typeFilter={typeFilter}
           dueFilter={dueFilter}
+          dueFrom={dueFrom}
+          dueTo={dueTo}
           stageFilter={stageFilter}
           clientFilter={clientFilter}
           search={search}
           onCaptainChange={setCaptainFilter}
           onTypeChange={setTypeFilter}
           onDueChange={setDueFilter}
+          onDueFromChange={setDueFrom}
+          onDueToChange={setDueTo}
           onStageChange={setStageFilter}
           onClientChange={setClientFilter}
           onSearchChange={setSearch}
@@ -215,6 +225,8 @@ export default function ListView() {
             captain: captainFilter,
             type: typeFilter,
             due: dueFilter,
+            dueFrom,
+            dueTo,
             stage: stageFilter,
             hiddenCols: [...hiddenCols],
             sortField,

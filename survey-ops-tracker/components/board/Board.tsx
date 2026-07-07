@@ -9,7 +9,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useCurrentMember } from '@/lib/hooks/useCurrentMember'
 import { useIsNewForMe } from '@/lib/hooks/useSeenProjects'
 import { STAGE_ORDER, getCheckboxesForColumn, type BoardColumn as BoardColumnType } from '@/lib/utils/stage'
-import { getDueUrgency } from '@/lib/utils/date'
+import { matchesDuePreset } from '@/lib/utils/date'
 import { useComplianceMaps } from '@/lib/hooks/useComplianceState'
 import { complianceGate } from '@/lib/utils/compliance'
 import { toast } from '@/lib/utils/toast'
@@ -46,6 +46,8 @@ export function Board({ projects, teamMembers, onMoveProject, wrapInContext = tr
   const [filterReady, setFilterReady] = useState(false)
   const [typeFilter, setTypeFilter] = useState<string | null>(null)
   const [dueFilter, setDueFilter] = useState<string | null>(null)
+  const [dueFrom, setDueFrom] = useState<string | null>(null)
+  const [dueTo, setDueTo] = useState<string | null>(null)
   const [stageFilter, setStageFilter] = useState<string | null>(null)
   const [clientFilter, setClientFilter] = useState<string | null>(null)
   const [search, setSearch] = useState('')
@@ -84,7 +86,7 @@ export function Board({ projects, teamMembers, onMoveProject, wrapInContext = tr
       )
         return false
       if (typeFilter && p.project_type !== typeFilter) return false
-      if (dueFilter && getDueUrgency(p.due_date) !== dueFilter) return false
+      if (!matchesDuePreset(p.due_date, dueFilter, dueFrom, dueTo)) return false
       if (stageFilter) {
         if (stageFilter === 'Closed') {
           if (p.status !== 'Closed') return false
@@ -107,13 +109,15 @@ export function Board({ projects, teamMembers, onMoveProject, wrapInContext = tr
       }
       return true
     })
-  }, [projects, captainFilter, typeFilter, dueFilter, stageFilter, clientFilter, search])
+  }, [projects, captainFilter, typeFilter, dueFilter, dueFrom, dueTo, stageFilter, clientFilter, search])
 
   const hasActiveFilters = !!(captainFilter || typeFilter || dueFilter || stageFilter || clientFilter || search)
   function clearAllFilters() {
     handleCaptainChange(null)
     setTypeFilter(null)
     setDueFilter(null)
+    setDueFrom(null)
+    setDueTo(null)
     setStageFilter(null)
     setClientFilter(null)
     setSearch('')
@@ -194,12 +198,16 @@ export function Board({ projects, teamMembers, onMoveProject, wrapInContext = tr
     captain: string | null
     type: string | null
     due: string | null
+    dueFrom?: string | null
+    dueTo?: string | null
     stage: string | null
   }
   function applyView(c: BoardViewConfig) {
     handleCaptainChange(c.captain)
     setTypeFilter(c.type)
     setDueFilter(c.due)
+    setDueFrom(c.dueFrom ?? null)
+    setDueTo(c.dueTo ?? null)
     setStageFilter(c.stage)
   }
 
@@ -212,19 +220,23 @@ export function Board({ projects, teamMembers, onMoveProject, wrapInContext = tr
           currentMemberId={currentMember?.id ?? null}
           typeFilter={typeFilter}
           dueFilter={dueFilter}
+          dueFrom={dueFrom}
+          dueTo={dueTo}
           stageFilter={stageFilter}
           clientFilter={clientFilter}
           search={search}
           onCaptainChange={handleCaptainChange}
           onTypeChange={setTypeFilter}
           onDueChange={setDueFilter}
+          onDueFromChange={setDueFrom}
+          onDueToChange={setDueTo}
           onStageChange={setStageFilter}
           onClientChange={setClientFilter}
           onSearchChange={setSearch}
         />
         <SavedViews<BoardViewConfig>
           storageKey="sot.savedViews"
-          current={{ captain: captainFilter, type: typeFilter, due: dueFilter, stage: stageFilter }}
+          current={{ captain: captainFilter, type: typeFilter, due: dueFilter, dueFrom, dueTo, stage: stageFilter }}
           onApply={applyView}
           tooltip="Save the current board filters (captain, type, due, stage) as a named view and jump back in one click. Personal to you. Pick one, then Update / Rename / Delete."
         />

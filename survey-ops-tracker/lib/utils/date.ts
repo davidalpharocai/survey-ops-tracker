@@ -1,4 +1,4 @@
-import { differenceInCalendarDays, parseISO, isAfter, startOfDay } from 'date-fns'
+import { differenceInCalendarDays, parseISO, isAfter, isBefore, startOfDay, endOfMonth } from 'date-fns'
 
 export type DueDateStatus = 'overdue' | 'soon' | 'normal' | null
 
@@ -24,6 +24,57 @@ export function getDueUrgency(dueDate: string | null): DueUrgency {
   if (days === 1) return 'tomorrow'
   if (days === 2) return 'twodays'
   return 'normal'
+}
+
+export type DueFilterPreset =
+  | 'overdue'
+  | 'today'
+  | 'tomorrow'
+  | 'twodays'
+  | 'week'
+  | 'month'
+  | 'none'
+  | 'custom'
+
+// Predicate for the Due filter dropdown (board + list). Deliberately separate
+// from getDueUrgency, which drives the colored due-date edges and only
+// distinguishes overdue/tomorrow/twodays/normal — this covers the fuller set
+// of filter presets plus an arbitrary custom [from, to] range. "Today" uses
+// the same local-midnight notion of "now" as getDueUrgency so the filter and
+// the card colors never disagree about what day it is.
+export function matchesDuePreset(
+  dueDate: string | null,
+  preset: string | null,
+  from?: string | null,
+  to?: string | null
+): boolean {
+  if (!preset) return true
+  if (preset === 'none') return !dueDate
+  if (!dueDate) return false
+  const today = startOfDay(new Date())
+  const due = startOfDay(parseISO(dueDate))
+  const days = differenceInCalendarDays(due, today)
+  switch (preset) {
+    case 'overdue':
+      return days < 0
+    case 'today':
+      return days === 0
+    case 'tomorrow':
+      return days === 1
+    case 'twodays':
+      return days === 2
+    case 'week':
+      return days >= 0 && days <= 6
+    case 'month':
+      return !isBefore(due, today) && !isAfter(due, endOfMonth(today))
+    case 'custom': {
+      if (from && isBefore(due, startOfDay(parseISO(from)))) return false
+      if (to && isAfter(due, startOfDay(parseISO(to)))) return false
+      return true
+    }
+    default:
+      return true
+  }
 }
 
 // Days a project is past its due date (0 if not past / no date). Used to

@@ -36,12 +36,16 @@ interface BoardFiltersProps {
   currentMemberId?: string | null
   typeFilter: string | null
   dueFilter: string | null
+  dueFrom: string | null
+  dueTo: string | null
   stageFilter: string | null
   clientFilter: string | null
   search: string
   onCaptainChange: (id: string | null) => void
   onTypeChange: (type: string | null) => void
   onDueChange: (due: string | null) => void
+  onDueFromChange: (date: string | null) => void
+  onDueToChange: (date: string | null) => void
   onStageChange: (stage: string | null) => void
   onClientChange: (client: string | null) => void
   onSearchChange: (q: string) => void
@@ -53,12 +57,16 @@ export function BoardFilters({
   currentMemberId = null,
   typeFilter,
   dueFilter,
+  dueFrom,
+  dueTo,
   stageFilter,
   clientFilter,
   search,
   onCaptainChange,
   onTypeChange,
   onDueChange,
+  onDueFromChange,
+  onDueToChange,
   onStageChange,
   onClientChange,
   onSearchChange,
@@ -117,18 +125,43 @@ export function BoardFilters({
           <option value="Rerun">Rerun</option>
         </select>
       </Field>
-      <Field label="Due" tooltip="Filter by due-date urgency, e.g. only projects due today or overdue.">
+      <Field label="Due" tooltip="Filter by due date — a preset window, or a custom range.">
         <select
           value={dueFilter ?? ''}
           onChange={e => onDueChange(e.target.value || null)}
           className={SELECT_CLASSES}
         >
-          <option value="">Any time</option>
-          <option value="overdue">Due today or overdue</option>
-          <option value="tomorrow">Due tomorrow</option>
-          <option value="twodays">Due in 2 days</option>
+          <option value="">All</option>
+          <option value="overdue">Overdue</option>
+          <option value="today">Today</option>
+          <option value="tomorrow">Tomorrow</option>
+          <option value="twodays">In 2 days</option>
+          <option value="week">This week</option>
+          <option value="month">This month</option>
+          <option value="none">No due date</option>
+          <option value="custom">Custom range…</option>
         </select>
       </Field>
+      {dueFilter === 'custom' && (
+        <>
+          <Field label="From">
+            <input
+              type="date"
+              value={dueFrom ?? ''}
+              onChange={e => onDueFromChange(e.target.value || null)}
+              className={SELECT_CLASSES}
+            />
+          </Field>
+          <Field label="To">
+            <input
+              type="date"
+              value={dueTo ?? ''}
+              onChange={e => onDueToChange(e.target.value || null)}
+              className={SELECT_CLASSES}
+            />
+          </Field>
+        </>
+      )}
       <Field label="Stage" tooltip="Filter by pipeline stage, from Submitted through Delivery (or Closed).">
         <select
           value={stageFilter ?? ''}
