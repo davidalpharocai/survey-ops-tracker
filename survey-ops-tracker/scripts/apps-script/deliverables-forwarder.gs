@@ -13,6 +13,11 @@
  */
 
 var PROCESSED_LABEL = 'deliverables-filed';
+// Only process mail routed via the deliverables@ Group. A Gmail filter on `list:deliverables@alpharoc.ai`
+// applies this label (+ skips the inbox), so the script never scans unrelated inbox mail. This matters
+// when the backing inbox also receives normal email — otherwise every internal email with an attachment
+// or a Google/Occam/Edwin link would get ingested.
+var SOURCE_LABEL = 'Deliverables';
 var MAX_ATTACHMENT_BYTES = 26214400; // ~25 MB; skip larger so the POST stays well under limits
 
 function processInbox() {
@@ -22,8 +27,8 @@ function processInbox() {
   if (!url || !secret) throw new Error('Set INGEST_URL and WEBHOOK_SECRET in Script Properties.');
 
   var label = GmailApp.getUserLabelByName(PROCESSED_LABEL) || GmailApp.createLabel(PROCESSED_LABEL);
-  // Unprocessed inbox threads from the last week (the trigger runs often; the window is just a safety bound).
-  var threads = GmailApp.search('in:inbox -label:' + PROCESSED_LABEL + ' newer_than:7d', 0, 50);
+  // Unprocessed Deliverables-labeled threads from the last week (the trigger runs often; the window is a safety bound).
+  var threads = GmailApp.search('label:' + SOURCE_LABEL + ' -label:' + PROCESSED_LABEL + ' newer_than:7d', 0, 50);
 
   for (var t = 0; t < threads.length; t++) {
     var thread = threads[t];

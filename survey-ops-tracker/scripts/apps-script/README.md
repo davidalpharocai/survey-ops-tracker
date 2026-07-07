@@ -8,9 +8,14 @@ review queue) and replies "Filed ✓".
 
 1. **Create the Google Group `deliverables@alpharoc.ai`** (groups.google.com -> Create group).
    - **Posting permissions:** in group settings set **Who can post → "Anyone in the organization"** so any AlphaRoc analyst can cc/bcc/forward to the address. You do **not** need to allow external (public) posting — the app only processes messages **from @alpharoc.ai** and ignores the rest — though allowing it is harmless if you prefer.
-   - Set the group to **deliver messages to a backing inbox**: add a Workspace user (e.g. an ops
-     mailbox you control) as a member with "Each email" delivery. The simplest reliable option:
-     add one Workspace user as a member so every group message also lands in that user's Gmail inbox.
+   - Set the group to **deliver messages to a backing inbox**: add a Workspace user as a member with
+     "Each email" delivery, so every group message also lands in that user's Gmail inbox.
+   - **Add a Gmail filter in that inbox so the script only ever sees deliverables mail** (REQUIRED —
+     otherwise, if the inbox also gets normal email, every internal email with an attachment or a
+     Google/Occam/Edwin link gets ingested): Gmail → Settings → **Filters and Blocked Addresses** →
+     **Create a new filter** → "Has the words" = `list:deliverables@alpharoc.ai` → **Create filter** →
+     check **Apply the label → `Deliverables`** and **Skip the Inbox (Archive it)**. The script searches
+     the `Deliverables` label, never the whole inbox.
 
 2. **In that backing inbox's Google account**, go to **script.google.com -> New project**.
    - Paste the contents of `deliverables-forwarder.gs`.
