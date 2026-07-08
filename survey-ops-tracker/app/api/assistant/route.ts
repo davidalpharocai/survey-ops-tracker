@@ -145,6 +145,7 @@ export async function POST(req: NextRequest) {
   const { data: activity } = await supabase
     .from('project_activity')
     .select('project_id, type, direction, sender, subject, snippet, occurred_at')
+    .is('deleted_at', null)
     .order('occurred_at', { ascending: false })
     .limit(80)
 

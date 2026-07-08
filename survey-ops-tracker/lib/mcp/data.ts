@@ -212,7 +212,7 @@ export async function getProjectDetail(id: string, userId: string) {
     supabase.from('project_bids').select('amount, blasts, note, created_at').eq('project_id', id).order('created_at', { ascending: false }),
     supabase.from('project_blasts').select('delivered, bid, blast_cost, note, created_at').eq('project_id', id).order('created_at', { ascending: false }),
     supabase.from('project_steps').select('id, text, done, completed_at, created_at').eq('project_id', id).order('created_at', { ascending: false }).limit(50),
-    supabase.from('project_activity').select('type, direction, sender, subject, snippet, occurred_at').eq('project_id', id).order('occurred_at', { ascending: false }).limit(10),
+    supabase.from('project_activity').select('type, direction, sender, subject, snippet, occurred_at').eq('project_id', id).is('deleted_at', null).order('occurred_at', { ascending: false }).limit(10),
     supabase.from('deliverables').select('file_name, status, source_url, kind, created_at').eq('project_id', id).is('deleted_at', null).order('created_at', { ascending: false }),
     supabase.from('project_segments').select('label, n_target, n_collected, n_actual, sort_order').eq('project_id', id).order('sort_order', { ascending: true }),
     supabase.from('clients').select('compliance_before_fielding, compliance_after_fielding').eq('id', p.client_id as string).maybeSingle(),
@@ -554,6 +554,7 @@ export async function listActivity(projectId: string | null, limit = 20) {
   const supabase = createAdminClient()
   let q = supabase.from('project_activity')
     .select('project_id, type, direction, sender, subject, snippet, occurred_at, survey_projects(project_code, project_name)')
+    .is('deleted_at', null)
     .order('occurred_at', { ascending: false })
     .limit(Math.min(limit, 50))
   if (projectId) q = q.eq('project_id', projectId)
