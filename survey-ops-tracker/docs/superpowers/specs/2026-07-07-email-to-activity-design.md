@@ -180,6 +180,37 @@ crons). States per project:
   auto-logged email can be filtered/muted/bulk-corrected independently. (Also
   rename the misleading `'make.com'` default on the raw activity webhook.)
 
+## Review & approve queue (core)
+
+The safety valve behind the precision-first decision: **uncertain email never
+touches a project timeline until a human approves it.**
+
+- **Where:** a dedicated **Email Review** view in the app (its own queue, mirroring
+  the existing Deliverables review-queue UX). It is global, not per-project —
+  uncertain emails often can't be tied to a project yet (the project is exactly
+  what's unclear), so they can't live on a project page.
+- **What lands here:** anything that isn't a confident, unambiguous single-project
+  match — e.g. a recognized client with 2+ active projects, a known contact who
+  maps to multiple clients, or a shared-domain contact match without a second
+  signal. (Confident PR-code / validated survey-ID / single-active-project matches
+  skip the queue and auto-log directly.)
+- **What a reviewer sees per item:** sender, recipients, subject, date, a snippet
+  (expand for the full body / open in Gmail), and the app's **best-guess candidate
+  project(s)** with the matched signal shown (e.g. "contact jane@acme.com → Acme,
+  2 active projects — pick one"), or "no confident match."
+- **Actions (one click):** **File to PR#####** — promotes the email into that
+  project's activity timeline (candidates shown as chips + a search box to pick any
+  project); **Ignore** — drops it, won't resurface; optionally **Not relevant** —
+  drop and suppress that sender/thread going forward.
+- **Who reviews:** any analyst can triage (items aren't locked to a captain, since
+  the captain is derived from the project, which is what's uncertain).
+- **Bounded:** items nobody files expire after the retention TTL (~30–45 days) so
+  the queue can't rot. A small pending-count badge surfaces it (optional later: a
+  daily digest of pending items).
+- **`pending_no_project`:** relevant mail whose project doesn't exist yet waits here;
+  when a matching project is created it auto-files **only** on an explicit PR-code /
+  survey-ID, otherwise it stays for one-click manual filing.
+
 ## Privacy & security model
 
 - Only Gmail-filter-matched (client-tied) mail ever leaves a mailbox.
@@ -221,7 +252,11 @@ job.
 
 ## Human setup (one-time)
 
-1. Create the `activity@alpharoc.ai` Google Group + a backing inbox.
+1. Create a **dedicated free Google Group `activity@alpharoc.ai`** (groups.google.com
+   — a Group, NOT a mailbox or paid seat; ~2 min, no admin), separate from
+   `deliverables@`. Posting → "anyone in the organization" (external senders are
+   ignored by the app). Add a Workspace user as a member with "each email"
+   delivery so messages land in a backing inbox.
 2. Install the one backing-inbox Apps Script + set `WEBHOOK_SECRET`.
 3. Each captain imports their generated Gmail filter set (app provides it).
 
