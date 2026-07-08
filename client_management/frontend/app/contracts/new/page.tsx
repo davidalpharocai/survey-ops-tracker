@@ -15,7 +15,7 @@ import {
 } from './actions';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'Add Contract · AlphaROC' };
+export const metadata = { title: 'Add a Contract · AlphaROC' };
 
 interface PageProps {
   searchParams: Promise<{ client_id?: string }>;
@@ -42,7 +42,7 @@ export default async function NewContractPage({ searchParams }: PageProps) {
   return (
     <>
       <Link className="back" href="/">← Home</Link>
-      <h1>Add Contract</h1>
+      <h1>Add a Contract</h1>
       <p className="muted">Contracts top up a client&apos;s available credits and/or dollars.</p>
 
       {clients.length === 0 ? (

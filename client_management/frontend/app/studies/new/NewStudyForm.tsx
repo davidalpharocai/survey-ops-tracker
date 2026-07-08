@@ -33,10 +33,10 @@ export default function NewStudyForm({ clientId, users }: Props) {
 
       {disabled && <p className="muted small">Pick a client above to enable this form.</p>}
 
-      <label>Users at this client (pick one or more)<InfoTooltip text={TIP.studyUser} />
+      <label>Contacts at this client (pick one or more)<InfoTooltip text={TIP.studyUser} />
         <select name="client_user_ids" multiple size={4} required disabled={disabled || users.length === 0}>
           {users.length === 0 && disabled ? null : users.length === 0 ? (
-            <option value="" disabled>(no users on this client)</option>
+            <option value="" disabled>(no contacts on this client)</option>
           ) : (
             users.map(u => (
               <option key={u.id} value={u.id}>
@@ -49,7 +49,7 @@ export default function NewStudyForm({ clientId, users }: Props) {
           {disabled
             ? 'Pick a client first.'
             : users.length === 0
-              ? 'Add a user to this client on Manage Client List, then come back.'
+              ? 'Add a contact to this client on Manage Client List, then come back.'
               : 'Hold Cmd/Ctrl to select more than one.'}
         </span>
       </label>

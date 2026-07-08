@@ -7,7 +7,7 @@ import ExistingStudiesTable from './ExistingStudiesTable';
 import NewStudyForm from './NewStudyForm';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'Add User Study · AlphaROC' };
+export const metadata = { title: 'Record a Study · AlphaROC' };
 
 interface PageProps {
   searchParams: Promise<{ client_id?: string }>;
@@ -36,8 +36,8 @@ export default async function NewStudyPage({ searchParams }: PageProps) {
   return (
     <>
       <Link className="back" href="/">← Home</Link>
-      <h1>Add User Study</h1>
-      <p className="muted">Each study can have multiple users. Trackers run on a recurring cadence; their per-run cost &times; runs per year is the annual draw on the client&apos;s balance.</p>
+      <h1>Record a Study</h1>
+      <p className="muted">Each study can be attributed to multiple contacts. Trackers run on a recurring cadence; their per-run cost &times; runs per year is the annual draw on the client&apos;s balance.</p>
 
       {clients.length === 0 ? (
         <p className="warn">No clients yet. <Link href="/clients">Create one first →</Link></p>

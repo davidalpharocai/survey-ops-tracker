@@ -120,8 +120,8 @@ export default async function ClientsPage({ searchParams }: PageProps) {
               </form>
 
               <div className="card">
-                <h3>Users at {selected.name}</h3>
-                <p className="muted">Users are people on the client side. Studies are attributed to one user.</p>
+                <h3>Contacts at {selected.name}</h3>
+                <p className="muted">Contacts are people on the client side. Studies are attributed to one contact.</p>
 
                 {selectedUsers.length > 0 ? (
                   <table className="report compact">
@@ -133,12 +133,12 @@ export default async function ClientsPage({ searchParams }: PageProps) {
                     </tbody>
                   </table>
                 ) : (
-                  <p className="muted">No users yet.</p>
+                  <p className="muted">No contacts yet.</p>
                 )}
 
                 <form action={createClientUserAction} className="add-row-form">
                   <input type="hidden" name="client_id" value={selected.id} />
-                  <strong>Add user</strong>
+                  <strong>Add contact</strong>
                   <label>Name <InfoTooltip text={TIP.clientUser} /><input name="name" type="text" required /></label>
                   <label>Email (optional) <input name="email" type="email" /></label>
                   <button type="submit" className="btn-sm">+ Add</button>
@@ -149,11 +149,11 @@ export default async function ClientsPage({ searchParams }: PageProps) {
                 <summary>Delete this client (irreversible)</summary>
                 <form action={deleteClientAction}>
                   <input type="hidden" name="id" value={selected.id} />
-                  <p className="muted">Removes <strong>{selected.name}</strong> from the client list along with every user, contract, and study attached to them. This cannot be undone.</p>
+                  <p className="muted">Removes <strong>{selected.name}</strong> from the client list along with every contact, contract, and study attached to them. This cannot be undone.</p>
                   <ConfirmButton
                     type="submit"
                     className="btn-danger"
-                    message={`Delete ${selected.name} and all their contracts, studies, and users? This cannot be undone.`}
+                    message={`Delete ${selected.name} and all their contracts, studies, and contacts? This cannot be undone.`}
                   >
                     Delete {selected.name}
                   </ConfirmButton>
@@ -188,7 +188,7 @@ function UserRow({ user }: { user: ClientUser }) {
         <button type="submit" form={formId} className="btn-sm">Save</button>
         <form action={deleteClientUserAction} className="inline-form">
           <input type="hidden" name="id" value={user.id} />
-          <ConfirmButton type="submit" className="btn-sm btn-danger" message={`Delete user ${user.name}?`}>
+          <ConfirmButton type="submit" className="btn-sm btn-danger" message={`Delete contact ${user.name}?`}>
             Delete
           </ConfirmButton>
         </form>

@@ -4,7 +4,7 @@ import { apiForRequest, parseId } from '../../lib/action';
 import AutoSubmitSelect from '../_components/AutoSubmitSelect';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'Manage User List · AlphaROC' };
+export const metadata = { title: 'Client Contacts · AlphaROC' };
 
 interface PageProps {
   searchParams: Promise<{ client_id?: string; q?: string }>;
@@ -24,8 +24,8 @@ export default async function UsersPage({ searchParams }: PageProps) {
   return (
     <>
       <Link className="back" href="/">← Home</Link>
-      <h1>Manage User List</h1>
-      <p className="muted">Every user across every client. Edits happen on the client&apos;s record — click <em>Open client</em> to jump there.</p>
+      <h1>Client Contacts</h1>
+      <p className="muted">Every contact across every client. Edits happen on the client&apos;s record — click <em>Open client</em> to jump there.</p>
 
       <form method="get" className="filterbar">
         <label>Filter by client

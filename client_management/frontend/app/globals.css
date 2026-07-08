@@ -143,9 +143,48 @@ h3 { font-size: 1rem; }
   margin-bottom: 2rem;
   font-size: 1.8rem;
 }
-.hub-panels {
+/* Primary daily actions, full-width above the card grid. */
+.hub-eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--muted);
+  margin: 0 0 0.6rem;
+}
+.hub-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1.75rem;
+}
+.hub-action {
+  display: block;
+  background: var(--accent-bg);
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  padding: 1rem 1.15rem;
+  text-decoration: none;
+  color: var(--fg);
+  transition: background 0.12s, box-shadow 0.12s;
+}
+.hub-action:hover {
+  background: #e0ecff;
+  box-shadow: 0 2px 10px rgba(37, 99, 235, 0.18);
+}
+.hub-action .hub-link-title {
+  color: var(--accent);
+  font-size: 1.05rem;
+}
+@media (max-width: 760px) {
+  .hub-actions { grid-template-columns: 1fr; }
+}
+
+/* Auto-fit so an odd number of sections (admins see 3) never orphans a
+   grid cell; still collapses to one column on narrow screens. */
+.hub-panels {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap: 1.5rem;
 }
 @media (max-width: 760px) {
