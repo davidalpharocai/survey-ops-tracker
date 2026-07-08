@@ -28,7 +28,7 @@ import type { EmailContactRec, EmailMatchData, EmailProjectRec } from './load'
 
 export type EmailDecision = 'auto-log' | 'review' | 'pending_no_project'
 export type EmailDirection = 'inbound' | 'outbound'
-export type EmailMatchMethod = 'code' | 'survey_id' | 'contact_email' | 'domain' | 'name' | 'none'
+export type EmailMatchMethod = 'code' | 'survey_id' | 'contact_email' | 'domain' | 'name' | 'content' | 'none'
 
 export type EmailCandidate = {
   clientId: string | null
@@ -74,8 +74,13 @@ const CONFIDENCE: Record<EmailMatchMethod, number> = {
   contact_email: 0.9,
   domain: 0.8,
   name: 0.7,
+  content: 0.7,
   none: 0,
 }
+
+// Bounded email matcher for scanning free text (body/subject) — stricter than the
+// header parser so prose punctuation doesn't over-match.
+const EMAIL_G = /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi
 
 const domainOf = (email: string): string => (email.split('@')[1] ?? '').toLowerCase().trim()
 
@@ -280,6 +285,30 @@ export function matchEmail(
     if (nameProjects.length) {
       method = 'name'
       clientIds = uniq(nameProjects.map((p) => p.client_id).filter((x): x is string => !!x))
+    }
+  }
+
+  // Content-scan tier (David: "it needs to work even if it comes from me — scan
+  // the email for the client"). When the headers didn't resolve a client (e.g. an
+  // internal teammate forwarded it), look for a client signal ANYWHERE in the
+  // subject/body: a known contact email, a non-shared client domain, or a client
+  // name. Softer than a real sender, so it stays method 'content' → review in
+  // Phase 1 (never counts as contact_email for the auto-log gate below).
+  if (clientIds.length === 0) {
+    const found = new Set<string>()
+    for (const e of uniq((hay.toLowerCase().match(EMAIL_G) ?? []))) {
+      for (const c of data.contacts) if (c.client_id && c.email === e) found.add(c.client_id)
+      const dom = domainOf(e)
+      if (dom && !SHARED_DOMAINS.has(dom)) for (const cid of clientsAtDomain(data.contacts, dom)) found.add(cid)
+    }
+    const nhay = ` ${normalizeName(hay)} `
+    for (const c of data.clients ?? []) {
+      const n = normalizeName(c.name)
+      if (n.length >= 4 && nhay.includes(` ${n} `)) found.add(c.id)
+    }
+    if (found.size) {
+      method = 'content'
+      clientIds = [...found]
     }
   }
 

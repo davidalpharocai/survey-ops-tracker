@@ -26,6 +26,9 @@ export type EmailContactRec = { email: string; client_id: string | null; project
 export type EmailMatchData = {
   projects: EmailProjectRec[]
   contacts: EmailContactRec[]
+  /** All non-deleted clients (id + name) — for the content-scan tier that looks
+   *  for a client name/contact/domain anywhere in the email text. */
+  clients: { id: string; name: string }[]
   /** validated survey-ID (upper-cased) → owning project id(s). >1 = ambiguous. */
   surveyIdMap: Map<string, string[]>
 }
@@ -43,7 +46,7 @@ const normEmail = (e: string | null | undefined): string => (e ?? '').toLowerCas
 export async function loadEmailMatchData(
   admin: ReturnType<typeof createAdminClient>
 ): Promise<EmailMatchData> {
-  const [projectsRes, contactsRes, recipsRes] = await Promise.all([
+  const [projectsRes, contactsRes, recipsRes, clientsRes] = await Promise.all([
     admin
       .from('survey_projects')
       .select(
@@ -56,6 +59,7 @@ export async function loadEmailMatchData(
       .eq('archived', false)
       .not('email', 'is', null),
     admin.from('project_recipients').select('email, project_id'),
+    admin.from('clients').select('id, name').is('deleted_at', null),
   ])
 
   const projects = (projectsRes.data ?? []) as unknown as EmailProjectRec[]
@@ -96,5 +100,7 @@ export async function loadEmailMatchData(
     }
   }
 
-  return { projects, contacts, surveyIdMap }
+  const clients = (clientsRes.data ?? []) as { id: string; name: string }[]
+
+  return { projects, contacts, clients, surveyIdMap }
 }

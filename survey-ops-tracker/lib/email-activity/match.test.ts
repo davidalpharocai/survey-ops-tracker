@@ -25,9 +25,10 @@ function P(o: Partial<EmailProjectRec> & { id: string }): EmailProjectRec {
 function data(
   projects: EmailProjectRec[],
   contacts: EmailContactRec[] = [],
-  surveyIdMap: Map<string, string[]> = new Map()
+  surveyIdMap: Map<string, string[]> = new Map(),
+  clients: { id: string; name: string }[] = []
 ): EmailMatchData {
-  return { projects, contacts, surveyIdMap }
+  return { projects, contacts, clients, surveyIdMap }
 }
 
 describe('matchEmail — explicit PR-code (always auto-log, any state)', () => {
@@ -290,6 +291,37 @@ describe('matchEmail — fuzzy client tiers', () => {
     expect(r.decision).toBe('review')
     expect(r.clientId).toBeNull()
     expect(r.candidates).toEqual([])
+  })
+})
+
+describe('matchEmail — content scan (client found in the body, e.g. internal forward)', () => {
+  it('resolves the client from a contact email in the BODY when headers do not', () => {
+    const p = P({ id: 'pcs', client_id: 'cB', board_column: 'Fielding' })
+    const contacts: EmailContactRec[] = [{ email: 'jcook@bamfunds.com', client_id: 'cB', project_id: null }]
+    const r = matchEmail(
+      {
+        fromEmail: 'david@alpharoc.ai', // came from us (internal)
+        toEmails: ['activity@alpharoc.ai'],
+        subject: 'Fwd: Korea Survey',
+        body: 'fyi\nFrom: James Cook <jcook@bamfunds.com>\nkorea study attached',
+      },
+      data([p], contacts)
+    )
+    expect(r.clientId).toBe('cB')
+    expect(r.method).toBe('content')
+    expect(r.decision).toBe('review') // softer signal → review in Phase 1
+    expect(r.candidates[0].projectId).toBe('pcs')
+  })
+
+  it('resolves the client from a client NAME in the body', () => {
+    const p = P({ id: 'pcn', client_id: 'cC' })
+    const r = matchEmail(
+      { fromEmail: 'david@alpharoc.ai', toEmails: [], subject: 'notes', body: 'quick note about the Coatue account' },
+      data([p], [], new Map(), [{ id: 'cC', name: 'Coatue' }])
+    )
+    expect(r.clientId).toBe('cC')
+    expect(r.method).toBe('content')
+    expect(r.decision).toBe('review')
   })
 })
 
