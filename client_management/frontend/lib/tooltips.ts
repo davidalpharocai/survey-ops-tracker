@@ -47,9 +47,9 @@ export const TIP = {
   dollarsRemaining:
     'Dollars added by contracts minus dollars consumed by studies. Negative means the client has overspent their dollars.',
   cyValue:
-    'Total dollar value of contracts dated in the current calendar year — a rough “what they’re worth this year”.',
+    'What this client contracted for this calendar year — shown in credits and/or dollars depending on how their contracts were priced.',
   cyRenewal:
-    'The renewal date of this year’s contract(s) — when the relationship is next up for renewal.',
+    'The client’s next upcoming renewal date: the earliest renewal still in the future across all their contracts.',
   creditsDelta:
     'The change to the credit balance from this transaction: contracts add (+), studies subtract (−).',
   dollarsDelta:

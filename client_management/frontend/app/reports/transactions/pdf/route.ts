@@ -13,6 +13,7 @@ import autoTable from 'jspdf-autotable';
 import { apiForRequest, parseId } from '../../../../lib/action';
 import { currentUserEmail } from '../../../../lib/auth';
 import {
+  contractValue,
   credits as creditsFmt,
   creditsSigned,
   dollars,
@@ -92,12 +93,12 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       'Credits remaining',
       'Dollars remaining',
       `${currentYear} contract value`,
-      `${currentYear} renewal`,
+      'Next renewal',
     ]],
     body: [[
       creditsFmt(bal.credits),
       dollars(bal.dollars),
-      dollars(bal.cyValue),
+      contractValue(bal.cyCredits, bal.cyValue),
       bal.cyRenewal ? isoDate(bal.cyRenewal) : '—',
     ]],
     theme: 'grid',

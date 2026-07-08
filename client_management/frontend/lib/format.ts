@@ -36,6 +36,18 @@ export function creditsSigned(v: Numeric): string {
   return sign + Math.round(n).toLocaleString('en-US');
 }
 
+// Current-year contract value, showing whichever currency the client
+// actually contracted in: credits, dollars, both, or "—". Credit-only
+// clients previously read "$0"; now they read their credit value.
+export function contractValue(cyCredits: Numeric, cyDollars: Numeric): string {
+  const cr = toNum(cyCredits) ?? 0;
+  const dl = toNum(cyDollars) ?? 0;
+  const parts: string[] = [];
+  if (cr > 0) parts.push(`${credits(cr)} cr`);
+  if (dl > 0) parts.push(dollars(dl));
+  return parts.length ? parts.join(' · ') : '—';
+}
+
 export function isoDate(d: Date | string | null | undefined): string {
   if (!d) return '';
   if (typeof d === 'string') return d.slice(0, 10);

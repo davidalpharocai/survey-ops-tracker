@@ -2,6 +2,7 @@ import Link from 'next/link';
 
 import { apiForRequest, parseId } from '../../../lib/action';
 import {
+  contractValue,
   credits as creditsFmt,
   creditsSigned,
   dollars,
@@ -31,7 +32,7 @@ export default async function TransactionsReportPage({ searchParams }: PageProps
     clientId ? api.getClient(clientId) : Promise.resolve(null),
   ]);
   let transactions: Transaction[] = [];
-  let bal: Balance = { credits: 0, dollars: 0, cyValue: 0, cyRenewal: null };
+  let bal: Balance = { credits: 0, dollars: 0, cyCredits: 0, cyValue: 0, cyRenewal: null };
   if (clientId && selected) {
     [transactions, bal] = await Promise.all([
       api.listTransactionsByClient(clientId),
@@ -82,10 +83,10 @@ export default async function TransactionsReportPage({ searchParams }: PageProps
             </div>
             <div className="bal">
               <span className="bal-label">{currentYear} contract value <InfoTooltip text={TIP.cyValue} /></span>
-              <span className="bal-value">{dollars(bal.cyValue)}</span>
+              <span className="bal-value">{contractValue(bal.cyCredits, bal.cyValue)}</span>
             </div>
             <div className="bal">
-              <span className="bal-label">{currentYear} renewal <InfoTooltip text={TIP.cyRenewal} /></span>
+              <span className="bal-label">Next renewal <InfoTooltip text={TIP.cyRenewal} /></span>
               <span className="bal-value">{bal.cyRenewal ? isoDate(bal.cyRenewal) : '—'}</span>
             </div>
           </div>

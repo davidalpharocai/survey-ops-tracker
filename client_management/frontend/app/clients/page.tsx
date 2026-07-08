@@ -2,7 +2,7 @@ import Link from 'next/link';
 
 import { apiForRequest, parseId } from '../../lib/action';
 import { todayIsoDate } from '../../lib/dates';
-import { credits as creditsFmt, dollars, isoDate } from '../../lib/format';
+import { contractValue, credits as creditsFmt, dollars, isoDate } from '../../lib/format';
 import { TIP } from '../../lib/tooltips';
 import type { Balance, ClientUser } from '../../lib/types';
 import InfoTooltip from '../_components/InfoTooltip';
@@ -28,7 +28,7 @@ export default async function ClientsPage({ searchParams }: PageProps) {
   const sp = await searchParams;
   const selectedId = parseId(sp?.id);
   const api = await apiForRequest();
-  const defaultBal: Balance = { credits: 0, dollars: 0, cyValue: 0, cyRenewal: null };
+  const defaultBal: Balance = { credits: 0, dollars: 0, cyCredits: 0, cyValue: 0, cyRenewal: null };
   const [clients, selected, selectedUsers, bal] = await Promise.all([
     api.listClients(),
     selectedId ? api.getClient(selectedId) : Promise.resolve(null),
@@ -88,10 +88,10 @@ export default async function ClientsPage({ searchParams }: PageProps) {
                   </div>
                   <div className="bal">
                     <span className="bal-label">{currentYear} contract value <InfoTooltip text={TIP.cyValue} /></span>
-                    <span className="bal-value">{dollars(bal.cyValue)}</span>
+                    <span className="bal-value">{contractValue(bal.cyCredits, bal.cyValue)}</span>
                   </div>
                   <div className="bal">
-                    <span className="bal-label">{currentYear} renewal <InfoTooltip text={TIP.cyRenewal} /></span>
+                    <span className="bal-label">Next renewal <InfoTooltip text={TIP.cyRenewal} /></span>
                     <span className="bal-value">{bal.cyRenewal ? isoDate(bal.cyRenewal) : '—'}</span>
                   </div>
                 </div>

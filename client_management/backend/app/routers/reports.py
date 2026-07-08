@@ -14,7 +14,7 @@ from sqlalchemy.orm import selectinload
 
 from app.auth import require_user
 from app.db import get_session
-from app.helpers import current_year_window
+from app.helpers import current_year_window, utc_today
 from app.models import Client, Transaction
 from app.serializers import client_dict, transaction_dict
 
@@ -59,7 +59,9 @@ async def client_balances(
     Returns
     -------
     dict
-        ``{"credits", "dollars", "cyValue", "cyRenewal"}``.
+        ``{"credits", "dollars", "cyCredits", "cyValue", "cyRenewal"}`` —
+        lifetime credit/dollar balances, the current-year contracted
+        credits and dollar value, and the next upcoming renewal date.
     """
     soy, eoy, _ = current_year_window()
     is_cy_contract = (
@@ -67,21 +69,31 @@ async def client_balances(
         & (Transaction.occurred_on >= soy)
         & (Transaction.occurred_on < eoy)
     )
+    # "Next renewal" = the earliest renewal date still in the future,
+    # across ALL of the client's contracts — not only ones dated this
+    # calendar year (a Dec-2025 contract renewing in 2026 must surface).
+    is_upcoming_renewal = (
+        (Transaction.kind == "contract")
+        & (Transaction.renewal_on.is_not(None))
+        & (Transaction.renewal_on >= utc_today())
+    )
     row = (
         await session.execute(
             select(
                 func.coalesce(func.sum(Transaction.credits_delta), 0),
                 func.coalesce(func.sum(Transaction.dollars_delta), 0),
+                func.coalesce(func.sum(case((is_cy_contract, Transaction.credits_delta), else_=0)), 0),
                 func.coalesce(func.sum(case((is_cy_contract, Transaction.dollars_delta), else_=0)), 0),
-                func.min(case((is_cy_contract, Transaction.renewal_on))),
+                func.min(case((is_upcoming_renewal, Transaction.renewal_on))),
             ).where(Transaction.client_id == client_id)
         )
     ).one()
     return {
         "credits": float(row[0]),
         "dollars": float(row[1]),
-        "cyValue": float(row[2]),
-        "cyRenewal": _iso(row[3]),
+        "cyCredits": float(row[2]),
+        "cyValue": float(row[3]),
+        "cyRenewal": _iso(row[4]),
     }
 
 
@@ -100,7 +112,7 @@ async def all_balances(
     -------
     list of dict
         One row per client: ``{"client", "credits", "dollars",
-        "cyValue", "cyRenewal"}``.
+        "cyCredits", "cyValue", "cyRenewal"}``.
     """
     soy, eoy, _ = current_year_window()
     is_cy_contract = (
@@ -108,29 +120,44 @@ async def all_balances(
         & (Transaction.occurred_on >= soy)
         & (Transaction.occurred_on < eoy)
     )
+    is_upcoming_renewal = (
+        (Transaction.kind == "contract")
+        & (Transaction.renewal_on.is_not(None))
+        & (Transaction.renewal_on >= utc_today())
+    )
     clients = (
         await session.execute(select(Client).order_by(Client.name.asc()))
     ).scalars().all()
     agg = {
-        row.client_id: (float(row.credits), float(row.dollars), float(row.cy_value), row.cy_renewal)
+        row.client_id: (
+            float(row.credits),
+            float(row.dollars),
+            float(row.cy_credits),
+            float(row.cy_value),
+            row.cy_renewal,
+        )
         for row in await session.execute(
             select(
                 Transaction.client_id.label("client_id"),
                 func.coalesce(func.sum(Transaction.credits_delta), 0).label("credits"),
                 func.coalesce(func.sum(Transaction.dollars_delta), 0).label("dollars"),
+                func.coalesce(func.sum(case((is_cy_contract, Transaction.credits_delta), else_=0)), 0).label("cy_credits"),
                 func.coalesce(func.sum(case((is_cy_contract, Transaction.dollars_delta), else_=0)), 0).label("cy_value"),
-                func.min(case((is_cy_contract, Transaction.renewal_on))).label("cy_renewal"),
+                func.min(case((is_upcoming_renewal, Transaction.renewal_on))).label("cy_renewal"),
             ).group_by(Transaction.client_id)
         )
     }
     out = []
     for c in clients:
-        credits, dollars, cy_value, cy_renewal = agg.get(c.id, (0.0, 0.0, 0.0, None))
+        credits, dollars, cy_credits, cy_value, cy_renewal = agg.get(
+            c.id, (0.0, 0.0, 0.0, 0.0, None)
+        )
         out.append(
             {
                 "client": client_dict(c),
                 "credits": credits,
                 "dollars": dollars,
+                "cyCredits": cy_credits,
                 "cyValue": cy_value,
                 "cyRenewal": _iso(cy_renewal),
             }

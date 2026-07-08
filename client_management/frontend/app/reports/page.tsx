@@ -12,7 +12,7 @@ export default function ReportsIndexPage() {
       <div className="report-grid">
         <Link className="report-card" href="/reports/balances">
           <h3>Credits and dollars remaining by client</h3>
-          <p>Every client&apos;s current credits balance, dollars balance, and current-year contract value with renewal date.</p>
+          <p>Every client&apos;s current credits balance, dollars balance, current-year contract value, and next renewal date.</p>
         </Link>
         <Link className="report-card" href="/reports/transactions">
           <h3>Per-client transaction log</h3>

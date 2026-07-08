@@ -1,7 +1,7 @@
 import Link from 'next/link';
 
 import { apiForRequest } from '../../../lib/action';
-import { credits as creditsFmt, dollars, isoDate } from '../../../lib/format';
+import { contractValue, credits as creditsFmt, dollars, isoDate } from '../../../lib/format';
 import { TIP } from '../../../lib/tooltips';
 import InfoTooltip from '../../_components/InfoTooltip';
 
@@ -17,7 +17,7 @@ export default async function BalancesPage() {
     <>
       <Link className="back" href="/reports">← Reports</Link>
       <h1>Credits and dollars remaining by client</h1>
-      <p className="muted">Live balances across every client. {currentYear} contract value sums dollars from contracts dated this year; renewal date is the next contract from this year that&apos;s up for renewal.</p>
+      <p className="muted">Live balances across every client. {currentYear} contract value sums the credits and dollars from contracts dated this year; next renewal is the earliest upcoming renewal date across all of a client&apos;s contracts.</p>
 
       {rows.length > 0 ? (
         <table className="report">
@@ -29,7 +29,7 @@ export default async function BalancesPage() {
               <th className="num">Credits remaining<InfoTooltip text={TIP.creditsRemaining} /></th>
               <th className="num">Dollars remaining<InfoTooltip text={TIP.dollarsRemaining} /></th>
               <th className="num">{currentYear} contract value<InfoTooltip text={TIP.cyValue} /></th>
-              <th>{currentYear} renewal<InfoTooltip text={TIP.cyRenewal} /></th>
+              <th>Next renewal<InfoTooltip text={TIP.cyRenewal} /></th>
             </tr>
           </thead>
           <tbody>
@@ -40,7 +40,7 @@ export default async function BalancesPage() {
                 <td>{isoDate(r.client.becameClientOn)}</td>
                 <td className={`num${r.credits < 0 ? ' neg' : ''}`}>{creditsFmt(r.credits)}</td>
                 <td className={`num${r.dollars < 0 ? ' neg' : ''}`}>{dollars(r.dollars)}</td>
-                <td className="num">{dollars(r.cyValue)}</td>
+                <td className="num">{contractValue(r.cyCredits, r.cyValue)}</td>
                 <td>{r.cyRenewal ? isoDate(r.cyRenewal) : '—'}</td>
               </tr>
             ))}

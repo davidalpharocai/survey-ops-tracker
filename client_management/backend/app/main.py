@@ -2,12 +2,14 @@
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.audit import AuditMiddleware
 from app.config import get_settings
 from app.db import apply_schema
+from app.helpers import MoneyParseError
 from app.routers import (
     admin,
     clients,
@@ -83,6 +85,12 @@ app.include_router(transactions.router)
 app.include_router(reports.router)
 app.include_router(admin.router)
 app.include_router(team.router)
+
+
+@app.exception_handler(MoneyParseError)
+async def _money_parse_error(_: Request, exc: MoneyParseError) -> JSONResponse:
+    """Return a 400 (not a 500) when a money field holds a typo."""
+    return JSONResponse(status_code=400, content={"detail": str(exc)})
 
 
 @app.get("/", tags=["meta"])

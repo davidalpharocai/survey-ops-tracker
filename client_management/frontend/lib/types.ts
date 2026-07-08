@@ -26,6 +26,7 @@ export interface ClientUser {
 export interface Balance {
   credits: number;
   dollars: number;
+  cyCredits: number;
   cyValue: number;
   cyRenewal: Date | null;
 }

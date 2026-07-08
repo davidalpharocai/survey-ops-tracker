@@ -58,6 +58,22 @@ def add_year(d: datetime) -> datetime:
         return d.replace(year=d.year + 1, day=d.day - 1)
 
 
+def utc_today() -> datetime:
+    """Return today's date as a naive UTC-midnight datetime.
+
+    Matches the naive-UTC convention of the timestamp columns (see the
+    module docstring), so it can be compared directly against stored
+    ``renewal_on`` / ``occurred_on`` values.
+
+    Returns
+    -------
+    datetime
+        Midnight (UTC) of the current date, tz-naive.
+    """
+    n = datetime.now(timezone.utc)
+    return datetime(n.year, n.month, n.day)
+
+
 def current_year_window() -> tuple[datetime, datetime, int]:
     """Return the [start, end) UTC bounds of the current calendar year.
 
@@ -84,11 +100,21 @@ def today_iso_date() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
 
-def parse_money(v: object) -> float:
-    """Coerce a form value to a non-throwing float.
+class MoneyParseError(ValueError):
+    """Raised when a money field holds a non-empty, unparseable value.
 
-    Mirrors the frontend ``parseMoney``: blank/``None``/non-numeric
-    inputs become ``0``.
+    Mapped to a 400 by the app's exception handler so a typo like
+    ``"1O0"`` surfaces as a validation error instead of being silently
+    saved as ``0`` (which would under-bill the client).
+    """
+
+
+def parse_money(v: object) -> float:
+    """Coerce a form value to a float, tolerating ``$`` and thousands commas.
+
+    A blank/``None`` value is ``0.0`` (an omitted optional amount). A
+    *non-empty* value that isn't a number raises :class:`MoneyParseError`
+    rather than silently becoming ``0``.
 
     Parameters
     ----------
@@ -98,11 +124,19 @@ def parse_money(v: object) -> float:
     Returns
     -------
     float
-        Parsed amount, or ``0.0`` when the value is missing or invalid.
+        The parsed amount (``0.0`` when the value is missing).
+
+    Raises
+    ------
+    MoneyParseError
+        When ``v`` is non-empty but cannot be parsed as a number.
     """
-    if v is None or v == "":
+    if v is None:
+        return 0.0
+    s = str(v).strip().replace(",", "").replace("$", "")
+    if s == "":
         return 0.0
     try:
-        return float(v)
+        return float(s)
     except (TypeError, ValueError):
-        return 0.0
+        raise MoneyParseError(f"“{v}” is not a valid amount.") from None
