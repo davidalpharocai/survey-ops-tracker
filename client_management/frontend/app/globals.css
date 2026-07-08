@@ -524,6 +524,90 @@ button:hover, .btn:hover { background: var(--accent-hover); }
 .studies-table td.num.annual-cell { font-variant-numeric: tabular-nums; font-weight: 600; }
 .bulk-actions { display: flex; gap: 1rem; align-items: center; margin: 0.75rem 0 1.5rem; }
 
+/* ---------- Info tooltip ((i) markers) ---------- */
+
+.info {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  margin-left: 0.3rem;
+  cursor: help;
+  vertical-align: middle;
+  outline: none;
+}
+.info-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: var(--border);
+  color: var(--muted);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 700;
+  line-height: 1;
+}
+.info:hover .info-dot,
+.info:focus .info-dot,
+.info:focus-visible .info-dot {
+  background: var(--accent);
+  color: #fff;
+}
+.info-pop {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: 260px;
+  background: #111827;
+  color: #fff;
+  padding: 0.5rem 0.65rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 400;
+  font-style: normal;
+  line-height: 1.4;
+  letter-spacing: normal;
+  text-transform: none;
+  white-space: normal;
+  text-align: left;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.12s ease;
+  z-index: 60;
+  pointer-events: none;
+}
+.info-pop::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: #111827;
+}
+.info:hover .info-pop,
+.info:focus .info-pop,
+.info:focus-within .info-pop {
+  opacity: 1;
+  visibility: visible;
+}
+/* Header cells sit high; drop their popup below the (i) so it isn't clipped. */
+th .info-pop {
+  bottom: auto;
+  top: calc(100% + 6px);
+}
+th .info-pop::after {
+  top: auto;
+  bottom: 100%;
+  border-top-color: transparent;
+  border-bottom-color: #111827;
+}
+
 /* ---------- Mobile ---------- */
 
 /* Wide data tables would otherwise push the whole page sideways on a

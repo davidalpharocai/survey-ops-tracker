@@ -3,7 +3,9 @@ import Link from 'next/link';
 import { apiForRequest, parseId } from '../../lib/action';
 import { todayIsoDate } from '../../lib/dates';
 import { credits as creditsFmt, dollars, isoDate } from '../../lib/format';
+import { TIP } from '../../lib/tooltips';
 import type { Balance, ClientUser } from '../../lib/types';
+import InfoTooltip from '../_components/InfoTooltip';
 import ConfirmButton from './ConfirmButton';
 import NewClientDialog from './NewClientDialog';
 import {
@@ -77,19 +79,19 @@ export default async function ClientsPage({ searchParams }: PageProps) {
                 </div>
                 <div className="detail-balances">
                   <div className="bal">
-                    <span className="bal-label">Credits</span>
+                    <span className="bal-label">Credits <InfoTooltip text={TIP.creditsRemaining} /></span>
                     <span className={`bal-value${bal.credits < 0 ? ' neg' : ''}`}>{creditsFmt(bal.credits)}</span>
                   </div>
                   <div className="bal">
-                    <span className="bal-label">Dollars</span>
+                    <span className="bal-label">Dollars <InfoTooltip text={TIP.dollarsRemaining} /></span>
                     <span className={`bal-value${bal.dollars < 0 ? ' neg' : ''}`}>{dollars(bal.dollars)}</span>
                   </div>
                   <div className="bal">
-                    <span className="bal-label">{currentYear} contract value</span>
+                    <span className="bal-label">{currentYear} contract value <InfoTooltip text={TIP.cyValue} /></span>
                     <span className="bal-value">{dollars(bal.cyValue)}</span>
                   </div>
                   <div className="bal">
-                    <span className="bal-label">{currentYear} renewal</span>
+                    <span className="bal-label">{currentYear} renewal <InfoTooltip text={TIP.cyRenewal} /></span>
                     <span className="bal-value">{bal.cyRenewal ? isoDate(bal.cyRenewal) : '—'}</span>
                   </div>
                 </div>
@@ -106,11 +108,11 @@ export default async function ClientsPage({ searchParams }: PageProps) {
                 <h3>Client details</h3>
                 <div className="form-grid">
                   <label>Client name <input name="name" type="text" defaultValue={selected.name} required /></label>
-                  <label>Client since <input name="became_on" type="date" defaultValue={isoDate(selected.becameClientOn)} required /></label>
-                  <label>Primary contact name <input name="primary_contact_name" type="text" defaultValue={selected.primaryContactName || ''} /></label>
+                  <label>Client since <InfoTooltip text={TIP.becameOn} /><input name="became_on" type="date" defaultValue={isoDate(selected.becameClientOn)} required /></label>
+                  <label>Primary contact name <InfoTooltip text={TIP.primaryContact} /><input name="primary_contact_name" type="text" defaultValue={selected.primaryContactName || ''} /></label>
                   <label>Primary contact cell <input name="primary_contact_cell" type="tel" defaultValue={selected.primaryContactCell || ''} /></label>
                   <label>Primary contact email <input name="primary_contact_email" type="email" defaultValue={selected.primaryContactEmail || ''} /></label>
-                  <label>Relationship manager <input name="relationship_manager" type="text" defaultValue={selected.relationshipManager || ''} placeholder="AlphaROC team member" /></label>
+                  <label>Relationship manager <InfoTooltip text={TIP.relationshipManager} /><input name="relationship_manager" type="text" defaultValue={selected.relationshipManager || ''} placeholder="AlphaROC team member" /></label>
                 </div>
                 <div className="actions">
                   <button type="submit">Save changes</button>
@@ -137,7 +139,7 @@ export default async function ClientsPage({ searchParams }: PageProps) {
                 <form action={createClientUserAction} className="add-row-form">
                   <input type="hidden" name="client_id" value={selected.id} />
                   <strong>Add user</strong>
-                  <label>Name <input name="name" type="text" required /></label>
+                  <label>Name <InfoTooltip text={TIP.clientUser} /><input name="name" type="text" required /></label>
                   <label>Email (optional) <input name="email" type="email" /></label>
                   <button type="submit" className="btn-sm">+ Add</button>
                 </form>

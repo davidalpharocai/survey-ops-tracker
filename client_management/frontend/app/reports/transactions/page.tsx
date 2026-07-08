@@ -9,8 +9,10 @@ import {
   fmtDateTime,
   isoDate,
 } from '../../../lib/format';
+import { TIP } from '../../../lib/tooltips';
 import type { Balance, Transaction } from '../../../lib/types';
 import AutoSubmitSelect from '../../_components/AutoSubmitSelect';
+import InfoTooltip from '../../_components/InfoTooltip';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Per-client transactions · AlphaROC' };
@@ -71,19 +73,19 @@ export default async function TransactionsReportPage({ searchParams }: PageProps
         <>
           <div className="detail-balances">
             <div className="bal">
-              <span className="bal-label">Credits</span>
+              <span className="bal-label">Credits <InfoTooltip text={TIP.creditsRemaining} /></span>
               <span className={`bal-value${bal.credits < 0 ? ' neg' : ''}`}>{creditsFmt(bal.credits)}</span>
             </div>
             <div className="bal">
-              <span className="bal-label">Dollars</span>
+              <span className="bal-label">Dollars <InfoTooltip text={TIP.dollarsRemaining} /></span>
               <span className={`bal-value${bal.dollars < 0 ? ' neg' : ''}`}>{dollars(bal.dollars)}</span>
             </div>
             <div className="bal">
-              <span className="bal-label">{currentYear} contract value</span>
+              <span className="bal-label">{currentYear} contract value <InfoTooltip text={TIP.cyValue} /></span>
               <span className="bal-value">{dollars(bal.cyValue)}</span>
             </div>
             <div className="bal">
-              <span className="bal-label">{currentYear} renewal</span>
+              <span className="bal-label">{currentYear} renewal <InfoTooltip text={TIP.cyRenewal} /></span>
               <span className="bal-value">{bal.cyRenewal ? isoDate(bal.cyRenewal) : '—'}</span>
             </div>
           </div>
@@ -96,8 +98,8 @@ export default async function TransactionsReportPage({ searchParams }: PageProps
                   <th>Kind</th>
                   <th>Name</th>
                   <th>For user</th>
-                  <th className="num">Credits Δ</th>
-                  <th className="num">Dollars Δ</th>
+                  <th className="num">Credits Δ <InfoTooltip text={TIP.creditsDelta} /></th>
+                  <th className="num">Dollars Δ <InfoTooltip text={TIP.dollarsDelta} /></th>
                   <th>Renewal</th>
                   <th>Recorded by</th>
                   <th>At</th>

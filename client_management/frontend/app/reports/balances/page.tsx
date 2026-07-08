@@ -2,6 +2,8 @@ import Link from 'next/link';
 
 import { apiForRequest } from '../../../lib/action';
 import { credits as creditsFmt, dollars, isoDate } from '../../../lib/format';
+import { TIP } from '../../../lib/tooltips';
+import InfoTooltip from '../../_components/InfoTooltip';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Balance summary · AlphaROC' };
@@ -24,10 +26,10 @@ export default async function BalancesPage() {
               <th>Client</th>
               <th>Relationship manager</th>
               <th>Client since</th>
-              <th className="num">Credits remaining</th>
-              <th className="num">Dollars remaining</th>
-              <th className="num">{currentYear} contract value</th>
-              <th>{currentYear} renewal</th>
+              <th className="num">Credits remaining<InfoTooltip text={TIP.creditsRemaining} /></th>
+              <th className="num">Dollars remaining<InfoTooltip text={TIP.dollarsRemaining} /></th>
+              <th className="num">{currentYear} contract value<InfoTooltip text={TIP.cyValue} /></th>
+              <th>{currentYear} renewal<InfoTooltip text={TIP.cyRenewal} /></th>
             </tr>
           </thead>
           <tbody>

@@ -3,6 +3,8 @@
 import { useMemo, useState } from 'react';
 
 import type { ClientUser, Cadence } from '../../../lib/types';
+import { TIP } from '../../../lib/tooltips';
+import InfoTooltip from '../../_components/InfoTooltip';
 import { createStudyAction } from './actions';
 
 const RUNS_PER_YEAR: Record<string, number> = { weekly: 52, monthly: 12, quarterly: 4 };
@@ -31,7 +33,7 @@ export default function NewStudyForm({ clientId, users }: Props) {
 
       {disabled && <p className="muted small">Pick a client above to enable this form.</p>}
 
-      <label>Users at this client (pick one or more)
+      <label>Users at this client (pick one or more)<InfoTooltip text={TIP.studyUser} />
         <select name="client_user_ids" multiple size={4} required disabled={disabled || users.length === 0}>
           {users.length === 0 && disabled ? null : users.length === 0 ? (
             <option value="" disabled>(no users on this client)</option>
@@ -61,7 +63,7 @@ export default function NewStudyForm({ clientId, users }: Props) {
       </label>
 
       <div className="amounts-row">
-        <label>Cadence
+        <label>Cadence<InfoTooltip text={TIP.cadence} />
           <select
             name="cadence"
             value={cadence}
@@ -74,7 +76,7 @@ export default function NewStudyForm({ clientId, users }: Props) {
             <option value="quarterly">Quarterly tracker</option>
           </select>
         </label>
-        <label>Cost type
+        <label>Cost type<InfoTooltip text={TIP.costType} />
           <select name="cost_type" required disabled={disabled} defaultValue="credits">
             <option value="credits">Credits</option>
             <option value="dollars">Dollars</option>
@@ -84,7 +86,7 @@ export default function NewStudyForm({ clientId, users }: Props) {
 
       <div className="amounts-row">
         <label>
-          {isTracker ? 'Cost per run' : 'Cost'}
+          {isTracker ? 'Cost per run' : 'Cost'}<InfoTooltip text={TIP.studyCost} />
           <input
             name="cost"
             type="number"
@@ -98,7 +100,7 @@ export default function NewStudyForm({ clientId, users }: Props) {
           <span className="muted small">Total / yr: {Math.round(annual).toLocaleString('en-US')}</span>
         </label>
         {isTracker && (
-          <label>Setup (credits, one-time)
+          <label>Setup (credits, one-time)<InfoTooltip text={TIP.setupCost} />
             <input name="setup_cost" type="number" step="0.01" min="0" defaultValue={0} disabled={disabled} />
           </label>
         )}

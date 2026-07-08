@@ -3,8 +3,10 @@ import Link from 'next/link';
 import { apiForRequest, parseId } from '../../../lib/action';
 import { todayIsoDate } from '../../../lib/dates';
 import { isoDate } from '../../../lib/format';
+import { TIP } from '../../../lib/tooltips';
 import ConfirmButton from '../../clients/ConfirmButton';
 import AutoSubmitSelect from '../../_components/AutoSubmitSelect';
+import InfoTooltip from '../../_components/InfoTooltip';
 import RenewalAutofill from './RenewalAutofill';
 import {
   createContractAction,
@@ -129,25 +131,25 @@ export default async function NewContractPage({ searchParams }: PageProps) {
               <p className="muted small">Pick a client above to enable this form.</p>
             )}
 
-            <label>Contract title
+            <label>Contract title <InfoTooltip text={TIP.contract} />
               <input name="name" type="text" required placeholder="e.g. Q4 2025 Initial Contract" disabled={!selectedClient} />
             </label>
 
             <div className="amounts-row">
-              <label>Contract date
+              <label>Contract date <InfoTooltip text={TIP.contractDate} />
                 <input name="occurred_on" id="occurred-on" type="date" defaultValue={today} required disabled={!selectedClient} />
               </label>
-              <label>Renewal date
+              <label>Renewal date <InfoTooltip text={TIP.renewalDate} />
                 <input name="renewal_on" id="renewal-on" type="date" required disabled={!selectedClient} />
                 <span className="muted small">Defaults to one year after the contract date.</span>
               </label>
             </div>
 
             <div className="amounts-row">
-              <label>Credits to add
+              <label>Credits to add <InfoTooltip text={TIP.creditsToAdd} />
                 <input name="credits_amount" type="number" step="0.01" min="0" placeholder="0" disabled={!selectedClient} />
               </label>
-              <label>Dollars to add
+              <label>Dollars to add <InfoTooltip text={TIP.dollarsToAdd} />
                 <input name="dollars_amount" type="number" step="0.01" min="0" placeholder="0" disabled={!selectedClient} />
               </label>
             </div>
