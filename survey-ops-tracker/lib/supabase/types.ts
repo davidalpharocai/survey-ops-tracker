@@ -226,6 +226,7 @@ export type Database = {
           project_code: string | null
           drive_folder_id: string | null
           deleted_at: string | null
+          delivered_at: string | null
           category: string | null
           objective: string | null
           sprint_number: number | null
@@ -292,6 +293,7 @@ export type Database = {
           project_code?: string | null
           drive_folder_id?: string | null
           deleted_at?: string | null
+          delivered_at?: string | null
           category?: string | null
           objective?: string | null
           sprint_number?: number | null
@@ -358,6 +360,7 @@ export type Database = {
           project_code?: string | null
           drive_folder_id?: string | null
           deleted_at?: string | null
+          delivered_at?: string | null
           category?: string | null
           objective?: string | null
           sprint_number?: number | null
@@ -646,6 +649,7 @@ export type Database = {
           occurred_at: string
           source: string | null
           external_id: string | null
+          deleted_at: string | null
           created_at: string
         }
         Insert: {
@@ -661,6 +665,7 @@ export type Database = {
           occurred_at?: string
           source?: string | null
           external_id?: string | null
+          deleted_at?: string | null
           created_at?: string
         }
         Update: {
@@ -676,6 +681,7 @@ export type Database = {
           occurred_at?: string
           source?: string | null
           external_id?: string | null
+          deleted_at?: string | null
           created_at?: string
         }
         Relationships: []
@@ -1149,6 +1155,81 @@ export type Database = {
         }
         Relationships: []
       }
+      email_inbox: {
+        Row: {
+          id: string
+          external_id: string
+          status: Database['public']['Enums']['email_inbox_status']
+          project_id: string | null
+          client_id: string | null
+          direction: string | null
+          from_email: string | null
+          to_emails: string[] | null
+          subject: string | null
+          snippet: string | null
+          body: string | null
+          occurred_at: string
+          gmail_message_id: string | null
+          source: string
+          match_candidates: Json | null
+          matched_confidence: number | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          external_id: string
+          status?: Database['public']['Enums']['email_inbox_status']
+          project_id?: string | null
+          client_id?: string | null
+          direction?: string | null
+          from_email?: string | null
+          to_emails?: string[] | null
+          subject?: string | null
+          snippet?: string | null
+          body?: string | null
+          occurred_at?: string
+          gmail_message_id?: string | null
+          source?: string
+          match_candidates?: Json | null
+          matched_confidence?: number | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          external_id?: string
+          status?: Database['public']['Enums']['email_inbox_status']
+          project_id?: string | null
+          client_id?: string | null
+          direction?: string | null
+          from_email?: string | null
+          to_emails?: string[] | null
+          subject?: string | null
+          snippet?: string | null
+          body?: string | null
+          occurred_at?: string
+          gmail_message_id?: string | null
+          source?: string
+          match_candidates?: Json | null
+          matched_confidence?: number | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'email_inbox_project_id_fkey'
+            columns: ['project_id']
+            isOneToOne: false
+            referencedRelation: 'survey_projects'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'email_inbox_client_id_fkey'
+            columns: ['client_id']
+            isOneToOne: false
+            referencedRelation: 'clients'
+            referencedColumns: ['id']
+          }
+        ]
+      }
     }
     Views: {
       portal_projects: {
@@ -1256,6 +1337,7 @@ export type Database = {
       deliverable_source: 'email' | 'upload'
       deliverable_kind: 'file' | 'link'
       deliverable_status: 'filed' | 'review' | 'duplicate' | 'unsorted'
+      email_inbox_status: 'review' | 'pending_no_project' | 'filed' | 'ignored'
     }
     CompositeTypes: Record<string, never>
   }
@@ -1274,6 +1356,8 @@ export type Enums<T extends keyof Database['public']['Enums']> =
 // Specific row types
 export type TeamMember = Tables<'team_members'>
 export type SurveyProject = Tables<'survey_projects'>
+export type EmailInbox = Tables<'email_inbox'>
+export type EmailInboxStatus = Enums<'email_inbox_status'>
 
 // Enum types
 export type ProjectType = Enums<'project_type'>
