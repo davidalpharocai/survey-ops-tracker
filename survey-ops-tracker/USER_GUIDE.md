@@ -256,6 +256,12 @@ Meridian."*
 - **It can't get around the rules.** A compliance gate stops it the same way it stops the app —
   it'll tell you and ask for an override reason rather than push through. It also can't touch
   **internal projects**, and it can't **delete** or **merge** anything.
+- **Creating a project walks the essentials.** When you ask it to add a survey, Claude runs a quick
+  intake — client, name, captain, type, salesperson, requested-by, due date, N, audience, budget,
+  longitudinal, and whether it's approved for the open pipeline or still in scoping — asking for
+  anything you skip and offering *"Not sure / will fill it in later"* so nothing blocks you. A
+  **captain is required**; if that person isn't on the roster yet, Claude can add them (with your OK
+  and their @alpharoc email).
 
 **Things you can ask it to recall:** *"What did we do last time for Coatue?"* · *"What's overdue
 for me?"* · *"How did last quarter's wave compare?"* If you ask what questions were asked last
