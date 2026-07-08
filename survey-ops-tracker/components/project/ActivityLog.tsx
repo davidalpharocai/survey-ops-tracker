@@ -23,10 +23,17 @@ function formatWhen(iso: string): string {
   })
 }
 
+// Gmail deep-link from the RFC-822 Message-ID stored in external_id ('email:<id>').
+function gmailUrl(externalId: string | null): string | null {
+  if (!externalId || !externalId.startsWith('email:')) return null
+  return `https://mail.google.com/mail/u/0/#search/rfc822msgid:${encodeURIComponent(externalId.slice('email:'.length))}`
+}
+
 export function ActivityLog({ projectId }: { projectId: string }) {
   const supabase = createClient()
   const [expanded, setExpanded] = useState<string | null>(null)
   const [showAll, setShowAll] = useState(false)
+  const [q, setQ] = useState('')
 
   const { data: activity = [], isLoading } = useQuery({
     queryKey: ['activity', projectId],
@@ -35,6 +42,7 @@ export function ActivityLog({ projectId }: { projectId: string }) {
         .from('project_activity')
         .select('*')
         .eq('project_id', projectId)
+        .is('deleted_at', null)
         .order('occurred_at', { ascending: false })
         .limit(100)
       if (error) throw error
@@ -42,16 +50,37 @@ export function ActivityLog({ projectId }: { projectId: string }) {
     },
   })
 
-  const visible = showAll ? activity : activity.slice(0, 5)
+  const term = q.trim().toLowerCase()
+  const filtered = term
+    ? activity.filter(a =>
+        `${a.subject ?? ''} ${a.snippet ?? ''} ${a.body ?? ''} ${a.sender ?? ''} ${a.recipients ?? ''}`
+          .toLowerCase()
+          .includes(term)
+      )
+    : activity
+  const visible = showAll || term ? filtered : filtered.slice(0, 5)
 
   return (
     <div className="bg-card border border-border shadow-sm rounded-xl p-4">
       <h3 className="text-xs text-muted-foreground uppercase tracking-widest mb-3 font-medium flex items-center">
         Activity
-        <InfoTooltip text="Logged emails and events for this project — click an entry to expand it." />
+        <InfoTooltip text="Logged emails and events for this project — click an entry to expand it. Use the search box to find a specific email." />
       </h3>
 
+      {activity.length > 0 && (
+        <input
+          value={q}
+          onChange={e => setQ(e.target.value)}
+          placeholder="Search activity (subject, body, people)…"
+          className="w-full text-xs px-2 py-1.5 mb-2 rounded-lg border border-border bg-background"
+        />
+      )}
+
       {isLoading && <p className="text-xs text-muted-foreground/50">Loading…</p>}
+
+      {!isLoading && term && filtered.length === 0 && (
+        <p className="text-xs text-muted-foreground/50">No activity matches “{q.trim()}”.</p>
+      )}
 
       {!isLoading && activity.length === 0 && (
         <p className="text-xs text-muted-foreground/50">
@@ -98,6 +127,16 @@ export function ActivityLog({ projectId }: { projectId: string }) {
                       {a.recipients && <>To: {a.recipients}</>}
                     </p>
                   )}
+                  {gmailUrl(a.external_id) && (
+                    <a
+                      href={gmailUrl(a.external_id) as string}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs text-muted-foreground hover:text-foreground w-fit"
+                    >
+                      open in Gmail ↗
+                    </a>
+                  )}
                   <pre className="text-sm text-foreground/90 whitespace-pre-wrap font-sans leading-relaxed max-h-80 overflow-y-auto">
                     {a.body ?? a.snippet ?? ''}
                   </pre>
@@ -108,7 +147,7 @@ export function ActivityLog({ projectId }: { projectId: string }) {
         })}
       </div>
 
-      {activity.length > 5 && (
+      {!term && activity.length > 5 && (
         <button
           onClick={() => setShowAll(v => !v)}
           className="text-xs text-muted-foreground hover:text-foreground mt-2 transition-colors"
