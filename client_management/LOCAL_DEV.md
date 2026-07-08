@@ -53,20 +53,28 @@ API docs: http://127.0.0.1:8000/docs
   files are byte-identical — **`backend/app/schema.sql` is the live one**
   (`frontend/db/schema.sql` is a vestigial copy used only by dead legacy scripts).
 
-## Findings (bugs & quirks found during the rebuild — none fixed yet)
+## Our changes on top of the pristine import
 
-1. **Server-action redirects drop the `/ccm` basePath** — every successful form
-   submit (create client/contract/study, edits, deletes) redirects to e.g.
-   `/clients?id=3` instead of `/ccm/clients?id=3` → lands on a 404. The write
-   succeeds. Next.js `redirect()` doesn't prepend `basePath`; fix is to prefix
-   the redirect paths (all in `app/**/actions.ts`). Likely broken in prod too.
-2. **Bare `/ccm` homepage shows "Sign in" locally** — the middleware matcher
-   misses the basePath root, so `x-user-email` isn't injected there; in prod the
-   Cognito cookie fallback in `lib/auth.ts` masks it. Subpages are fine.
-3. **Create/update client without a date 500s** — `became_on` is optional in the
-   request schema but NOT NULL in the DB → IntegrityError 500 instead of a 400.
-   Same class of issue: contracts don't validate `occurred_on` (missing/bad date
-   → 500). Studies DO validate theirs.
+- **FIXED — basePath redirects** (`1c1cb2a`): all server actions now redirect
+  through `redirectTo()` in `lib/action.ts`, which prepends `/ccm`
+  (single-sourced from `next.config.mjs` as `NEXT_PUBLIC_BASE_PATH`).
+  Worth flagging upstream to Tedi/Nachiket — likely broken in prod too.
+- **FIXED — local homepage auth** (`1c1cb2a`): `lib/auth.ts` falls back to
+  `DEV_USER_EMAIL` (never in production) so the `/ccm` hub renders signed-in.
+- **FIXED — date-validation 500s** (`1c1cb2a`): `parse_date` tolerates garbage,
+  clients require `became_on`, contracts require `occurred_on` + valid
+  `renewal_on` — clean 400s with human messages.
+- **NEW — credit-usage PDF export**: `GET /ccm/reports/transactions/pdf?client_id=N`
+  (jsPDF route handler) + a Download PDF button on the per-client transaction
+  report. Branded snapshot: balance summary + colored signed ledger.
+- **NEW — demo seed** (`.devstack/seed-from-socc.mjs`): loads the SOCC export
+  (62 clients w/ RM + since-date, 222 studies attributed to the requested-by
+  contact or a per-client "(Unassigned)" user, contacts as client users)
+  through the backend API. Studies land at 0 cost on purpose — the tracker has
+  no credit pricing; fill costs via the studies bulk-edit flow. Rerunnable.
+
+## Findings still open (inherited from the import)
+
 4. **`INTERNAL_API_SECRET` / `X-Internal-Auth` is documentation-only** — READMEs
    and both `.env.example`s describe a frontend↔backend shared secret; no code
    implements it (backend auth is Cognito JWT / X-User-Email + domain gate).

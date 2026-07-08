@@ -9,6 +9,7 @@
     "db:stop": "node db.mjs stop"
   },
   "dependencies": {
-    "embedded-postgres": "^17.2.0-beta.15"
+    "embedded-postgres": "^17.2.0-beta.15",
+    "exceljs": "^4.4.0"
   }
 }
