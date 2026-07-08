@@ -165,6 +165,12 @@ async def create_client(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Client name is required.",
         )
+    became_client_on = parse_date(body.became_on)
+    if became_client_on is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A 'became a client' date is required.",
+        )
     dup = await session.execute(select(Client).where(Client.name == name))
     if dup.scalar_one_or_none() is not None:
         raise HTTPException(
@@ -173,7 +179,7 @@ async def create_client(
         )
     client = Client(
         name=name,
-        became_client_on=parse_date(body.became_on),
+        became_client_on=became_client_on,
         primary_contact_name=_clean(body.primary_contact_name),
         primary_contact_cell=_clean(body.primary_contact_cell),
         primary_contact_email=_clean(body.primary_contact_email),
@@ -233,8 +239,14 @@ async def update_client(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=f"Another client is already named '{new_name}'.",
             )
+    became_client_on = parse_date(body.became_on)
+    if became_client_on is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A 'became a client' date is required.",
+        )
     client.name = new_name
-    client.became_client_on = parse_date(body.became_on)
+    client.became_client_on = became_client_on
     client.primary_contact_name = _clean(body.primary_contact_name)
     client.primary_contact_cell = _clean(body.primary_contact_cell)
     client.primary_contact_email = _clean(body.primary_contact_email)

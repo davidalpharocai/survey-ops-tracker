@@ -12,11 +12,28 @@
 
 import { cookies, headers } from 'next/headers';
 
-import { COOKIE_ID_TOKEN, verifyIdToken, type VerifiedUser } from './cognito';
+import {
+  COGNITO_ENABLED,
+  COOKIE_ID_TOKEN,
+  verifyIdToken,
+  type VerifiedUser,
+} from './cognito';
+
+// Local-dev shim, mirroring middleware.ts: when Cognito is not configured
+// (and never in production) treat DEV_USER_EMAIL as a signed-in admin.
+// Needed because the middleware matcher does not run on the bare basePath
+// root, so the home page would otherwise render signed-out locally.
+function devFallbackUser(): VerifiedUser | null {
+  if (COGNITO_ENABLED || process.env.NODE_ENV === 'production') return null;
+  const email = (process.env.DEV_USER_EMAIL || '').toLowerCase();
+  const domain = process.env.ALLOWED_DOMAIN || 'alpharoc.ai';
+  if (!email.endsWith('@' + domain)) return null;
+  return { email, isAdmin: true, claims: {} };
+}
 
 async function userFromCookie(): Promise<VerifiedUser | null> {
   const token = (await cookies()).get(COOKIE_ID_TOKEN)?.value;
-  return verifyIdToken(token);
+  return (await verifyIdToken(token)) ?? devFallbackUser();
 }
 
 export async function currentUserEmail(): Promise<string> {

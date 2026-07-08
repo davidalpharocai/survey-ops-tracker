@@ -1,9 +1,11 @@
+const basePath = '/ccm';
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   output: 'standalone',
-  basePath: '/ccm',
+  basePath,
   // Inline all env vars into the build. Amplify Hosting injects env vars
   // at build time only — the standalone SSR Lambda does NOT get runtime
   // process.env injection, so anything not baked here is empty at request
@@ -12,6 +14,7 @@ const nextConfig = {
   // route handler, never sent to browsers) so baking it in is safe: it ends
   // up only in the server bundle, not in any client-side JS.
   env: {
+    NEXT_PUBLIC_BASE_PATH: basePath,
     COGNITO_DOMAIN: process.env.COGNITO_DOMAIN || '',
     COGNITO_ISSUER: process.env.COGNITO_ISSUER || '',
     COGNITO_CLIENT_ID: process.env.COGNITO_CLIENT_ID || '',

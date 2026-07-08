@@ -22,13 +22,18 @@ def parse_date(s: str | None) -> datetime | None:
     Returns
     -------
     datetime or None
-        Timezone-aware UTC datetime at midnight, or ``None`` when no
-        input was given.
+        Naive datetime at UTC midnight (see module docstring), or
+        ``None`` when the input is missing or not a valid date.
+        Callers that require a date treat unparseable input the same
+        as absent and raise their own 400s.
     """
     if not s:
         return None
-    year, month, day = (int(p) for p in s.split("-"))
-    return datetime(year, month, day)
+    try:
+        year, month, day = (int(p) for p in str(s).split("-"))
+        return datetime(year, month, day)
+    except (TypeError, ValueError):
+        return None
 
 
 def add_year(d: datetime) -> datetime:

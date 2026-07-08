@@ -1,9 +1,8 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { redirect } from 'next/navigation';
 
-import { apiForRequest, parseId } from '../../../lib/action';
+import { apiForRequest, parseId, redirectTo } from '../../../lib/action';
 
 interface StudyInput {
   name?: FormDataEntryValue | null;
@@ -51,7 +50,7 @@ function bulkStudyFromFormData(formData: FormData, sid: string): StudyInput {
 
 export async function createStudyAction(formData: FormData): Promise<void> {
   const clientId = parseId(formData.get('client_id'));
-  if (clientId == null) redirect('/studies/new');
+  if (clientId == null) redirectTo('/studies/new');
   const api = await apiForRequest();
   const body = studyBody({
     name: formData.get('name'),
@@ -64,15 +63,15 @@ export async function createStudyAction(formData: FormData): Promise<void> {
   });
   await api.createStudy({ client_id: formData.get('client_id'), ...body });
   revalidatePath('/', 'layout');
-  redirect(`/studies/new?client_id=${clientId}`);
+  redirectTo(`/studies/new?client_id=${clientId}`);
 }
 
 export async function updateStudyAction(formData: FormData): Promise<void> {
   const id = parseId(formData.get('id'));
-  if (id == null) redirect('/studies/new');
+  if (id == null) redirectTo('/studies/new');
   const api = await apiForRequest();
   const t = await api.getTransaction(id);
-  if (!t || t.kind !== 'study') redirect('/studies/new');
+  if (!t || t.kind !== 'study') redirectTo('/studies/new');
   await api.updateStudy(id, studyBody({
     name: formData.get('name'),
     occurred_on: formData.get('occurred_on'),
@@ -83,31 +82,31 @@ export async function updateStudyAction(formData: FormData): Promise<void> {
     client_user_ids: formData.getAll('client_user_ids'),
   }));
   revalidatePath('/', 'layout');
-  redirect(`/studies/new?client_id=${t.clientId}`);
+  redirectTo(`/studies/new?client_id=${t.clientId}`);
 }
 
 export async function deleteStudyAction(formData: FormData): Promise<void> {
   const id = parseId(formData.get('id'));
-  if (id == null) redirect('/studies/new');
+  if (id == null) redirectTo('/studies/new');
   const api = await apiForRequest();
   const r = await api.deleteStudy(id);
   revalidatePath('/', 'layout');
-  redirect(`/studies/new?client_id=${r.clientId}`);
+  redirectTo(`/studies/new?client_id=${r.clientId}`);
 }
 
 export async function markStudyReviewedAction(formData: FormData): Promise<void> {
   const id = parseId(formData.get('id'));
-  if (id == null) redirect('/studies/new');
+  if (id == null) redirectTo('/studies/new');
   const api = await apiForRequest();
   const r = await api.markStudyReviewed(id);
   revalidatePath('/', 'layout');
-  redirect(`/studies/new?client_id=${r.clientId}`);
+  redirectTo(`/studies/new?client_id=${r.clientId}`);
 }
 
 // Save every row of the existing-studies table in one shot.
 export async function bulkUpdateStudiesAction(formData: FormData): Promise<void> {
   const clientId = parseId(formData.get('client_id'));
-  if (!clientId) redirect('/studies/new');
+  if (!clientId) redirectTo('/studies/new');
 
   const sids = new Set<string>();
   for (const key of formData.keys()) {
@@ -122,5 +121,5 @@ export async function bulkUpdateStudiesAction(formData: FormData): Promise<void>
   const api = await apiForRequest();
   await api.bulkUpdateStudies({ client_id: clientId, studies });
   revalidatePath('/', 'layout');
-  redirect(`/studies/new?client_id=${clientId}`);
+  redirectTo(`/studies/new?client_id=${clientId}`);
 }

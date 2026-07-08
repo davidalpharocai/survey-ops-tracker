@@ -59,10 +59,10 @@ def _validate(
         Trimmed contract name.
     credits_amount, dollars_amount : float
         Parsed positive amounts.
-    occurred_on : datetime
-        Contract start date.
-    renewal_on : datetime
-        Renewal date.
+    occurred_on : datetime or None
+        Contract start date (``None`` when missing/unparseable).
+    renewal_on : datetime or None
+        Renewal date (``None`` when the given value was unparseable).
 
     Raises
     ------
@@ -71,6 +71,10 @@ def _validate(
     """
     if not name:
         raise HTTPException(400, "Contract name is required.")
+    if occurred_on is None:
+        raise HTTPException(400, "Contract date is required.")
+    if renewal_on is None:
+        raise HTTPException(400, "Renewal date must be a valid date.")
     if credits_amount < 0 or dollars_amount < 0:
         raise HTTPException(400, "Contract amounts must be non-negative.")
     if credits_amount == 0 and dollars_amount == 0:
@@ -176,7 +180,11 @@ async def create_contract(
     name = (body.name or "").strip()
     occurred_on = parse_date(body.occurred_on)
     renewal_raw = (body.renewal_on or "").strip()
-    renewal_on = parse_date(renewal_raw) if renewal_raw else add_year(occurred_on)
+    renewal_on = (
+        parse_date(renewal_raw)
+        if renewal_raw
+        else (add_year(occurred_on) if occurred_on else None)
+    )
     credits_amount = parse_money(body.credits_amount)
     dollars_amount = parse_money(body.dollars_amount)
     _validate(name, credits_amount, dollars_amount, occurred_on, renewal_on)
@@ -230,7 +238,11 @@ async def update_contract(
     name = (body.name or "").strip()
     occurred_on = parse_date(body.occurred_on)
     renewal_raw = (body.renewal_on or "").strip()
-    renewal_on = parse_date(renewal_raw) if renewal_raw else add_year(occurred_on)
+    renewal_on = (
+        parse_date(renewal_raw)
+        if renewal_raw
+        else (add_year(occurred_on) if occurred_on else None)
+    )
     credits_amount = parse_money(body.credits_amount)
     dollars_amount = parse_money(body.dollars_amount)
     _validate(name, credits_amount, dollars_amount, occurred_on, renewal_on)

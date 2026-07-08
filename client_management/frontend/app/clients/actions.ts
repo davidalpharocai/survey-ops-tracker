@@ -1,9 +1,8 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { redirect } from 'next/navigation';
 
-import { apiForRequest, parseId } from '../../lib/action';
+import { apiForRequest, parseId, redirectTo } from '../../lib/action';
 
 export async function createClientAction(formData: FormData): Promise<void> {
   const api = await apiForRequest();
@@ -16,12 +15,12 @@ export async function createClientAction(formData: FormData): Promise<void> {
     relationship_manager: formData.get('relationship_manager'),
   });
   revalidatePath('/', 'layout');
-  redirect(`/clients?id=${c.id}`);
+  redirectTo(`/clients?id=${c.id}`);
 }
 
 export async function updateClientAction(formData: FormData): Promise<void> {
   const id = parseId(formData.get('id'));
-  if (id == null) redirect('/clients');
+  if (id == null) redirectTo('/clients');
   const api = await apiForRequest();
   await api.updateClient(id, {
     name: formData.get('name'),
@@ -32,51 +31,51 @@ export async function updateClientAction(formData: FormData): Promise<void> {
     relationship_manager: formData.get('relationship_manager'),
   });
   revalidatePath('/', 'layout');
-  redirect(`/clients?id=${id}`);
+  redirectTo(`/clients?id=${id}`);
 }
 
 export async function deleteClientAction(formData: FormData): Promise<void> {
   const id = parseId(formData.get('id'));
-  if (id == null) redirect('/clients');
+  if (id == null) redirectTo('/clients');
   const api = await apiForRequest();
   await api.deleteClient(id);
   revalidatePath('/', 'layout');
-  redirect('/clients');
+  redirectTo('/clients');
 }
 
 export async function createClientUserAction(formData: FormData): Promise<void> {
   const clientId = parseId(formData.get('client_id'));
-  if (clientId == null) redirect('/clients');
+  if (clientId == null) redirectTo('/clients');
   const api = await apiForRequest();
   await api.createClientUser(clientId, {
     name: formData.get('name'),
     email: formData.get('email'),
   });
   revalidatePath('/', 'layout');
-  redirect(`/clients?id=${clientId}`);
+  redirectTo(`/clients?id=${clientId}`);
 }
 
 export async function updateClientUserAction(formData: FormData): Promise<void> {
   const id = parseId(formData.get('id'));
-  if (id == null) redirect('/clients');
+  if (id == null) redirectTo('/clients');
   const api = await apiForRequest();
   const u = await api.getClientUser(id);
-  if (!u) redirect('/clients');
+  if (!u) redirectTo('/clients');
   await api.updateClientUser(id, {
     name: formData.get('name'),
     email: formData.get('email'),
   });
   revalidatePath('/', 'layout');
-  redirect(`/clients?id=${u.clientId}`);
+  redirectTo(`/clients?id=${u.clientId}`);
 }
 
 export async function deleteClientUserAction(formData: FormData): Promise<void> {
   const id = parseId(formData.get('id'));
-  if (id == null) redirect('/clients');
+  if (id == null) redirectTo('/clients');
   const api = await apiForRequest();
   const u = await api.getClientUser(id);
-  if (!u) redirect('/clients');
+  if (!u) redirectTo('/clients');
   const r = await api.deleteClientUser(id);
   revalidatePath('/', 'layout');
-  redirect(`/clients?id=${r.clientId}`);
+  redirectTo(`/clients?id=${r.clientId}`);
 }
