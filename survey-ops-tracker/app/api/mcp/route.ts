@@ -182,7 +182,10 @@ Before mutating: every create/update/status/stage tool follows preview-then-conf
 
 Duplicates: create_project checks for likely duplicate projects and returns them instead of writing. Ask the user whether to proceed before retrying with proceed_despite_duplicate:true — don't assume they want to.
 
-Creating a project — run an intake checklist. When asked to create/add a survey or project, make sure these are covered, asking for any the user hasn't given: client + project name (required); **captain (required** — create_project refuses without a valid team member, so ask until you have a real name/initials); project type (PS/B2B/Rerun); salesperson; requested-by (which client contact); due date; N target; audience size; budget; and whether it's longitudinal (+ cadence). For every item EXCEPT client/name/captain, always offer the user "Not sure / will fill it in later" as a valid answer — if they choose it, leave that field blank and move on; never nag or block on it. create_project itself takes client/project_name/project_type/captain/salesperson/due_date/n_target; set the rest AFTER creating — audience size / budget / longitudinal via update_project, requested-by via set_requested_by, a bid budget via set_bid_budget. If the client has compliance requirements (visible via get_client), mention them. Read the assembled details back to the user, then create.
+Creating a project — run an intake checklist. When asked to create/add a survey or project, make sure these are covered, asking for any the user hasn't given: client + project name (required); **captain (required)** — create_project refuses without a valid team member; project type (PS/B2B/Rerun); salesperson; requested-by (which client contact); due date; N target; audience size; budget; whether it's longitudinal (+ cadence); and **whether it's approved for the open pipeline or still in scoping**. For every item EXCEPT client/name/captain, always offer the user "Not sure / will fill it in later" — if they choose it, leave that field blank and move on; never nag or block on it.
+- Captain not on the roster? Tell the user and OFFER to add them: with their approval, get the person's name + @alpharoc email and call add_team_member (preview → confirm), then create the project with that captain. Never invent a captain or leave one unassigned.
+- Pipeline status: if the user hasn't said, ASK whether it's approved to move into the open pipeline (→ pass skip_scoping:true, starts Active/Submitted) or still in scoping / pre-sale (→ leave skip_scoping off; it defaults to Scoping / New Inquiry).
+create_project itself takes client/project_name/project_type/captain/salesperson/due_date/n_target/skip_scoping; set the rest AFTER creating — audience size / budget / longitudinal via update_project, requested-by via set_requested_by, a bid budget via set_bid_budget. If the client has compliance requirements (visible via get_client), mention them. Read the assembled details back to the user, then create.
 
 History & "what did we do last time": for "what did we do last time for <client>" or when planning a new project for a client you've served before, call get_client_history first — it returns past projects, derived patterns (typical N, common project type, typical fielding duration, cadence, recurring contacts), and any explicitly stated preferences. Use those patterns to offer sensible defaults when creating a new project for that client. get_project_history returns a project's sibling waves when it's part of a longitudinal/rerun series.
 
@@ -1351,8 +1354,8 @@ const handler = createMcpHandler(
               return {
                 needs: 'captain',
                 message: args.captain
-                  ? `"${args.captain}" didn't match a team member. A captain is required — who is running this project? (name or initials)`
-                  : 'A captain is required — who is running this project? (name or initials)',
+                  ? `"${args.captain}" isn't on the team roster. A captain is required — pick one below, or (with the user's OK) add them first via add_team_member using their name + @alpharoc email, then retry.`
+                  : 'A captain is required — who is running this project? (name or initials). If they are not on the roster, offer to add them via add_team_member (needs their @alpharoc email).',
                 valid_captains: (members ?? []).map(m => ({ name: m.name, initials: m.initials })),
               }
             }
@@ -1409,6 +1412,58 @@ const handler = createMcpHandler(
                 ok: true, project_code: row.project_code, id: row.id,
                 client: row.client, client_id: row.client_id, phase: row.phase, board_column: row.board_column,
               }
+            }
+          )
+        }, meta))
+      }
+    )
+
+    server.tool(
+      'add_team_member',
+      "Add a new team member to the roster (e.g. a captain not yet listed). Preview first; confirm to apply. Needs the person's name and @alpharoc email; initials are derived if not given. Only add someone the user has explicitly approved adding.",
+      {
+        name: z.string(),
+        email: z.string(),
+        initials: z.string().optional(),
+        confirm: z.boolean().optional(),
+      },
+      async (args, extra) => {
+        const meta: LoggedMeta = {}
+        return json(await logged(extra, 'add_team_member', async () => {
+          const name = args.name.trim()
+          const email = args.email.trim().toLowerCase()
+          if (!name || !email) return { error: 'name and email are both required.' }
+          if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return { error: 'A valid email is required to add a team member.' }
+          const deriveInitials = (n: string): string => {
+            const parts = n.split(/\s+/).filter(Boolean)
+            if (parts.length === 0) return ''
+            if (parts.length === 1) return parts[0].slice(0, 2)
+            return parts[0][0] + parts[parts.length - 1][0]
+          }
+          const initials = (args.initials?.trim() || deriveInitials(name)).toUpperCase()
+          if (!/^[A-Z0-9]{1,6}$/.test(initials)) {
+            return { needs: 'initials', message: 'Could not derive valid initials — provide initials explicitly (letters/digits, up to 6).' }
+          }
+          const supabase = createAdminClient()
+          const { data: dupEmail } = await supabase.from('team_members').select('name, initials').eq('email', email).maybeSingle()
+          if (dupEmail) {
+            return { already_exists: true, message: `${dupEmail.name} (${dupEmail.initials}) is already on the roster with that email — use them as the captain (no need to add).`, name: dupEmail.name, initials: dupEmail.initials }
+          }
+          const { data: dupInit } = await supabase.from('team_members').select('name').eq('initials', initials).maybeSingle()
+          if (dupInit) {
+            return { needs: 'initials', message: `Initials "${initials}" are already taken (by ${dupInit.name}). Provide different initials.` }
+          }
+          return confirmable(
+            args,
+            async () => ({ summary: `Add team member ${name} — ${initials} · ${email}`, fields: { name, initials, email } }),
+            async () => {
+              const { data: row, error } = await supabase.from('team_members').insert({ name, initials, email }).select('id, name, initials').single()
+              if (error) {
+                if (error.code === '23505') return { error: 'A team member with that email or initials already exists.' }
+                throw error
+              }
+              meta.detail = { created_team_member: { id: row.id, name: row.name, initials: row.initials } }
+              return { ok: true, id: row.id, name: row.name, initials: row.initials }
             }
           )
         }, meta))
