@@ -6,6 +6,11 @@ const nextConfig = {
   poweredByHeader: false,
   output: 'standalone',
   basePath,
+  // The Import Data admin page uploads whole workbooks through a server
+  // action; the SOCC export runs ~1 MB, over the 1 MB default.
+  experimental: {
+    serverActions: { bodySizeLimit: '10mb' },
+  },
   // Inline all env vars into the build. Amplify Hosting injects env vars
   // at build time only — the standalone SSR Lambda does NOT get runtime
   // process.env injection, so anything not baked here is empty at request

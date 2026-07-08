@@ -51,6 +51,10 @@ export default async function HomePage() {
                 <span className="hub-link-title">Audit Log</span>
                 <span className="hub-link-sub">Browse every write action and denied attempt across all users</span>
               </Link>
+              <Link className="hub-link" href="/admin/import">
+                <span className="hub-link-title">Import Data</span>
+                <span className="hub-link-sub">Upload a spreadsheet (CMS template or Survey Ops export), preview, apply</span>
+              </Link>
             </section>
           )}
         </div>

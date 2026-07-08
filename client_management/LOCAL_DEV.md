@@ -67,6 +67,15 @@ API docs: http://127.0.0.1:8000/docs
 - **NEW — credit-usage PDF export**: `GET /ccm/reports/transactions/pdf?client_id=N`
   (jsPDF route handler) + a Download PDF button on the per-client transaction
   report. Branded snapshot: balance summary + colored signed ledger.
+- **NEW — Import Data page** (`/ccm/admin/import`, admin-gated, on the hub's
+  Administration panel): upload an .xlsx → preview creates/updates/unchanged →
+  Apply → per-row results. Auto-detects the **CMS template** (blank download on
+  the page; the only format carrying costs/contracts — matched rows update only
+  the columns the sheet fills) vs a **SOCC export** (create-only refresh, never
+  touches existing records). Match by name, case-insensitive; empty cells never
+  overwrite; nothing is ever deleted; re-uploading a file is a no-op.
+  Engine in `frontend/lib/importer.ts`; test harness `.devstack/test-importer.mts`
+  (`npx tsx test-importer.mts <xlsx> [--apply]`).
 - **NEW — demo seed** (`.devstack/seed-from-socc.mjs`): loads the SOCC export
   (62 clients w/ RM + since-date, 222 studies attributed to the requested-by
   contact or a per-client "(Unassigned)" user, contacts as client users)
