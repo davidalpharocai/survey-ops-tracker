@@ -187,7 +187,7 @@ export default function ProjectDetailPage() {
           ← {backTo.label}
         </button>
         <span className="text-muted-foreground/50">/</span>
-        <h1 className="text-2xl font-bold text-foreground">{project.project_name}</h1>
+        <EditableTitle value={project.project_name} onSave={v => updateProject.mutate({ id, updates: { project_name: v } })} />
         {project.project_code && (
           <span
             className="text-xs font-mono text-muted-foreground border border-border rounded px-1.5 py-0.5"
@@ -1131,6 +1131,50 @@ function FlagChip({
           off-state reads as a pressable toggle rather than a disabled chip. */}
       {value ? (tone === 'red' ? `⚠ ${label}` : `✓ ${label}`) : `○ ${label}`}
     </button>
+  )
+}
+
+function EditableTitle({ value, onSave }: { value: string; onSave: (next: string) => void }) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState('')
+
+  function save() {
+    const trimmed = draft.trim()
+    if (trimmed && trimmed !== value) onSave(trimmed)
+    setEditing(false)
+  }
+
+  if (editing) {
+    return (
+      <span className="flex items-center gap-1.5 min-w-0 flex-1">
+        <input
+          autoFocus
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === 'Enter') save()
+            if (e.key === 'Escape') setEditing(false)
+          }}
+          className="text-2xl font-bold text-foreground bg-muted border border-border rounded px-1.5 py-0.5 focus:outline-none focus:border-ring min-w-0 flex-1"
+        />
+        <button
+          onClick={save}
+          className="text-xs bg-muted hover:bg-accent border border-border rounded px-2 py-1 transition-colors shrink-0"
+        >
+          Save
+        </button>
+      </span>
+    )
+  }
+
+  return (
+    <h1
+      onClick={() => { setDraft(value); setEditing(true) }}
+      title="Click to rename (the PR##### code stays the same)"
+      className="text-2xl font-bold text-foreground cursor-pointer hover:text-foreground/70 rounded px-1 -mx-1 transition-colors"
+    >
+      {value}
+    </h1>
   )
 }
 
