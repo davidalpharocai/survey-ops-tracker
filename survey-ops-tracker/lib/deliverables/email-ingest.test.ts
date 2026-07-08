@@ -75,6 +75,17 @@ describe('ingestEmail', () => {
     expect(rows).toHaveLength(0)
   })
 
+  it('does not re-stage a review copy when the attachment is already filed elsewhere (global content dedup)', async () => {
+    const drive = new FakeDrive('root')
+    // Ambiguous recipient → would normally route to 00_Needs Review, but this exact file is already in the depository.
+    const { deps, rows, replies } = makeDeps(drive, { findDup: async () => 'already-filed-id' })
+    const out = await ingestEmail({ ...pdfPayload, to: 'unknown@randomco.com', body: 'no hints', messageId: 'msg-dup-elsewhere' }, deps)
+    expect(out).toEqual({ action: 'processed', filed: 0, queued: 0, duplicates: 1 })
+    expect(rows).toHaveLength(0)                                                 // no review row created
+    expect(replies[0].subject).toContain('Already filed')
+    expect(await drive.findChildFolder('root', '00_Needs Review')).toBeFalsy()   // and no empty review folder created
+  })
+
   it('ignores a link-only email — links are not auto-filed (attachments only)', async () => {
     const drive = new FakeDrive('root')
     const { deps, rows } = makeDeps(drive)
@@ -131,7 +142,7 @@ describe('ingestEmail', () => {
   it('skips a duplicate item but files its new sibling in the same email', async () => {
     const drive = new FakeDrive('root')
     const dupHash = sha256(Buffer.from('dupe'))
-    const { deps, rows } = makeDeps(drive, { findDup: async (_f, opts) => (opts.fileHash === dupHash ? 'existing-id' : null) })
+    const { deps, rows } = makeDeps(drive, { findDup: async (opts) => (opts.fileHash === dupHash ? 'existing-id' : null) })
     const out = await ingestEmail({
       ...pdfPayload, messageId: 'msg-mixed',
       attachments: [

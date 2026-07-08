@@ -4,7 +4,7 @@ import { GoogleDrive } from '@/lib/drive/google'
 import { safeEqual } from '@/lib/utils/secureCompare'
 import { ingestEmail, type IngestDeps, type EmailDeliverableRow } from '@/lib/deliverables/email-ingest'
 import { loadMatchData } from '@/lib/deliverables/load'
-import { findDuplicate } from '@/lib/deliverables/persist'
+import { findDuplicateAnywhere } from '@/lib/deliverables/persist'
 import { ensureClientFolder } from '@/lib/deliverables/folders'
 import { sendAndLog } from '@/lib/email/send'
 import type { Database } from '@/lib/supabase/types'
@@ -41,7 +41,7 @@ export async function POST(req: Request) {
       return (data?.length ?? 0) > 0
     },
     clientFolderId: (clientId) => ensureClientFolder(admin, drive, sharedDriveId, clientId),
-    findDup: (folderId, opts) => findDuplicate(admin, folderId, opts),
+    findDup: (opts) => findDuplicateAnywhere(admin, opts),
     persist: async (row: EmailDeliverableRow) => {
       // Boundary cast: row is structurally the deliverables Insert; only match_candidates (LabeledCandidate[]) needs widening to Json.
       const { data: inserted, error } = await admin

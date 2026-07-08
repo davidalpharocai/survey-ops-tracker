@@ -3,9 +3,8 @@ import type { DriveClient } from '@/lib/drive/types'
 import type { ClientRec, ContactRec, ProjectRec } from './types'
 import { matchDeliverable } from './matcher'
 import { fileDeliverable, type FolderResolver } from './ingest'
-import { ensureChildFolder } from './folders'
 import { projectFolderName, originalSendDate } from './naming'
-import { routeMatch, describeCandidates, type LabeledCandidate, type Routing } from './confidence'
+import { routeMatch, describeCandidates, type LabeledCandidate } from './confidence'
 import { clientSignalEmail, emailDateISO, itemizeAttachments, isInternalSender, type IngestPayload } from './email'
 import { replySubject, renderReplyHtml, type ReplyItem } from './reply'
 
@@ -47,7 +46,9 @@ export type IngestDeps = {
   now: Date
   isProcessed: (gmailMessageId: string) => Promise<boolean>
   clientFolderId: (clientId: string) => Promise<string>
-  findDup: (folderId: string, opts: { fileHash?: string | null; sourceUrl?: string | null }) => Promise<string | null>
+  // Dedup is content-global (any folder): a file already filed anywhere in the depository is treated as a
+  // duplicate, so an already-filed deliverable arriving by email is not re-staged into the review queue.
+  findDup: (opts: { fileHash?: string | null; sourceUrl?: string | null }) => Promise<string | null>
   persist: (row: EmailDeliverableRow) => Promise<void>
   reply: (to: string, subject: string, html: string) => Promise<void>
 }
@@ -55,12 +56,6 @@ export type IngestDeps = {
 export type IngestOutcome =
   | { action: 'ignored'; reason: 'external_sender' | 'duplicate_message' | 'no_items' }
   | { action: 'processed'; filed: number; queued: number; duplicates: number }
-
-async function targetFolder(deps: IngestDeps, r: FolderResolver, routing: Routing): Promise<string> {
-  if (!routing.confident) return ensureChildFolder(deps.drive, deps.sharedDriveId, r.needsReviewFolderName)
-  const clientFolder = await r.clientFolderId()
-  return ensureChildFolder(deps.drive, clientFolder, routing.hasProject ? r.projectFolderName() : r.unsortedFolderName)
-}
 
 export async function ingestEmail(payload: IngestPayload, deps: IngestDeps): Promise<IngestOutcome> {
   if (!isInternalSender(payload.from)) return { action: 'ignored', reason: 'external_sender' }
@@ -99,7 +94,6 @@ export async function ingestEmail(payload: IngestPayload, deps: IngestDeps): Pro
     unsortedFolderName: '_Unsorted',
   }
 
-  const folderId = await targetFolder(deps, resolver, routing)
   const persistClientId = routing.confident ? match.clientId : null
   const persistProjectId = routing.status === 'filed' ? match.projectId : null
 
@@ -113,7 +107,7 @@ export async function ingestEmail(payload: IngestPayload, deps: IngestDeps): Pro
     file?: { mimeType: string; bytes: Buffer }
     sourceUrl?: string | null
   }) {
-    if (await deps.findDup(folderId, opts.dedup)) {
+    if (await deps.findDup(opts.dedup)) {
       duplicates++
       replyItems.push({ name: opts.name, status: 'duplicate' })
       return
