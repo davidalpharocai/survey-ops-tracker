@@ -182,6 +182,8 @@ Before mutating: every create/update/status/stage tool follows preview-then-conf
 
 Duplicates: create_project checks for likely duplicate projects and returns them instead of writing. Ask the user whether to proceed before retrying with proceed_despite_duplicate:true — don't assume they want to.
 
+Creating a project — run an intake checklist. When asked to create/add a survey or project, make sure these are covered, asking for any the user hasn't given: client + project name (required); **captain (required** — create_project refuses without a valid team member, so ask until you have a real name/initials); project type (PS/B2B/Rerun); salesperson; requested-by (which client contact); due date; N target; audience size; budget; and whether it's longitudinal (+ cadence). For every item EXCEPT client/name/captain, always offer the user "Not sure / will fill it in later" as a valid answer — if they choose it, leave that field blank and move on; never nag or block on it. create_project itself takes client/project_name/project_type/captain/salesperson/due_date/n_target; set the rest AFTER creating — audience size / budget / longitudinal via update_project, requested-by via set_requested_by, a bid budget via set_bid_budget. If the client has compliance requirements (visible via get_client), mention them. Read the assembled details back to the user, then create.
+
 History & "what did we do last time": for "what did we do last time for <client>" or when planning a new project for a client you've served before, call get_client_history first — it returns past projects, derived patterns (typical N, common project type, typical fielding duration, cadence, recurring contacts), and any explicitly stated preferences. Use those patterns to offer sensible defaults when creating a new project for that client. get_project_history returns a project's sibling waves when it's part of a longitudinal/rerun series.
 
 Questionnaire content: the actual questions asked live in Google Docs/Sheets, not this database. get_project and get_client_history return linked document URLs — hand those to the user's Drive connector if they ask what was asked last time, rather than guessing at question content.
@@ -1331,18 +1333,29 @@ const handler = createMcpHandler(
 
           const supabase = createAdminClient()
 
+          // Captain is REQUIRED for connector-created projects. Resolve the name/
+          // initials to a team member; if absent or unmatched, block (on preview AND
+          // confirm) and ask — nothing is allowed to land unassigned.
           let captainId: string | null = null
-          let captainNote: string | null = null
-          if (args.captain) {
+          {
             const { data: members, error: memErr } = await supabase.from('team_members').select('id, name, initials')
             if (memErr) throw memErr
-            const s = args.captain.trim().toLowerCase()
-            const match =
-              (members ?? []).find(m => m.initials.toLowerCase() === s) ??
-              (members ?? []).find(m => m.name.toLowerCase() === s) ??
-              (members ?? []).find(m => m.name.toLowerCase().includes(s))
+            const s = (args.captain ?? '').trim().toLowerCase()
+            const match = s
+              ? ((members ?? []).find(m => m.initials.toLowerCase() === s) ??
+                 (members ?? []).find(m => m.name.toLowerCase() === s) ??
+                 (members ?? []).find(m => m.name.toLowerCase().includes(s)))
+              : undefined
             if (match) captainId = match.id
-            else captainNote = `Captain "${args.captain}" didn't match a team member — left unassigned.`
+            else {
+              return {
+                needs: 'captain',
+                message: args.captain
+                  ? `"${args.captain}" didn't match a team member. A captain is required — who is running this project? (name or initials)`
+                  : 'A captain is required — who is running this project? (name or initials)',
+                valid_captains: (members ?? []).map(m => ({ name: m.name, initials: m.initials })),
+              }
+            }
           }
 
           // Duplicate check: same client firm, or a similarly-named project already on file.
@@ -1383,7 +1396,6 @@ const handler = createMcpHandler(
             async () => ({
               summary: `Create "${projectName}" for ${normalizeClientText(clientText)}${args.skip_scoping ? ' (skip scoping — Active/Submitted)' : ''}`,
               fields: patch,
-              captain_note: captainNote,
               duplicate_warning: dupRows && dupRows.length > 0
                 ? `${dupRows.length} similar project(s) already exist for this client/name — proceeding anyway.`
                 : null,
