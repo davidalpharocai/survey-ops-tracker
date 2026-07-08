@@ -523,3 +523,30 @@ button:hover, .btn:hover { background: var(--accent-hover); }
 .studies-table th .sort-ind { color: var(--accent); margin-left: 0.2rem; font-size: 0.75rem; }
 .studies-table td.num.annual-cell { font-variant-numeric: tabular-nums; font-weight: 600; }
 .bulk-actions { display: flex; gap: 1rem; align-items: center; margin: 0.75rem 0 1.5rem; }
+
+/* ---------- Mobile ---------- */
+
+/* Wide data tables would otherwise push the whole page sideways on a
+   phone. On narrow screens make each table its own horizontal-scroll
+   region (single-line cells) so the page body itself never scrolls. */
+@media (max-width: 760px) {
+  .report,
+  .studies-table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    white-space: nowrap;
+  }
+  main { padding: 1rem; }
+}
+
+/* Top bar: let the long product name and its links wrap instead of
+   overflowing on a phone. */
+@media (max-width: 600px) {
+  .topbar {
+    flex-wrap: wrap;
+    gap: 0.5rem 0.9rem;
+    padding: 0.6rem 0.9rem;
+  }
+  .topbar .brand { font-size: 0.95rem; flex-basis: 100%; }
+}
