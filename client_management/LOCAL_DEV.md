@@ -67,6 +67,12 @@ API docs: http://127.0.0.1:8000/docs
 - **NEW — credit-usage PDF export**: `GET /ccm/reports/transactions/pdf?client_id=N`
   (jsPDF route handler) + a Download PDF button on the per-client transaction
   report. Branded snapshot: balance summary + colored signed ledger.
+- **NEW — (i) tooltips**: CSS-only `InfoTooltip` (app/_components) + shared
+  text (lib/tooltips.ts) on the ambiguous domain labels across the study &
+  contract forms, client detail, and both reports (esp. the credit/cadence
+  math). Hover or keyboard-focus to reveal.
+- **NEW — Mobile**: wide tables scroll within their own region under 760px;
+  topbar wraps under 600px (the app already collapsed panels/panes/dialogs).
 - **NEW — Admin allow-list**: `CCM_ADMIN_EMAILS` (default
   david@/tedi@/nachi@alpharoc.ai) grants admin regardless of Cognito group;
   `settings.is_admin()` / `isAdminIdentity()` gate both tiers. Local dev no
