@@ -167,6 +167,20 @@ file it, pick another project from the dropdown, or mark it **"Not a deliverable
 Items already filed under the right client but with no project show as **unsorted** — assign a
 project the same way.
 
+## 9b. Email activity timeline
+
+Client emails are logged automatically to each project's **Activity** panel, so there's a clean, chronological record of what was said and when — nobody has to copy anything out of Gmail.
+
+**How it decides where an email goes** (once set up — see the `EMAIL_ACTIVITY_GO_LIVE.md` runbook):
+- **Auto-logged** when it's confident: the email mentions a project code (PR#####) or a survey ID, or it's from a known client contact and clearly about one project (its name is in the email, or the client has just one active project).
+- **Sent to Email Review** (☰ menu → **Email Review**) when it's unsure — e.g. a client with several active projects and nothing in the email says which one. Open the queue and file each email to the right project with one click, or **Ignore** it. Confident emails skip review entirely.
+
+**On the project page:** the **Activity** panel lists emails newest-first — click one to expand the full message, use **open in Gmail** to jump to the original, and use the **search box** to find a specific email by subject, body, or person.
+
+**Ask Claude:** with the connector you can ask things like *"find the email where Coatue approved the budget"* — it searches the activity log and can pull up the full message.
+
+**Privacy:** only mail from a known client contact or domain is ever forwarded — and it's a copy, so your own inbox is untouched. Personal / HR / finance mail is never captured. Delivered and on-hold projects aren't treated as "open," and a project keeps logging email for 2 days after it's marked delivered (to catch stragglers), then stops.
+
 ## 10. Connect your Claude
 
 The **☰ menu → Connect your Claude** page (`/connect`) links Survey Ops to Claude — claude.ai,
