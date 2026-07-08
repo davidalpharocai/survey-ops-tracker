@@ -4,6 +4,8 @@ import { currentUserEmail, currentUserIsAdmin } from '../lib/auth';
 
 export const metadata = { title: 'AlphaROC Client Credit Management' };
 
+const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || '';
+
 export default async function HomePage() {
   const [userEmail, isAdmin] = await Promise.all([
     currentUserEmail(),
@@ -54,6 +56,14 @@ export default async function HomePage() {
               <Link className="hub-link" href="/admin/import">
                 <span className="hub-link-title">Import Data</span>
                 <span className="hub-link-sub">Upload a spreadsheet (CMS template or Survey Ops export), preview, apply</span>
+              </Link>
+              <a className="hub-link" href={`${BASE_PATH}/admin/export`} download>
+                <span className="hub-link-title">Export Data</span>
+                <span className="hub-link-sub">Download all clients, contracts &amp; studies as a ZIP (re-importable workbook + raw ledger)</span>
+              </a>
+              <Link className="hub-link" href="/admin/team">
+                <span className="hub-link-title">Team Members</span>
+                <span className="hub-link-sub">Invite or remove @alpharoc.ai users and set who is an admin</span>
               </Link>
             </section>
           )}
