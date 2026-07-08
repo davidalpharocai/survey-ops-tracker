@@ -142,6 +142,40 @@ export default async function ConnectPage() {
       </div>
 
       <div className={card}>
+        <h3 className={heading}>Email capture setup</h3>
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          Turn on automatic logging of your client emails into each project&apos;s Activity timeline.
+          Only mail from a known client contact or domain is forwarded — and it&apos;s a copy, so your
+          own inbox is untouched; personal, HR, and finance mail is never captured. Anything uncertain
+          waits in <a href="/email-review" className="text-primary hover:underline">Email Review</a> for
+          one click.
+        </p>
+        <ol className="list-decimal list-inside space-y-1.5 text-sm text-muted-foreground mt-3">
+          <li>
+            In Gmail → <strong className="text-foreground">Settings → Forwarding and POP/IMAP → Add a
+            forwarding address</strong>, add{' '}
+            <code className="text-xs bg-muted rounded px-1 py-0.5">activity@alpharoc.ai</code> and verify
+            it (whoever set up the group can get you the confirmation code).
+          </li>
+          <li>
+            Download your filter set below, then in Gmail → <strong className="text-foreground">Settings
+            → Filters and Blocked Addresses → Import filters</strong>, choose the file and create them.
+            (Re-importing later? Delete the old &quot;Survey Ops activity capture&quot; filters first.)
+          </li>
+        </ol>
+        <a
+          href="/api/admin/gmail-filters"
+          className="inline-block mt-3 text-sm bg-muted hover:bg-accent border border-border text-foreground rounded-lg px-3 py-1.5 transition-colors"
+        >
+          ⬇ Download my filter set
+        </a>
+        <p className="text-xs text-muted-foreground/70 mt-2">
+          Requires the one-time group setup (see EMAIL_ACTIVITY_GO_LIVE.md). Added new client contacts
+          since last time? Re-download and re-import to keep the filters current.
+        </p>
+      </div>
+
+      <div className={card}>
         <h3 className={heading}>Active connections</h3>
         {connections.length === 0 ? (
           <p className="text-xs text-muted-foreground/50">No Claudes connected yet.</p>

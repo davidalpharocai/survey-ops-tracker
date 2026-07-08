@@ -171,7 +171,7 @@ project the same way.
 
 Client emails are logged automatically to each project's **Activity** panel, so there's a clean, chronological record of what was said and when — nobody has to copy anything out of Gmail.
 
-**How it decides where an email goes** (once set up — see the `EMAIL_ACTIVITY_GO_LIVE.md` runbook):
+**Setup (once per captain):** ☰ menu → **Connect your Claude → Email capture setup** — verify the forwarding address and import your filter set. **How it decides where an email goes:**
 - **Auto-logged** when it's confident: the email mentions a project code (PR#####) or a survey ID, or it's from a known client contact and clearly about one project (its name is in the email, or the client has just one active project).
 - **Sent to Email Review** (☰ menu → **Email Review**) when it's unsure — e.g. a client with several active projects and nothing in the email says which one. Open the queue and file each email to the right project with one click, or **Ignore** it. Confident emails skip review entirely.
 
