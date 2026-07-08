@@ -131,9 +131,10 @@ async def require_user(
                 detail="Missing X-User-Email header.",
             )
         email = x_user_email.strip().lower()
-        # Local dev has no token; treat the dev user as a member of both
-        # the app and admin groups so the admin page is reachable.
-        groups = [settings.cognito_allowed_group, settings.cognito_admin_group]
+        # Local dev has no token; grant the app group. Admin rights come
+        # from the CCM_ADMIN_EMAILS allow-list (see settings.is_admin), so
+        # the dev user is admin only if their email is listed.
+        groups = [settings.cognito_allowed_group]
 
     domain = settings.allowed_domain
     if domain and not email.endswith("@" + domain):
@@ -180,7 +181,7 @@ async def require_admin(
         ``403`` if the user is not a member of the admin group.
     """
     groups = getattr(request.state, "actor_groups", []) or []
-    if settings.cognito_admin_group not in groups:
+    if not settings.is_admin(_email, groups):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Admin access required.",

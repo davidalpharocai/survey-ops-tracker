@@ -46,6 +46,13 @@ class Settings(BaseSettings):
     cognito_admin_group: str = Field(
         default="ccm-admins", alias="COGNITO_ADMIN_GROUP"
     )
+    # Comma-separated emails granted admin regardless of Cognito group
+    # membership. Lets the app be administered before/without the
+    # ccm-admins group being wired up. Defaults to the initial owners.
+    admin_emails: str = Field(
+        default="david@alpharoc.ai,tedi@alpharoc.ai,nachi@alpharoc.ai",
+        alias="CCM_ADMIN_EMAILS",
+    )
 
     # Athena query path for the audit-log admin page. Populated by
     # Terraform; empty in local development (the admin endpoints then
@@ -147,6 +154,43 @@ class Settings(BaseSettings):
         """
         return bool(
             self.athena_database and self.athena_table and self.audit_s3_output
+        )
+
+    @property
+    def admin_email_set(self) -> set[str]:
+        """Lower-cased set of explicitly allow-listed admin emails.
+
+        Returns
+        -------
+        set of str
+            Emails from ``CCM_ADMIN_EMAILS`` that are admins regardless
+            of Cognito group membership.
+        """
+        return {
+            e.strip().lower() for e in self.admin_emails.split(",") if e.strip()
+        }
+
+    def is_admin(self, email: str, groups: list[str]) -> bool:
+        """Whether the given identity has admin rights.
+
+        Admin if the email is in the :attr:`admin_email_set` allow-list
+        OR the user is a member of the Cognito admin group.
+
+        Parameters
+        ----------
+        email : str
+            The verified user email.
+        groups : list of str
+            The user's Cognito groups.
+
+        Returns
+        -------
+        bool
+            ``True`` if the user is an administrator.
+        """
+        return (
+            email.strip().lower() in self.admin_email_set
+            or self.cognito_admin_group in (groups or [])
         )
 
     @property

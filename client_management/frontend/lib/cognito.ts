@@ -22,6 +22,21 @@ const ALLOWED_DOMAIN = process.env.ALLOWED_DOMAIN || 'alpharoc.ai';
 const ALLOWED_GROUP = process.env.COGNITO_ALLOWED_GROUP || 'ccm-users';
 const ADMIN_GROUP = process.env.COGNITO_ADMIN_GROUP || 'ccm-admins';
 
+// Emails granted admin regardless of Cognito group. Mirrors the
+// backend's CCM_ADMIN_EMAILS so both tiers agree on who is an admin.
+const ADMIN_EMAILS = new Set(
+  (process.env.CCM_ADMIN_EMAILS ||
+    'david@alpharoc.ai,tedi@alpharoc.ai,nachi@alpharoc.ai')
+    .split(',')
+    .map(e => e.trim().toLowerCase())
+    .filter(Boolean),
+);
+
+/** Whether an identity is an admin (allow-list email OR admin group). */
+export function isAdminIdentity(email: string, groups: string[]): boolean {
+  return ADMIN_EMAILS.has(email.trim().toLowerCase()) || groups.includes(ADMIN_GROUP);
+}
+
 // CLIENT_SECRET is only used server-side (token exchange); do not gate
 // COGNITO_ENABLED on it — Edge middleware never has access to the secret.
 export const COGNITO_ENABLED = Boolean(DOMAIN && ISSUER && CLIENT_ID);
@@ -66,7 +81,7 @@ export async function verifyIdToken(token: string | undefined): Promise<Verified
     const email = String(payload.email || '').toLowerCase();
     if (!email || !email.endsWith('@' + ALLOWED_DOMAIN)) return null;
 
-    return { email, isAdmin: groups.includes(ADMIN_GROUP), claims: payload };
+    return { email, isAdmin: isAdminIdentity(email, groups), claims: payload };
   } catch {
     return null;
   }

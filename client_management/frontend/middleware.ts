@@ -12,7 +12,12 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 
-import { COGNITO_ENABLED, COOKIE_ID_TOKEN, verifyIdToken } from './lib/cognito';
+import {
+  COGNITO_ENABLED,
+  COOKIE_ID_TOKEN,
+  isAdminIdentity,
+  verifyIdToken,
+} from './lib/cognito';
 
 const ALLOWED_DOMAIN = process.env.ALLOWED_DOMAIN || 'alpharoc.ai';
 
@@ -45,9 +50,9 @@ export async function middleware(req: NextRequest): Promise<NextResponse> {
       devEmail &&
       devEmail.toLowerCase().endsWith('@' + ALLOWED_DOMAIN)
     ) {
-      // Local dev has no IdP; treat the dev user as an admin so the
-      // admin page is reachable without Cognito.
-      return forward(req, devEmail, true);
+      // Local dev has no IdP; admin rights follow the CCM_ADMIN_EMAILS
+      // allow-list (same as production), not an automatic grant.
+      return forward(req, devEmail, isAdminIdentity(devEmail, []));
     }
     return new NextResponse(
       'Auth not configured. Set Cognito env vars, or DEV_USER_EMAIL for local dev.',

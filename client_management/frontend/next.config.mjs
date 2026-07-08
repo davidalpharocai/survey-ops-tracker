@@ -29,6 +29,7 @@ const nextConfig = {
     COGNITO_ADMIN_GROUP: process.env.COGNITO_ADMIN_GROUP || '',
     APP_BASE_URL: process.env.APP_BASE_URL || '',
     ALLOWED_DOMAIN: process.env.ALLOWED_DOMAIN || '',
+    CCM_ADMIN_EMAILS: process.env.CCM_ADMIN_EMAILS || '',
     BACKEND_URL: process.env.BACKEND_URL || '',
     DEV_USER_EMAIL: process.env.DEV_USER_EMAIL || '',
   },
