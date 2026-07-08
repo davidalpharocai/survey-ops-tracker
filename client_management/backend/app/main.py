@@ -15,6 +15,7 @@ from app.routers import (
     health,
     reports,
     studies,
+    team,
     transactions,
     users,
 )
@@ -81,6 +82,7 @@ app.include_router(studies.router)
 app.include_router(transactions.router)
 app.include_router(reports.router)
 app.include_router(admin.router)
+app.include_router(team.router)
 
 
 @app.get("/", tags=["meta"])

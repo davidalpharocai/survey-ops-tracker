@@ -152,6 +152,29 @@ export interface ApiClient {
   listTransactionsByClient(clientId: number): Promise<Transaction[]>;
 
   listAuditLogs(filters: AuditLogFilters): Promise<AuditLogPage>;
+
+  listTeam(): Promise<TeamList>;
+  inviteTeamMember(d: { email: string; is_admin: boolean }): Promise<unknown>;
+  setTeamAdmin(d: { email: string; is_admin: boolean }): Promise<unknown>;
+  setTeamEnabled(d: { email: string; enabled: boolean }): Promise<unknown>;
+}
+
+export interface TeamMember {
+  email: string;
+  status: string | null;
+  enabled: boolean;
+  isAdmin: boolean;
+  adminSource: 'allowlist' | 'group' | null;
+  createdAt: string | null;
+}
+
+export interface TeamList {
+  configured: boolean;
+  allowlistAdmins: string[];
+  allowedGroup: string;
+  adminGroup: string;
+  allowedDomain: string;
+  members: TeamMember[];
 }
 
 /**
@@ -207,5 +230,10 @@ export function api(userEmail: string): ApiClient {
       const s = qs.toString();
       return r('GET', `/api/admin/audit-logs${s ? `?${s}` : ''}`);
     },
+
+    listTeam: () => r('GET', '/api/admin/team'),
+    inviteTeamMember: d => r('POST', '/api/admin/team', d),
+    setTeamAdmin: d => r('POST', '/api/admin/team/set-admin', d),
+    setTeamEnabled: d => r('POST', '/api/admin/team/set-enabled', d),
   };
 }

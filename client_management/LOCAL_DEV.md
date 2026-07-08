@@ -67,6 +67,22 @@ API docs: http://127.0.0.1:8000/docs
 - **NEW — credit-usage PDF export**: `GET /ccm/reports/transactions/pdf?client_id=N`
   (jsPDF route handler) + a Download PDF button on the per-client transaction
   report. Branded snapshot: balance summary + colored signed ledger.
+- **NEW — Admin allow-list**: `CCM_ADMIN_EMAILS` (default
+  david@/tedi@/nachi@alpharoc.ai) grants admin regardless of Cognito group;
+  `settings.is_admin()` / `isAdminIdentity()` gate both tiers. Local dev no
+  longer auto-admins every dev user — admin follows the allow-list.
+- **NEW — Export Data** (`/ccm/admin/export`, admin-only): downloads a ZIP of
+  the re-importable CMS-template workbook + a raw transaction-ledger CSV +
+  README. Round-trips through the importer (verified 344 unchanged).
+- **NEW — Team Members** (`/ccm/admin/team`, admin-only): invite/enable/disable
+  @alpharoc.ai users and toggle admin, via Cognito Admin APIs (backend router
+  `team.py`). **Prereq for prod:** the backend Lambda's execution role needs
+  `cognito-idp:AdminCreateUser`, `AdminAddUserToGroup`,
+  `AdminRemoveUserFromGroup`, `AdminEnableUser`, `AdminDisableUser`,
+  `ListUsers`, `ListUsersInGroup` on the CCM pool (add to `infra/terraform`
+  before this works). Locally (no Cognito) the page shows a manual-runbook
+  state and the allow-list admins; the Cognito write calls are therefore
+  **built but unverified locally** — verify in staging once IAM is granted.
 - **NEW — Import Data page** (`/ccm/admin/import`, admin-gated, on the hub's
   Administration panel): upload an .xlsx → preview creates/updates/unchanged →
   Apply → per-row results. Auto-detects the **CMS template** (blank download on

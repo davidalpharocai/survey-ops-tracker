@@ -492,6 +492,7 @@ button:hover, .btn:hover { background: var(--accent-hover); }
 .tag-error { background: #fee2e2; color: var(--neg); }
 
 .neg { color: var(--neg); }
+.pos { color: var(--pos); }
 
 .audit-detail { margin-top: 0.4rem; }
 .audit-detail pre {
