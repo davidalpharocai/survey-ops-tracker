@@ -552,6 +552,12 @@ export default function ProjectDetailPage() {
                 onSave={v => updateProject.mutate({ id, updates: { launch_date: v } })}
               />
               <EditableDateRow
+                label="Due Date"
+                value={project.due_date}
+                tooltip={TOOLTIPS['Due Date']}
+                onSave={v => updateProject.mutate({ id, updates: { due_date: v } })}
+              />
+              <EditableDateRow
                 label="Deliver Date"
                 value={project.deliver_date}
                 tooltip={TOOLTIPS['Deliver Date']}
@@ -1145,7 +1151,7 @@ function DetailRow({
         {label}
         {tooltip && <InfoTooltip text={tooltip} />}
       </span>
-      <span className={`text-sm ${valueClass}`}>{value}</span>
+      <span className={`text-sm px-1.5 ${valueClass}`}>{value}</span>
     </div>
   )
 }
