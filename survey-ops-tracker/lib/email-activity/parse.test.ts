@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { extractMessageId, stripQuotedHistory, tokenizeSurveyIds, parseParticipants } from './parse'
+import { extractMessageId, stripQuotedHistory, tokenizeSurveyIds, parseParticipants, parseForwardedHeaders } from './parse'
 
 describe('extractMessageId', () => {
   it('extracts the RFC-822 Message-ID without angle brackets', () => {
@@ -68,6 +68,42 @@ describe('tokenizeSurveyIds', () => {
     expect(tokenizeSurveyIds(null)).toEqual([])
     expect(tokenizeSurveyIds('')).toEqual([])
     expect(tokenizeSurveyIds('   \n  ')).toEqual([])
+  })
+})
+
+describe('parseForwardedHeaders', () => {
+  it('recovers the original sender + recipients from a Gmail forward', () => {
+    const body = [
+      'FYI — see below.',
+      '',
+      '---------- Forwarded message ---------',
+      'From: Jane Client <jane@acme.com>',
+      'Date: Mon, Jul 8, 2026 at 2:00 PM',
+      'Subject: Korea Survey',
+      'To: David Ohnona <david@alpharoc.ai>',
+      '',
+      'Hi David, numbers attached…',
+    ].join('\n')
+    const r = parseForwardedHeaders(body)
+    expect(r?.from_email).toBe('jane@acme.com')
+    expect(r?.to_emails).toContain('david@alpharoc.ai')
+    expect(r?.subject).toBe('Korea Survey')
+  })
+  it('handles an Outlook "Original Message" block', () => {
+    const body = [
+      '-----Original Message-----',
+      'From: Bob Vendor <bob@vendor.com>',
+      'Sent: Monday, July 8, 2026 2:00 PM',
+      'To: Team <ops@alpharoc.ai>',
+      'Subject: Update',
+    ].join('\n')
+    const r = parseForwardedHeaders(body)
+    expect(r?.from_email).toBe('bob@vendor.com')
+    expect(r?.to_emails).toContain('ops@alpharoc.ai')
+  })
+  it('returns null when there is no forwarded header block', () => {
+    expect(parseForwardedHeaders('Just a normal note, nothing quoted.')).toBeNull()
+    expect(parseForwardedHeaders('')).toBeNull()
   })
 })
 

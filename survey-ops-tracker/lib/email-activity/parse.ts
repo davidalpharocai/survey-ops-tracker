@@ -85,3 +85,43 @@ export function parseParticipants(
 ): { from_email: string | null; to_emails: string[] } {
   return { from_email: firstAddress(from), to_emails: addressList(to) }
 }
+
+const FWD_MARKER_RE =
+  /^\s*(?:-{2,}\s*Forwarded message\s*-{2,}|-{2,}\s*Original Message\s*-{2,}|Begin forwarded message:)/im
+
+/** Recover the ORIGINAL sender/recipients from a forwarded email's body. A manual
+ *  "Fwd:" arrives with the forwarder as From and activity@ as To, so the real
+ *  client lives in the quoted header block. Anchors on a forwarded-message marker
+ *  when present, else the first "From:" line with an address. Returns null if none
+ *  is found (the caller only trusts this when the mail already looks forwarded). */
+export function parseForwardedHeaders(
+  body: string
+): { from_email: string | null; to_emails: string[]; subject: string | null } | null {
+  if (!body) return null
+  const lines = body.split(/\r?\n/)
+  let start = 0
+  for (let i = 0; i < lines.length; i++) {
+    if (FWD_MARKER_RE.test(lines[i])) { start = i + 1; break }
+  }
+  let fromEmail: string | null = null
+  let fromIdx = -1
+  for (let i = start; i < lines.length; i++) {
+    const m = lines[i].match(/^\s*From:\s*(.+)$/i)
+    if (m) {
+      const addr = m[1].match(EMAIL_RE)?.[0]
+      if (addr) { fromEmail = addr.toLowerCase(); fromIdx = i; break }
+    }
+  }
+  if (!fromEmail) return null
+  const toEmails: string[] = []
+  let subject: string | null = null
+  for (let i = fromIdx; i < Math.min(lines.length, fromIdx + 10); i++) {
+    const to = lines[i].match(/^\s*(?:To|Cc):\s*(.+)$/i)
+    if (to) for (const a of to[1].matchAll(EMAIL_RE)) toEmails.push(a[0].toLowerCase())
+    if (!subject) {
+      const s = lines[i].match(/^\s*Subject:\s*(.+)$/i)
+      if (s) subject = s[1].trim()
+    }
+  }
+  return { from_email: fromEmail, to_emails: [...new Set(toEmails)], subject }
+}
