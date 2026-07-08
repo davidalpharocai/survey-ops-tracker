@@ -1,0 +1,47 @@
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Python (legacy, will be removed once the rewrite is verified)
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.venv/
+venv/
+env/
+*.egg-info/
+.pytest_cache/
+
+# SQLite (local DB shouldn't be committed)
+*.db
+*.sqlite
+*.sqlite3
+
+# Legacy Flask instance dir (old Python app)
+instance/
+
+# Env files (only the .example is committed)
+.env
+.env.local
+
+# OS / editors
+.DS_Store
+._*
+Thumbs.db
+.idea/
+.vscode/
+
+# Build artifacts
+build/
+dist/
+.next/
+*.tsbuildinfo
+
+# Source data (company-confidential, never commit)
+data/
+*.xlsx

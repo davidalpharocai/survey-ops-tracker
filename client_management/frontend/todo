@@ -1,0 +1,1 @@
+source .venv/bin/activate && DEV_USER_EMAIL=mlrecce@alpharoc.ai SECRET_KEY=dev python app.py

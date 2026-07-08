@@ -1,0 +1,36 @@
+{
+  "name": "client-credits-app",
+  "version": "0.2.0",
+  "description": "AlphaROC client credits and dollars management (Next.js)",
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start --hostname 0.0.0.0",
+    "db:init": "node --env-file=.env scripts/apply-schema.js",
+    "migrate:from-sqlite": "python3 scripts/migrate_sqlite_to_postgres.py",
+    "seed:clients": "node --env-file=.env scripts/seed-from-spreadsheet.js",
+    "seed:users": "node --env-file=.env scripts/seed-users.js",
+    "seed:studies": "node --env-file=.env scripts/seed-studies.js",
+    "seed:client-studies": "node --env-file=.env scripts/seed-client-studies.js",
+    "migrate:tx-users": "node --env-file=.env scripts/migrate-tx-users.js",
+    "reset:contracts": "node --env-file=.env scripts/reset-contracts.js"
+  },
+  "dependencies": {
+    "exceljs": "^4.4.0",
+    "jose": "^5.10.0",
+    "next": "^15.0.3",
+    "pg": "^8.13.1",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.1",
+    "@types/react": "^19.2.15",
+    "@types/react-dom": "^19.2.3",
+    "typescript": "^6.0.3"
+  }
+}

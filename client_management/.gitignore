@@ -1,0 +1,59 @@
+# ---- Secrets / env (NEVER commit) ----
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+
+# ---- Node ----
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.Python
+.venv/
+venv/
+env/
+.pytest_cache/
+
+# ---- Terraform (state holds the DB password/secrets — never commit) ----
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+tfplan*
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+# Keep the dependency lock file (.terraform.lock.hcl) tracked.
+
+# ---- SQLite / local DBs ----
+*.db
+*.sqlite
+*.sqlite3
+instance/
+
+# ---- Source data (company-confidential) ----
+data/
+*.xlsx
+
+# ---- OS / editors ----
+.DS_Store
+._*
+Thumbs.db
+.idea/
+.vscode/
+
+# ---- Build artifacts ----
+build/
+dist/

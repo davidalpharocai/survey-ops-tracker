@@ -1,0 +1,66 @@
+"""Request bodies for the write API.
+
+These intentionally mirror the *form field names* the Express routes
+collected (``became_on``, ``credits_amount``, ``client_user_ids`` …)
+rather than the database columns. All parsing, defaulting and validation
+that used to live in ``frontend/src/app.js`` now happens server-side so
+the frontend is a thin pass-through.
+"""
+
+from pydantic import BaseModel, Field
+
+
+class ClientIn(BaseModel):
+    """Create/update payload for a client (mirrors the client form)."""
+
+    name: str = ""
+    became_on: str | None = None
+    primary_contact_name: str | None = None
+    primary_contact_cell: str | None = None
+    primary_contact_email: str | None = None
+    relationship_manager: str | None = None
+
+
+class ClientUserIn(BaseModel):
+    """Create/update payload for a client user."""
+
+    name: str = ""
+    email: str | None = None
+
+
+class ContractIn(BaseModel):
+    """Create/update payload for a contract transaction."""
+
+    client_id: int | None = None
+    name: str = ""
+    occurred_on: str | None = None
+    renewal_on: str | None = None
+    credits_amount: float | str | None = None
+    dollars_amount: float | str | None = None
+
+
+class StudyIn(BaseModel):
+    """Create/update payload for a study transaction.
+
+    Mirrors the unified study form consumed by ``readStudyForm``: a
+    single ``cost`` field (per-run for trackers, total otherwise) with
+    legacy ``cost_per_run`` / ``cost_amount`` fallbacks.
+    """
+
+    client_id: int | None = None
+    name: str = ""
+    occurred_on: str | None = None
+    cost_type: str | None = None
+    cadence: str | None = None
+    cost: float | str | None = None
+    cost_per_run: float | str | None = None
+    cost_amount: float | str | None = None
+    setup_cost: float | str | None = None
+    client_user_ids: list[int] = Field(default_factory=list)
+
+
+class StudyBulkUpdateIn(BaseModel):
+    """Bulk save payload: one client, many study rows keyed by id."""
+
+    client_id: int
+    studies: dict[int, StudyIn]

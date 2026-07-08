@@ -1,0 +1,283 @@
+"""Client-user CRUD endpoints.
+
+Covers the inline user management on the Manage Client List page and the
+flat, filterable Manage User List. The "can't delete a user still
+attributed to transactions" guard is enforced here.
+"""
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func, or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.auth import require_user
+from app.db import get_session
+from app.models import Client, ClientUser, Transaction
+from app.schemas import ClientUserIn
+from app.serializers import client_dict, client_user_dict
+
+router = APIRouter(tags=["users"], dependencies=[Depends(require_user)])
+
+
+async def _user_or_404(session: AsyncSession, user_id: int) -> ClientUser:
+    """Fetch a client user by id or raise ``404``.
+
+    Parameters
+    ----------
+    session : AsyncSession
+        Active database session.
+    user_id : int
+        Primary key to look up.
+
+    Returns
+    -------
+    ClientUser
+        The matching client user.
+
+    Raises
+    ------
+    HTTPException
+        ``404`` when no user has the given id.
+    """
+    user = await session.get(ClientUser, user_id)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
+    return user
+
+
+@router.get("/api/clients/{client_id}/users")
+async def list_client_users(
+    client_id: int, session: AsyncSession = Depends(get_session)
+) -> list[dict]:
+    """List a client's users ascending by name.
+
+    Parameters
+    ----------
+    client_id : int
+        Owning client.
+    session : AsyncSession
+        Injected request-scoped database session.
+
+    Returns
+    -------
+    list of dict
+        Serialised client users.
+    """
+    result = await session.execute(
+        select(ClientUser)
+        .where(ClientUser.client_id == client_id)
+        .order_by(ClientUser.name.asc())
+    )
+    return [client_user_dict(u) for u in result.scalars().all()]
+
+
+@router.post(
+    "/api/clients/{client_id}/users", status_code=status.HTTP_201_CREATED
+)
+async def create_client_user(
+    client_id: int,
+    body: ClientUserIn,
+    session: AsyncSession = Depends(get_session),
+    user: str = Depends(require_user),
+) -> dict:
+    """Add a user to a client.
+
+    Parameters
+    ----------
+    client_id : int
+        Owning client.
+    body : ClientUserIn
+        User form payload.
+    session : AsyncSession
+        Injected request-scoped database session.
+    user : str
+        Authenticated acting user (recorded as ``created_by_email``).
+
+    Returns
+    -------
+    dict
+        The created client user.
+
+    Raises
+    ------
+    HTTPException
+        ``404`` if the client is absent, ``400`` if the name is blank.
+    """
+    client = await session.get(Client, client_id)
+    if client is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Client not found"
+        )
+    name = (body.name or "").strip()
+    if not name:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User name is required.",
+        )
+    email = (body.email or "").strip() or None
+    cu = ClientUser(
+        client_id=client_id,
+        name=name,
+        email=email,
+        created_by_email=user,
+    )
+    session.add(cu)
+    await session.commit()
+    await session.refresh(cu)
+    return client_user_dict(cu)
+
+
+@router.get("/api/users")
+async def list_users_filtered(
+    client_id: int | None = Query(default=None),
+    q: str | None = Query(default=None),
+    session: AsyncSession = Depends(get_session),
+) -> list[dict]:
+    """Flat user list with the parent client embedded as ``client``.
+
+    Parameters
+    ----------
+    client_id : int or None
+        Restrict to one client.
+    q : str or None
+        Case-sensitive substring matched against name or email.
+    session : AsyncSession
+        Injected request-scoped database session.
+
+    Returns
+    -------
+    list of dict
+        Serialised users, each with a nested ``client``.
+    """
+    stmt = (
+        select(ClientUser, Client)
+        .join(Client, Client.id == ClientUser.client_id)
+        .order_by(Client.name.asc(), ClientUser.name.asc())
+    )
+    if client_id:
+        stmt = stmt.where(ClientUser.client_id == client_id)
+    if q:
+        like = f"%{q}%"
+        stmt = stmt.where(
+            or_(ClientUser.name.like(like), ClientUser.email.like(like))
+        )
+    result = await session.execute(stmt)
+    rows = []
+    for cu, client in result.all():
+        d = client_user_dict(cu)
+        d["client"] = client_dict(client)
+        rows.append(d)
+    return rows
+
+
+@router.get("/api/users/{user_id}")
+async def get_user(
+    user_id: int, session: AsyncSession = Depends(get_session)
+) -> dict:
+    """Fetch a single client user by id.
+
+    Parameters
+    ----------
+    user_id : int
+        Primary key of the user.
+    session : AsyncSession
+        Injected request-scoped database session.
+
+    Returns
+    -------
+    dict
+        The serialised client user.
+
+    Raises
+    ------
+    HTTPException
+        ``404`` if absent.
+    """
+    return client_user_dict(await _user_or_404(session, user_id))
+
+
+@router.patch("/api/users/{user_id}")
+async def update_user(
+    user_id: int,
+    body: ClientUserIn,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Update a client user's name/email.
+
+    Parameters
+    ----------
+    user_id : int
+        Primary key of the user to update.
+    body : ClientUserIn
+        User form payload.
+    session : AsyncSession
+        Injected request-scoped database session.
+
+    Returns
+    -------
+    dict
+        The updated client user (includes ``clientId`` for redirects).
+
+    Raises
+    ------
+    HTTPException
+        ``404`` if absent, ``400`` if the name is blank.
+    """
+    cu = await _user_or_404(session, user_id)
+    name = (body.name or "").strip()
+    if not name:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User name is required.",
+        )
+    cu.name = name
+    cu.email = (body.email or "").strip() or None
+    await session.commit()
+    await session.refresh(cu)
+    return client_user_dict(cu)
+
+
+@router.delete("/api/users/{user_id}")
+async def delete_user(
+    user_id: int, session: AsyncSession = Depends(get_session)
+) -> dict:
+    """Delete a client user, unless still attributed to transactions.
+
+    Parameters
+    ----------
+    user_id : int
+        Primary key of the user to delete.
+    session : AsyncSession
+        Injected request-scoped database session.
+
+    Returns
+    -------
+    dict
+        ``{"clientId": int, "name": str}`` so the caller can redirect
+        and flash a confirmation.
+
+    Raises
+    ------
+    HTTPException
+        ``404`` if absent, ``409`` if the user is still attributed to
+        one or more transactions (legacy ``client_user_id`` column).
+    """
+    cu = await _user_or_404(session, user_id)
+    count = await session.scalar(
+        select(func.count())
+        .select_from(Transaction)
+        .where(Transaction.client_user_id == user_id)
+    )
+    if count and count > 0:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"Can't delete '{cu.name}' — attributed to {count} "
+                "transaction(s). Reassign or void those first."
+            ),
+        )
+    client_id, name = cu.client_id, cu.name
+    await session.delete(cu)
+    await session.commit()
+    return {"clientId": client_id, "name": name}

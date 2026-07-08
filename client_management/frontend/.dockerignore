@@ -1,0 +1,33 @@
+# Dependencies (rebuilt inside the image; node_modules is platform-specific)
+node_modules/
+npm-debug.log*
+
+# Secrets / env
+.env
+.env.local
+
+# Databases — never bake data into the image
+*.db
+*.sqlite
+*.sqlite3
+instance/
+
+# Company-confidential source data
+data/
+*.xlsx
+
+# Python legacy
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# VCS / OS / editor cruft
+.git/
+.gitignore
+.DS_Store
+._*
+.idea/
+.vscode/
+todo

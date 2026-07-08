@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtualenvs
+.venv/
+venv/
+env/
+
+# Env files (only the .example is committed)
+.env
+.env.local
+
+# OS / editors
+.DS_Store
+._*
+.idea/
+.vscode/

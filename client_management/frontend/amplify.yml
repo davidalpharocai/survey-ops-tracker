@@ -1,0 +1,26 @@
+version: 1
+# Monorepo build spec for AWS Amplify Hosting. The Next.js app lives in
+# frontend/; backend and infra live elsewhere in the same repo.
+applications:
+  - appRoot: frontend
+    frontend:
+      phases:
+        preBuild:
+          commands:
+            # Next 15 requires Node ≥ 18.18. Pin to 20 (the default
+            # Amplify build image's Node version can lag).
+            - nvm install 20
+            - nvm use 20
+            - node --version
+            - npm ci --no-audit --no-fund
+        build:
+          commands:
+            - npm run build
+      artifacts:
+        baseDirectory: .next
+        files:
+          - '**/*'
+      cache:
+        paths:
+          - .next/cache/**/*
+          - node_modules/**/*
