@@ -2,6 +2,8 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useQuery } from '@tanstack/react-query'
+import { createClient } from '@/lib/supabase/client'
 
 const USER_GUIDE_URL =
   'https://docs.google.com/document/d/1FtnUeytOj1OI54dEhB5ogmoIcVKK18c9E1FztwKpQXE/edit'
@@ -15,6 +17,20 @@ export function AppMenu() {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   const pathname = usePathname()
+
+  // Pending Email Review count → a small badge so the queue actually gets drained.
+  // Fails soft (defaults to 0 → no badge) if the table/permission isn't there.
+  const { data: emailPending = 0 } = useQuery({
+    queryKey: ['email-review-count'],
+    queryFn: async () => {
+      const { count } = await createClient()
+        .from('email_inbox')
+        .select('id', { count: 'exact', head: true })
+        .in('status', ['review', 'pending_no_project'])
+      return count ?? 0
+    },
+    staleTime: 60_000,
+  })
 
   // Close when navigating, clicking outside, or pressing Escape
   useEffect(() => setOpen(false), [pathname])
@@ -87,6 +103,11 @@ export function AppMenu() {
             title="Email Review — client emails we couldn't confidently tie to one project; file them to the right project or ignore"
           >
             <span>✉️</span> Email Review
+            {emailPending > 0 && (
+              <span className="ml-auto text-xs font-medium px-1.5 py-0.5 rounded-full bg-primary/15 text-primary">
+                {emailPending}
+              </span>
+            )}
           </Link>
           <div className="border-t border-border my-1.5" />
           <Link

@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
@@ -34,31 +34,36 @@ export function ActivityLog({ projectId }: { projectId: string }) {
   const [expanded, setExpanded] = useState<string | null>(null)
   const [showAll, setShowAll] = useState(false)
   const [q, setQ] = useState('')
+  // Debounce the search term. An empty term shows the recent view; a term runs a
+  // DB search (trigram-indexed) over the FULL history, not just the loaded page.
+  const [debounced, setDebounced] = useState('')
+  useEffect(() => {
+    const id = setTimeout(() => setDebounced(q.trim()), 250)
+    return () => clearTimeout(id)
+  }, [q])
+  const searching = debounced.length > 0
 
   const { data: activity = [], isLoading } = useQuery({
-    queryKey: ['activity', projectId],
+    queryKey: ['activity', projectId, debounced.toLowerCase()],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('project_activity')
         .select('*')
         .eq('project_id', projectId)
         .is('deleted_at', null)
+      const s = debounced.replace(/[%_,()\\]/g, ' ').trim()
+      if (s) {
+        query = query.or(`subject.ilike.%${s}%,body.ilike.%${s}%,snippet.ilike.%${s}%,sender.ilike.%${s}%`)
+      }
+      const { data, error } = await query
         .order('occurred_at', { ascending: false })
-        .limit(100)
+        .limit(s ? 50 : 100)
       if (error) throw error
       return data as Activity[]
     },
   })
 
-  const term = q.trim().toLowerCase()
-  const filtered = term
-    ? activity.filter(a =>
-        `${a.subject ?? ''} ${a.snippet ?? ''} ${a.body ?? ''} ${a.sender ?? ''} ${a.recipients ?? ''}`
-          .toLowerCase()
-          .includes(term)
-      )
-    : activity
-  const visible = showAll || term ? filtered : filtered.slice(0, 5)
+  const visible = showAll || searching ? activity : activity.slice(0, 5)
 
   return (
     <div className="bg-card border border-border shadow-sm rounded-xl p-4">
@@ -78,8 +83,8 @@ export function ActivityLog({ projectId }: { projectId: string }) {
 
       {isLoading && <p className="text-xs text-muted-foreground/50">Loading…</p>}
 
-      {!isLoading && term && filtered.length === 0 && (
-        <p className="text-xs text-muted-foreground/50">No activity matches “{q.trim()}”.</p>
+      {!isLoading && searching && activity.length === 0 && (
+        <p className="text-xs text-muted-foreground/50">No activity matches “{debounced}”.</p>
       )}
 
       {!isLoading && activity.length === 0 && (
@@ -147,7 +152,7 @@ export function ActivityLog({ projectId }: { projectId: string }) {
         })}
       </div>
 
-      {!term && activity.length > 5 && (
+      {!searching && activity.length > 5 && (
         <button
           onClick={() => setShowAll(v => !v)}
           className="text-xs text-muted-foreground hover:text-foreground mt-2 transition-colors"
