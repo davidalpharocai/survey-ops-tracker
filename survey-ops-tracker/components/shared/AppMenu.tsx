@@ -81,6 +81,13 @@ export function AppMenu() {
           >
             <span>📦</span> Deliverables
           </Link>
+          <Link
+            href="/email-review"
+            className={itemClass}
+            title="Email Review — client emails we couldn't confidently tie to one project; file them to the right project or ignore"
+          >
+            <span>✉️</span> Email Review
+          </Link>
           <div className="border-t border-border my-1.5" />
           <Link
             href="/connect"
