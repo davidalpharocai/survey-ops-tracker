@@ -1,0 +1,14 @@
+{
+  "name": "cms-devstack",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local dev Postgres for client_management (embedded, no Docker/service)",
+  "type": "module",
+  "scripts": {
+    "db:start": "node db.mjs start",
+    "db:stop": "node db.mjs stop"
+  },
+  "dependencies": {
+    "embedded-postgres": "^17.2.0-beta.15"
+  }
+}

@@ -37,6 +37,9 @@ override.tf.json
 *_override.tf.json
 # Keep the dependency lock file (.terraform.lock.hcl) tracked.
 
+# ---- Local dev Postgres (embedded-postgres data dir) ----
+.devstack/pgdata/
+
 # ---- SQLite / local DBs ----
 *.db
 *.sqlite
