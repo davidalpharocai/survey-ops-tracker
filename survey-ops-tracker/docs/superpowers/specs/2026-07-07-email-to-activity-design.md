@@ -224,10 +224,13 @@ touches a project timeline until a human approves it.**
 
 ## Rollout (phased)
 
-- **Phase 1**: explicit-signal auto-log only — validated survey-ID / PR-code /
-  single active-operational project — plus the review queue for everything else.
-  Ship, then observe review-queue volume.
+- **Phase 1**: **inbound client mail only** (Gmail auto-forward fires on incoming
+  mail, not a captain's own Sent — see Review resolutions), with **explicit-signal
+  auto-log only** — validated survey-ID / PR-code / single active-operational
+  project — plus the review queue for everything else. Ship, then observe queue volume.
 - **Phase 2**: enable the fuzzier contact / domain / name tiers once volume is trusted.
+- **Later (optional)**: an explicit outbound mechanism (or a manual "cc activity@" habit)
+  if standalone outbound capture is wanted beyond the quoted history in replies.
 
 ## Reused vs. new
 
@@ -270,3 +273,115 @@ job.
 - Integration: endpoint happy path (confident → `project_activity`), ambiguous →
   `review`, unknown → `pending_no_project`, duplicate Message-ID → no-op,
   promote-on-file.
+
+## Review resolutions (final decisions from the 2026-07-07 spec review)
+
+A 4-lens review found the architecture sound (`ready-with-changes`) but flagged
+gaps to close before planning. These resolutions govern the implementation plan.
+
+**Scope — inbound-first (must-fix).** Gmail filter "forward to" fires only on
+*incoming* mail, so a captain's own Sent mail is NOT auto-captured. Phase 1
+captures **inbound client mail**; since replies quote the prior thread and we
+store the full body, outbound context is preserved. Automatic outbound capture is
+out of scope (optional later: explicit mechanism or a manual "cc activity@" habit).
+
+**Header transport — validate before building (must-fix).** Dedup
+(`external_id='email:'+RFC-822 Message-ID`) and inbound client resolution
+(original `From`) assume those headers survive filter→Group→backing-inbox. Groups
+can rewrite `From` (DMARC) and GmailApp has no Message-ID accessor. **Plan task #1
+is a spike**: forward one CC'd email from two accounts through `activity@` and
+confirm (a) both backing-inbox copies share one Message-ID and (b) the original
+From survives. Extract via Gmail advanced service `Users.Messages.get(format=metadata)`
+or `getRawContent()`+`/^Message-ID:/im` (no attachment download). If Message-ID/From
+can't be resolved → route to review. Disable Group From-munging if present.
+
+**delivered_at (must-fix).** Add `survey_projects.delivered_at timestamptz`. Stamp
+via a dedicated **BEFORE UPDATE trigger** when `OLD.board_column <> 'Delivery' AND
+NEW.board_column = 'Delivery'` (the existing audit trigger is AFTER UPDATE and
+can't set NEW). **One-time backfill** from `project_audit` (field='board_column',
+new_value='Delivery', latest changed_at). Already-Delivered projects left NULL →
+treated as past-sweep → fuzzy matches route to review.
+
+**email_inbox DDL (must-fix).** Named enum type `email_inbox_status` =
+{review, pending_no_project, filed, ignored}; `direction` text, `from_email` text,
+`to_emails text[]`, `subject/snippet/body text`, `occurred_at timestamptz`,
+`gmail_message_id text`, `source text default 'email-timeline'`,
+`match_candidates jsonb`, `matched_confidence numeric`, `created_at timestamptz
+default now()` (drives TTL). **Partial-unique index on `external_id`**; indexes on
+status, project_id, client_id, occurred_at. RLS = the **036/045 split** (revoke
+anon/authenticated; service_role full for ingest; analyst select+update for triage).
+
+**Matcher = per-candidate gate, not a pre-filtered set (must-fix).** Load **all
+non-deleted projects** so exact PR-code / validated survey-ID can match a project
+in ANY state (the "always auto-logs" override must work for Closed/Delivered).
+Apply `isActiveOperational()` only to **downgrade the fuzzy tiers** (single-active
+/ domain / name) to review. This is **new work, not reuse**: extend `loadMatchData`
+to select status/phase/board_column; source contacts from a **union of
+`client_contacts` (archived=false, non-null email — authoritative for "client-tied"
+relevance, since the Gmail filters are built from it; wins on conflict) and
+`project_recipients`**; and **rewrite the routing layer** (`confidence.routeMatch`
+emits Drive statuses — the email pipeline needs its own {auto-log, review,
+pending_no_project} routing).
+
+**Survey-ID tier (must-fix).** `survey_ids_from_sheet` is a single free-text
+string: split on comma/whitespace/newline, trim + case-fold, blanks = no signal.
+Extend `loadMatchData` to select it and build a validated `surveyId → projectId`
+map. Match only on **exact membership**; an ID mapping to >1 project → review (or
+defer to the rerun newest-in-window rule). Never substring-match a survey ID.
+
+**Cross-pipeline dedup (must-fix).** A deliverable email must not log twice
+(deliverables inserts `external_id='deliverable:<id>'`, this pipeline
+`email:<Message-ID>`). Before inserting an email-timeline row, **skip if a
+`project_activity` row already exists for the same Message-ID**. The two Apps
+Scripts use **separate backing inboxes / disjoint labels**. (Chosen over relying on
+a "never cc both" habit.)
+
+**Search (should-fix, net-new).** `listActivity`/`getProjectDetail` select no body
+and take no search term today. Add a `pg_trgm`/tsvector GIN index on
+`project_activity(subject, body)`; extend both reads to search; **bound result
+size**. Store the **full raw body** (for expand) but **index a quoted-history-
+stripped body** for search (avoid O(n²) dup hits). Connector `list_activity`
+returns **snippets by default with on-demand full-body fetch** — so full bodies are
+searchable via MCP without dumping every body inline.
+
+**Storage & promote (should-fix).** New endpoint has its own body-size cap; the
+promote path writes the full body **without** the 20k clip. Promote is two-step and
+**crash-safe**: activity-insert 23505 = already promoted (still flip the row to
+`filed`); email_inbox-insert treats 23505 as success (concurrent CC'd forwards
+no-op, not 500). Add `project_activity.deleted_at` and `.is('deleted_at', null)` to
+**every** activity read.
+
+**Threading (should-fix).** Log **every** message (dedup by Message-ID); collapse
+by thread in the **UI only**. Optional later: a `thread_key` (References/In-Reply-To
+root) for server-side collapse. **Drop the "Not relevant/suppress sender" action
+from Phase 1** (no data model) — revisit with a suppressed-senders store.
+
+**Retention (should-fix).** `/api/cron/email-retention` (CRON_SECRET-gated, in
+vercel.json): expire `email_inbox` rows older than **45 days** (by created_at).
+Fire `pending_no_project → attach` from a scan keyed off project creation (explicit
+code/survey-ID only). On client offboard/soft-delete, purge that client's
+`project_activity` email rows after a short grace.
+
+**Human-setup additions (should-fix).** Each captain must add + **verify**
+`activity@alpharoc.ai` under Gmail → Forwarding before importing filters (imported
+filters silently drop forwards to unverified addresses); confirm the Workspace admin
+console permits auto-forwarding. Filter **regenerate/re-import lifecycle**: Gmail
+import doesn't dedupe → delete-old-then-reimport; build the filter from
+contact/domain criteria (validate survey IDs **server-side**, since Gmail
+has-words is substring-only and would over-forward); chunk large sets under Gmail's
+per-filter and total-filter caps.
+
+**Inbound attachments (should-fix).** Not stored by this feature (body-centric);
+attachments worth filing go through the existing deliverables path. The activity
+forwarder does not download attachments.
+
+**Nits.** Cite RLS pattern as **036/045** (not 007/036). Keep the `source='make.com'`
+rename **out** of this feature (don't touch the live raw webhook). Relabel
+"Reused vs new" honestly — matcher routing, `loadMatchData` contact source, and
+connector search are new work. Human-setup wording: external *posts* to the Group
+are rejected, but the original external From *inside* a captain-forwarded message is
+exactly what inbound capture reads (not a contradiction). Temper "nothing missed":
+contact/domain-only pending mail needs one-click manual filing — surface
+`pending_no_project` items on the new client/project page. (Verified OK:
+`project_activity` RLS is already analyst-only per 030; `isActiveOperational` =
+Open + Active + board_column ≠ 'Delivery'.)
