@@ -298,8 +298,8 @@ const handler = createMcpHandler(
 
     server.tool(
       'list_activity',
-      'Recent logged activity (emails etc.), newest first, optionally scoped to one project.',
-      { project: z.string().optional(), limit: z.number().int().min(1).max(50).optional() },
+      'Recent logged activity (emails etc.), newest first, optionally scoped to one project. Returns snippets (not full bodies); pass `search` to find emails by text (subject/body/sender), then use get_email with an entry id for the full body.',
+      { project: z.string().optional(), search: z.string().optional(), limit: z.number().int().min(1).max(50).optional() },
       async (args, extra) => json(await logged(extra, 'list_activity', async () => {
         let projectId: string | null = null
         if (args.project) {
@@ -310,8 +310,15 @@ const handler = createMcpHandler(
           }
           projectId = resolved.id as string
         }
-        return data.listActivity(projectId, args.limit ?? 20)
+        return data.listActivity(projectId, args.limit ?? 20, args.search)
       }))
+    )
+
+    server.tool(
+      'get_email',
+      'Get the full body + participants of one logged activity entry (email) by its id (from list_activity).',
+      { id: z.string() },
+      async (args, extra) => json(await logged(extra, 'get_email', () => data.getActivityDetail(args.id)))
     )
 
     server.tool(

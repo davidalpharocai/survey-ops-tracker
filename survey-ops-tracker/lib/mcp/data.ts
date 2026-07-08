@@ -550,25 +550,53 @@ export async function searchClients(args: { query?: string; limit?: number }) {
   return results
 }
 
-export async function listActivity(projectId: string | null, limit = 20) {
+export async function listActivity(projectId: string | null, limit = 20, search?: string) {
   const supabase = createAdminClient()
   let q = supabase.from('project_activity')
-    .select('project_id, type, direction, sender, subject, snippet, occurred_at, survey_projects(project_code, project_name)')
+    .select('id, project_id, type, direction, sender, subject, snippet, occurred_at, survey_projects(project_code, project_name)')
     .is('deleted_at', null)
-    .order('occurred_at', { ascending: false })
-    .limit(Math.min(limit, 50))
   if (projectId) q = q.eq('project_id', projectId)
+  if (search) {
+    const s = sanitizeQuery(search)
+    q = q.or(`subject.ilike.%${s}%,body.ilike.%${s}%,sender.ilike.%${s}%`)
+  }
+  q = q.order('occurred_at', { ascending: false }).limit(Math.min(limit, 50))
   const { data, error } = await q
   if (error) throw error
+  // Snippets only (not full bodies) to keep the connector's context lean — use
+  // getActivityDetail(id) for the full body of a specific entry.
   return (data ?? []).map((a: Record<string, unknown>) => {
     const proj = a.survey_projects as { project_code: string | null; project_name: string } | null
     return {
+      id: a.id,
       project_code: proj?.project_code ?? null,
       project_name: proj?.project_name ?? null,
       type: a.type, direction: a.direction, sender: a.sender,
       subject: a.subject, snippet: a.snippet, occurred_at: a.occurred_at,
     }
   })
+}
+
+/** Full body + participants of one logged activity entry (email) by id — the
+ *  on-demand full-body fetch behind the connector's get_email tool. */
+export async function getActivityDetail(id: string) {
+  const supabase = createAdminClient()
+  const { data, error } = await supabase.from('project_activity')
+    .select('id, type, direction, sender, recipients, subject, body, occurred_at, external_id, survey_projects(project_code, project_name)')
+    .eq('id', id)
+    .is('deleted_at', null)
+    .maybeSingle()
+  if (error) throw error
+  if (!data) return { error: 'No activity entry with that id.' }
+  const a = data as Record<string, unknown>
+  const proj = a.survey_projects as { project_code: string | null; project_name: string } | null
+  return {
+    id: a.id,
+    project_code: proj?.project_code ?? null,
+    project_name: proj?.project_name ?? null,
+    type: a.type, direction: a.direction, sender: a.sender, recipients: a.recipients,
+    subject: a.subject, body: a.body, occurred_at: a.occurred_at, external_id: a.external_id,
+  }
 }
 
 export async function getTeamInitials(): Promise<string[]> {
