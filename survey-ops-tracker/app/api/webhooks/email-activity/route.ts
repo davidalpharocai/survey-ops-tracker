@@ -91,9 +91,16 @@ export async function POST(req: NextRequest) {
     /^\s*(?:fwd?|fw):/i.test(subject ?? '') || /forwarded message|original message/i.test(bodyText ?? '')
   if (from_email && INTERNAL_RE.test(from_email) && looksForwarded) {
     const fwd = parseForwardedHeaders(bodyText ?? '')
-    if (fwd?.from_email) {
-      effFrom = fwd.from_email
-      if (fwd.to_emails.length) effTo = fwd.to_emails
+    if (fwd) {
+      // The real client is EXTERNAL — skip internal forwarders in a nested chain.
+      const extFrom = fwd.froms.find(e => !INTERNAL_RE.test(e))
+      const extTos = fwd.to_emails.filter(e => !INTERNAL_RE.test(e))
+      if (extFrom) {
+        effFrom = extFrom // client sent it → inbound
+        if (extTos.length) effTo = extTos
+      } else if (extTos.length) {
+        effTo = extTos // we sent it TO the client → outbound; resolve from recipients
+      }
     }
   }
 

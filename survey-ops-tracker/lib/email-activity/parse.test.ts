@@ -72,36 +72,38 @@ describe('tokenizeSurveyIds', () => {
 })
 
 describe('parseForwardedHeaders', () => {
-  it('recovers the original sender + recipients from a Gmail forward', () => {
+  it('collects the original sender + recipients from a Gmail forward', () => {
     const body = [
-      'FYI — see below.',
-      '',
       '---------- Forwarded message ---------',
       'From: Jane Client <jane@acme.com>',
-      'Date: Mon, Jul 8, 2026 at 2:00 PM',
       'Subject: Korea Survey',
       'To: David Ohnona <david@alpharoc.ai>',
       '',
       'Hi David, numbers attached…',
     ].join('\n')
     const r = parseForwardedHeaders(body)
-    expect(r?.from_email).toBe('jane@acme.com')
+    expect(r?.froms).toContain('jane@acme.com')
     expect(r?.to_emails).toContain('david@alpharoc.ai')
     expect(r?.subject).toBe('Korea Survey')
   })
-  it('handles an Outlook "Original Message" block', () => {
+  it('collects EVERY From across a nested forward chain, in body order', () => {
     const body = [
-      '-----Original Message-----',
-      'From: Bob Vendor <bob@vendor.com>',
-      'Sent: Monday, July 8, 2026 2:00 PM',
-      'To: Team <ops@alpharoc.ai>',
-      'Subject: Update',
+      '---------- Forwarded message ---------',
+      'From: Alex <alex@alpharoc.ai>',
+      'To: team@alpharoc.ai',
+      '',
+      'fyi',
+      '---------- Forwarded message ---------',
+      'From: James Cook <jcook@bamfunds.com>',
+      'To: Alex <alex@alpharoc.ai>',
+      '',
+      'hi',
     ].join('\n')
     const r = parseForwardedHeaders(body)
-    expect(r?.from_email).toBe('bob@vendor.com')
-    expect(r?.to_emails).toContain('ops@alpharoc.ai')
+    // Caller picks the first EXTERNAL one (jcook) as the client.
+    expect(r?.froms).toEqual(['alex@alpharoc.ai', 'jcook@bamfunds.com'])
   })
-  it('returns null when there is no forwarded header block', () => {
+  it('returns null when there is no header block', () => {
     expect(parseForwardedHeaders('Just a normal note, nothing quoted.')).toBeNull()
     expect(parseForwardedHeaders('')).toBeNull()
   })
