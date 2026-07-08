@@ -7,10 +7,16 @@
 //   2. Validated survey-ID (1 owner) → auto-log to that project in ANY state.
 //   Both explicit tiers IGNORE the watch window. `isActiveOperational` is never
 //   used to pre-filter the loaded project set — it only gates the fuzzy tiers.
-//   3. Fuzzy client tiers (contact / domain / name): resolve a client, then the
-//   single in-window (Watching or Sweep) project. These AUTO-LOG only when
-//   `opts.fuzzyAutoLog` is true (Phase 2); in Phase 1 (default false) they route
-//   to review. A shared-domain-only contact is always downgraded to review.
+//   3. Contact tier: an exact (non-shared-domain) contact email resolves the
+//   client; the project is then pinned by a distinctive project-name token in
+//   the email, or by being the client's only in-window project. A confident
+//   contact pin AUTO-LOGS even in Phase 1. A shared-domain-only contact is
+//   always downgraded to review.
+//   4. Weaker tiers (domain-only / project-name without a contact): resolve a
+//   client/project but AUTO-LOG only when `opts.fuzzyAutoLog` is true (Phase 2);
+//   in Phase 1 (default false) they route to review.
+//   The window (Watching or 48h Sweep) gates every fuzzy-derived match; only the
+//   explicit code/survey-ID tiers ignore it.
 //
 // The window is a fixed 48h absolute duration off `delivered_at`, so it is
 // timezone-invariant; `opts.now` is injectable for deterministic tests.
@@ -112,6 +118,36 @@ function clientsAtDomain(contacts: EmailContactRec[], dom: string): string[] {
     if (c.client_id && domainOf(c.email) === dom) set.add(c.client_id)
   }
   return [...set]
+}
+
+/** Tokens (len>=4) of a normalized project name. */
+function nameTokens(name: string): string[] {
+  return normalizeName(name).split(' ').filter((t) => t.length >= 4)
+}
+
+/**
+ * Project-name disambiguation within a client's project set: a project is
+ * "named" when a DISTINCTIVE token of its name (one that belongs to only that
+ * project within the set) appears in the email. Shared tokens (e.g. the firm
+ * name across sibling projects) never pin. Returns [] when there is nothing to
+ * disambiguate (0-1 projects).
+ */
+function pinByName(projects: EmailProjectRec[], hay: string): EmailProjectRec[] {
+  if (projects.length <= 1) return []
+  const owners = new Map<string, Set<string>>()
+  for (const p of projects) {
+    for (const t of new Set(nameTokens(p.project_name))) {
+      if (!owners.has(t)) owners.set(t, new Set())
+      owners.get(t)?.add(p.id)
+    }
+  }
+  const nhay = ` ${normalizeName(hay)} `
+  const named = new Set<string>()
+  for (const [tok, ids] of owners) {
+    if (ids.size !== 1) continue // shared across projects → not distinctive
+    if (nhay.includes(` ${tok} `)) named.add([...ids][0])
+  }
+  return projects.filter((p) => named.has(p.id))
 }
 
 function build(
@@ -247,33 +283,56 @@ export function matchEmail(
     return build('review', null, null, fuzzyConf, direction, method, cands)
   }
 
-  // Single client resolved: find the in-window target project(s).
+  // Single client resolved: find the in-window target project(s), pinning a
+  // specific one when the email names it (project-name disambiguation).
   const clientId = clientIds[0]
-  const inWindow = data.projects.filter((p) => p.client_id === clientId && inWatchWindow(p, now))
-
-  // A name-tier match pins specific projects — constrain to those (in-window).
-  let targets = inWindow
-  if (method === 'name' && nameProjects.length) {
-    const nameIds = new Set(nameProjects.map((p) => p.id))
-    targets = inWindow.filter((p) => nameIds.has(p.id))
-  }
+  const clientProjects = data.projects.filter((p) => p.client_id === clientId)
+  const inWindow = clientProjects.filter((p) => inWatchWindow(p, now))
 
   const candsFor = (ps: EmailProjectRec[]): EmailCandidate[] =>
     ps.map((p) => ({ clientId, projectId: p.id, confidence: fuzzyConf, reason: method, method }))
 
-  // Resolve to a single target (rerun disambiguation for 2+).
+  // A distinctive project-name token appearing in the email pins that project.
+  const namePinned = pinByName(inWindow, hay)
+  if (namePinned.length > 1) {
+    // The email names more than one of the client's in-window projects → ambiguous.
+    return build('review', null, clientId, fuzzyConf, direction, method, candsFor(namePinned))
+  }
+
   let target: EmailProjectRec | null = null
-  if (targets.length === 1) target = targets[0]
-  else if (targets.length > 1) target = pickRerunWave(targets)
+  let pinnedByName = false
+  if (namePinned.length === 1) {
+    target = namePinned[0]
+    pinnedByName = true
+  } else if (inWindow.length === 1) {
+    target = inWindow[0]
+  } else if (inWindow.length > 1) {
+    target = pickRerunWave(inWindow) // 2+ unnamed: only a single rerun wave resolves
+  }
 
   if (!target) {
-    // 0 in-window, or 2+ ambiguous (non-rerun) → review; surface the best candidate set.
-    const source = targets.length ? targets : inWindow.length ? inWindow : data.projects.filter((p) => p.client_id === clientId)
+    // 0 in-window, or 2+ ambiguous (non-rerun, unnamed) → review.
+    const source = inWindow.length ? inWindow : clientProjects
     return build('review', null, clientId, fuzzyConf, direction, method, candsFor(source))
   }
 
-  const cand: EmailCandidate = { clientId, projectId: target.id, confidence: fuzzyConf, reason: method, method }
-  const canAutoLog = fuzzyAutoLog && !sharedContactOnly
-  if (canAutoLog) return build('auto-log', target.id, clientId, fuzzyConf, direction, method, [cand])
-  return build('review', null, clientId, fuzzyConf, direction, method, [cand])
+  // Auto-log rule: a real contact (not shared-domain-only) that pins the project
+  // — by a distinctive project-name token OR because it's the client's only
+  // in-window project — is confident enough to log without review even in
+  // Phase 1. Domain-/name-resolved clients stay gated behind fuzzyAutoLog.
+  const contactResolved = method === 'contact_email' && !sharedContactOnly
+  const singleActive = inWindow.length === 1
+  const confidentPin = contactResolved && (pinnedByName || singleActive)
+  const conf = pinnedByName ? 0.95 : fuzzyConf
+  const cand: EmailCandidate = {
+    clientId,
+    projectId: target.id,
+    confidence: conf,
+    reason: pinnedByName ? `${method}+name` : method,
+    method,
+  }
+  if (confidentPin || (fuzzyAutoLog && !sharedContactOnly)) {
+    return build('auto-log', target.id, clientId, conf, direction, method, [cand])
+  }
+  return build('review', null, clientId, conf, direction, method, [cand])
 }

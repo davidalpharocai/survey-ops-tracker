@@ -111,20 +111,21 @@ describe('matchEmail — validated survey-ID', () => {
   })
 })
 
-describe('matchEmail — single active-operational (fuzzy, flag-gated)', () => {
+describe('matchEmail — contact-resolved single project (Phase 1 confident auto-log)', () => {
   const p = P({ id: 'p7', client_id: 'c7', board_column: 'Fielding' })
   const contacts: EmailContactRec[] = [{ email: 'jane@acme.com', client_id: 'c7', project_id: null }]
   const input = { fromEmail: 'jane@acme.com', toEmails: ['ops@alpharoc.ai'], subject: 'hello', body: 'quick question' }
 
-  it('Phase 1 (fuzzyAutoLog=false) routes a single-active contact match to review', () => {
+  it('Phase 1 auto-logs a contact match to the client\'s only in-window project', () => {
     const r = matchEmail(input, data([p], contacts))
-    expect(r.decision).toBe('review')
+    expect(r.decision).toBe('auto-log')
     expect(r.direction).toBe('inbound')
     expect(r.method).toBe('contact_email')
-    expect(r.candidates[0].projectId).toBe('p7')
+    expect(r.projectId).toBe('p7')
+    expect(r.clientId).toBe('c7')
   })
 
-  it('Phase 2 (fuzzyAutoLog=true) auto-logs a single-active contact match', () => {
+  it('still auto-logs under Phase 2 (fuzzyAutoLog=true)', () => {
     const r = matchEmail(input, data([p], contacts), { fuzzyAutoLog: true })
     expect(r.decision).toBe('auto-log')
     expect(r.projectId).toBe('p7')
@@ -144,7 +145,49 @@ describe('matchEmail — single active-operational (fuzzy, flag-gated)', () => {
     const px = P({ id: 'p18', client_id: 'c18' })
     const c: EmailContactRec[] = [{ email: 'jane@acme.com', client_id: 'c18', project_id: null }]
     const r = matchEmail({ fromEmail: 'jane@acme.com', toEmails: [], subject: 'PR99999 maybe', body: '' }, data([px], c))
+    expect(r.decision).toBe('auto-log')
+    expect(r.projectId).toBe('p18')
+  })
+})
+
+describe('matchEmail — project-name disambiguation within a contact-resolved client', () => {
+  const pc = P({ id: 'pc', client_id: 'cX', project_name: 'Stanley Black Decker Construction' })
+  const pk = P({ id: 'pk', client_id: 'cX', project_name: 'Stanley Black Decker Consumers' })
+  const c: EmailContactRec[] = [{ email: 'jane@holocene.com', client_id: 'cX', project_id: null }]
+
+  it('auto-logs to the project named by a distinctive token, even with 2+ active (Phase 1)', () => {
+    const r = matchEmail(
+      { fromEmail: 'jane@holocene.com', toEmails: [], subject: 'Construction fieldwork update', body: '' },
+      data([pc, pk], c)
+    )
+    expect(r.decision).toBe('auto-log')
+    expect(r.projectId).toBe('pc')
+  })
+
+  it('reviews (both candidates) when 2+ active and nothing names one', () => {
+    const r = matchEmail(
+      { fromEmail: 'jane@holocene.com', toEmails: [], subject: 'quick question', body: 'hi there' },
+      data([pc, pk], c)
+    )
     expect(r.decision).toBe('review')
+    expect(r.candidates.map((x) => x.projectId).sort()).toEqual(['pc', 'pk'])
+  })
+
+  it('does NOT pin on a token shared across sibling projects (firm name) → review', () => {
+    const r = matchEmail(
+      { fromEmail: 'jane@holocene.com', toEmails: [], subject: 'Stanley update', body: 'Black Decker' },
+      data([pc, pk], c)
+    )
+    expect(r.decision).toBe('review')
+  })
+
+  it('reviews when the email names more than one of the client\'s projects', () => {
+    const r = matchEmail(
+      { fromEmail: 'jane@holocene.com', toEmails: [], subject: 'Construction and Consumers both', body: '' },
+      data([pc, pk], c)
+    )
+    expect(r.decision).toBe('review')
+    expect(r.candidates.map((x) => x.projectId).sort()).toEqual(['pc', 'pk'])
   })
 })
 
