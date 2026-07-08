@@ -292,3 +292,28 @@ describe('matchEmail — fuzzy client tiers', () => {
     expect(r.candidates).toEqual([])
   })
 })
+
+describe('matchEmail — precision guards (review hardening)', () => {
+  const c: EmailContactRec[] = [{ email: 'jane@holocene.com', client_id: 'cH', project_id: null }]
+
+  it('a generic shared word (survey/tracker) does NOT pin — 2 active → review', () => {
+    const pa = P({ id: 'pa', client_id: 'cH', project_name: 'Coatue Brand Tracker' })
+    const pb = P({ id: 'pb', client_id: 'cH', project_name: 'Coatue Customer Survey' })
+    const r = matchEmail(
+      { fromEmail: 'jane@holocene.com', toEmails: [], subject: 'quick survey note', body: 'about the tracker' },
+      data([pa, pb], c)
+    )
+    expect(r.decision).toBe('review')
+    expect(r.candidates.map((x) => x.projectId).sort()).toEqual(['pa', 'pb'])
+  })
+
+  it('does NOT auto-log a contact match onto a deliver-then-Closed project in the sweep window', () => {
+    const closed = P({ id: 'pcz', client_id: 'cH', status: 'Closed', board_column: 'Delivery', delivered_at: days(-1) })
+    const r = matchEmail(
+      { fromEmail: 'jane@holocene.com', toEmails: [], subject: 'thanks', body: '' },
+      data([closed], c),
+      { now: NOW }
+    )
+    expect(r.decision).toBe('review')
+  })
+})

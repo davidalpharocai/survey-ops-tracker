@@ -81,6 +81,12 @@ create index if not exists email_inbox_created_idx on public.email_inbox (create
 -- may read + triage (mirrors the 045/036 split, not 034's single "for all" policy).
 alter table public.email_inbox enable row level security;
 revoke all on public.email_inbox from anon, authenticated;
+-- RLS filters ROWS, but only for a role that already holds a base grant. The
+-- analyst UI reads + triages via the authenticated browser client, so re-grant
+-- select+update to authenticated (the policies below still restrict to analysts);
+-- service_role does ingest inserts + the retention cron's deletes.
+grant select, update on public.email_inbox to authenticated;
+grant all on public.email_inbox to service_role;
 
 drop policy if exists email_inbox_analyst_select on public.email_inbox;
 create policy email_inbox_analyst_select on public.email_inbox

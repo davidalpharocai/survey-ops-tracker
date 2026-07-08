@@ -61,32 +61,40 @@ export async function loadEmailMatchData(
   const projects = (projectsRes.data ?? []) as unknown as EmailProjectRec[]
   const projClientById = new Map(projects.map((p) => [p.id, p.client_id]))
 
-  // Build the roster; project_recipients first, then let client_contacts win on conflict.
-  const byEmail = new Map<string, EmailContactRec>()
+  // Build the roster. Accumulate EVERY client an address is tied to (across
+  // project_recipients + client_contacts) and emit one record per (email, client),
+  // so an address shared by two clients yields two records — the matcher then sees
+  // >1 client and routes to review instead of silently collapsing to one.
+  const byEmail = new Map<string, Map<string, string | null>>() // email → clientId → project_id?
+  const tie = (email: string, clientId: string | null, projectId: string | null) => {
+    if (!email || !clientId) return // no client tie = no relevance signal
+    const inner = byEmail.get(email) ?? new Map<string, string | null>()
+    if (!inner.has(clientId) || (projectId && !inner.get(clientId))) inner.set(clientId, projectId)
+    byEmail.set(email, inner)
+  }
   for (const r of recipsRes.data ?? []) {
-    const email = normEmail(r.email)
-    if (!email) continue
-    byEmail.set(email, {
-      email,
-      client_id: projClientById.get(r.project_id) ?? null,
-      project_id: r.project_id,
-    })
+    tie(normEmail(r.email), projClientById.get(r.project_id) ?? null, r.project_id)
   }
   for (const c of contactsRes.data ?? []) {
-    const email = normEmail(c.email)
-    if (!email) continue
-    // client_contacts is authoritative: it carries the client tie but no project hint.
-    byEmail.set(email, { email, client_id: c.client_id, project_id: null })
+    tie(normEmail(c.email), c.client_id, null)
+  }
+  const contacts: EmailContactRec[] = []
+  for (const [email, inner] of byEmail) {
+    for (const [client_id, project_id] of inner) contacts.push({ email, client_id, project_id })
   }
 
+  // Validate survey-ID tokens before they become auto-log keys — this column is
+  // human-typed free text, so drop placeholders (a real ID is >=6 chars with a digit).
+  const isPlausibleSurveyId = (t: string) => t.length >= 6 && /\d/.test(t)
   const surveyIdMap = new Map<string, string[]>()
   for (const p of projects) {
     for (const id of tokenizeSurveyIds(p.survey_ids_from_sheet)) {
+      if (!isPlausibleSurveyId(id)) continue
       const owners = surveyIdMap.get(id) ?? []
       if (!owners.includes(p.id)) owners.push(p.id)
       surveyIdMap.set(id, owners)
     }
   }
 
-  return { projects, contacts: [...byEmail.values()], surveyIdMap }
+  return { projects, contacts, surveyIdMap }
 }

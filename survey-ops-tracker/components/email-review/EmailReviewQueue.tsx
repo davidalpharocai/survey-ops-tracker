@@ -124,9 +124,18 @@ function EmailCard({ row }: { row: EmailQueueRow }) {
 }
 
 export function EmailReviewQueue() {
-  const { data, isLoading } = useEmailReviewQueue()
+  const { data, isLoading, error } = useEmailReviewQueue()
 
   if (isLoading) return <p className="text-sm text-muted-foreground">Loading…</p>
+  if (error) {
+    // Surface the failure rather than masking it as an empty queue — a masked
+    // permission error is exactly what could hide the queue silently going dark.
+    return (
+      <p className="text-sm text-destructive">
+        Couldn&apos;t load the review queue: {String((error as Error).message)}
+      </p>
+    )
+  }
   if (!data || data.length === 0) {
     return (
       <p className="text-sm text-muted-foreground flex items-center">

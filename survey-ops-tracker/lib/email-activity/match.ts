@@ -89,7 +89,9 @@ const uniq = (xs: string[]): string[] => [...new Set(xs)]
 /** Watching (active-operational) OR within the post-delivery Sweep window. */
 function inWatchWindow(p: EmailProjectRec, now: Date): boolean {
   if (isActiveOperational(p)) return true
-  if (p.board_column === 'Delivery' && p.delivered_at) {
+  // Post-delivery Sweep: still open (not Closed/Hold) but in the Delivered column
+  // within 48h — catches stragglers without reviving a deliver-then-close project.
+  if (p.status !== 'Closed' && p.status !== 'Hold' && p.board_column === 'Delivery' && p.delivered_at) {
     return now.getTime() <= Date.parse(p.delivered_at) + SWEEP_MS
   }
   return false // Closed/Hold, or Delivered with NULL/expired delivered_at → past-sweep
@@ -120,9 +122,21 @@ function clientsAtDomain(contacts: EmailContactRec[], dom: string): string[] {
   return [...set]
 }
 
-/** Tokens (len>=4) of a normalized project name. */
+// Domain-generic words that must NOT count as a distinctive project-name pin —
+// otherwise "…Brand Tracker" vs "…Customer Survey" would auto-log on a casual
+// "survey"/"tracker" mention. A confident pin needs a genuinely distinguishing token.
+const NAME_STOPWORDS = new Set([
+  'survey', 'study', 'tracker', 'tracking', 'brand', 'wave', 'poll', 'research',
+  'data', 'report', 'topline', 'results', 'weekly', 'monthly', 'quarterly',
+  'annual', 'customer', 'employee', 'consumer', 'feedback', 'update', 'phase',
+  'project', 'final', 'draft', 'analysis', 'insights',
+])
+
+/** Distinctive tokens (len>=4, non-stopword) of a normalized project name. */
 function nameTokens(name: string): string[] {
-  return normalizeName(name).split(' ').filter((t) => t.length >= 4)
+  return normalizeName(name)
+    .split(' ')
+    .filter((t) => t.length >= 4 && !NAME_STOPWORDS.has(t))
 }
 
 /**

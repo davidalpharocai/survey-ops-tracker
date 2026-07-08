@@ -22,7 +22,7 @@ forwarded (a copy), never moved.
 
 ## Part 1 — Create the `activity@` Group + backing inbox (~10 min)
 1. **groups.google.com → Create group** → `activity@alpharoc.ai`. (This is a **Group**, not a paid mailbox.) This is **separate** from `deliverables@`.
-2. Group settings → **Who can post → "Anyone in the organization."** External senders are ignored by the app, so external posting can stay off.
+2. Group settings → **Who can post → "Anyone in the organization."** External senders are ignored by the app, so external posting can normally stay off — **but** Gmail's forwarding-verification codes arrive from an external Google address, so during Part 4 you'll briefly allow external posting (or allowlist `forwarding-noreply@google.com`), then re-tighten.
 3. Give it a **backing inbox**: add a Workspace user as a member with **"Each email"** delivery, so every group message also lands in that user's Gmail.
 4. In that backing inbox, **create a Gmail filter** so the script only ever sees activity mail: Gmail → Settings → **Filters and Blocked Addresses → Create a new filter** → **Has the words** = `list:activity@alpharoc.ai` → **Create filter** → check **Apply the label → `Activity`** and **Skip the Inbox (Archive it)**.
 
@@ -39,7 +39,11 @@ forwarded (a copy), never moved.
 2. Quick check: `select count(*) from public.email_inbox;` returns `0` (not an error), and `select delivered_at from public.survey_projects limit 1;` doesn't error.
 
 ## Part 4 — Each captain sets up capture (~3 min each)
-1. **Verify the forwarding address** (required — Gmail silently drops forwards to unverified addresses): Gmail → Settings → **Forwarding and POP/IMAP → Add a forwarding address** → `activity@alpharoc.ai` → enter the confirmation code Gmail sends. (You do **not** need to turn on "forward all mail" — the filter does the forwarding.)
+1. **Verify the forwarding address** (required — Gmail silently drops forwards to unverified addresses). In each captain's Gmail → Settings → **Forwarding and POP/IMAP → Add a forwarding address** → `activity@alpharoc.ai` → **Next → Proceed**. Gmail then emails a confirmation code **from `forwarding-noreply@google.com` to `activity@`** — which lands in the **backing inbox**, not the captain's own inbox. So:
+   - a. One-time, in the Group settings, **temporarily allow posting from outside the organization** (or allowlist `forwarding-noreply@google.com`) so that code email is accepted.
+   - b. The **backing-inbox owner** opens each verification email (under the `Activity` label / archived), then either **clicks the verification link** in it or copies the code to the captain to paste into their "Add a forwarding address" dialog.
+   - c. After every captain is verified, **re-tighten** the Group to organization-only posting.
+   (You do **not** need to turn on "forward all mail" — the imported filters do the forwarding.)
 2. **Download the filter set:** signed in to the app as an analyst, open
    `https://survey-ops-tracker.vercel.app/api/admin/gmail-filters` → it downloads `survey-ops-activity-filters.xml`.
 3. **Import it:** Gmail → Settings → **Filters and Blocked Addresses → Import filters** → choose the file → **Open file → Create filters**. (These forward client mail to `activity@` and leave your own copy untouched.)
