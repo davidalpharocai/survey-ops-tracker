@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 
 import { currentUserEmail, currentUserIsAdmin } from '../lib/auth';
 import NavRibbon from './_components/NavRibbon';
+import SearchBox from './_components/SearchBox';
 import ThemeToggle from './_components/ThemeToggle';
 
 export const metadata = {
@@ -40,6 +41,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
           {/* Persistent primary nav; Admin entry only for admins. Also the
               future home of the global search box (roadmap ②). */}
           {userEmail && <NavRibbon isAdmin={isAdmin} />}
+          {userEmail && <SearchBox />}
           <span className="who">{userEmail || 'not signed in'}</span>
           {userEmail && (
             <Link className="signout" href="/api/auth/logout">Sign out</Link>

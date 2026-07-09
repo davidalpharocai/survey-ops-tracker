@@ -96,6 +96,17 @@ export interface Ledger {
   totals: { credits: number; dollars: number };
 }
 
+// Global search (omnibox) result groups.
+export interface SearchClientHit { id: number; name: string; code?: string | null; }
+export interface SearchTxnHit { id: number; name: string; code?: string | null; clientId: number; clientName: string; }
+export interface SearchContactHit { id: number; name: string; email?: string | null; clientId: number; clientName: string; }
+export interface SearchResults {
+  clients: SearchClientHit[];
+  contracts: SearchTxnHit[];
+  studies: SearchTxnHit[];
+  contacts: SearchContactHit[];
+}
+
 export interface BulkUpdateStudiesResult {
   updated: number;
   errors: string[];
