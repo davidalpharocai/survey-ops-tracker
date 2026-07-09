@@ -990,6 +990,28 @@ th .info-pop::after {
   border-radius: 5px;
   font-size: 0.8rem;
 }
+
+/* Export Credits Summary config popover. */
+.export-summary { position: relative; }
+.export-pop {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 60;
+  width: 320px;
+  max-width: 90vw;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  box-shadow: var(--shadow-md);
+}
+.export-field { display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.85rem; }
+.export-field > span { font-weight: 500; }
+.export-range { display: flex; align-items: center; gap: 0.4rem; }
+.export-range input { flex: 1; min-width: 0; }
+.export-presets { display: flex; gap: 0.3rem; margin-top: 0.3rem; flex-wrap: wrap; }
+.export-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0.2rem 0.6rem; }
+.export-col { display: flex; align-items: center; gap: 0.3rem; font-weight: 400; }
 /* Whole contract name is the click target for expand/collapse, not just
    the arrow. */
 .ledger-contract-toggle {

@@ -13,6 +13,7 @@ import type { Balance, Ledger } from '../../../lib/types';
 import AutoSubmitSelect from '../../_components/AutoSubmitSelect';
 import InfoTooltip from '../../_components/InfoTooltip';
 import SubmitButton from '../../_components/SubmitButton';
+import ExportCreditsSummary from './ExportCreditsSummary';
 import LedgerTree from './LedgerTree';
 import { createAdjustmentAction } from './actions';
 
@@ -51,6 +52,11 @@ export default async function TransactionsReportPage({ searchParams }: PageProps
   const bal: Balance = selected ? balResult : defaultBal;
   const hasRows =
     ledger.contracts.length + ledger.unassigned.length + ledger.adjustments.length > 0;
+  const exportContracts = ledger.contracts.map(c => ({ id: c.id, name: c.name }));
+  const exportSurveys = [
+    ...ledger.contracts.flatMap(c => c.studies),
+    ...ledger.unassigned,
+  ].map(s => ({ id: s.id, name: s.name }));
 
   const currentYear = new Date().getUTCFullYear();
 
@@ -69,16 +75,11 @@ export default async function TransactionsReportPage({ searchParams }: PageProps
           </AutoSubmitSelect>
         </label>
         {selected && (
-          // Plain <a> (not <Link>): this is a file download served by a
-          // route handler, so it must be a full navigation — and plain
-          // anchors don't get basePath prepended automatically.
-          <a
-            className="btn btn-sm"
-            href={`${process.env.NEXT_PUBLIC_BASE_PATH || ''}/reports/transactions/pdf?client_id=${selected.id}`}
-            download
-          >
-            Download PDF
-          </a>
+          <ExportCreditsSummary
+            clientId={selected.id}
+            contracts={exportContracts}
+            surveys={exportSurveys}
+          />
         )}
       </form>
 
