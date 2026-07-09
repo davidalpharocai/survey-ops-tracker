@@ -40,6 +40,8 @@ export const TIP = {
     'A one-time setup charge for recurring trackers, always in credits. Added once on top of the per-run costs. Leave 0 if none.',
   studyUser:
     'The client-side person this study is for. Pick from this client’s users; it attributes the spend to them.',
+  studyContract:
+    'Optionally roll this study up to one of the client’s contracts, so that contract shows its own remaining balance. Leave as “none” to keep the study Unassigned; it still draws down the client total either way.',
 
   // Balances / reports
   creditsRemaining:

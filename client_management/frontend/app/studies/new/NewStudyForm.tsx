@@ -13,9 +13,10 @@ const RUNS_PER_YEAR: Record<string, number> = { weekly: 52, monthly: 12, quarter
 interface Props {
   clientId: number | null;
   users: ClientUser[];
+  contracts: { id: number; name: string }[];
 }
 
-export default function NewStudyForm({ clientId, users }: Props) {
+export default function NewStudyForm({ clientId, users, contracts }: Props) {
   const [cadence, setCadence] = useState<Cadence>('single');
   const [cost, setCost] = useState('');
 
@@ -106,6 +107,20 @@ export default function NewStudyForm({ clientId, users }: Props) {
           </label>
         )}
       </div>
+
+      <label>Rolls up to contract (optional)<InfoTooltip text={TIP.studyContract} />
+        <select name="contract_id" disabled={disabled}>
+          <option value="">— none (Unassigned) —</option>
+          {contracts.map(c => (
+            <option key={c.id} value={c.id}>{c.name}</option>
+          ))}
+        </select>
+        <span className="muted small">
+          {contracts.length === 0
+            ? 'This client has no contracts yet — the study will be Unassigned.'
+            : 'Pick the contract this study draws its credits from.'}
+        </span>
+      </label>
 
       <div className="actions">
         <SubmitButton disabled={disabled} pendingLabel="Publishing…">Publish study</SubmitButton>

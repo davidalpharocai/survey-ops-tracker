@@ -14,6 +14,7 @@ import type {
   Client,
   ClientUser,
   ContractTransaction,
+  Ledger,
   RenewalRow,
   StudyTransaction,
   Transaction,
@@ -174,6 +175,7 @@ export interface ApiClient {
   listRenewals(): Promise<RenewalRow[]>;
   balanceHealth(): Promise<BalanceHealthRow[]>;
   listTransactionsByClient(clientId: number): Promise<Transaction[]>;
+  clientLedger(clientId: number): Promise<Ledger>;
 
   createAdjustment(d: Record<string, unknown>): Promise<AdjustmentResult>;
 
@@ -285,6 +287,7 @@ export function api(userEmail: string): ApiClient {
     listRenewals: () => r('GET', '/api/reports/renewals'),
     balanceHealth: () => r('GET', '/api/reports/balance-health'),
     listTransactionsByClient: clientId => r('GET', `/api/clients/${clientId}/transactions`),
+    clientLedger: clientId => r('GET', `/api/clients/${clientId}/ledger`),
 
     createAdjustment: d => r('POST', '/api/adjustments', d),
 

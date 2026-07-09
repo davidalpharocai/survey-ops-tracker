@@ -23,16 +23,22 @@ export default async function NewStudyPage({ searchParams }: PageProps) {
   // common path from the "+ Add study" quicklinks) that client's studies in
   // one parallel wave — the per-client read only needs `preselect` (a URL
   // int), so waiting for the list first was a gratuitous extra round trip.
-  const [clients, fetchedStudies] = await Promise.all([
+  const [clients, fetchedStudies, fetchedContracts] = await Promise.all([
     api.listClientsWithUsers(),
     preselect
       ? api.listStudiesByClient(preselect).catch(onlyNotFound([] as StudyTransaction[]))
       : Promise.resolve([] as StudyTransaction[]),
+    preselect
+      ? api.listContractsByClient(preselect).catch(() => [])
+      : Promise.resolve([]),
   ]);
 
   const selectedClient = preselect ? clients.find(c => c.id === preselect) || null : null;
   const selectedClientUsers: ClientUser[] = selectedClient?.users || [];
   const existingStudies: StudyTransaction[] = selectedClient ? fetchedStudies : [];
+  const clientContracts = selectedClient
+    ? fetchedContracts.map(c => ({ id: c.id, name: c.name }))
+    : [];
 
   const pending = existingStudies.filter(t => t.isImported).length;
 
@@ -87,6 +93,7 @@ export default async function NewStudyPage({ searchParams }: PageProps) {
           <NewStudyForm
             clientId={selectedClient ? selectedClient.id : null}
             users={selectedClientUsers}
+            contracts={clientContracts}
           />
         </>
       )}

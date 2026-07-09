@@ -5,18 +5,18 @@ import { onlyNotFound } from '../../../lib/api';
 import {
   contractValue,
   credits as creditsFmt,
-  creditsSigned,
   dollars,
-  dollarsSigned,
-  fmtDateTime,
   isoDate,
 } from '../../../lib/format';
 import { TIP } from '../../../lib/tooltips';
-import type { Balance, Transaction } from '../../../lib/types';
+import type { Balance, Ledger } from '../../../lib/types';
 import AutoSubmitSelect from '../../_components/AutoSubmitSelect';
 import InfoTooltip from '../../_components/InfoTooltip';
 import SubmitButton from '../../_components/SubmitButton';
+import LedgerTree from './LedgerTree';
 import { createAdjustmentAction } from './actions';
+
+const EMPTY_LEDGER: Ledger = { contracts: [], unassigned: [], adjustments: [], totals: { credits: 0, dollars: 0 } };
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Per-client transactions · AlphaROC' };
@@ -37,18 +37,20 @@ export default async function TransactionsReportPage({ searchParams }: PageProps
   // Transient errors are NOT swallowed — only a 404 (archived/stale id)
   // degrades to the empty state; a 5xx surfaces rather than showing a fake
   // $0 balance for a real client.
-  const [clients, selected, txResult, balResult] = await Promise.all([
+  const [clients, selected, ledgerResult, balResult] = await Promise.all([
     api.listClients(),
     clientId ? api.getClient(clientId) : Promise.resolve(null),
     clientId
-      ? api.listTransactionsByClient(clientId).catch(onlyNotFound([] as Transaction[]))
-      : Promise.resolve([] as Transaction[]),
+      ? api.clientLedger(clientId).catch(onlyNotFound(EMPTY_LEDGER))
+      : Promise.resolve(EMPTY_LEDGER),
     clientId
       ? api.clientBalances(clientId).catch(onlyNotFound(defaultBal))
       : Promise.resolve(defaultBal),
   ]);
-  const transactions: Transaction[] = selected ? txResult : [];
+  const ledger: Ledger = selected ? ledgerResult : EMPTY_LEDGER;
   const bal: Balance = selected ? balResult : defaultBal;
+  const hasRows =
+    ledger.contracts.length + ledger.unassigned.length + ledger.adjustments.length > 0;
 
   const currentYear = new Date().getUTCFullYear();
 
@@ -101,41 +103,8 @@ export default async function TransactionsReportPage({ searchParams }: PageProps
             </div>
           </div>
 
-          {transactions.length > 0 ? (
-            <table className="report">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Kind</th>
-                  <th>Name</th>
-                  <th>For user</th>
-                  <th className="num">Credits Δ <InfoTooltip text={TIP.creditsDelta} /></th>
-                  <th className="num">Dollars Δ <InfoTooltip text={TIP.dollarsDelta} /></th>
-                  <th>Renewal</th>
-                  <th>Recorded by</th>
-                  <th>At</th>
-                </tr>
-              </thead>
-              <tbody>
-                {transactions.map(t => {
-                  const cd = Number(t.creditsDelta);
-                  const dd = Number(t.dollarsDelta);
-                  return (
-                    <tr key={t.id}>
-                      <td>{isoDate(t.occurredOn)}</td>
-                      <td><span className={`tag tag-${t.kind}`}>{t.kind}</span></td>
-                      <td>{t.name}</td>
-                      <td>{t.clientUser ? t.clientUser.name : ''}</td>
-                      <td className={`num${cd < 0 ? ' neg' : cd > 0 ? ' pos' : ''}`}>{creditsSigned(t.creditsDelta)}</td>
-                      <td className={`num${dd < 0 ? ' neg' : dd > 0 ? ' pos' : ''}`}>{dollarsSigned(t.dollarsDelta)}</td>
-                      <td>{t.renewalOn ? isoDate(t.renewalOn) : ''}</td>
-                      <td>{t.actorEmail}</td>
-                      <td className="muted">{fmtDateTime(t.createdAt)}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+          {hasRows ? (
+            <LedgerTree ledger={ledger} />
           ) : (
             <p className="muted">No transactions yet for this client.</p>
           )}

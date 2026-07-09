@@ -61,7 +61,8 @@ export async function createStudyAction(formData: FormData): Promise<void> {
     setup_cost: formData.get('setup_cost'),
     client_user_ids: formData.getAll('client_user_ids'),
   });
-  await api.createStudy({ client_id: formData.get('client_id'), ...body });
+  const contractId = parseId(formData.get('contract_id'));
+  await api.createStudy({ client_id: formData.get('client_id'), ...body, contract_id: contractId });
   revalidatePath('/', 'layout');
   redirectTo(`/studies/new?client_id=${clientId}`);
 }
@@ -72,15 +73,23 @@ export async function updateStudyAction(formData: FormData): Promise<void> {
   const api = await apiForRequest();
   const t = await api.getTransaction(id);
   if (!t || t.kind !== 'study') redirectTo('/studies/new');
-  await api.updateStudy(id, studyBody({
-    name: formData.get('name'),
-    occurred_on: formData.get('occurred_on'),
-    cost_type: formData.get('cost_type'),
-    cadence: formData.get('cadence'),
-    cost: formData.get('cost'),
-    setup_cost: formData.get('setup_cost'),
-    client_user_ids: formData.getAll('client_user_ids'),
-  }));
+  // Preserve the existing contract link when the form doesn't carry the
+  // field (so an edit that omits it can't silently unlink the study).
+  const contractId = formData.has('contract_id')
+    ? parseId(formData.get('contract_id'))
+    : (t.contractId ?? null);
+  await api.updateStudy(id, {
+    ...studyBody({
+      name: formData.get('name'),
+      occurred_on: formData.get('occurred_on'),
+      cost_type: formData.get('cost_type'),
+      cadence: formData.get('cadence'),
+      cost: formData.get('cost'),
+      setup_cost: formData.get('setup_cost'),
+      client_user_ids: formData.getAll('client_user_ids'),
+    }),
+    contract_id: contractId,
+  });
   revalidatePath('/', 'layout');
   redirectTo(`/studies/new?client_id=${t.clientId}`);
 }

@@ -54,6 +54,7 @@ interface TransactionBase {
   dollarsDelta: number | string;
   actorEmail: string;
   soccProjectCode?: string | null;
+  contractId?: number | null;
   createdAt: Date;
   clientUser?: ClientUser | null;
 }
@@ -77,6 +78,23 @@ export interface StudyTransaction extends TransactionBase {
 }
 
 export type Transaction = ContractTransaction | StudyTransaction;
+
+// Contract-grouped ledger (GET /api/clients/{id}/ledger).
+export interface LedgerContract extends ContractTransaction {
+  remainingCredits: number;
+  remainingDollars: number;
+  studies: StudyTransaction[];
+}
+export interface LedgerAdjustment extends TransactionBase {
+  kind: 'adjustment';
+  note?: string | null;
+}
+export interface Ledger {
+  contracts: LedgerContract[];
+  unassigned: StudyTransaction[];
+  adjustments: LedgerAdjustment[];
+  totals: { credits: number; dollars: number };
+}
 
 export interface BulkUpdateStudiesResult {
   updated: number;
