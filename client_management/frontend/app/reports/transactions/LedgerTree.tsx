@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { Fragment, useMemo, useState } from 'react';
 
 import {
@@ -11,7 +12,9 @@ import {
 } from '../../../lib/format';
 import { filterLedger } from '../../../lib/ledger';
 import type { Ledger, LedgerContract, StudyTransaction } from '../../../lib/types';
+import DeleteConfirm from '../../_components/DeleteConfirm';
 import InfoTooltip from '../../_components/InfoTooltip';
+import { deleteLedgerContractAction, deleteLedgerStudyAction } from './actions';
 
 const REMAINING_TIP =
   'What is left on this contract: its funding minus every study that rolls up to it. Red means the contract is over-drawn.';
@@ -27,7 +30,7 @@ function remainingCell(c: LedgerContract) {
   return <span className={value < 0 ? 'neg' : ''}>{text}</span>;
 }
 
-function StudyRow({ s }: { s: StudyTransaction }) {
+function StudyRow({ s, clientId }: { s: StudyTransaction; clientId: number }) {
   const cd = Number(s.creditsDelta);
   const dd = Number(s.dollarsDelta);
   return (
@@ -41,16 +44,26 @@ function StudyRow({ s }: { s: StudyTransaction }) {
       <td className={`num${dd < 0 ? ' neg' : dd > 0 ? ' pos' : ''}`}>{dollarsSigned(s.dollarsDelta)}</td>
       <td />
       <td className="num" />
+      <td className="row-actions">
+        <Link className="btn-sm" href={`/studies/new?client_id=${clientId}`}>Edit</Link>
+        <DeleteConfirm action={deleteLedgerStudyAction} id={s.id} clientId={clientId} name={s.name} />
+      </td>
     </tr>
   );
 }
 
-export default function LedgerTree({ ledger }: { ledger: Ledger }) {
+export default function LedgerTree({ ledger, clientId }: { ledger: Ledger; clientId: number }) {
   const [q, setQ] = useState('');
   const [collapsed, setCollapsed] = useState<Set<number>>(new Set());
 
   const view = useMemo(() => filterLedger(ledger, q), [ledger, q]);
   const allIds = ledger.contracts.map(c => c.id);
+  // Original (unfiltered) linked-study counts — a contract can only be
+  // archived when nothing rolls up to it (the backend enforces this too).
+  const studyCounts = useMemo(
+    () => new Map(ledger.contracts.map(c => [c.id, c.studies.length])),
+    [ledger],
+  );
 
   const toggle = (id: number) =>
     setCollapsed(prev => {
@@ -84,11 +97,13 @@ export default function LedgerTree({ ledger }: { ledger: Ledger }) {
             <th className="num">Dollars Δ</th>
             <th>Renewal</th>
             <th className="num">Remaining <InfoTooltip text={REMAINING_TIP} align="right" /></th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
           {view.contracts.map(c => {
             const isCollapsed = collapsed.has(c.id);
+            const canDelete = (studyCounts.get(c.id) ?? 0) === 0;
             return (
               <Fragment key={c.id}>
                 <tr className="ledger-contract">
@@ -112,8 +127,16 @@ export default function LedgerTree({ ledger }: { ledger: Ledger }) {
                   <td className="num">{dollarsSigned(c.dollarsDelta)}</td>
                   <td>{c.renewalOn ? isoDate(c.renewalOn) : ''}</td>
                   <td className="num ledger-remaining">{remainingCell(c)}</td>
+                  <td className="row-actions">
+                    <Link className="btn-sm" href={`/contracts/new?client_id=${clientId}`}>Edit</Link>
+                    {canDelete ? (
+                      <DeleteConfirm action={deleteLedgerContractAction} id={c.id} clientId={clientId} name={c.name} />
+                    ) : (
+                      <span className="muted small" title="Unlink or archive its surveys first">has surveys</span>
+                    )}
+                  </td>
                 </tr>
-                {!isCollapsed && c.studies.map(s => <StudyRow key={s.id} s={s} />)}
+                {!isCollapsed && c.studies.map(s => <StudyRow key={s.id} s={s} clientId={clientId} />)}
               </Fragment>
             );
           })}
@@ -121,16 +144,16 @@ export default function LedgerTree({ ledger }: { ledger: Ledger }) {
           {view.unassigned.length > 0 && (
             <>
               <tr className="ledger-group">
-                <td colSpan={6}>Unassigned <InfoTooltip text={UNASSIGNED_TIP} align="left" /></td>
+                <td colSpan={7}>Unassigned <InfoTooltip text={UNASSIGNED_TIP} align="left" /></td>
               </tr>
-              {view.unassigned.map(s => <StudyRow key={s.id} s={s} />)}
+              {view.unassigned.map(s => <StudyRow key={s.id} s={s} clientId={clientId} />)}
             </>
           )}
 
           {view.adjustments.length > 0 && (
             <>
               <tr className="ledger-group">
-                <td colSpan={6}>Adjustments</td>
+                <td colSpan={7}>Adjustments</td>
               </tr>
               {view.adjustments.map(a => {
                 const cd = Number(a.creditsDelta);
@@ -143,6 +166,7 @@ export default function LedgerTree({ ledger }: { ledger: Ledger }) {
                     <td className={`num${dd < 0 ? ' neg' : dd > 0 ? ' pos' : ''}`}>{dollarsSigned(a.dollarsDelta)}</td>
                     <td />
                     <td className="num" />
+                    <td />
                   </tr>
                 );
               })}
@@ -150,7 +174,7 @@ export default function LedgerTree({ ledger }: { ledger: Ledger }) {
           )}
 
           {view.contracts.length === 0 && view.unassigned.length === 0 && view.adjustments.length === 0 && (
-            <tr><td colSpan={6} className="muted">No matches.</td></tr>
+            <tr><td colSpan={7} className="muted">No matches.</td></tr>
           )}
         </tbody>
       </table>

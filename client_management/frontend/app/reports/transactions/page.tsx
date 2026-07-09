@@ -104,7 +104,7 @@ export default async function TransactionsReportPage({ searchParams }: PageProps
           </div>
 
           {hasRows ? (
-            <LedgerTree ledger={ledger} />
+            <LedgerTree ledger={ledger} clientId={selected.id} />
           ) : (
             <p className="muted">No contracts or surveys yet for this client.</p>
           )}

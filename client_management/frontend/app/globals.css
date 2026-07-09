@@ -866,6 +866,20 @@ th .info-pop::after {
   line-height: 1;
 }
 .tree-toggle:hover { color: var(--accent); }
+/* Inline type-"Delete" confirm on ledger rows. */
+.delete-confirm {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin: 0;
+}
+.delete-confirm-input {
+  width: 6.5rem;
+  padding: 0.2rem 0.4rem;
+  border: 1px solid var(--danger);
+  border-radius: 5px;
+  font-size: 0.8rem;
+}
 /* Whole contract name is the click target for expand/collapse, not just
    the arrow. */
 .ledger-contract-toggle {
