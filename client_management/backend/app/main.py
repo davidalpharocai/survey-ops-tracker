@@ -19,6 +19,7 @@ from app.routers import (
     health,
     reports,
     search,
+    socc,
     studies,
     team,
     transactions,
@@ -92,6 +93,7 @@ app.include_router(adjustments.router)
 app.include_router(transactions.router)
 app.include_router(reports.router)
 app.include_router(search.router)
+app.include_router(socc.router)
 app.include_router(admin.router)
 app.include_router(archive.router)
 app.include_router(team.router)

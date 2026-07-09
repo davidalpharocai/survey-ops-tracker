@@ -767,6 +767,8 @@ button:hover, .btn:hover { background: var(--accent-hover); }
 .tag-success { background: var(--tag-ok-bg); color: var(--pos); }
 .tag-denied { background: var(--warn-bg); color: var(--warn-fg); }
 .tag-error { background: var(--tag-err-bg); color: var(--neg); }
+.tag-socc { background: var(--surface-2); color: var(--muted); border: 1px solid var(--border); margin-left: 0.4rem; }
+.tag-socc.is-fielding { background: var(--tag-ok-bg); color: var(--pos); border-color: transparent; }
 
 .neg { color: var(--neg); }
 .pos { color: var(--pos); }

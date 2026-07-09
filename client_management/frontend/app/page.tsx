@@ -73,6 +73,11 @@ export default async function HomePage() {
                   <span className="hub-link-sub">Upload a spreadsheet (CCM import template or Survey Ops export), preview, apply.</span>
                   <LinkPending />
                 </Link>
+                <Link className="hub-link" href="/admin/socc-sync">
+                  <span className="hub-link-title">Sync from SOCC</span>
+                  <span className="hub-link-sub">Upload a Survey Ops export to stamp each survey&apos;s current SOCC stage (e.g. Fielding). Status only — never touches money.</span>
+                  <LinkPending />
+                </Link>
                 <a className="hub-link" href={`${BASE_PATH}/admin/export`} download>
                   <span className="hub-link-title">Export Data</span>
                   <span className="hub-link-sub">Download all clients, contracts &amp; studies as a ZIP (re-importable workbook + raw ledger).</span>

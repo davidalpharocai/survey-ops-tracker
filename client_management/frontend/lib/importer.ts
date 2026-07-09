@@ -69,7 +69,7 @@ export interface ApplyResult {
 
 // ---------------------------------------------------------------- parsing
 
-function normHeader(h: string): string {
+export function normHeader(h: string): string {
   return h.toLowerCase().replace(/[^a-z0-9]+/g, '');
 }
 
@@ -102,7 +102,7 @@ function toIsoDay(raw: string): string | null {
 
 type SheetRow = Record<string, string>;
 
-function sheetRows(ws: ExcelJS.Worksheet): SheetRow[] {
+export function sheetRows(ws: ExcelJS.Worksheet): SheetRow[] {
   const headerRow = ws.getRow(1);
   const keys: (string | null)[] = [];
   headerRow.eachCell({ includeEmpty: true }, (cell, col) => {
@@ -128,7 +128,7 @@ function sheetRows(ws: ExcelJS.Worksheet): SheetRow[] {
 }
 
 /** First non-empty value among alias header keys. */
-function pick(row: SheetRow, ...aliases: string[]): string {
+export function pick(row: SheetRow, ...aliases: string[]): string {
   for (const a of aliases) {
     const v = row[a];
     if (v) return v;

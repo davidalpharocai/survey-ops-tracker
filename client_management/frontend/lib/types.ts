@@ -55,6 +55,8 @@ interface TransactionBase {
   actorEmail: string;
   soccProjectCode?: string | null;
   contractId?: number | null;
+  soccBoardColumn?: string | null;
+  soccSyncedAt?: string | null;
   createdAt: Date;
   clientUser?: ClientUser | null;
 }
@@ -105,6 +107,17 @@ export interface SearchResults {
   contracts: SearchTxnHit[];
   studies: SearchTxnHit[];
   contacts: SearchContactHit[];
+}
+
+// CCM <- SOCC manual status sync.
+export interface SoccStatus { prCode: string; boardColumn: string; projectName: string; clientName: string; }
+export interface SoccSyncMatched { prCode: string; studyId: number; name: string; boardColumn: string; clientId: number; clientName: string; }
+export interface SoccSyncUnmatched { prCode: string; boardColumn: string; projectName: string; clientName: string; }
+export interface SoccSyncResult {
+  matched: SoccSyncMatched[];
+  unmatched: SoccSyncUnmatched[];
+  matchedCount: number;
+  unmatchedCount: number;
 }
 
 export interface BulkUpdateStudiesResult {

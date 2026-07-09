@@ -185,6 +185,12 @@ class Transaction(Base):
     # Optional study→contract link (self-referential; NULL = Unassigned).
     # Meaningful only for kind='study'; validated in the application layer.
     contract_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # One-way SOCC sync (status only): the survey's SOCC board column and
+    # when it was last synced. Never affects money.
+    socc_board_column: Mapped[str | None] = mapped_column(String, nullable=True)
+    socc_synced_at: Mapped[datetime | None] = mapped_column(
+        DateTime, nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now()
     )

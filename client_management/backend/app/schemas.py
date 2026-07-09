@@ -70,3 +70,18 @@ class StudyBulkUpdateIn(BaseModel):
 
     client_id: int
     studies: dict[int, StudyIn]
+
+
+class SoccProjectStatus(BaseModel):
+    """One SOCC project's status row from an uploaded export."""
+
+    pr_code: str = ""
+    board_column: str = ""
+    project_name: str = ""
+    client_name: str = ""
+
+
+class SoccSyncIn(BaseModel):
+    """Payload for the manual SOCC status sync (parsed client-side)."""
+
+    updates: list[SoccProjectStatus] = Field(default_factory=list)

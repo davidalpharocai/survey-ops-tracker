@@ -17,6 +17,8 @@ import type {
   Ledger,
   RenewalRow,
   SearchResults,
+  SoccStatus,
+  SoccSyncResult,
   StudyTransaction,
   Transaction,
   UserListRow,
@@ -189,6 +191,8 @@ export interface ApiClient {
     id: number;
   }): Promise<{ type: ArchivedRecordType; id: number; name: string }>;
 
+  soccSync(updates: SoccStatus[]): Promise<SoccSyncResult>;
+
   listTeam(): Promise<TeamList>;
   inviteTeamMember(d: { email: string; is_admin: boolean }): Promise<unknown>;
   setTeamAdmin(d: { email: string; is_admin: boolean }): Promise<unknown>;
@@ -305,6 +309,16 @@ export function api(userEmail: string): ApiClient {
       const s = qs.toString();
       return r('GET', `/api/admin/audit-logs${s ? `?${s}` : ''}`);
     },
+
+    soccSync: updates =>
+      r('POST', '/api/admin/socc-sync', {
+        updates: updates.map(u => ({
+          pr_code: u.prCode,
+          board_column: u.boardColumn,
+          project_name: u.projectName,
+          client_name: u.clientName,
+        })),
+      }),
 
     listTeam: () => r('GET', '/api/admin/team'),
     inviteTeamMember: d => r('POST', '/api/admin/team', d),

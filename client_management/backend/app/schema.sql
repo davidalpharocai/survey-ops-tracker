@@ -107,3 +107,9 @@ ALTER TABLE transactions ADD COLUMN IF NOT EXISTS contract_id INTEGER
     REFERENCES transactions(id) ON DELETE SET NULL ON UPDATE CASCADE;
 CREATE INDEX IF NOT EXISTS transactions_contract_id_idx
     ON transactions (contract_id);
+
+-- CCM<->SOCC one-way sync (status only): the survey's SOCC board column
+-- (e.g. "Fielding") and when it was last synced from a SOCC export. Purely
+-- informational — never affects credits/dollars or any report math.
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS socc_board_column TEXT;
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS socc_synced_at TIMESTAMP(3);

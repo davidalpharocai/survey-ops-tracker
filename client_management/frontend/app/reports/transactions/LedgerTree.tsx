@@ -38,6 +38,9 @@ function StudyRow({ s, clientId }: { s: StudyTransaction; clientId: number }) {
       <td className="ledger-indent">
         {s.name}
         {s.soccProjectCode ? <span className="muted small"> · {s.soccProjectCode}</span> : null}
+        {s.soccBoardColumn ? (
+          <span className={`tag tag-socc${s.soccBoardColumn.toLowerCase() === 'fielding' ? ' is-fielding' : ''}`}>{s.soccBoardColumn}</span>
+        ) : null}
       </td>
       <td>{s.clientUser ? s.clientUser.name : ''}</td>
       <td className={`num${cd < 0 ? ' neg' : cd > 0 ? ' pos' : ''}`}>{creditsSigned(s.creditsDelta)}</td>
