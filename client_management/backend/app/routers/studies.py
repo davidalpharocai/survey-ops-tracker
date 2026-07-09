@@ -125,6 +125,43 @@ async def _validate_users(
     return found
 
 
+async def _resolve_contract_id(
+    session: AsyncSession, contract_id: int | None, client_id: int
+) -> int | None:
+    """Validate a study's optional contract link.
+
+    Parameters
+    ----------
+    session : AsyncSession
+        Active database session.
+    contract_id : int or None
+        Requested contract link (``None`` = Unassigned / unlink).
+    client_id : int
+        The study's owning client.
+
+    Returns
+    -------
+    int or None
+        The validated contract id, or ``None``.
+
+    Raises
+    ------
+    HTTPException
+        ``400`` if the id is not an active contract of this client.
+    """
+    if contract_id is None:
+        return None
+    con = await session.get(Transaction, contract_id)
+    if (
+        con is None
+        or con.deleted_at is not None
+        or con.kind != "contract"
+        or con.client_id != client_id
+    ):
+        raise HTTPException(400, "Pick a contract that belongs to this client.")
+    return contract_id
+
+
 def _check_common(f: StudyForm) -> None:
     """Apply the validations shared by create/update/bulk.
 
@@ -304,6 +341,9 @@ async def create_study(
     users = await _validate_users(session, f.user_ids, client.id)
     if users is None:
         raise HTTPException(400, "Pick users that belong to this client.")
+    contract_id = await _resolve_contract_id(
+        session, body.contract_id, client.id
+    )
 
     credits_annual = f.annual_total if f.cost_type == "credits" else 0.0
     dollars_annual = f.annual_total if f.cost_type == "dollars" else 0.0
@@ -321,6 +361,7 @@ async def create_study(
         client_user_id=users[0].id,
         actor_email=user,
         idem_key=idem,
+        contract_id=contract_id,
     )
     client_name = client.name  # read before commit/rollback expires it
     session.add(t)
@@ -378,6 +419,11 @@ async def update_study(
     users = await _validate_users(session, f.user_ids, t.client_id)
     if users is None:
         raise HTTPException(400, "Pick users that belong to this client.")
+    # The study form always submits the contract field, so None here means
+    # "unlink" (move to Unassigned), not "leave unchanged".
+    t.contract_id = await _resolve_contract_id(
+        session, body.contract_id, t.client_id
+    )
 
     # Clear the CSV-import "needs review" note once a real cost is set.
     note = t.note

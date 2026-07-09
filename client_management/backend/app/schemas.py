@@ -60,6 +60,9 @@ class StudyIn(BaseModel):
     cost_amount: float | str | None = None
     setup_cost: float | str | None = None
     client_user_ids: list[int] = Field(default_factory=list)
+    # Optional study→contract link. None = Unassigned (also used to unlink
+    # on edit). Validated against the client's active contracts server-side.
+    contract_id: int | None = None
 
 
 class StudyBulkUpdateIn(BaseModel):

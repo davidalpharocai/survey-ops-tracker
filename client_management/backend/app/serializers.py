@@ -140,6 +140,7 @@ def transaction_dict(
         "note": t.note,
         "soccProjectCode": t.socc_project_code,
         "reversesTransactionId": t.reverses_transaction_id,
+        "contractId": t.contract_id,
         "createdAt": _iso(t.created_at),
     }
     if with_client_user:

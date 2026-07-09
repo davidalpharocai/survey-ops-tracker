@@ -98,3 +98,12 @@ ALTER TABLE transactions ADD COLUMN IF NOT EXISTS reverses_transaction_id INTEGE
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS idem_key TEXT;
 CREATE UNIQUE INDEX IF NOT EXISTS transactions_idem_key_key
     ON transactions (idem_key) WHERE idem_key IS NOT NULL;
+
+-- Contract-linked ledger: a study may optionally roll up to exactly one
+-- contract of the same client (self-referential; NULL = Unassigned). The
+-- "same client + kind='contract' + not archived" rule is enforced in the
+-- application layer. Additive and nullable: existing studies are untouched.
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS contract_id INTEGER
+    REFERENCES transactions(id) ON DELETE SET NULL ON UPDATE CASCADE;
+CREATE INDEX IF NOT EXISTS transactions_contract_id_idx
+    ON transactions (contract_id);

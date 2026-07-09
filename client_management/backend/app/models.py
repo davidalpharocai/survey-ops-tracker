@@ -182,6 +182,9 @@ class Transaction(Base):
     # Idempotency key for money-creating POSTs (partial unique index
     # transactions_idem_key_key in schema.sql).
     idem_key: Mapped[str | None] = mapped_column(String, nullable=True)
+    # Optional study→contract link (self-referential; NULL = Unassigned).
+    # Meaningful only for kind='study'; validated in the application layer.
+    contract_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now()
     )
