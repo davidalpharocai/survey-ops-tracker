@@ -65,6 +65,11 @@ async def list_client_users(
     list of dict
         Serialised client users.
     """
+    owner = await session.get(Client, client_id)
+    if owner is None or owner.deleted_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Client not found"
+        )
     result = await session.execute(
         select(ClientUser)
         .where(
@@ -109,7 +114,7 @@ async def create_client_user(
         ``404`` if the client is absent, ``400`` if the name is blank.
     """
     client = await session.get(Client, client_id)
-    if client is None:
+    if client is None or client.deleted_at is not None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Client not found"
         )
@@ -145,7 +150,8 @@ async def list_users_filtered(
     client_id : int or None
         Restrict to one client.
     q : str or None
-        Case-sensitive substring matched against name or email.
+        Case-insensitive substring matched against name or email
+        (LIKE metacharacters are escaped to match literally).
     session : AsyncSession
         Injected request-scoped database session.
 
@@ -163,9 +169,17 @@ async def list_users_filtered(
     if client_id:
         stmt = stmt.where(ClientUser.client_id == client_id)
     if q:
-        like = f"%{q}%"
+        # Escape LIKE metacharacters so a literal % or _ typed in the
+        # search box matches itself instead of acting as a wildcard, and
+        # match case-insensitively (a user searching "acme" expects
+        # "Acme Corp").
+        safe = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        like = f"%{safe}%"
         stmt = stmt.where(
-            or_(ClientUser.name.like(like), ClientUser.email.like(like))
+            or_(
+                ClientUser.name.ilike(like, escape="\\"),
+                ClientUser.email.ilike(like, escape="\\"),
+            )
         )
     result = await session.execute(stmt)
     rows = []

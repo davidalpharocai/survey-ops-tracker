@@ -184,12 +184,22 @@ async def test_reports_include_zero_activity_clients(client):
     assert rows[0]["client"]["id"] == made["id"]
 
 
-async def test_balances_for_unknown_client_returns_zeros(client):
-    # Current behaviour: /balances does not 404 on unknown ids — it
-    # aggregates over zero rows and returns an all-zero summary.
-    bal = await get_balances(client, 99999)
-    assert bal["credits"] == 0.0
-    assert bal["cyRenewal"] is None
+async def test_balances_for_unknown_client_returns_404(client):
+    # Per-client reads 404 for an unknown (or archived) client rather than
+    # silently aggregating over zero rows, so a stale ?id= in the UI fails
+    # cleanly (the page catches the 404 and shows the empty state) instead
+    # of implying the phantom client exists with an all-zero balance.
+    r = await client.get("/api/clients/99999/balances", headers=ADMIN)
+    assert r.status_code == 404, r.text
+
+
+async def test_balances_for_archived_client_returns_404(client):
+    made = await make_client(client)
+    await client.delete(f"/api/clients/{made['id']}", headers=ADMIN)
+    r = await client.get(
+        f"/api/clients/{made['id']}/balances", headers=ADMIN
+    )
+    assert r.status_code == 404, r.text
 
 
 async def test_transaction_log_newest_first_excluding_deleted(client):

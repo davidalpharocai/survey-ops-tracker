@@ -7,6 +7,7 @@ import { TIP } from '../../../lib/tooltips';
 import ConfirmButton from '../../clients/ConfirmButton';
 import AutoSubmitSelect from '../../_components/AutoSubmitSelect';
 import InfoTooltip from '../../_components/InfoTooltip';
+import SubmitButton from '../../_components/SubmitButton';
 import RenewalAutofill from './RenewalAutofill';
 import {
   createContractAction,
@@ -156,7 +157,7 @@ export default async function NewContractPage({ searchParams }: PageProps) {
             <p className="muted small">Enter at least one of credits or dollars. Both are optional individually.</p>
 
             <div className="actions">
-              <button type="submit" disabled={!selectedClient}>Record contract</button>
+              <SubmitButton disabled={!selectedClient} pendingLabel="Recording…">Record contract</SubmitButton>
             </div>
           </form>
 

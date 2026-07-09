@@ -7,6 +7,7 @@ every datetime here is a **naive** value representing a UTC instant —
 asyncpg rejects tz-aware datetimes for those columns.
 """
 
+import math
 from datetime import datetime, timezone
 
 
@@ -151,6 +152,13 @@ def parse_money(v: object) -> float:
     if s == "":
         return 0.0
     try:
-        return float(s)
+        parsed = float(s)
     except (TypeError, ValueError):
         raise MoneyParseError(f"“{v}” is not a valid amount.") from None
+    # Reject nan/inf/1e400: these pass float() but slip through every
+    # downstream <0 / ==0 guard, then a NaN persists in the NUMERIC
+    # column and permanently breaks the SUM-based balance reports (NaN is
+    # not valid JSON), while +/-inf blows up at insert time.
+    if not math.isfinite(parsed):
+        raise MoneyParseError(f"“{v}” is not a valid amount.") from None
+    return parsed

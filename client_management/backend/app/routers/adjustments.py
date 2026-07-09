@@ -100,7 +100,10 @@ async def create_adjustment(
         an amount is unparseable, or the referenced transaction belongs
         to another client.
     """
-    existing = await _existing_by_idem_key(session, idempotency_key)
+    # Namespace the key per kind so the same Idempotency-Key presented to
+    # a different endpoint can never collide or return a wrong-kind row.
+    idem = f"adjustment:{idempotency_key}" if idempotency_key else None
+    existing = await _existing_by_idem_key(session, idem)
     if existing is not None:
         out = transaction_dict(existing)
         prior_client = await session.get(Client, existing.client_id)
@@ -153,7 +156,7 @@ async def create_adjustment(
         actor_email=user,
         note=note,
         reverses_transaction_id=body.reverses_transaction_id,
-        idem_key=idempotency_key,
+        idem_key=idem,
     )
     client_name = client.name  # read before commit/rollback expires it
     session.add(t)
@@ -163,7 +166,7 @@ async def create_adjustment(
         # Race on the idem_key unique index: another request with the same
         # key won; return its row instead of failing.
         await session.rollback()
-        existing = await _existing_by_idem_key(session, idempotency_key)
+        existing = await _existing_by_idem_key(session, idem)
         if existing is None:
             raise
         out = transaction_dict(existing)

@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react';
 import type { ClientUser, Cadence } from '../../../lib/types';
 import { TIP } from '../../../lib/tooltips';
 import InfoTooltip from '../../_components/InfoTooltip';
+import SubmitButton from '../../_components/SubmitButton';
 import { createStudyAction } from './actions';
 
 const RUNS_PER_YEAR: Record<string, number> = { weekly: 52, monthly: 12, quarterly: 4 };
@@ -107,7 +108,7 @@ export default function NewStudyForm({ clientId, users }: Props) {
       </div>
 
       <div className="actions">
-        <button type="submit" disabled={disabled}>Publish study</button>
+        <SubmitButton disabled={disabled} pendingLabel="Publishing…">Publish study</SubmitButton>
       </div>
     </form>
   );

@@ -115,6 +115,7 @@ async def _validate_users(
         .where(
             ClientUser.id.in_(user_ids),
             ClientUser.client_id == client_id,
+            ClientUser.deleted_at.is_(None),
         )
         .order_by(ClientUser.id.asc())
     )
@@ -143,6 +144,12 @@ def _check_common(f: StudyForm) -> None:
         raise HTTPException(400, "Study date is required.")
     if f.annual_total < 0:
         raise HTTPException(400, "Cost cannot be negative.")
+    # Setup cost is folded onto the credits side as a negative delta, so a
+    # negative setup_cost would FLIP the sign and make a study ADD credits
+    # (money from nothing). Guard it explicitly — annual_total alone
+    # doesn't cover it.
+    if f.setup_cost < 0:
+        raise HTTPException(400, "Setup cost cannot be negative.")
     if not f.user_ids:
         raise HTTPException(
             400, "Pick at least one user this study belongs to."
@@ -200,6 +207,11 @@ async def list_studies(
     list of dict
         Decorated study transactions.
     """
+    owner = await session.get(Client, client_id)
+    if owner is None or owner.deleted_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Client not found"
+        )
     result = await session.execute(
         select(Transaction)
         .where(
@@ -272,7 +284,10 @@ async def create_study(
     HTTPException
         ``404`` if the client is absent, ``400`` if validation fails.
     """
-    existing = await _existing_by_idem_key(session, idempotency_key)
+    # Namespace the key per kind so the same Idempotency-Key presented to
+    # a different endpoint can never collide or return a wrong-kind row.
+    idem = f"study:{idempotency_key}" if idempotency_key else None
+    existing = await _existing_by_idem_key(session, idem)
     if existing is not None:
         out = transaction_dict(existing)
         prior_client = await session.get(Client, existing.client_id)
@@ -280,7 +295,7 @@ async def create_study(
         return out
 
     client = await session.get(Client, body.client_id or 0)
-    if client is None:
+    if client is None or client.deleted_at is not None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Client not found"
         )
@@ -305,7 +320,7 @@ async def create_study(
         setup_cost=f.setup_cost if f.cadence else None,
         client_user_id=users[0].id,
         actor_email=user,
-        idem_key=idempotency_key,
+        idem_key=idem,
     )
     client_name = client.name  # read before commit/rollback expires it
     session.add(t)
@@ -317,7 +332,7 @@ async def create_study(
         # Race on the idem_key unique index: another request with the same
         # key won; return its row instead of failing.
         await session.rollback()
-        existing = await _existing_by_idem_key(session, idempotency_key)
+        existing = await _existing_by_idem_key(session, idem)
         if existing is None:
             raise
         out = transaction_dict(existing)
@@ -499,6 +514,9 @@ async def bulk_update(
             continue
         if f.annual_total < 0:
             errors.append(f"'{f.name}': cost cannot be negative")
+            continue
+        if f.setup_cost < 0:
+            errors.append(f"'{f.name}': setup cost cannot be negative")
             continue
         if not f.user_ids:
             errors.append(f"'{f.name}': pick at least one user")

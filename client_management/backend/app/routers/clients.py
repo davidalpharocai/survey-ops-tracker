@@ -178,9 +178,12 @@ async def create_client(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="A 'became a client' date is required.",
         )
+    # Case-insensitive so "Acme" can't be created alongside "acme"
+    # (matches the update path, which already compares lower()).
     dup = await session.execute(
         select(Client).where(
-            Client.name == name, Client.deleted_at.is_(None)
+            func.lower(Client.name) == name.lower(),
+            Client.deleted_at.is_(None),
         )
     )
     if dup.scalar_one_or_none() is not None:

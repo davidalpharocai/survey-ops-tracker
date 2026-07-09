@@ -160,6 +160,11 @@ async def list_contracts(
     list of dict
         Decorated contract transactions.
     """
+    owner = await session.get(Client, client_id)
+    if owner is None or owner.deleted_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Client not found"
+        )
     result = await session.execute(
         select(Transaction)
         .where(
@@ -203,7 +208,10 @@ async def create_contract(
     HTTPException
         ``404`` if the client is absent, ``400`` if validation fails.
     """
-    existing = await _existing_by_idem_key(session, idempotency_key)
+    # Namespace the key per kind so the same Idempotency-Key presented to
+    # a different endpoint can never collide or return a wrong-kind row.
+    idem = f"contract:{idempotency_key}" if idempotency_key else None
+    existing = await _existing_by_idem_key(session, idem)
     if existing is not None:
         out = _contract_dict(existing)
         prior_client = await session.get(Client, existing.client_id)
@@ -211,7 +219,7 @@ async def create_contract(
         return out
 
     client = await session.get(Client, body.client_id or 0)
-    if client is None:
+    if client is None or client.deleted_at is not None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Client not found"
         )
@@ -237,7 +245,7 @@ async def create_contract(
         credits_delta=credits_amount,
         dollars_delta=dollars_amount,
         actor_email=user,
-        idem_key=idempotency_key,
+        idem_key=idem,
     )
     client_name = client.name  # read before commit/rollback expires it
     session.add(t)
@@ -247,7 +255,7 @@ async def create_contract(
         # Race on the idem_key unique index: another request with the same
         # key won; return its row instead of failing.
         await session.rollback()
-        existing = await _existing_by_idem_key(session, idempotency_key)
+        existing = await _existing_by_idem_key(session, idem)
         if existing is None:
             raise
         out = _contract_dict(existing)

@@ -53,7 +53,11 @@ async def lifespan(_: FastAPI):
 app = FastAPI(
     title="AlphaROC Client Credit Management API",
     version="0.2.0",
+    # In production, serve no interactive docs and no machine-readable
+    # OpenAPI schema: the API is internal-only, so there is no reason to
+    # publish its full surface to anyone who reaches the origin.
     docs_url=None if settings.is_production else "/docs",
+    openapi_url=None if settings.is_production else "/openapi.json",
     redoc_url=None,
     lifespan=lifespan,
 )
@@ -101,9 +105,12 @@ async def _money_parse_error(_: Request, exc: MoneyParseError) -> JSONResponse:
 async def root() -> dict[str, str]:
     """Service identity endpoint.
 
+    Returns just enough to confirm the service is up for a smoke check,
+    without disclosing the build version to unauthenticated callers.
+
     Returns
     -------
     dict of str to str
-        The service name and version, useful for smoke checks.
+        The service name and a static ``ok`` status.
     """
-    return {"service": app.title, "version": app.version}
+    return {"service": app.title, "status": "ok"}

@@ -28,6 +28,20 @@ const MUTED = '#6b7280';
 const ACCENT = '#1d4ed8';
 const RULE = '#e5e7eb';
 
+// This PDF is handed to clients, so never print raw internal staff email
+// addresses on it. Show a human display name derived from the local part
+// (e.g. "jane.doe@alpharoc.ai" -> "Jane Doe") instead of the full address.
+function staffName(email: string | null | undefined): string {
+  if (!email) return '';
+  const local = email.split('@')[0] || '';
+  const name = local
+    .split(/[._-]+/)
+    .filter(Boolean)
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+  return name || email;
+}
+
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const email = await currentUserEmail();
   if (!email) {
@@ -72,7 +86,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   doc.setTextColor(MUTED);
   const metaRight = [
     `Generated ${generatedOn}`,
-    `Prepared by ${email}`,
+    `Prepared by ${staffName(email)}`,
     client.relationshipManager
       ? `Relationship manager: ${client.relationshipManager}`
       : '',
@@ -131,7 +145,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       creditsSigned(t.creditsDelta),
       dollarsSigned(t.dollarsDelta),
       t.renewalOn ? isoDate(t.renewalOn) : '',
-      t.actorEmail,
+      staffName(t.actorEmail),
     ]),
     theme: 'striped',
     styles: { fontSize: 9, cellPadding: 6, textColor: INK, lineColor: RULE },

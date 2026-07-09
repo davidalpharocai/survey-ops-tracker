@@ -32,6 +32,21 @@ router = APIRouter(
 )
 
 
+async def _active_client_or_404(session: AsyncSession, client_id: int) -> Client:
+    """Fetch a non-archived client by id, or raise 404.
+
+    Per-client read endpoints are directly reachable on the public API,
+    so they must agree with ``GET /api/clients/{id}`` and hide archived
+    or nonexistent clients rather than serving zeros/real data.
+    """
+    c = await session.get(Client, client_id)
+    if c is None or c.deleted_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Client not found"
+        )
+    return c
+
+
 def _iso(dt: datetime | None) -> str | None:
     """Render a renewal datetime as a UTC ISO string.
 
@@ -70,6 +85,7 @@ async def client_balances(
         lifetime credit/dollar balances, the current-year contracted
         credits and dollar value, and the next upcoming renewal date.
     """
+    await _active_client_or_404(session, client_id)
     soy, eoy, _ = current_year_window()
     is_cy_contract = (
         (Transaction.kind == "contract")
@@ -204,10 +220,7 @@ async def client_transactions(
     HTTPException
         ``404`` if the client does not exist.
     """
-    if await session.get(Client, client_id) is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Client not found"
-        )
+    await _active_client_or_404(session, client_id)
     result = await session.execute(
         select(Transaction)
         .where(
@@ -316,11 +329,18 @@ def _run_out(today: datetime, balance: float, monthly_burn: float) -> datetime |
     datetime or None
         ``today + (balance / monthly_burn)`` months (at
         :data:`DAYS_PER_MONTH` days each), or ``None`` when there is no
-        burn or no positive balance to deplete.
+        burn, no positive balance to deplete, or the runway is so long
+        (huge balance / tiny recent burn) that it is effectively "never".
     """
     if monthly_burn <= 0 or balance <= 0:
         return None
-    return today + timedelta(days=(balance / monthly_burn) * DAYS_PER_MONTH)
+    days = (balance / monthly_burn) * DAYS_PER_MONTH
+    # A runway beyond ~27 years is "not a concern" — and, crucially,
+    # datetime + timedelta OverflowErrors past year 9999, which would
+    # 500 the whole balance-health report for every client.
+    if days > 10_000:
+        return None
+    return today + timedelta(days=days)
 
 
 @router.get("/reports/balance-health")

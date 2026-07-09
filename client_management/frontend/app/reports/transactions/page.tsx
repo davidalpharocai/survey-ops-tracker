@@ -14,6 +14,7 @@ import { TIP } from '../../../lib/tooltips';
 import type { Balance, Transaction } from '../../../lib/types';
 import AutoSubmitSelect from '../../_components/AutoSubmitSelect';
 import InfoTooltip from '../../_components/InfoTooltip';
+import SubmitButton from '../../_components/SubmitButton';
 import { createAdjustmentAction } from './actions';
 
 export const dynamic = 'force-dynamic';
@@ -152,7 +153,7 @@ export default async function TransactionsReportPage({ searchParams }: PageProps
                   placeholder="Why this correction is needed"
                 />
               </label>
-              <button className="btn" type="submit">Record adjustment</button>
+              <SubmitButton className="btn" pendingLabel="Recording…">Record adjustment</SubmitButton>
             </form>
           </section>
         </>
