@@ -83,7 +83,7 @@ export default function LedgerTree({ ledger }: { ledger: Ledger }) {
             <th className="num">Credits Δ</th>
             <th className="num">Dollars Δ</th>
             <th>Renewal</th>
-            <th className="num">Remaining <InfoTooltip text={REMAINING_TIP} /></th>
+            <th className="num">Remaining <InfoTooltip text={REMAINING_TIP} align="right" /></th>
           </tr>
         </thead>
         <tbody>
@@ -121,7 +121,7 @@ export default function LedgerTree({ ledger }: { ledger: Ledger }) {
           {view.unassigned.length > 0 && (
             <>
               <tr className="ledger-group">
-                <td colSpan={6}>Unassigned <InfoTooltip text={UNASSIGNED_TIP} /></td>
+                <td colSpan={6}>Unassigned <InfoTooltip text={UNASSIGNED_TIP} align="left" /></td>
               </tr>
               {view.unassigned.map(s => <StudyRow key={s.id} s={s} />)}
             </>

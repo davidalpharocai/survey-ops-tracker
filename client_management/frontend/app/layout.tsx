@@ -5,10 +5,15 @@ import type { ReactNode } from 'react';
 
 import { currentUserEmail, currentUserIsAdmin } from '../lib/auth';
 import NavRibbon from './_components/NavRibbon';
+import ThemeToggle from './_components/ThemeToggle';
 
 export const metadata = {
   title: 'AlphaROC Client Credit Management',
 };
+
+// Apply the saved theme before first paint so there's no flash of the
+// wrong palette. Runs inline in <head>; CSP allows 'unsafe-inline' scripts.
+const THEME_INIT = `(function(){try{var t=localStorage.getItem('ccm-theme');if(t==='dark'||t==='light'){document.documentElement.setAttribute('data-theme',t);}}catch(e){}})();`;
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
   const [userEmail, isAdmin] = await Promise.all([
@@ -16,7 +21,10 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
     currentUserIsAdmin(),
   ]);
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT }} />
+      </head>
       <body>
         <header className="topbar">
           <Link className="brand" href="/">
@@ -36,6 +44,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
           {userEmail && (
             <Link className="signout" href="/api/auth/logout">Sign out</Link>
           )}
+          <ThemeToggle />
         </header>
         <main>{children}</main>
       </body>

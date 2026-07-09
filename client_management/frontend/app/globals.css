@@ -5,13 +5,87 @@
   --accent: #2563eb;
   --accent-hover: #1d4ed8;
   --accent-bg: #eff6ff;
+  --accent-bg-strong: #e0ecff;
   --border: #e5e7eb;
   --card: #ffffff;
+  --surface-2: #fafafa;
+  --skeleton-hi: #eef1f4;
   --pos: #047857;
   --neg: #b91c1c;
   --warn-bg: #fef3c7;
   --warn-fg: #92400e;
   --danger: #dc2626;
+  --err-bg: #fef2f2;
+  --err-border: #fecaca;
+  --tag-contract-bg: #dbeafe; --tag-contract-fg: #1e40af;
+  --tag-study-bg: #fce7f3;    --tag-study-fg: #9d174d;
+  --tag-adj-bg: #fef3c7;      --tag-adj-fg: #92400e;
+  --tag-ok-bg: #d1fae5;       --tag-err-bg: #fee2e2;
+  --pending-bg: #fffbeb;      --pending-border: #f59e0b;
+  --shadow: 0 1px 2px rgba(16, 24, 40, 0.06);
+  --shadow-md: 0 4px 14px rgba(16, 24, 40, 0.10);
+  color-scheme: light;
+}
+
+/* Dark theme. Variable-driven so a single set of values drives everything.
+   Follow the OS by default; an explicit toggle (data-theme) always wins. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --bg: #0f1216;
+    --fg: #e6e8ec;
+    --muted: #98a1af;
+    --accent: #5b9bf6;
+    --accent-hover: #7db0f8;
+    --accent-bg: #17233b;
+    --accent-bg-strong: #1f3255;
+    --border: #2a313c;
+    --card: #161a20;
+    --surface-2: #1b2028;
+    --skeleton-hi: #232a34;
+    --pos: #34d399;
+    --neg: #f87171;
+    --warn-bg: #3a2f12;
+    --warn-fg: #fcd34d;
+    --danger: #ef4444;
+    --err-bg: #2a1414;
+    --err-border: #5b2626;
+    --tag-contract-bg: #1e3a8a; --tag-contract-fg: #bfdbfe;
+    --tag-study-bg: #7d1d54;    --tag-study-fg: #fbcfe8;
+    --tag-adj-bg: #3f320f;      --tag-adj-fg: #fde68a;
+    --tag-ok-bg: #0b3d2e;       --tag-err-bg: #4c1d1d;
+    --pending-bg: #2a2410;      --pending-border: #b7791f;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.5);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1216;
+  --fg: #e6e8ec;
+  --muted: #98a1af;
+  --accent: #5b9bf6;
+  --accent-hover: #7db0f8;
+  --accent-bg: #17233b;
+  --accent-bg-strong: #1f3255;
+  --border: #2a313c;
+  --card: #161a20;
+  --surface-2: #1b2028;
+  --skeleton-hi: #232a34;
+  --pos: #34d399;
+  --neg: #f87171;
+  --warn-bg: #3a2f12;
+  --warn-fg: #fcd34d;
+  --danger: #ef4444;
+  --err-bg: #2a1414;
+  --err-border: #5b2626;
+  --tag-contract-bg: #1e3a8a; --tag-contract-fg: #bfdbfe;
+  --tag-study-bg: #7d1d54;    --tag-study-fg: #fbcfe8;
+  --tag-adj-bg: #3f320f;      --tag-adj-fg: #fde68a;
+  --tag-ok-bg: #0b3d2e;       --tag-err-bg: #4c1d1d;
+  --pending-bg: #2a2410;      --pending-border: #b7791f;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.5);
+  color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
@@ -86,6 +160,22 @@ body {
   margin-left: 1rem;
 }
 .topbar .signout:hover { text-decoration: underline; }
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  margin-left: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: none;
+  color: var(--fg);
+  font-size: 0.95rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.theme-toggle:hover { background: var(--accent-bg); border-color: var(--accent); }
 
 /* ---------- Login ---------- */
 
@@ -127,9 +217,9 @@ body {
 }
 .login-btn:hover { background: var(--accent-hover); }
 .login-error {
-  background: #fef2f2;
+  background: var(--err-bg);
   color: var(--neg);
-  border: 1px solid #fecaca;
+  border: 1px solid var(--err-border);
   border-radius: 8px;
   padding: 0.6rem 0.8rem;
   font-size: 0.88rem;
@@ -199,14 +289,15 @@ h3 { font-size: 1rem; }
   background: var(--accent-bg);
   border: 1px solid var(--accent);
   border-radius: 10px;
-  padding: 1rem 1.15rem;
+  padding: 1.1rem 1.25rem;
   text-decoration: none;
   color: var(--fg);
-  transition: background 0.12s, box-shadow 0.12s;
+  box-shadow: var(--shadow);
+  transition: background 0.12s, box-shadow 0.12s, transform 0.12s;
 }
 .hub-action:hover {
-  background: #e0ecff;
-  box-shadow: 0 2px 10px rgba(37, 99, 235, 0.18);
+  background: var(--accent-bg-strong);
+  box-shadow: var(--shadow-md);
 }
 .hub-action .hub-link-title {
   color: var(--accent);
@@ -231,6 +322,7 @@ h3 { font-size: 1rem; }
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 1.25rem;
+  box-shadow: var(--shadow);
 }
 .panel h2 {
   margin-bottom: 1rem;
@@ -246,15 +338,17 @@ h3 { font-size: 1rem; }
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 0.85rem 1rem;
+  padding: 0.9rem 1rem;
   margin-bottom: 0.75rem;
   text-decoration: none;
   color: var(--fg);
-  transition: background 0.1s, border-color 0.1s;
+  box-shadow: var(--shadow);
+  transition: background 0.1s, border-color 0.1s, box-shadow 0.1s;
 }
 .hub-link:hover {
   background: var(--accent-bg);
   border-color: var(--accent);
+  box-shadow: var(--shadow-md);
 }
 .hub-link-title {
   display: block;
@@ -447,8 +541,8 @@ button:hover, .btn:hover { background: var(--accent-hover); }
 }
 
 .danger-zone {
-  background: #fff5f5;
-  border: 1px solid #fecaca;
+  background: var(--err-bg);
+  border: 1px solid var(--err-border);
   border-radius: 8px;
   padding: 0.75rem 1rem;
   margin-top: 1rem;
@@ -531,7 +625,7 @@ button:hover, .btn:hover { background: var(--accent-hover); }
 }
 .report tr:last-child td { border-bottom: none; }
 .report th {
-  background: #fafafa;
+  background: var(--surface-2);
   font-weight: 600;
   color: var(--muted);
   font-size: 0.78rem;
@@ -557,15 +651,15 @@ button:hover, .btn:hover { background: var(--accent-hover); }
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
-.tag-contract { background: #dbeafe; color: #1e40af; }
-.tag-study { background: #fce7f3; color: #9d174d; }
-.tag-adjustment { background: #fef3c7; color: #92400e; }
+.tag-contract { background: var(--tag-contract-bg); color: var(--tag-contract-fg); }
+.tag-study { background: var(--tag-study-bg); color: var(--tag-study-fg); }
+.tag-adjustment { background: var(--tag-adj-bg); color: var(--tag-adj-fg); }
 
 /* ---------- Audit log ---------- */
 
-.tag-success { background: #d1fae5; color: var(--pos); }
+.tag-success { background: var(--tag-ok-bg); color: var(--pos); }
 .tag-denied { background: var(--warn-bg); color: var(--warn-fg); }
-.tag-error { background: #fee2e2; color: var(--neg); }
+.tag-error { background: var(--tag-err-bg); color: var(--neg); }
 
 .neg { color: var(--neg); }
 .pos { color: var(--pos); }
@@ -593,8 +687,8 @@ button:hover, .btn:hover { background: var(--accent-hover); }
 .studies-table select:not([multiple]) { min-width: 7.5em; }
 .studies-table .row-actions,
 .contracts-table .row-actions { white-space: nowrap; display: flex; gap: 0.4rem; }
-.studies-table tr.is-pending { background: #fffbeb; }
-.studies-table tr.is-pending td:first-child { border-left: 3px solid #f59e0b; }
+.studies-table tr.is-pending { background: var(--pending-bg); }
+.studies-table tr.is-pending td:first-child { border-left: 3px solid var(--pending-border); }
 .studies-table th { user-select: none; }
 .studies-table th .sort-ind { color: var(--accent); margin-left: 0.2rem; font-size: 0.75rem; }
 .studies-table td.num.annual-cell { font-variant-numeric: tabular-nums; font-weight: 600; }
@@ -672,6 +766,21 @@ button:hover, .btn:hover { background: var(--accent-hover); }
   opacity: 1;
   visibility: visible;
 }
+/* Edge-anchored variants: open the popup inward so it isn't cut off (or
+   clipped by a table's overflow) when the (i) sits near a page edge. */
+.info-pop.align-left {
+  left: 0;
+  right: auto;
+  transform: none;
+}
+.info-pop.align-left::after { left: 10px; transform: none; }
+.info-pop.align-right {
+  left: auto;
+  right: 0;
+  transform: none;
+}
+.info-pop.align-right::after { left: auto; right: 10px; transform: none; }
+
 /* Header cells sit high; drop their popup below the (i) so it isn't clipped. */
 th .info-pop {
   bottom: auto;
@@ -735,7 +844,7 @@ th .info-pop::after {
   border-radius: 6px;
 }
 .ledger-control-actions { display: flex; gap: 0.4rem; }
-.ledger-table .ledger-contract td { background: #fafafa; font-weight: 600; }
+.ledger-table .ledger-contract td { background: var(--surface-2); font-weight: 600; }
 .ledger-table .ledger-contract .tag { font-weight: 600; margin-right: 0.4rem; }
 .ledger-table .ledger-indent { padding-left: 2.2rem; }
 .ledger-table .ledger-remaining { font-variant-numeric: tabular-nums; }
@@ -788,7 +897,7 @@ th .info-pop::after {
 .skeleton-line,
 .skeleton-block {
   display: block;
-  background: linear-gradient(90deg, var(--border) 25%, #f0f1f3 37%, var(--border) 63%);
+  background: linear-gradient(90deg, var(--border) 25%, var(--skeleton-hi) 37%, var(--border) 63%);
   background-size: 800px 100%;
   animation: ccm-shimmer 1.4s ease-in-out infinite;
   border-radius: 6px;
