@@ -67,11 +67,11 @@ export async function GET(): Promise<NextResponse> {
 
   const clientsWs = wb.addWorksheet('Clients');
   headerRow(clientsWs,
-    ['Client Name', 'Became Client On', 'Relationship Manager', 'Primary Contact Name', 'Primary Contact Cell', 'Primary Contact Email'],
-    [32, 18, 22, 22, 18, 28]);
+    ['Client Name', 'Client Code', 'Became Client On', 'Relationship Manager', 'Primary Contact Name', 'Primary Contact Cell', 'Primary Contact Email'],
+    [32, 14, 18, 22, 22, 18, 28]);
   for (const { client: c } of perClient) {
     clientsWs.addRow([
-      c.name, isoDate(c.becameClientOn), c.relationshipManager || '',
+      c.name, c.soccCode || '', isoDate(c.becameClientOn), c.relationshipManager || '',
       c.primaryContactName || '', c.primaryContactCell || '', c.primaryContactEmail || '',
     ]);
   }
@@ -88,13 +88,13 @@ export async function GET(): Promise<NextResponse> {
 
   const contractsWs = wb.addWorksheet('Contracts');
   headerRow(contractsWs,
-    ['Client', 'Contract Name', 'Contract Date', 'Renewal Date', 'Credits', 'Dollars'],
-    [32, 34, 16, 16, 12, 12]);
+    ['Client', 'Contract Name', 'Project Code', 'Contract Date', 'Renewal Date', 'Credits', 'Dollars'],
+    [32, 34, 14, 16, 16, 12, 12]);
   let contractCount = 0;
   for (const { client: c, contracts } of perClient) {
     for (const t of contracts) {
       contractsWs.addRow([
-        c.name, t.name, isoDate(t.occurredOn), t.renewalOn ? isoDate(t.renewalOn) : '',
+        c.name, t.name, t.soccProjectCode || '', isoDate(t.occurredOn), t.renewalOn ? isoDate(t.renewalOn) : '',
         Number(t.creditsAmount ?? 0), Number(t.dollarsAmount ?? 0),
       ]);
       contractCount += 1;
@@ -103,8 +103,8 @@ export async function GET(): Promise<NextResponse> {
 
   const studiesWs = wb.addWorksheet('Studies');
   headerRow(studiesWs,
-    ['Client', 'Study Name', 'Study Date', 'For User', 'Cost Type', 'Cadence', 'Cost', 'Setup Cost'],
-    [32, 40, 16, 24, 12, 12, 12, 12]);
+    ['Client', 'Study Name', 'Project Code', 'Study Date', 'For User', 'Cost Type', 'Cadence', 'Cost', 'Setup Cost'],
+    [32, 40, 14, 16, 24, 12, 12, 12, 12]);
   let studyCount = 0;
   for (const { client: c, studies } of perClient) {
     for (const t of studies) {
@@ -113,7 +113,7 @@ export async function GET(): Promise<NextResponse> {
       const cost = isTracker ? Number(t.costPerRun ?? 0) : Number(t.costAnnual ?? 0);
       const forUser = (t.userObjs && t.userObjs[0]?.name) || '';
       studiesWs.addRow([
-        c.name, t.name, isoDate(t.occurredOn), forUser,
+        c.name, t.name, t.soccProjectCode || '', isoDate(t.occurredOn), forUser,
         t.costType || 'credits', cadence, cost, Number(t.setupCost ?? 0),
       ]);
       studyCount += 1;
@@ -123,7 +123,7 @@ export async function GET(): Promise<NextResponse> {
   const xlsxBuf = await wb.xlsx.writeBuffer();
 
   // ---- raw ledger CSV ----
-  const cols = ['transaction_id', 'client', 'kind', 'name', 'occurred_on', 'renewal_on', 'credits_delta', 'dollars_delta', 'cadence', 'attributed_users', 'recorded_by', 'recorded_at'];
+  const cols = ['transaction_id', 'client', 'kind', 'name', 'project_code', 'occurred_on', 'renewal_on', 'credits_delta', 'dollars_delta', 'cadence', 'attributed_users', 'recorded_by', 'recorded_at'];
   const lines = [cols.join(',')];
   let txnCount = 0;
   for (const { client: c, ledger } of perClient) {
@@ -131,7 +131,7 @@ export async function GET(): Promise<NextResponse> {
       const st = t as Partial<StudyTransaction>;
       const users = (st.userObjs || []).map(u => u.name).join('; ');
       lines.push([
-        t.id, c.name, t.kind, t.name, isoDate(t.occurredOn), t.renewalOn ? isoDate(t.renewalOn) : '',
+        t.id, c.name, t.kind, t.name, t.soccProjectCode || '', isoDate(t.occurredOn), t.renewalOn ? isoDate(t.renewalOn) : '',
         t.creditsDelta ?? 0, t.dollarsDelta ?? 0, st.cadence || '', users, t.actorEmail,
         t.createdAt ? new Date(t.createdAt).toISOString() : '',
       ].map(csvCell).join(','));

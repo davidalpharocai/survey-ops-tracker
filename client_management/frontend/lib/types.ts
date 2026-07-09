@@ -8,6 +8,7 @@ export type TransactionKind = 'contract' | 'study';
 export interface Client {
   id: number;
   name: string;
+  soccCode?: string | null;
   becameClientOn: Date;
   primaryContactName?: string | null;
   primaryContactCell?: string | null;
@@ -52,6 +53,7 @@ interface TransactionBase {
   creditsDelta: number | string;
   dollarsDelta: number | string;
   actorEmail: string;
+  soccProjectCode?: string | null;
   createdAt: Date;
   clientUser?: ClientUser | null;
 }

@@ -138,6 +138,7 @@ function pick(row: SheetRow, ...aliases: string[]): string {
 interface LiveClient {
   id: number;
   name: string;
+  soccCode: string;
   becameClientOn: string; // ISO day
   relationshipManager: string;
   primaryContactName: string;
@@ -148,6 +149,7 @@ interface LiveClient {
 
 interface LiveState {
   clients: Map<string, LiveClient>; // key: lower name
+  clientsByCode: Map<string, LiveClient>; // key: socc_code (Cl#####)
   contracts: Map<number, Map<string, Record<string, unknown>>>; // clientId -> lower name -> decorated
   studies: Map<number, Map<string, Record<string, unknown>>>;
 }
@@ -155,6 +157,7 @@ interface LiveState {
 async function fetchLiveState(api: ApiClient, clientNames: Set<string>): Promise<LiveState> {
   const raw = (await api.listClientsWithUsers()) as unknown as Array<Record<string, unknown>>;
   const clients = new Map<string, LiveClient>();
+  const clientsByCode = new Map<string, LiveClient>();
   for (const c of raw) {
     const users = new Map<string, { id: number; name: string; email: string }>();
     for (const u of (c.users as Array<Record<string, unknown>>) || []) {
@@ -164,16 +167,19 @@ async function fetchLiveState(api: ApiClient, clientNames: Set<string>): Promise
         email: (u.email as string) || '',
       });
     }
-    clients.set(String(c.name).toLowerCase(), {
+    const live: LiveClient = {
       id: c.id as number,
       name: String(c.name),
+      soccCode: (c.soccCode as string) || '',
       becameClientOn: isoDate(c.becameClientOn as Date | string),
       relationshipManager: (c.relationshipManager as string) || '',
       primaryContactName: (c.primaryContactName as string) || '',
       primaryContactCell: (c.primaryContactCell as string) || '',
       primaryContactEmail: (c.primaryContactEmail as string) || '',
       users,
-    });
+    };
+    clients.set(live.name.toLowerCase(), live);
+    if (live.soccCode) clientsByCode.set(live.soccCode, live);
   }
   // Contracts/studies only for the clients the sheet references.
   const contracts = new Map<number, Map<string, Record<string, unknown>>>();
@@ -188,7 +194,7 @@ async function fetchLiveState(api: ApiClient, clientNames: Set<string>): Promise
     contracts.set(c.id, new Map(cs.map(t => [String(t.name).toLowerCase(), t])));
     studies.set(c.id, new Map(ss.map(t => [String(t.name).toLowerCase(), t])));
   }
-  return { clients, contracts, studies };
+  return { clients, clientsByCode, contracts, studies };
 }
 
 // ------------------------------------------------------------ plan builders
@@ -222,6 +228,7 @@ function planTemplate(
       const name = pick(r, 'clientname', 'client', 'name');
       if (!name) continue;
       const key = name.toLowerCase();
+      const code = pick(r, 'socccode', 'clientcode', 'code');
       const became = pick(r, 'becameclienton', 'clientsince', 'becameon', 'since');
       const becameIso = became ? toIsoDay(became) : null;
       if (became && !becameIso) {
@@ -234,7 +241,8 @@ function planTemplate(
         primary_contact_cell: pick(r, 'primarycontactcell'),
         primary_contact_email: pick(r, 'primarycontactemail'),
       };
-      const existing = live.clients.get(key);
+      // Match on the stable code first, then name.
+      const existing = (code && live.clientsByCode.get(code)) || live.clients.get(key);
       if (!existing) {
         const row: PlanRow = {
           tab: 'clients',
@@ -242,11 +250,13 @@ function planTemplate(
           client: name,
           name,
           changes: [
+            ...(code ? [{ field: 'code', from: '', to: code }] : []),
             { field: 'became client on', from: '', to: becameIso || '(today)' },
             ...Object.entries(provided).filter(([, v]) => v).map(([f, v]) => ({ field: f.replace(/_/g, ' '), from: '', to: v })),
           ],
           payload: {
             name,
+            socc_code: code,
             became_on: becameIso || new Date().toISOString().slice(0, 10),
             ...provided,
           },
@@ -268,6 +278,10 @@ function planTemplate(
       if (becameIso && becameIso !== existing.becameClientOn) {
         changes.push({ field: 'became client on', from: existing.becameClientOn, to: becameIso });
         merged.became_on = becameIso;
+      }
+      if (code && code !== existing.soccCode) {
+        changes.push({ field: 'code', from: existing.soccCode || '', to: code });
+        merged.socc_code = code;
       }
       const liveVals: Record<string, string> = {
         relationship_manager: existing.relationshipManager,
@@ -365,6 +379,7 @@ function planTemplate(
           ],
           payload: {
             name,
+            socc_project_code: pick(r, 'soccprojectcode', 'projectcode'),
             occurred_on: occurred,
             renewal_on: renewal || '',
             credits_amount: String(numOr(creditsRaw, 0)),
@@ -443,6 +458,7 @@ function planTemplate(
           ],
           payload: {
             name,
+            socc_project_code: pick(r, 'soccprojectcode', 'projectcode'),
             occurred_on: occurred || new Date().toISOString().slice(0, 10),
             cost_type: costTypeRaw === 'dollars' ? 'dollars' : 'credits',
             cadence,
@@ -541,7 +557,12 @@ function planSocc(
   for (const c of clientsTab) {
     nameByUuid.set(c.id, c.name);
     const key = c.name.toLowerCase();
-    if (live.clients.has(key)) {
+    const code = (c.code || '').trim();
+    // Match on the stable Cl##### code first, then fall back to name.
+    // The code match is what stops a re-spelled client (GoldenTree vs
+    // Goldentree) from creating a duplicate.
+    const existing = (code && live.clientsByCode.get(code)) || live.clients.get(key);
+    if (existing) {
       rows.push({ tab: 'clients', action: 'unchanged', client: c.name, name: c.name, changes: [] });
       continue;
     }
@@ -551,10 +572,11 @@ function planSocc(
     const row: PlanRow = {
       tab: 'clients', action: 'create', client: c.name, name: c.name,
       changes: [
+        ...(code ? [{ field: 'code', from: '', to: code }] : []),
         { field: 'became client on', from: '', to: became },
         ...(rm ? [{ field: 'relationship manager', from: '', to: rm }] : []),
       ],
-      payload: { name: c.name, became_on: became, relationship_manager: rm },
+      payload: { name: c.name, socc_code: code, became_on: became, relationship_manager: rm },
     };
     rows.push(row);
     plannedClients.set(key, row);
@@ -612,6 +634,7 @@ function planSocc(
       ],
       payload: {
         name: p.projectname,
+        socc_project_code: (p.projectcode || '').trim(),
         occurred_on: occurred,
         cost_type: 'credits',
         cadence: 'single',

@@ -67,6 +67,20 @@ API docs: http://127.0.0.1:8000/docs
 - **NEW — credit-usage PDF export**: `GET /ccm/reports/transactions/pdf?client_id=N`
   (jsPDF route handler) + a Download PDF button on the per-client transaction
   report. Branded snapshot: balance summary + colored signed ledger.
+- **NEW — Foundation hardening (from FUTURE.md; before-Monday-backfill set):**
+  - **Permanent codes**: `clients.socc_code` (Cl#####, unique) +
+    `transactions.socc_project_code` (PR#####). The importer + seed now match
+    on the code first, then name — so a re-spelled client (GoldenTree vs
+    Goldentree) can't duplicate. Codes carried through import template, export,
+    and the client detail header. Backfilled onto seeded clients.
+  - **Soft-delete**: deleting a client/contact/study now *archives* it
+    (`deleted_at`) — history is never destroyed, and a client delete no longer
+    cascade-wipes its ledger. Everything filters archived rows (balances,
+    lists, reports, transaction log). The client danger-zone now says "Archive".
+  - **Editor attribution**: `updated_by_email`/`updated_at` set on every edit.
+  - Schema changes are idempotent `ALTER ... ADD COLUMN IF NOT EXISTS` on boot.
+  - The deep "gift-card grants + immutable-ledger" rebuild is the post-demo
+    pass (see FUTURE.md); this is the cheap-now / expensive-to-retrofit subset.
 - **NEW — (i) tooltips**: CSS-only `InfoTooltip` (app/_components) + shared
   text (lib/tooltips.ts) on the ambiguous domain labels across the study &
   contract forms, client detail, and both reports (esp. the credit/cadence

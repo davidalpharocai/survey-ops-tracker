@@ -65,6 +65,7 @@ export async function GET(): Promise<NextResponse> {
 
   addSheet(wb, 'Clients', [
     { key: 'Client Name', width: 32 },
+    { key: 'Client Code', width: 14 },
     { key: 'Became Client On', width: 18 },
     { key: 'Relationship Manager', width: 22 },
     { key: 'Primary Contact Name', width: 22 },
@@ -79,6 +80,7 @@ export async function GET(): Promise<NextResponse> {
   addSheet(wb, 'Contracts', [
     { key: 'Client', width: 32 },
     { key: 'Contract Name', width: 34 },
+    { key: 'Project Code', width: 14 },
     { key: 'Contract Date', width: 16 },
     { key: 'Renewal Date', width: 16 },
     { key: 'Credits', width: 12 },
@@ -87,6 +89,7 @@ export async function GET(): Promise<NextResponse> {
   addSheet(wb, 'Studies', [
     { key: 'Client', width: 32 },
     { key: 'Study Name', width: 40 },
+    { key: 'Project Code', width: 14 },
     { key: 'Study Date', width: 16 },
     { key: 'For User', width: 24 },
     { key: 'Cost Type', width: 12 },

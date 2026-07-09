@@ -75,7 +75,10 @@ export default async function ClientsPage({ searchParams }: PageProps) {
               <div className="detail-head">
                 <div>
                   <h2>{selected.name}</h2>
-                  <p className="muted">Client since {isoDate(selected.becameClientOn)}</p>
+                  <p className="muted">
+                    Client since {isoDate(selected.becameClientOn)}
+                    {selected.soccCode ? ` · ${selected.soccCode}` : ''}
+                  </p>
                 </div>
                 <div className="detail-balances">
                   <div className="bal">
@@ -146,16 +149,16 @@ export default async function ClientsPage({ searchParams }: PageProps) {
               </div>
 
               <details className="danger-zone" id="delete-client">
-                <summary>Delete this client (irreversible)</summary>
+                <summary>Archive this client</summary>
                 <form action={deleteClientAction}>
                   <input type="hidden" name="id" value={selected.id} />
-                  <p className="muted">Removes <strong>{selected.name}</strong> from the client list along with every contact, contract, and study attached to them. This cannot be undone.</p>
+                  <p className="muted">Hides <strong>{selected.name}</strong> from every list and picker. Their contracts, studies, and contacts are kept (never destroyed) and can be restored by an admin.</p>
                   <ConfirmButton
                     type="submit"
                     className="btn-danger"
-                    message={`Delete ${selected.name} and all their contracts, studies, and contacts? This cannot be undone.`}
+                    message={`Archive ${selected.name}? They'll be hidden from all lists; their history is kept and can be restored.`}
                   >
-                    Delete {selected.name}
+                    Archive {selected.name}
                   </ConfirmButton>
                 </form>
               </details>

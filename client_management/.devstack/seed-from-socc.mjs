@@ -93,9 +93,14 @@ console.log(
 );
 
 // ---- clients ----
-const existing = new Map((await api('GET', '/api/clients')).map(c => [c.name.toLowerCase(), c]));
+const liveClients = await api('GET', '/api/clients');
+const existing = new Map(liveClients.map(c => [c.name.toLowerCase(), c]));
+const existingByCode = new Map(
+  liveClients.filter(c => c.soccCode).map(c => [c.soccCode, c]),
+);
 const idByUuid = new Map(); // tracker client UUID -> CMS client id
 let created = 0;
+let codeBackfilled = 0;
 for (const c of clientsTab) {
   const meta = perClient.get(c.id);
   const becameOn =
@@ -103,25 +108,41 @@ for (const c of clientsTab) {
   const rm = meta
     ? [...meta.salespeople.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null
     : null;
-  const found = existing.get(c.name.toLowerCase());
+  // Match on the stable Cl##### code first, then by name.
+  const found = (c.code && existingByCode.get(c.code)) || existing.get(c.name.toLowerCase());
   if (found) {
     idByUuid.set(c.id, found.id);
+    // Backfill the code onto a pre-existing client that lacks one.
+    if (c.code && !found.soccCode && !DRY) {
+      await api('PATCH', `/api/clients/${found.id}`, {
+        name: found.name,
+        socc_code: c.code,
+        became_on: (found.becameClientOn || '').slice(0, 10),
+        relationship_manager: found.relationshipManager,
+        primary_contact_name: found.primaryContactName,
+        primary_contact_cell: found.primaryContactCell,
+        primary_contact_email: found.primaryContactEmail,
+      });
+      found.soccCode = c.code;
+      codeBackfilled += 1;
+    }
     continue;
   }
   if (DRY) {
-    console.log(`would create client: ${c.name} (since ${becameOn}, RM ${rm ?? '—'})`);
+    console.log(`would create client: ${c.name} [${c.code || 'no code'}] (since ${becameOn}, RM ${rm ?? '—'})`);
     idByUuid.set(c.id, -(idByUuid.size + 1)); // fake id so study joins preview
     continue;
   }
   const madeClient = await api('POST', '/api/clients', {
     name: c.name,
+    socc_code: c.code || null,
     became_on: becameOn,
     relationship_manager: rm,
   });
   idByUuid.set(c.id, madeClient.id);
   created += 1;
 }
-console.log(`clients: ${created} created, ${existing.size} already present`);
+console.log(`clients: ${created} created, ${existing.size} already present, ${codeBackfilled} codes backfilled`);
 
 // ---- client users from Client Contacts ----
 const usersByClient = new Map(); // CMS client id -> Map(lower name -> user id)
@@ -195,6 +216,7 @@ for (const p of projectsTab) {
   await api('POST', '/api/studies', {
     client_id: cmsClientId,
     name: p.project_name,
+    socc_project_code: p.project_code || null,
     occurred_on: occurred,
     cost_type: 'credits',
     cadence: 'single',
