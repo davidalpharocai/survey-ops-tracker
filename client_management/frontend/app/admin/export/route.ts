@@ -143,7 +143,7 @@ export async function GET(): Promise<NextResponse> {
   const generatedOn = new Date().toISOString();
   const day = generatedOn.slice(0, 10);
   const readme = [
-    'AlphaROC Client Credit Management — data export',
+    'AlphaROC Credit Management — data export',
     '',
     `Generated: ${generatedOn}`,
     `By: ${actor}`,

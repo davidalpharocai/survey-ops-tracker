@@ -1,4 +1,4 @@
-# AlphaROC Client Credit Management — User Guide
+# AlphaROC Credit Management — User Guide
 
 *For the sales and product team. Last updated 2026-07-09.*
 

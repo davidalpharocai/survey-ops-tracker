@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { currentUserEmail, currentUserIsAdmin } from '../lib/auth';
 import LinkPending from './_components/LinkPending';
 
-export const metadata = { title: 'AlphaROC Client Credit Management' };
+export const metadata = { title: 'AlphaROC Credit Management' };
 
 const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || '';
 
@@ -15,7 +15,7 @@ export default async function HomePage() {
 
   return (
     <div className="hub">
-      <h1 className="hub-title">AlphaROC Client Credit Management</h1>
+      <h1 className="hub-title">AlphaROC Credit Management</h1>
 
       {userEmail ? (
         <>

@@ -108,20 +108,27 @@ body {
 }
 .topbar .brand {
   display: inline-flex;
-  align-items: center;
-  gap: 0.55rem;
-  font-weight: 600;
-  font-size: 1.05rem;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  line-height: 1.05;
   text-decoration: none;
   color: var(--fg);
   flex: none;
 }
 .topbar .brand .brand-logo {
-  height: 26px;
+  height: 24px;
   width: auto;
   display: block;
+  /* The wordmark art is white; on the default (light) bar, invert it to
+     dark ink. Dark mode leaves it white. */
+  filter: invert(1);
 }
-.topbar .brand .brand-text { font-weight: 600; }
+.topbar .brand .brand-text { font-weight: 600; font-size: 0.9rem; }
+:root[data-theme="dark"] .topbar .brand .brand-logo { filter: none; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) .topbar .brand .brand-logo { filter: none; }
+}
 /* Primary navigation ribbon: takes the middle space and pushes the
    user/sign-out cluster to the right. */
 .nav-ribbon {

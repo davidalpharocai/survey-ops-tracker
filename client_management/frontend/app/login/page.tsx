@@ -24,7 +24,7 @@ export default async function LoginPage({
     <div className="login-wrap">
       <div className="login-card">
         <h1 className="login-title">AlphaROC</h1>
-        <p className="login-sub">Client Credit Management</p>
+        <p className="login-sub">Credit Management</p>
         {message && <p className="login-error">{message}</p>}
         <Link className="login-btn" href={href}>
           Sign in with AlphaROC

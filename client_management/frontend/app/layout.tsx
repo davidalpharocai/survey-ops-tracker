@@ -10,7 +10,7 @@ import ThemeToggle from './_components/ThemeToggle';
 import UserMenu from './_components/UserMenu';
 
 export const metadata = {
-  title: 'AlphaROC Client Credit Management',
+  title: 'AlphaROC Credit Management',
 };
 
 // Apply the saved theme before first paint so there's no flash of the
@@ -34,10 +34,10 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
               className="brand-logo"
               src={`${process.env.NEXT_PUBLIC_BASE_PATH || ''}/alpharoc-logo.png`}
               alt="AlphaROC"
-              width={70}
-              height={26}
+              width={54}
+              height={24}
             />
-            <span className="brand-text">Client Credit Management</span>
+            <span className="brand-text">Credit Management</span>
           </Link>
           {/* Persistent primary nav; Admin entry only for admins. Also the
               future home of the global search box (roadmap ②). */}
