@@ -7,7 +7,7 @@ import type { TeamList } from '../../../lib/api';
 import TeamClient from './TeamClient';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'Team Members · AlphaROC' };
+export const metadata = { title: 'AlphaROC Team · AlphaROC' };
 
 export default async function TeamPage() {
   if (!(await currentUserIsAdmin())) notFound();
@@ -24,7 +24,7 @@ export default async function TeamPage() {
   return (
     <>
       <Link className="back" href="/">← Home</Link>
-      <h1>Team Members</h1>
+      <h1>AlphaROC Team</h1>
       <p className="muted">
         Who can sign in to this app. Access is restricted to{' '}
         <strong>@{data?.allowedDomain || 'alpharoc.ai'}</strong> Google accounts;
