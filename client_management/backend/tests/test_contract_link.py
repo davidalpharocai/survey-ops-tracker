@@ -108,6 +108,26 @@ async def test_update_study_reassigns_and_unlinks(client):
     assert r.json()["contractId"] == con["id"]
 
 
+async def test_cannot_archive_contract_with_active_linked_studies(client):
+    c = await make_client(client)
+    u = await make_user(client, c["id"])
+    con = await make_contract(client, c["id"], name="C")
+    await make_study(client, c["id"], [u["id"]], name="s", contract_id=con["id"])
+    r = await client.delete(f"/api/contracts/{con['id']}", headers=ADMIN)
+    assert r.status_code == 409, r.text
+
+
+async def test_can_archive_contract_after_linked_studies_archived(client):
+    c = await make_client(client)
+    u = await make_user(client, c["id"])
+    con = await make_contract(client, c["id"], name="C")
+    study = await make_study(client, c["id"], [u["id"]], name="s", contract_id=con["id"])
+    d = await client.delete(f"/api/studies/{study['id']}", headers=ADMIN)
+    assert d.status_code == 200, d.text
+    r = await client.delete(f"/api/contracts/{con['id']}", headers=ADMIN)
+    assert r.status_code == 200, r.text
+
+
 async def test_update_study_rejects_foreign_contract(client):
     a = await make_client(client, name="AA")
     con_a = await make_contract(client, a["id"], name="AA-Con")

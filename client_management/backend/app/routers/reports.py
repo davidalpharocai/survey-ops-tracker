@@ -236,6 +236,91 @@ async def client_transactions(
     ]
 
 
+@router.get("/clients/{client_id}/ledger")
+async def client_ledger(
+    client_id: int, session: AsyncSession = Depends(get_session)
+) -> dict:
+    """Contract-grouped ledger for a client.
+
+    Groups a client's active transactions so studies nest under the
+    contract they roll up to, each contract carrying its own remaining
+    balance (funding minus its linked studies). Studies with no contract
+    fall to ``unassigned``; adjustments stay client-level. This is an
+    additive read — it never changes the pooled client balance, which is
+    still ``totals`` here and identical to ``/balances``.
+
+    Parameters
+    ----------
+    client_id : int
+        Target client.
+    session : AsyncSession
+        Injected request-scoped database session.
+
+    Returns
+    -------
+    dict
+        ``{"contracts": [...], "unassigned": [...], "adjustments": [...],
+        "totals": {"credits", "dollars"}}``. Each contract carries
+        ``remainingCredits``/``remainingDollars`` and a nested ``studies``
+        list.
+
+    Raises
+    ------
+    HTTPException
+        ``404`` if the client is absent or archived.
+    """
+    await _active_client_or_404(session, client_id)
+    result = await session.execute(
+        select(Transaction)
+        .where(
+            Transaction.client_id == client_id,
+            Transaction.deleted_at.is_(None),
+        )
+        .order_by(Transaction.occurred_on.desc(), Transaction.id.desc())
+        .options(selectinload(Transaction.client_user))
+    )
+    txns = list(result.scalars().all())
+    contract_ids = {t.id for t in txns if t.kind == "contract"}
+
+    studies_by_contract: dict[int, list[Transaction]] = {}
+    unassigned: list[Transaction] = []
+    for s in (t for t in txns if t.kind == "study"):
+        # A link to a soft-deleted/absent contract falls back to Unassigned.
+        if s.contract_id is not None and s.contract_id in contract_ids:
+            studies_by_contract.setdefault(s.contract_id, []).append(s)
+        else:
+            unassigned.append(s)
+
+    contract_rows = []
+    for c in (t for t in txns if t.kind == "contract"):
+        linked = studies_by_contract.get(c.id, [])
+        row = transaction_dict(c)
+        row["remainingCredits"] = float(c.credits_delta) + sum(
+            float(s.credits_delta) for s in linked
+        )
+        row["remainingDollars"] = float(c.dollars_delta) + sum(
+            float(s.dollars_delta) for s in linked
+        )
+        row["studies"] = [
+            transaction_dict(s, with_client_user=True) for s in linked
+        ]
+        contract_rows.append(row)
+
+    return {
+        "contracts": contract_rows,
+        "unassigned": [
+            transaction_dict(s, with_client_user=True) for s in unassigned
+        ],
+        "adjustments": [
+            transaction_dict(a) for a in txns if a.kind == "adjustment"
+        ],
+        "totals": {
+            "credits": sum(float(t.credits_delta) for t in txns),
+            "dollars": sum(float(t.dollars_delta) for t in txns),
+        },
+    }
+
+
 def _bucket(days_until: int) -> str:
     """Classify a renewal by how far out it is.
 

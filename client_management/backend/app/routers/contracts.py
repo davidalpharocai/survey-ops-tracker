@@ -7,7 +7,7 @@ after the contract date) is authoritative here.
 """
 
 from fastapi import APIRouter, Depends, Header, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -348,6 +348,25 @@ async def delete_contract(
         ``404`` if absent or not a contract.
     """
     t = await _contract_or_404(session, txn_id)
+    # Don't orphan usage: block archiving a contract that still has active
+    # studies rolling up to it (mirrors the client-user delete guard).
+    linked = await session.scalar(
+        select(func.count())
+        .select_from(Transaction)
+        .where(
+            Transaction.contract_id == txn_id,
+            Transaction.deleted_at.is_(None),
+        )
+    )
+    if linked and linked > 0:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"Can't archive this contract — {linked} active "
+                "study/studies still roll up to it. Reassign or archive "
+                "those first."
+            ),
+        )
     t.deleted_at = utc_now()
     t.updated_by_email = user
     t.updated_at = utc_now()
