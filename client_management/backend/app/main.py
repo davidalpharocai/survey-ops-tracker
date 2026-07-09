@@ -11,7 +11,9 @@ from app.config import get_settings
 from app.db import apply_schema
 from app.helpers import MoneyParseError
 from app.routers import (
+    adjustments,
     admin,
+    archive,
     clients,
     contracts,
     health,
@@ -81,9 +83,11 @@ app.include_router(clients.router)
 app.include_router(users.router)
 app.include_router(contracts.router)
 app.include_router(studies.router)
+app.include_router(adjustments.router)
 app.include_router(transactions.router)
 app.include_router(reports.router)
 app.include_router(admin.router)
+app.include_router(archive.router)
 app.include_router(team.router)
 
 

@@ -480,3 +480,45 @@ async def test_bulk_update_rejects_other_clients_study(client):
     assert r.status_code == 200
     assert r.json()["errors"] == [f"#{foreign['id']}: not found"]
     assert r.json()["updated"] == 0
+
+
+# --- Idempotency -------------------------------------------------------------
+
+
+async def test_study_idempotency_key_replay_returns_same_row(client, db):
+    made, user = await _client_with_user(client)
+    headers = {**ADMIN, "Idempotency-Key": "study-key-1"}
+    payload = _study_payload(made["id"], [user["id"]])
+    first = await client.post("/api/studies", json=payload, headers=headers)
+    assert first.status_code == 201, first.text
+    second = await client.post("/api/studies", json=payload, headers=headers)
+    assert second.status_code in (200, 201)
+    assert second.json()["id"] == first.json()["id"]
+    assert second.json()["clientName"] == made["name"]
+
+    count = await db.fetchval(
+        "SELECT count(*) FROM transactions WHERE kind = 'study'"
+    )
+    assert count == 1
+    # The replay did not double-charge the client.
+    bal = await get_balances(client, made["id"])
+    assert bal["credits"] == -100.0
+
+
+async def test_study_different_idempotency_keys_create_two_rows(client, db):
+    made, user = await _client_with_user(client)
+    payload = _study_payload(made["id"], [user["id"]])
+    ids = set()
+    for key in ("study-key-a", "study-key-b"):
+        r = await client.post(
+            "/api/studies",
+            json=payload,
+            headers={**ADMIN, "Idempotency-Key": key},
+        )
+        assert r.status_code == 201
+        ids.add(r.json()["id"])
+    assert len(ids) == 2
+    count = await db.fetchval(
+        "SELECT count(*) FROM transactions WHERE kind = 'study'"
+    )
+    assert count == 2

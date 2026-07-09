@@ -87,3 +87,14 @@ CREATE UNIQUE INDEX IF NOT EXISTS clients_name_active_key
     ON clients (name) WHERE deleted_at IS NULL;
 CREATE INDEX IF NOT EXISTS transactions_socc_project_code_idx
     ON transactions (socc_project_code) WHERE socc_project_code IS NOT NULL;
+
+-- Adjustment entries: corrections are recorded as NEW ledger rows
+-- (kind = 'adjustment') instead of editing history. An adjustment may
+-- point at the transaction it reverses.
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS reverses_transaction_id INTEGER;
+
+-- Idempotency keys on money-creating POSTs: a retried request (client
+-- retry, double-click, network replay) can never double-insert a row.
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS idem_key TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS transactions_idem_key_key
+    ON transactions (idem_key) WHERE idem_key IS NOT NULL;

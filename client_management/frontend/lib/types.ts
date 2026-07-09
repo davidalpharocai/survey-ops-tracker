@@ -119,3 +119,30 @@ export interface AuditLogPage {
   nextToken: string | null;
   athena?: boolean;
 }
+
+export type RenewalBucket = '30' | '60' | '90' | 'later';
+
+export interface RenewalRow {
+  client: Client;
+  contractId: number;
+  contractName: string;
+  renewalOn: Date;
+  daysUntil: number;
+  creditsAmount: number;
+  dollarsAmount: number;
+  bucket: RenewalBucket;
+}
+
+export type BalanceHealthStatus = 'negative' | 'low' | 'ok';
+
+export interface BalanceHealthRow {
+  client: Client;
+  credits: number;
+  dollars: number;
+  monthlyCreditBurn: number;
+  monthlyDollarBurn: number;
+  /** YYYY-MM-DD, or null when there is no burn / no positive balance. */
+  creditsRunOutOn: string | null;
+  dollarsRunOutOn: string | null;
+  status: BalanceHealthStatus;
+}

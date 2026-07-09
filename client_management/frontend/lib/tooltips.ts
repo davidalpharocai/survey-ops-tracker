@@ -54,4 +54,20 @@ export const TIP = {
     'The change to the credit balance from this transaction: contracts add (+), studies subtract (−).',
   dollarsDelta:
     'The change to the dollar balance from this transaction: contracts add (+), studies subtract (−).',
+
+  // Renewal radar
+  daysUntilRenewal:
+    'Whole days from today until this contract renews. 0 means the renewal is due today.',
+  contractCredits:
+    'The credits this contract added when it was signed — the size of the deal that is coming up for renewal.',
+  contractDollars:
+    'The dollars this contract added when it was signed — the size of the deal that is coming up for renewal.',
+
+  // Balance health
+  monthlyBurn:
+    'Average credits consumed per month, measured over the trailing 90 days: all study spend in that window divided by 3. Zero means no recent activity.',
+  runOutDate:
+    'The projected date the balance hits zero if the client keeps spending at their trailing-90-day pace. Blank when there is no recent burn or no positive balance to deplete.',
+  healthStatus:
+    'NEGATIVE: a balance is already below zero. LOW: projected to run out within 60 days. OK: neither — balance covers 60+ days at the current pace.',
 } as const;

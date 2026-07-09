@@ -27,6 +27,13 @@ if settings.db_enabled:
         settings.async_database_url,
         poolclass=NullPool,
         echo=not settings.is_production,
+        # Disable asyncpg's prepared-statement cache. Harmless for a
+        # direct Postgres, and required when the connection goes through
+        # a transaction-mode pooler (PgBouncer / Neon/Supabase pooled
+        # endpoints), where cached prepared statements break across
+        # pooled connections. Keeps the same code working locally and on
+        # the hosted preview.
+        connect_args={"statement_cache_size": 0},
     )
     SessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 else:

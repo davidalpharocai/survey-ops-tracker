@@ -14,6 +14,7 @@ import { TIP } from '../../../lib/tooltips';
 import type { Balance, Transaction } from '../../../lib/types';
 import AutoSubmitSelect from '../../_components/AutoSubmitSelect';
 import InfoTooltip from '../../_components/InfoTooltip';
+import { createAdjustmentAction } from './actions';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Per-client transactions · AlphaROC' };
@@ -129,6 +130,31 @@ export default async function TransactionsReportPage({ searchParams }: PageProps
           ) : (
             <p className="muted">No transactions yet for this client.</p>
           )}
+
+          <section className="panel" style={{ marginTop: 16 }}>
+            <h2>Add adjustment</h2>
+            <p className="muted small">
+              Corrections are recorded as new ledger rows — history is never
+              edited. Signed amounts: negative subtracts, positive adds.
+            </p>
+            <form action={createAdjustmentAction} className="add-row-form">
+              <input type="hidden" name="client_id" value={selected.id} />
+              <label>Credits Δ
+                <input name="credits_delta" placeholder="e.g. -100" />
+              </label>
+              <label>Dollars Δ
+                <input name="dollars_delta" placeholder="e.g. 250" />
+              </label>
+              <label>Note
+                <input
+                  name="note"
+                  required
+                  placeholder="Why this correction is needed"
+                />
+              </label>
+              <button className="btn" type="submit">Record adjustment</button>
+            </form>
+          </section>
         </>
       ) : (
         <p className="muted">Pick a client above to see their transaction log.</p>

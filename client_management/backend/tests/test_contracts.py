@@ -1,5 +1,5 @@
 """Contract endpoints: balance effect, validation 400s, money parsing,
-socc_project_code, soft delete."""
+socc_project_code, soft delete, idempotency."""
 
 from conftest import ADMIN, get_balances, make_client, make_contract
 
@@ -192,3 +192,50 @@ async def test_get_transaction_returns_contract(client):
     assert r.status_code == 200
     assert r.json()["kind"] == "contract"
     assert r.json()["clientId"] == made["id"]
+
+
+async def test_contract_idempotency_key_replay_returns_same_row(client, db):
+    made = await make_client(client)
+    headers = {**ADMIN, "Idempotency-Key": "contract-key-1"}
+    first = await client.post(
+        "/api/contracts", json=_payload(made["id"]), headers=headers
+    )
+    assert first.status_code == 201, first.text
+    second = await client.post(
+        "/api/contracts", json=_payload(made["id"]), headers=headers
+    )
+    assert second.status_code in (200, 201)
+    assert second.json()["id"] == first.json()["id"]
+    assert second.json()["clientName"] == made["name"]
+
+    count = await db.fetchval("SELECT count(*) FROM transactions")
+    assert count == 1
+    # The replay did not double the balance.
+    assert (await get_balances(client, made["id"]))["credits"] == 100.0
+
+
+async def test_contract_different_idempotency_keys_create_two_rows(client, db):
+    made = await make_client(client)
+    ids = set()
+    for key in ("contract-key-a", "contract-key-b"):
+        r = await client.post(
+            "/api/contracts",
+            json=_payload(made["id"]),
+            headers={**ADMIN, "Idempotency-Key": key},
+        )
+        assert r.status_code == 201
+        ids.add(r.json()["id"])
+    assert len(ids) == 2
+    count = await db.fetchval("SELECT count(*) FROM transactions")
+    assert count == 2
+
+
+async def test_contract_without_key_never_deduplicates(client, db):
+    made = await make_client(client)
+    for _ in range(2):
+        r = await client.post(
+            "/api/contracts", json=_payload(made["id"]), headers=ADMIN
+        )
+        assert r.status_code == 201
+    count = await db.fetchval("SELECT count(*) FROM transactions")
+    assert count == 2

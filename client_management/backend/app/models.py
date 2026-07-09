@@ -174,6 +174,14 @@ class Transaction(Base):
     actor_email: Mapped[str] = mapped_column(String)
     note: Mapped[str | None] = mapped_column(String, nullable=True)
     socc_project_code: Mapped[str | None] = mapped_column(String, nullable=True)
+    # Adjustment rows may point at the transaction they reverse (plain
+    # integer column — no FK constraint; see schema.sql).
+    reverses_transaction_id: Mapped[int | None] = mapped_column(
+        Integer, nullable=True
+    )
+    # Idempotency key for money-creating POSTs (partial unique index
+    # transactions_idem_key_key in schema.sql).
+    idem_key: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now()
     )

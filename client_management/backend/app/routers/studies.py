@@ -7,8 +7,9 @@ flag, single-row save, and bulk save — all ported faithfully from the
 former Express routes.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -25,6 +26,31 @@ router = APIRouter(
     tags=["studies"],
     dependencies=[Depends(require_user)],
 )
+
+
+async def _existing_by_idem_key(
+    session: AsyncSession, key: str | None
+) -> Transaction | None:
+    """Return the transaction already created under an idempotency key.
+
+    Parameters
+    ----------
+    session : AsyncSession
+        Active database session.
+    key : str or None
+        The ``Idempotency-Key`` header value, if any.
+
+    Returns
+    -------
+    Transaction or None
+        The previously created row, or ``None``.
+    """
+    if not key:
+        return None
+    result = await session.execute(
+        select(Transaction).where(Transaction.idem_key == key)
+    )
+    return result.scalar_one_or_none()
 
 
 async def _study_or_404(
@@ -220,6 +246,7 @@ async def create_study(
     body: StudyIn,
     session: AsyncSession = Depends(get_session),
     user: str = Depends(require_user),
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
 ) -> dict:
     """Publish a new study for a client.
 
@@ -231,6 +258,9 @@ async def create_study(
         Injected request-scoped database session.
     user : str
         Authenticated acting user (recorded as ``actor_email``).
+    idempotency_key : str or None
+        Optional ``Idempotency-Key`` header; a replayed key returns the
+        already-created row instead of inserting a duplicate.
 
     Returns
     -------
@@ -242,6 +272,13 @@ async def create_study(
     HTTPException
         ``404`` if the client is absent, ``400`` if validation fails.
     """
+    existing = await _existing_by_idem_key(session, idempotency_key)
+    if existing is not None:
+        out = transaction_dict(existing)
+        prior_client = await session.get(Client, existing.client_id)
+        out["clientName"] = prior_client.name if prior_client else None
+        return out
+
     client = await session.get(Client, body.client_id or 0)
     if client is None:
         raise HTTPException(
@@ -268,14 +305,27 @@ async def create_study(
         setup_cost=f.setup_cost if f.cadence else None,
         client_user_id=users[0].id,
         actor_email=user,
+        idem_key=idempotency_key,
     )
+    client_name = client.name  # read before commit/rollback expires it
     session.add(t)
-    await session.flush()
-    await _set_attributions(session, t.id, [u.id for u in users])
-    await session.commit()
+    try:
+        await session.flush()
+        await _set_attributions(session, t.id, [u.id for u in users])
+        await session.commit()
+    except IntegrityError:
+        # Race on the idem_key unique index: another request with the same
+        # key won; return its row instead of failing.
+        await session.rollback()
+        existing = await _existing_by_idem_key(session, idempotency_key)
+        if existing is None:
+            raise
+        out = transaction_dict(existing)
+        out["clientName"] = client_name
+        return out
     await session.refresh(t)
     out = transaction_dict(t)
-    out["clientName"] = client.name
+    out["clientName"] = client_name
     return out
 
 

@@ -18,10 +18,14 @@ export default function ReportsIndexPage() {
           <h3>Per-client transaction log</h3>
           <p>Pick a client and see every contract and study, who recorded it, and when.</p>
         </Link>
-        <div className="report-card disabled">
-          <h3>More reports — coming soon</h3>
-          <p className="muted">Suggested next: spend by relationship manager · monthly burn rate · low-balance flagging · contract value vs. consumed.</p>
-        </div>
+        <Link className="report-card" href="/reports/renewals">
+          <h3>Renewal Radar</h3>
+          <p>Every upcoming contract renewal grouped into 30 / 60 / 90-day windows, so nothing sneaks up.</p>
+        </Link>
+        <Link className="report-card" href="/reports/health">
+          <h3>Balance Health</h3>
+          <p>Each client&apos;s monthly burn over the last 90 days, the projected date their balance runs out, and who needs attention.</p>
+        </Link>
       </div>
     </>
   );

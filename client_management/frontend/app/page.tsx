@@ -66,6 +66,10 @@ export default async function HomePage() {
                   <span className="hub-link-title">Export Data</span>
                   <span className="hub-link-sub">Download all clients, contracts &amp; studies as a ZIP (re-importable workbook + raw ledger).</span>
                 </a>
+                <Link className="hub-link" href="/admin/archive">
+                  <span className="hub-link-title">Recently Archived</span>
+                  <span className="hub-link-sub">Restore archived clients, contacts, contracts &amp; studies — nothing is ever destroyed.</span>
+                </Link>
                 <Link className="hub-link" href="/admin/team">
                   <span className="hub-link-title">AlphaROC Team</span>
                   <span className="hub-link-sub">Invite or remove @alpharoc.ai staff and set who is an admin.</span>

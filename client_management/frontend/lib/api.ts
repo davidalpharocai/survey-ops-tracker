@@ -9,10 +9,12 @@ import { cookies } from 'next/headers';
 
 import type {
   Balance,
+  BalanceHealthRow,
   BalanceRow,
   Client,
   ClientUser,
   ContractTransaction,
+  RenewalRow,
   StudyTransaction,
   Transaction,
   UserListRow,
@@ -155,14 +157,54 @@ export interface ApiClient {
 
   clientBalances(clientId: number): Promise<Balance>;
   allBalances(): Promise<BalanceRow[]>;
+  listRenewals(): Promise<RenewalRow[]>;
+  balanceHealth(): Promise<BalanceHealthRow[]>;
   listTransactionsByClient(clientId: number): Promise<Transaction[]>;
 
+  createAdjustment(d: Record<string, unknown>): Promise<AdjustmentResult>;
+
   listAuditLogs(filters: AuditLogFilters): Promise<AuditLogPage>;
+
+  listArchived(): Promise<ArchiveList>;
+  restoreArchived(d: {
+    type: ArchivedRecordType;
+    id: number;
+  }): Promise<{ type: ArchivedRecordType; id: number; name: string }>;
 
   listTeam(): Promise<TeamList>;
   inviteTeamMember(d: { email: string; is_admin: boolean }): Promise<unknown>;
   setTeamAdmin(d: { email: string; is_admin: boolean }): Promise<unknown>;
   setTeamEnabled(d: { email: string; enabled: boolean }): Promise<unknown>;
+}
+
+// Adjustment rows come back shaped like transactions but with
+// kind 'adjustment'; only the fields the UI needs are typed here.
+export interface AdjustmentResult {
+  id: number;
+  clientId: number;
+  clientName?: string | null;
+  name: string;
+  creditsDelta: number | string;
+  dollarsDelta: number | string;
+  note?: string | null;
+  reversesTransactionId?: number | null;
+}
+
+export type ArchivedRecordType = 'client' | 'user' | 'transaction';
+
+export interface ArchivedRecord {
+  id: number;
+  name: string;
+  kind?: string; // transactions only: contract | study | adjustment
+  deletedAt: string | null;
+  updatedByEmail: string | null;
+  clientName?: string | null; // users & transactions only
+}
+
+export interface ArchiveList {
+  clients: ArchivedRecord[];
+  users: ArchivedRecord[];
+  transactions: ArchivedRecord[];
 }
 
 export interface TeamMember {
@@ -226,7 +268,14 @@ export function api(userEmail: string): ApiClient {
 
     clientBalances: clientId => r('GET', `/api/clients/${clientId}/balances`),
     allBalances: () => r('GET', '/api/reports/balances'),
+    listRenewals: () => r('GET', '/api/reports/renewals'),
+    balanceHealth: () => r('GET', '/api/reports/balance-health'),
     listTransactionsByClient: clientId => r('GET', `/api/clients/${clientId}/transactions`),
+
+    createAdjustment: d => r('POST', '/api/adjustments', d),
+
+    listArchived: () => r('GET', '/api/admin/archive'),
+    restoreArchived: d => r('POST', '/api/admin/archive/restore', d),
 
     listAuditLogs: filters => {
       const qs = new URLSearchParams();

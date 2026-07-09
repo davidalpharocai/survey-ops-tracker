@@ -523,6 +523,7 @@ button:hover, .btn:hover { background: var(--accent-hover); }
 }
 .tag-contract { background: #dbeafe; color: #1e40af; }
 .tag-study { background: #fce7f3; color: #9d174d; }
+.tag-adjustment { background: #fef3c7; color: #92400e; }
 
 /* ---------- Audit log ---------- */
 
