@@ -31,7 +31,11 @@ Home → **Record a Study**.
    - Tracker → the cost of **one run**. The app bills the yearly total
      automatically (weekly ×52, monthly ×12, quarterly ×4).
    - Trackers can also have a one-time **setup cost** (always in credits).
-7. Publish. The client's balance goes down immediately.
+7. **Rolls up to contract (optional)**: pick which of the client's contracts
+   this study draws from, so that contract shows its own remaining balance.
+   Leave it as "none" to keep the study **Unassigned** — it still draws down
+   the client's overall balance either way.
+8. Publish. The client's balance goes down immediately.
 
 > Hover any **(i)** icon if you're unsure what a field means.
 
@@ -45,12 +49,24 @@ Home → **Add a Contract**.
    one).
 4. Record it. The client's balance goes up immediately.
 
+## Getting around
+
+A **navigation ribbon** runs across the top of every page — Home, Record
+Study, Add Contract, Clients, Contacts, Reports (and Admin, for admins). The
+section you're on is highlighted. No need to go back Home to jump around.
+
 ## Looking things up
 
 - **Client Balances** (Home → Balances & Reports): every client's remaining
   credits and dollars, this year's contract value, and their next renewal.
-  Click a client for their full transaction log, or **Download PDF** for a
+  Click a client for their transaction log, or **Download PDF** for a
   client-ready statement.
+- **The transaction log is grouped by contract**: each contract is a row
+  showing its own **remaining** balance (its funding minus the studies that
+  roll up to it — red if over-drawn), with those studies indented beneath it.
+  Collapse/expand any contract, or all at once. Studies not tied to a contract
+  sit under **Unassigned**; corrections sit under **Adjustments**. A search box
+  filters that client's contracts and studies instantly.
 - **Manage Client List**: a client's full record — contact details,
   relationship manager, their contacts, and quick links to add a contract or
   study.

@@ -24,7 +24,9 @@ predates them.
 | 224 | study | Q2 Institutional Sentiment Tracker | -2,400 |
 | 225 | study | Sector Rotation Pulse - Energy | -1,800 |
 
-→ combined funding 26,000, balance **21,800**.
+→ combined funding 26,000, balance **21,800**. Studies 224 + 225 are
+linked (`contract_id`) to the Research Retainer (223) → it shows 13,800
+remaining; the H2 Expansion (229) has no linked studies (8,000 remaining).
 
 ### HingeVoter/Carah — client id 20 (demonstrates *surveys drawing on one contract*)
 | txn id | kind | name | credits |
@@ -33,7 +35,8 @@ predates them.
 | 227 | study | Swing-State Likely-Voter Wave 1 | -1,500 |
 | 228 | study | Message Testing - Economy | -1,100 |
 
-→ funding 12,000, balance **9,400**.
+→ funding 12,000, balance **9,400**. Studies 227 + 228 are linked to the
+Polling Program (226) → it shows 9,400 remaining with 2 nested studies.
 
 ## How to remove the demo data
 The seeded rows carry no special flag (kept out of the `note` field so
