@@ -37,7 +37,34 @@ body {
   font-size: 1.05rem;
   text-decoration: none;
   color: var(--fg);
+  flex: none;
+}
+/* Primary navigation ribbon: takes the middle space and pushes the
+   user/sign-out cluster to the right. */
+.nav-ribbon {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
   flex: 1;
+  flex-wrap: wrap;
+}
+.nav-ribbon a {
+  padding: 0.35rem 0.7rem;
+  border-radius: 6px;
+  text-decoration: none;
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.nav-ribbon a:hover {
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+.nav-ribbon a.is-active {
+  background: var(--accent-bg);
+  color: var(--accent);
+  font-weight: 600;
 }
 .topbar .who {
   color: var(--muted);
@@ -673,6 +700,14 @@ th .info-pop::after {
     padding: 0.6rem 0.9rem;
   }
   .topbar .brand { font-size: 0.95rem; flex-basis: 100%; }
+  /* Give the nav its own full-width row on phones, scrolling horizontally
+     rather than stacking into a tall block. */
+  .nav-ribbon {
+    flex-basis: 100%;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
 }
 
 /* --- Loading skeletons -------------------------------------------------- */

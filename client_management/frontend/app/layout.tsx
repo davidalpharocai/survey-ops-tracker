@@ -3,22 +3,26 @@ import './globals.css';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 
-import { currentUserEmail } from '../lib/auth';
+import { currentUserEmail, currentUserIsAdmin } from '../lib/auth';
+import NavRibbon from './_components/NavRibbon';
 
 export const metadata = {
   title: 'AlphaROC Client Credit Management',
 };
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
-  const userEmail = await currentUserEmail();
+  const [userEmail, isAdmin] = await Promise.all([
+    currentUserEmail(),
+    currentUserIsAdmin(),
+  ]);
   return (
     <html lang="en">
       <body>
         <header className="topbar">
           <Link className="brand" href="/">AlphaROC Client Credit Management</Link>
-          {/* Admin functions live in the Administration section on the home
-              page; no separate top-bar Admin link (it only duplicated the
-              Audit Log shortcut). */}
+          {/* Persistent primary nav; Admin entry only for admins. Also the
+              future home of the global search box (roadmap ②). */}
+          {userEmail && <NavRibbon isAdmin={isAdmin} />}
           <span className="who">{userEmail || 'not signed in'}</span>
           {userEmail && (
             <Link className="signout" href="/api/auth/logout">Sign out</Link>

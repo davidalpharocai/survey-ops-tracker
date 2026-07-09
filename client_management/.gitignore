@@ -64,3 +64,6 @@ Thumbs.db
 # ---- Build artifacts ----
 build/
 dist/
+
+# Local data backups (client financial data — never commit)
+.backups/
