@@ -19,7 +19,16 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
     <html lang="en">
       <body>
         <header className="topbar">
-          <Link className="brand" href="/">AlphaROC Client Credit Management</Link>
+          <Link className="brand" href="/">
+            <img
+              className="brand-logo"
+              src={`${process.env.NEXT_PUBLIC_BASE_PATH || ''}/alpharoc-logo.png`}
+              alt="AlphaROC"
+              width={70}
+              height={26}
+            />
+            <span className="brand-text">Client Credit Management</span>
+          </Link>
           {/* Persistent primary nav; Admin entry only for admins. Also the
               future home of the global search box (roadmap ②). */}
           {userEmail && <NavRibbon isAdmin={isAdmin} />}

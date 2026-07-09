@@ -95,16 +95,17 @@ export default function LedgerTree({ ledger }: { ledger: Ledger }) {
                   <td>
                     <button
                       type="button"
-                      className="tree-toggle"
+                      className="ledger-contract-toggle"
                       aria-expanded={!isCollapsed}
-                      aria-label={isCollapsed ? 'Expand contract' : 'Collapse contract'}
+                      aria-label={`${isCollapsed ? 'Expand' : 'Collapse'} contract ${c.name}`}
                       onClick={() => toggle(c.id)}
                     >
-                      {isCollapsed ? '▸' : '▾'}
+                      <span className="tree-toggle" aria-hidden="true">{isCollapsed ? '▸' : '▾'}</span>
+                      <span className="tag tag-contract">contract</span>
+                      <span className="ledger-contract-name">{c.name}</span>
+                      {c.soccProjectCode ? <span className="muted small"> · {c.soccProjectCode}</span> : null}
+                      {c.studies.length ? <span className="muted small"> ({c.studies.length})</span> : null}
                     </button>
-                    <span className="tag tag-contract">contract</span> {c.name}
-                    {c.soccProjectCode ? <span className="muted small"> · {c.soccProjectCode}</span> : null}
-                    {c.studies.length ? <span className="muted small"> ({c.studies.length})</span> : null}
                   </td>
                   <td />
                   <td className="num pos">{creditsSigned(c.creditsDelta)}</td>
