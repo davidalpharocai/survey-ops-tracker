@@ -66,6 +66,7 @@ def client_dict(c: Client) -> dict:
     return {
         "id": c.id,
         "name": c.name,
+        "soccCode": c.socc_code,
         "becameClientOn": _iso(c.became_client_on),
         "primaryContactName": c.primary_contact_name,
         "primaryContactCell": c.primary_contact_cell,
@@ -137,6 +138,7 @@ def transaction_dict(
         "clientUserId": t.client_user_id,
         "actorEmail": t.actor_email,
         "note": t.note,
+        "soccProjectCode": t.socc_project_code,
         "createdAt": _iso(t.created_at),
     }
     if with_client_user:

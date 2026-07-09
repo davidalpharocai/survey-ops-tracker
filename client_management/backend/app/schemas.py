@@ -14,6 +14,7 @@ class ClientIn(BaseModel):
     """Create/update payload for a client (mirrors the client form)."""
 
     name: str = ""
+    socc_code: str | None = None
     became_on: str | None = None
     primary_contact_name: str | None = None
     primary_contact_cell: str | None = None
@@ -33,6 +34,7 @@ class ContractIn(BaseModel):
 
     client_id: int | None = None
     name: str = ""
+    socc_project_code: str | None = None
     occurred_on: str | None = None
     renewal_on: str | None = None
     credits_amount: float | str | None = None
@@ -49,6 +51,7 @@ class StudyIn(BaseModel):
 
     client_id: int | None = None
     name: str = ""
+    socc_project_code: str | None = None
     occurred_on: str | None = None
     cost_type: str | None = None
     cadence: str | None = None

@@ -11,7 +11,7 @@ from sqlalchemy.orm import selectinload
 
 from app.auth import require_user
 from app.db import get_session
-from app.helpers import parse_date
+from app.helpers import parse_date, utc_now
 from app.models import Client
 from app.schemas import ClientIn
 from app.serializers import client_dict, client_user_dict
@@ -63,7 +63,7 @@ async def _get_or_404(session: AsyncSession, client_id: int) -> Client:
         ``404`` when no client has the given id.
     """
     client = await session.get(Client, client_id)
-    if client is None:
+    if client is None or client.deleted_at is not None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Client not found"
         )
@@ -91,7 +91,11 @@ async def list_clients(
         Serialised clients.
     """
     want_users = include == "users"
-    stmt = select(Client).order_by(Client.name.asc())
+    stmt = (
+        select(Client)
+        .where(Client.deleted_at.is_(None))
+        .order_by(Client.name.asc())
+    )
     if want_users:
         stmt = stmt.options(selectinload(Client.users))
     result = await session.execute(stmt)
@@ -100,7 +104,10 @@ async def list_clients(
     for c in clients:
         d = client_dict(c)
         if want_users:
-            users = sorted(c.users, key=lambda u: u.name)
+            users = sorted(
+                (u for u in c.users if u.deleted_at is None),
+                key=lambda u: u.name,
+            )
             d["users"] = [client_user_dict(u) for u in users]
         out.append(d)
     return out
@@ -171,14 +178,29 @@ async def create_client(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="A 'became a client' date is required.",
         )
-    dup = await session.execute(select(Client).where(Client.name == name))
+    dup = await session.execute(
+        select(Client).where(
+            Client.name == name, Client.deleted_at.is_(None)
+        )
+    )
     if dup.scalar_one_or_none() is not None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"A client named '{name}' already exists.",
         )
+    socc_code = _clean(body.socc_code)
+    if socc_code is not None:
+        clash = await session.execute(
+            select(Client).where(Client.socc_code == socc_code)
+        )
+        if clash.scalar_one_or_none() is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Client code '{socc_code}' is already in use.",
+            )
     client = Client(
         name=name,
+        socc_code=socc_code,
         became_client_on=became_client_on,
         primary_contact_name=_clean(body.primary_contact_name),
         primary_contact_cell=_clean(body.primary_contact_cell),
@@ -197,6 +219,7 @@ async def update_client(
     client_id: int,
     body: ClientIn,
     session: AsyncSession = Depends(get_session),
+    user: str = Depends(require_user),
 ) -> dict:
     """Update a client.
 
@@ -232,6 +255,7 @@ async def update_client(
             select(Client).where(
                 func.lower(Client.name) == new_name.lower(),
                 Client.id != client_id,
+                Client.deleted_at.is_(None),
             )
         )
         if clash.scalar_one_or_none() is not None:
@@ -245,12 +269,28 @@ async def update_client(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="A 'became a client' date is required.",
         )
+    socc_code = _clean(body.socc_code)
+    if socc_code is not None and socc_code != client.socc_code:
+        clash = await session.execute(
+            select(Client).where(
+                Client.socc_code == socc_code, Client.id != client_id
+            )
+        )
+        if clash.scalar_one_or_none() is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Client code '{socc_code}' is already in use.",
+            )
     client.name = new_name
+    if socc_code is not None:  # only overwrite when a code was supplied
+        client.socc_code = socc_code
     client.became_client_on = became_client_on
     client.primary_contact_name = _clean(body.primary_contact_name)
     client.primary_contact_cell = _clean(body.primary_contact_cell)
     client.primary_contact_email = _clean(body.primary_contact_email)
     client.relationship_manager = _clean(body.relationship_manager)
+    client.updated_by_email = user
+    client.updated_at = utc_now()
     await session.commit()
     await session.refresh(client)
     return client_dict(client)
@@ -258,16 +298,25 @@ async def update_client(
 
 @router.delete("/{client_id}")
 async def delete_client(
-    client_id: int, session: AsyncSession = Depends(get_session)
+    client_id: int,
+    session: AsyncSession = Depends(get_session),
+    user: str = Depends(require_user),
 ) -> dict:
-    """Delete a client; users and transactions cascade via FK.
+    """Archive a client (soft delete) — its ledger is never destroyed.
+
+    Sets ``deleted_at`` instead of removing the row, so the client
+    disappears from every list/picker while all its contracts, studies
+    and contacts stay intact and recoverable. Replaces the old hard
+    delete, which cascade-wiped the client's entire financial history.
 
     Parameters
     ----------
     client_id : int
-        Primary key of the client to delete.
+        Primary key of the client to archive.
     session : AsyncSession
         Injected request-scoped database session.
+    user : str
+        Authenticated acting user (recorded as ``updated_by_email``).
 
     Returns
     -------
@@ -278,10 +327,11 @@ async def delete_client(
     Raises
     ------
     HTTPException
-        ``404`` if no client has the given id.
+        ``404`` if no client has the given id (or it is already archived).
     """
     client = await _get_or_404(session, client_id)
-    name = client.name
-    await session.delete(client)
+    client.deleted_at = utc_now()
+    client.updated_by_email = user
+    client.updated_at = utc_now()
     await session.commit()
-    return {"id": client_id, "name": name}
+    return {"id": client_id, "name": client.name}

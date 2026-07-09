@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import require_user
 from app.db import get_session
+from app.helpers import utc_now
 from app.models import Client, ClientUser, Transaction
 from app.schemas import ClientUserIn
 from app.serializers import client_dict, client_user_dict
@@ -39,7 +40,7 @@ async def _user_or_404(session: AsyncSession, user_id: int) -> ClientUser:
         ``404`` when no user has the given id.
     """
     user = await session.get(ClientUser, user_id)
-    if user is None:
+    if user is None or user.deleted_at is not None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
         )
@@ -66,7 +67,10 @@ async def list_client_users(
     """
     result = await session.execute(
         select(ClientUser)
-        .where(ClientUser.client_id == client_id)
+        .where(
+            ClientUser.client_id == client_id,
+            ClientUser.deleted_at.is_(None),
+        )
         .order_by(ClientUser.name.asc())
     )
     return [client_user_dict(u) for u in result.scalars().all()]
@@ -153,6 +157,7 @@ async def list_users_filtered(
     stmt = (
         select(ClientUser, Client)
         .join(Client, Client.id == ClientUser.client_id)
+        .where(ClientUser.deleted_at.is_(None), Client.deleted_at.is_(None))
         .order_by(Client.name.asc(), ClientUser.name.asc())
     )
     if client_id:
@@ -202,6 +207,7 @@ async def update_user(
     user_id: int,
     body: ClientUserIn,
     session: AsyncSession = Depends(get_session),
+    user: str = Depends(require_user),
 ) -> dict:
     """Update a client user's name/email.
 
@@ -233,6 +239,8 @@ async def update_user(
         )
     cu.name = name
     cu.email = (body.email or "").strip() or None
+    cu.updated_by_email = user
+    cu.updated_at = utc_now()
     await session.commit()
     await session.refresh(cu)
     return client_user_dict(cu)
@@ -240,9 +248,11 @@ async def update_user(
 
 @router.delete("/api/users/{user_id}")
 async def delete_user(
-    user_id: int, session: AsyncSession = Depends(get_session)
+    user_id: int,
+    session: AsyncSession = Depends(get_session),
+    user: str = Depends(require_user),
 ) -> dict:
-    """Delete a client user, unless still attributed to transactions.
+    """Archive a client user (soft delete), unless still attributed.
 
     Parameters
     ----------
@@ -277,7 +287,8 @@ async def delete_user(
                 "transaction(s). Reassign or void those first."
             ),
         )
-    client_id, name = cu.client_id, cu.name
-    await session.delete(cu)
+    cu.deleted_at = utc_now()
+    cu.updated_by_email = user
+    cu.updated_at = utc_now()
     await session.commit()
-    return {"clientId": client_id, "name": name}
+    return {"clientId": cu.client_id, "name": cu.name}

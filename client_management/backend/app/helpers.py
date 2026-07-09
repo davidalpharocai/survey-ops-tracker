@@ -58,6 +58,20 @@ def add_year(d: datetime) -> datetime:
         return d.replace(year=d.year + 1, day=d.day - 1)
 
 
+def utc_now() -> datetime:
+    """Return the current instant as a naive UTC datetime.
+
+    Naive to match the tz-naive timestamp columns (asyncpg rejects
+    tz-aware values for them). Use for ``updated_at`` / ``deleted_at``.
+
+    Returns
+    -------
+    datetime
+        Current UTC time, tz-naive, second precision.
+    """
+    return datetime.now(timezone.utc).replace(tzinfo=None, microsecond=0)
+
+
 def utc_today() -> datetime:
     """Return today's date as a naive UTC-midnight datetime.
 

@@ -85,7 +85,10 @@ async def client_balances(
                 func.coalesce(func.sum(case((is_cy_contract, Transaction.credits_delta), else_=0)), 0),
                 func.coalesce(func.sum(case((is_cy_contract, Transaction.dollars_delta), else_=0)), 0),
                 func.min(case((is_upcoming_renewal, Transaction.renewal_on))),
-            ).where(Transaction.client_id == client_id)
+            ).where(
+                Transaction.client_id == client_id,
+                Transaction.deleted_at.is_(None),
+            )
         )
     ).one()
     return {
@@ -126,7 +129,11 @@ async def all_balances(
         & (Transaction.renewal_on >= utc_today())
     )
     clients = (
-        await session.execute(select(Client).order_by(Client.name.asc()))
+        await session.execute(
+            select(Client)
+            .where(Client.deleted_at.is_(None))
+            .order_by(Client.name.asc())
+        )
     ).scalars().all()
     agg = {
         row.client_id: (
@@ -144,7 +151,9 @@ async def all_balances(
                 func.coalesce(func.sum(case((is_cy_contract, Transaction.credits_delta), else_=0)), 0).label("cy_credits"),
                 func.coalesce(func.sum(case((is_cy_contract, Transaction.dollars_delta), else_=0)), 0).label("cy_value"),
                 func.min(case((is_upcoming_renewal, Transaction.renewal_on))).label("cy_renewal"),
-            ).group_by(Transaction.client_id)
+            )
+            .where(Transaction.deleted_at.is_(None))
+            .group_by(Transaction.client_id)
         )
     }
     out = []
@@ -194,7 +203,10 @@ async def client_transactions(
         )
     result = await session.execute(
         select(Transaction)
-        .where(Transaction.client_id == client_id)
+        .where(
+            Transaction.client_id == client_id,
+            Transaction.deleted_at.is_(None),
+        )
         .order_by(Transaction.occurred_on.desc(), Transaction.id.desc())
         .options(selectinload(Transaction.client_user))
     )

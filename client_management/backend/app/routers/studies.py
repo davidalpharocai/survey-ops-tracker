@@ -14,6 +14,7 @@ from sqlalchemy.orm import selectinload
 
 from app.auth import require_user
 from app.db import get_session
+from app.helpers import utc_now
 from app.models import Client, ClientUser, Transaction, TransactionUser
 from app.schemas import StudyBulkUpdateIn, StudyIn
 from app.serializers import transaction_dict
@@ -54,7 +55,7 @@ async def _study_or_404(
         .options(selectinload(Transaction.users))
     )
     t = result.scalar_one_or_none()
-    if t is None or t.kind != "study":
+    if t is None or t.kind != "study" or t.deleted_at is not None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Study not found"
         )
@@ -178,6 +179,7 @@ async def list_studies(
         .where(
             Transaction.client_id == client_id,
             Transaction.kind == "study",
+            Transaction.deleted_at.is_(None),
         )
         .order_by(Transaction.occurred_on.desc(), Transaction.id.desc())
         .options(
@@ -257,6 +259,7 @@ async def create_study(
         client_id=client.id,
         kind="study",
         name=f.name,
+        socc_project_code=(body.socc_project_code or "").strip() or None,
         occurred_on=f.occurred_on,
         credits_delta=-(f.setup_cost + credits_annual),
         dollars_delta=-dollars_annual,
@@ -281,6 +284,7 @@ async def update_study(
     txn_id: int,
     body: StudyIn,
     session: AsyncSession = Depends(get_session),
+    user: str = Depends(require_user),
 ) -> dict:
     """Update a single study.
 
@@ -327,6 +331,10 @@ async def update_study(
     t.setup_cost = f.setup_cost if f.cadence else None
     t.client_user_id = users[0].id
     t.note = note
+    if body.socc_project_code is not None:
+        t.socc_project_code = (body.socc_project_code or "").strip() or None
+    t.updated_by_email = user
+    t.updated_at = utc_now()
     await session.commit()
     await session.refresh(t)
     return transaction_dict(t)
@@ -334,9 +342,11 @@ async def update_study(
 
 @router.delete("/studies/{txn_id}")
 async def delete_study(
-    txn_id: int, session: AsyncSession = Depends(get_session)
+    txn_id: int,
+    session: AsyncSession = Depends(get_session),
+    user: str = Depends(require_user),
 ) -> dict:
-    """Delete a study; attributions cascade via FK.
+    """Archive a study (soft delete) — its history is preserved.
 
     Parameters
     ----------
@@ -356,10 +366,11 @@ async def delete_study(
         ``404`` if absent or not a study.
     """
     t = await _study_or_404(session, txn_id)
-    client_id, name = t.client_id, t.name
-    await session.delete(t)
+    t.deleted_at = utc_now()
+    t.updated_by_email = user
+    t.updated_at = utc_now()
     await session.commit()
-    return {"clientId": client_id, "name": name}
+    return {"clientId": t.client_id, "name": t.name}
 
 
 @router.post("/studies/{txn_id}/mark-reviewed")
@@ -396,6 +407,7 @@ async def mark_reviewed(
 async def bulk_update(
     body: StudyBulkUpdateIn,
     session: AsyncSession = Depends(get_session),
+    user: str = Depends(require_user),
 ) -> dict:
     """Save every row of the existing-studies table in one shot.
 
@@ -420,7 +432,12 @@ async def bulk_update(
 
     for sid, st in body.studies.items():
         t = await session.get(Transaction, sid)
-        if t is None or t.kind != "study" or t.client_id != client_id:
+        if (
+            t is None
+            or t.kind != "study"
+            or t.client_id != client_id
+            or t.deleted_at is not None
+        ):
             errors.append(f"#{sid}: not found")
             continue
         f = read_study_form(st)
@@ -457,6 +474,8 @@ async def bulk_update(
         t.setup_cost = f.setup_cost if f.cadence else None
         t.client_user_id = users[0].id
         t.note = note
+        t.updated_by_email = user
+        t.updated_at = utc_now()
         updated += 1
 
     await session.commit()

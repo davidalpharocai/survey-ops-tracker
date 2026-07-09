@@ -45,7 +45,7 @@ async def get_transaction(
         ``404`` if no transaction has the given id.
     """
     t = await session.get(Transaction, txn_id)
-    if t is None:
+    if t is None or t.deleted_at is not None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Transaction not found",

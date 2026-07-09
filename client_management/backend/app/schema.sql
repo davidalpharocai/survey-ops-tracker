@@ -56,3 +56,27 @@ CREATE TABLE IF NOT EXISTS transaction_users (
 
 CREATE INDEX IF NOT EXISTS transactions_client_kind_occurred_idx
     ON transactions (client_id, kind, occurred_on);
+
+-- Additive columns (idempotent; see FUTURE.md). Applied on boot.
+-- Stable cross-app identifiers (SOCC Cl##### / PR#####): the only
+-- reliable join key between CCM and the Survey Ops Command Center.
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS socc_code TEXT;
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS socc_project_code TEXT;
+
+-- Soft-delete: money history is never destroyed by a delete.
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP(3);
+ALTER TABLE client_users ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP(3);
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP(3);
+
+-- Editor attribution: who last changed a row, and when.
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS updated_by_email TEXT;
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP(3);
+ALTER TABLE client_users ADD COLUMN IF NOT EXISTS updated_by_email TEXT;
+ALTER TABLE client_users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP(3);
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS updated_by_email TEXT;
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP(3);
+
+CREATE UNIQUE INDEX IF NOT EXISTS clients_socc_code_key
+    ON clients (socc_code) WHERE socc_code IS NOT NULL;
+CREATE INDEX IF NOT EXISTS transactions_socc_project_code_idx
+    ON transactions (socc_project_code) WHERE socc_project_code IS NOT NULL;

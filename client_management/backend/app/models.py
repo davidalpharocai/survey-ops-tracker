@@ -50,6 +50,7 @@ class Client(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String, unique=True)
+    socc_code: Mapped[str | None] = mapped_column(String, nullable=True)
     became_client_on: Mapped[datetime] = mapped_column(DateTime)
     primary_contact_name: Mapped[str | None] = mapped_column(String, nullable=True)
     primary_contact_cell: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -59,6 +60,9 @@ class Client(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now()
     )
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    updated_by_email: Mapped[str | None] = mapped_column(String, nullable=True)
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     users: Mapped[list["ClientUser"]] = relationship(
         back_populates="client", cascade="all, delete-orphan"
@@ -98,6 +102,9 @@ class ClientUser(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now()
     )
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    updated_by_email: Mapped[str | None] = mapped_column(String, nullable=True)
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     client: Mapped[Client] = relationship(back_populates="users")
 
@@ -163,9 +170,13 @@ class Transaction(Base):
     )
     actor_email: Mapped[str] = mapped_column(String)
     note: Mapped[str | None] = mapped_column(String, nullable=True)
+    socc_project_code: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now()
     )
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    updated_by_email: Mapped[str | None] = mapped_column(String, nullable=True)
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     client_user: Mapped[ClientUser | None] = relationship()
     users: Mapped[list["TransactionUser"]] = relationship(
