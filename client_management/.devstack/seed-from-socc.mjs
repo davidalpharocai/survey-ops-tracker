@@ -22,11 +22,15 @@ const XLSX =
 const DRY = process.argv.includes('--dry-run');
 const BASE = process.env.BACKEND_URL || 'http://127.0.0.1:8000';
 const EMAIL = process.env.SEED_USER_EMAIL || 'david@alpharoc.ai';
+// Required when BASE is a production deployment (see .env.preview-secrets).
+const INTERNAL_SECRET = process.env.INTERNAL_API_SECRET || '';
 
 async function api(method, path, body) {
+  const headers = { 'Content-Type': 'application/json', 'X-User-Email': EMAIL };
+  if (INTERNAL_SECRET) headers['X-Internal-Auth'] = INTERNAL_SECRET;
   const res = await fetch(BASE + path, {
     method,
-    headers: { 'Content-Type': 'application/json', 'X-User-Email': EMAIL },
+    headers,
     body: body == null ? undefined : JSON.stringify(body),
   });
   const text = await res.text();

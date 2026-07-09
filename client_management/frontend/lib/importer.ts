@@ -38,6 +38,9 @@ export interface PlanRow {
   payload?: Record<string, unknown>;
   /** For updates: the existing record's id. */
   targetId?: number;
+  /** Resolved owning-client id (set when the client was matched by code
+   * under a different live name; apply must not re-resolve by name). */
+  clientId?: number;
   /** Study attribution to resolve/create at apply time (user name). */
   ensureUser?: string;
 }
@@ -218,8 +221,15 @@ function planTemplate(
   plannedClients: Map<string, PlanRow>,
 ): PlanRow[] {
   const rows: PlanRow[] = [];
+  // Sheet client name -> live client, including clients matched by CODE
+  // whose live name is spelled differently than the sheet's. Child rows
+  // (users/contracts/studies) reference clients by sheet name, so they
+  // must resolve through this alias map, not just live.clients.
+  const aliasToLive = new Map<string, LiveClient>();
+  const resolveLive = (nameLower: string): LiveClient | undefined =>
+    aliasToLive.get(nameLower) || live.clients.get(nameLower);
   const clientKnown = (nameLower: string) =>
-    live.clients.has(nameLower) || plannedClients.has(nameLower);
+    resolveLive(nameLower) !== undefined || plannedClients.has(nameLower);
 
   // -- Clients tab
   const clientsWs = wb.worksheets.find(w => normHeader(w.name) === 'clients');
@@ -243,6 +253,7 @@ function planTemplate(
       };
       // Match on the stable code first, then name.
       const existing = (code && live.clientsByCode.get(code)) || live.clients.get(key);
+      if (existing) aliasToLive.set(key, existing);
       if (!existing) {
         const row: PlanRow = {
           tab: 'clients',
@@ -316,12 +327,14 @@ function planTemplate(
         continue;
       }
       const email = pick(r, 'email');
-      const existing = live.clients.get(ckey)?.users.get(name.toLowerCase());
+      const ownerLive = resolveLive(ckey);
+      const existing = ownerLive?.users.get(name.toLowerCase());
       if (!existing) {
         rows.push({
           tab: 'users', action: 'create', client: clientName, name,
           changes: email ? [{ field: 'email', from: '', to: email }] : [],
           payload: { name, email },
+          clientId: ownerLive?.id,
         });
       } else if (email && email !== existing.email) {
         rows.push({
@@ -329,6 +342,7 @@ function planTemplate(
           changes: [{ field: 'email', from: existing.email, to: email }],
           payload: { name: existing.name, email },
           targetId: existing.id,
+          clientId: ownerLive?.id,
         });
       } else {
         rows.push({ tab: 'users', action: 'unchanged', client: clientName, name, changes: [] });
@@ -359,7 +373,7 @@ function planTemplate(
       const creditsRaw = pick(r, 'credits', 'creditsamount');
       const dollarsRaw = pick(r, 'dollars', 'dollarsamount');
 
-      const liveClient = live.clients.get(ckey);
+      const liveClient = resolveLive(ckey);
       const existing = liveClient
         ? live.contracts.get(liveClient.id)?.get(name.toLowerCase())
         : undefined;
@@ -440,7 +454,7 @@ function planTemplate(
       const costRaw = pick(r, 'cost');
       const setupRaw = pick(r, 'setupcost', 'setup');
 
-      const liveClient = live.clients.get(ckey);
+      const liveClient = resolveLive(ckey);
       const existing = liveClient
         ? live.studies.get(liveClient.id)?.get(name.toLowerCase())
         : undefined;
@@ -554,6 +568,11 @@ function planSocc(
   }
 
   const nameByUuid = new Map<string, string>();
+  // Sheet client name -> live client (covers code-matched clients whose
+  // live name differs from the sheet spelling).
+  const aliasToLive = new Map<string, LiveClient>();
+  const resolveLive = (nameLower: string): LiveClient | undefined =>
+    aliasToLive.get(nameLower) || live.clients.get(nameLower);
   for (const c of clientsTab) {
     nameByUuid.set(c.id, c.name);
     const key = c.name.toLowerCase();
@@ -563,6 +582,7 @@ function planSocc(
     // Goldentree) from creating a duplicate.
     const existing = (code && live.clientsByCode.get(code)) || live.clients.get(key);
     if (existing) {
+      aliasToLive.set(key, existing);
       rows.push({ tab: 'clients', action: 'unchanged', client: c.name, name: c.name, changes: [] });
       continue;
     }
@@ -587,7 +607,7 @@ function planSocc(
     if (!clientName) continue;
     const name = [ct.firstname, ct.lastname].filter(Boolean).join(' ').trim();
     if (!name) continue;
-    const liveClient = live.clients.get(clientName.toLowerCase());
+    const liveClient = resolveLive(clientName.toLowerCase());
     if (liveClient?.users.has(name.toLowerCase())) {
       rows.push({ tab: 'users', action: 'unchanged', client: clientName, name, changes: [] });
     } else {
@@ -595,6 +615,7 @@ function planSocc(
         tab: 'users', action: 'create', client: clientName, name,
         changes: ct.email ? [{ field: 'email', from: '', to: ct.email }] : [],
         payload: { name, email: ct.email || '' },
+        clientId: liveClient?.id,
       });
     }
   }
@@ -609,7 +630,7 @@ function planSocc(
     const ckey = clientName.toLowerCase();
     const nameKey = p.projectname.toLowerCase();
     const seen = seenPerClient.get(ckey) || new Set();
-    const liveClient = live.clients.get(ckey);
+    const liveClient = resolveLive(ckey);
     const exists =
       seen.has(nameKey) ||
       (liveClient ? live.studies.get(liveClient.id)?.has(nameKey) : false);
@@ -642,6 +663,7 @@ function planSocc(
         setup_cost: '0',
       },
       ensureUser: attributee,
+      clientId: liveClient?.id,
     });
   }
 
@@ -718,7 +740,9 @@ export async function applyPlan(api: ApiClient, plan: ImportPlan): Promise<Apply
     for (const row of plan.rows) {
       if (row.tab !== tab || (row.action !== 'create' && row.action !== 'update')) continue;
       try {
-        const clientId = clientIds.get(row.client.toLowerCase());
+        // Prefer the id resolved at plan time (covers clients matched by
+        // code whose live name differs from the sheet's spelling).
+        const clientId = row.clientId ?? clientIds.get(row.client.toLowerCase());
         if (tab === 'clients') {
           if (row.action === 'create') {
             if (clientId) {

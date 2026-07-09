@@ -17,7 +17,8 @@
     "seed:studies": "node --env-file=.env scripts/seed-studies.js",
     "seed:client-studies": "node --env-file=.env scripts/seed-client-studies.js",
     "migrate:tx-users": "node --env-file=.env scripts/migrate-tx-users.js",
-    "reset:contracts": "node --env-file=.env scripts/reset-contracts.js"
+    "reset:contracts": "node --env-file=.env scripts/reset-contracts.js",
+    "test": "vitest run"
   },
   "dependencies": {
     "exceljs": "^4.4.0",
@@ -34,6 +35,7 @@
     "@types/node": "^25.9.1",
     "@types/react": "^19.2.15",
     "@types/react-dom": "^19.2.3",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.10"
   }
 }

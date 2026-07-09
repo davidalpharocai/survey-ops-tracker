@@ -30,6 +30,10 @@ const nextConfig = {
     APP_BASE_URL: process.env.APP_BASE_URL || '',
     ALLOWED_DOMAIN: process.env.ALLOWED_DOMAIN || '',
     CCM_ADMIN_EMAILS: process.env.CCM_ADMIN_EMAILS || '',
+    // Server/edge-only (middleware gate + lib/api service secret); no
+    // client component references these, so they stay out of browser JS.
+    BASIC_AUTH_PASSWORD: process.env.BASIC_AUTH_PASSWORD || '',
+    BACKEND_SHARED_SECRET: process.env.BACKEND_SHARED_SECRET || '',
     BACKEND_URL: process.env.BACKEND_URL || '',
     DEV_USER_EMAIL: process.env.DEV_USER_EMAIL || '',
   },

@@ -277,7 +277,10 @@ async def delete_user(
     count = await session.scalar(
         select(func.count())
         .select_from(Transaction)
-        .where(Transaction.client_user_id == user_id)
+        .where(
+            Transaction.client_user_id == user_id,
+            Transaction.deleted_at.is_(None),
+        )
     )
     if count and count > 0:
         raise HTTPException(

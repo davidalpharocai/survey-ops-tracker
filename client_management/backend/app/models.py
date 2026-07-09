@@ -49,7 +49,10 @@ class Client(Base):
     __tablename__ = "clients"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    name: Mapped[str] = mapped_column(String, unique=True)
+    # Uniqueness is enforced by a partial index over ACTIVE clients only
+    # (clients_name_active_key in schema.sql), so archived names can be
+    # reused.
+    name: Mapped[str] = mapped_column(String)
     socc_code: Mapped[str | None] = mapped_column(String, nullable=True)
     became_client_on: Mapped[datetime] = mapped_column(DateTime)
     primary_contact_name: Mapped[str | None] = mapped_column(String, nullable=True)

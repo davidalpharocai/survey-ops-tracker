@@ -45,3 +45,6 @@ dist/
 # Source data (company-confidential, never commit)
 data/
 *.xlsx
+
+.vercel
+.env*

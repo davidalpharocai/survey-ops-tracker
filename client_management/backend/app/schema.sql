@@ -78,5 +78,12 @@ ALTER TABLE transactions ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP(3);
 
 CREATE UNIQUE INDEX IF NOT EXISTS clients_socc_code_key
     ON clients (socc_code) WHERE socc_code IS NOT NULL;
+
+-- Name uniqueness applies to ACTIVE clients only, so an archived
+-- client's name can be reused (the API dup-check already filters on
+-- deleted_at; this makes the DB agree with it).
+ALTER TABLE clients DROP CONSTRAINT IF EXISTS clients_name_key;
+CREATE UNIQUE INDEX IF NOT EXISTS clients_name_active_key
+    ON clients (name) WHERE deleted_at IS NULL;
 CREATE INDEX IF NOT EXISTS transactions_socc_project_code_idx
     ON transactions (socc_project_code) WHERE socc_project_code IS NOT NULL;

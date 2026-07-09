@@ -20,6 +20,7 @@ import {
 } from './lib/cognito';
 
 const ALLOWED_DOMAIN = process.env.ALLOWED_DOMAIN || 'alpharoc.ai';
+const BASIC_AUTH_PASSWORD = process.env.BASIC_AUTH_PASSWORD || '';
 
 // Paths reachable without authentication.
 function isPublicPath(pathname: string): boolean {
@@ -28,6 +29,43 @@ function isPublicPath(pathname: string): boolean {
     pathname === '/login' ||
     pathname.startsWith('/api/auth/')
   );
+}
+
+// Constant-time string comparison (edge runtime has no node:crypto).
+function safeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+// HTTP Basic Auth gate — the documented production gate for deployments
+// without Cognito (e.g. the shared preview). The username is the
+// @alpharoc.ai email used for attribution; the password is the shared
+// BASIC_AUTH_PASSWORD. Takes precedence over the dev shim when set.
+function basicAuthGate(req: NextRequest): NextResponse | { email: string } {
+  const challenge = () =>
+    new NextResponse('Sign in with your @alpharoc.ai email and the shared password.', {
+      status: 401,
+      headers: { 'WWW-Authenticate': 'Basic realm="AlphaROC CCM", charset="UTF-8"' },
+    });
+  const header = req.headers.get('authorization') || '';
+  if (!header.toLowerCase().startsWith('basic ')) return challenge();
+  let decoded = '';
+  try {
+    decoded = atob(header.slice(6).trim());
+  } catch {
+    return challenge();
+  }
+  const sep = decoded.indexOf(':');
+  if (sep < 0) return challenge();
+  const email = decoded.slice(0, sep).trim().toLowerCase();
+  const password = decoded.slice(sep + 1);
+  if (!safeEqual(password, BASIC_AUTH_PASSWORD)) return challenge();
+  if (!email.endsWith('@' + ALLOWED_DOMAIN)) {
+    return new NextResponse(`Access is restricted to @${ALLOWED_DOMAIN} accounts.`, { status: 403 });
+  }
+  return { email };
 }
 
 function forward(req: NextRequest, email: string, isAdmin: boolean): NextResponse {
@@ -40,6 +78,14 @@ function forward(req: NextRequest, email: string, isAdmin: boolean): NextRespons
 export async function middleware(req: NextRequest): Promise<NextResponse> {
   const { pathname } = req.nextUrl;
   if (isPublicPath(pathname)) return NextResponse.next();
+
+  // Basic Auth gate (shared preview deployments). When configured it is
+  // the authentication method, in any environment.
+  if (!COGNITO_ENABLED && BASIC_AUTH_PASSWORD) {
+    const result = basicAuthGate(req);
+    if (result instanceof NextResponse) return result;
+    return forward(req, result.email, isAdminIdentity(result.email, []));
+  }
 
   if (!COGNITO_ENABLED) {
     // Local development shim — never honoured in production, so a
@@ -73,5 +119,8 @@ const loginUrl = new URL(req.nextUrl.basePath + '/login', req.url);
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+  // The bare basePath root needs its own entry — the pattern below does
+  // not match it (long-standing Next basePath quirk), which previously
+  // left the home page outside the auth gate.
+  matcher: ['/', '/((?!_next/static|_next/image|favicon.ico).*)'],
 };

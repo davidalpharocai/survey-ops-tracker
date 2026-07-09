@@ -34,6 +34,11 @@ class Settings(BaseSettings):
 
     database_url: str = Field(default="", alias="DATABASE_URL")
     database_url_secret_arn: str = Field(default="", alias="DATABASE_URL_SECRET_ARN")
+    # Shared secret the trusted frontend sends as X-Internal-Auth. When
+    # set, a request carrying it may authenticate via X-User-Email even
+    # in production (the frontend has already verified the human). This
+    # implements the long-documented frontend<->backend service secret.
+    internal_api_secret: str = Field(default="", alias="INTERNAL_API_SECRET")
     allowed_domain: str = Field(default="alpharoc.ai", alias="ALLOWED_DOMAIN")
     frontend_url: str = Field(default="", alias="FRONTEND_URL")
     env: str = Field(default="development", alias="ENV")

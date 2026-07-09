@@ -40,6 +40,10 @@ override.tf.json
 # ---- Local dev Postgres (embedded-postgres data dir) ----
 .devstack/pgdata/
 
+# ---- Vercel (per-machine project links) ----
+.vercel/
+**/.vercel/
+
 # ---- SQLite / local DBs ----
 *.db
 *.sqlite

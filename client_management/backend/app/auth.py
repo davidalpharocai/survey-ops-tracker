@@ -13,6 +13,8 @@ When Cognito is not configured (local development) the service falls
 back to trusting the ``X-User-Email`` header.
 """
 
+import hmac
+
 import jwt
 from fastapi import Depends, Header, HTTPException, Request, status
 
@@ -20,6 +22,27 @@ from app.cognito import verify_id_token
 from app.config import get_settings
 
 settings = get_settings()
+
+
+def _internal_auth_ok(header_value: str | None) -> bool:
+    """Whether the request carries the valid frontend service secret.
+
+    Parameters
+    ----------
+    header_value : str or None
+        Value of the ``X-Internal-Auth`` header.
+
+    Returns
+    -------
+    bool
+        ``True`` when ``INTERNAL_API_SECRET`` is configured and the
+        header matches (constant-time comparison).
+    """
+    return bool(
+        settings.internal_api_secret
+        and header_value
+        and hmac.compare_digest(header_value, settings.internal_api_secret)
+    )
 
 
 def _email_from_bearer(authorization: str | None) -> tuple[str, list[str]]:
@@ -83,6 +106,7 @@ async def require_user(
     request: Request,
     authorization: str | None = Header(default=None),
     x_user_email: str | None = Header(default=None),
+    x_internal_auth: str | None = Header(default=None),
 ) -> str:
     """Authenticate the calling request and return the acting user email.
 
@@ -117,10 +141,12 @@ async def require_user(
     if settings.cognito_enabled:
         email, groups = _email_from_bearer(authorization)
     else:
-        # X-User-Email is a development-only fallback. In production it
-        # must never be trusted, so a misconfigured deploy (Cognito env
-        # vars missing) fails closed instead of accepting a raw header.
-        if settings.is_production:
+        # X-User-Email is trusted in two cases only: local development,
+        # or a production request carrying the valid X-Internal-Auth
+        # service secret (the trusted frontend has already verified the
+        # human). Otherwise production fails closed: a misconfigured
+        # deploy (no Cognito, no secret) accepts nothing.
+        if settings.is_production and not _internal_auth_ok(x_internal_auth):
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="Authentication is not configured.",
@@ -131,9 +157,9 @@ async def require_user(
                 detail="Missing X-User-Email header.",
             )
         email = x_user_email.strip().lower()
-        # Local dev has no token; grant the app group. Admin rights come
+        # No token in this path; grant the app group. Admin rights come
         # from the CCM_ADMIN_EMAILS allow-list (see settings.is_admin), so
-        # the dev user is admin only if their email is listed.
+        # the user is admin only if their email is listed.
         groups = [settings.cognito_allowed_group]
 
     domain = settings.allowed_domain

@@ -28,6 +28,11 @@ const BASE = (process.env.BACKEND_URL || 'http://127.0.0.1:8000').replace(
   '',
 );
 
+// Service secret proving requests come from this trusted frontend; the
+// backend accepts X-User-Email in production only when this matches its
+// INTERNAL_API_SECRET. Server-only (this module imports next/headers).
+const SHARED_SECRET = process.env.BACKEND_SHARED_SECRET || '';
+
 // Keys that hold timestamps in the API payloads. Revived to `Date` so
 // templates calling isoDate()/fmtDateTime() behave as before.
 const DATE_KEYS = new Set([
@@ -78,6 +83,7 @@ async function request<T>(
     'Content-Type': 'application/json',
     'X-User-Email': userEmail || '',
   };
+  if (SHARED_SECRET) headers['X-Internal-Auth'] = SHARED_SECRET;
   if (idToken) headers.Authorization = `Bearer ${idToken}`;
   const res = await fetch(BASE + path, {
     method,

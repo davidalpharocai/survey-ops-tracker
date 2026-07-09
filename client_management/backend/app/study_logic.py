@@ -69,11 +69,18 @@ def read_study_form(body: StudyIn) -> StudyForm:
     cadence_raw = (body.cadence or "single").lower()
     cadence = cadence_raw if cadence_raw in RUNS_PER_YEAR else None
 
-    cost = parse_money(body.cost)
-    fallback = parse_money(
-        body.cost_per_run if body.cost_per_run not in (None, "") else body.cost_amount
-    )
-    per_run = cost if cost > 0 else fallback
+    # The unified cost field wins whenever it was actually provided —
+    # including zero/negative values, so validation can reject negatives
+    # instead of silently treating them as "not given". Legacy fields
+    # only apply when the unified field is absent.
+    if body.cost not in (None, ""):
+        per_run = parse_money(body.cost)
+    else:
+        per_run = parse_money(
+            body.cost_per_run
+            if body.cost_per_run not in (None, "")
+            else body.cost_amount
+        )
     annual_total = per_run * runs_per_year(cadence) if cadence else per_run
     setup_cost = parse_money(body.setup_cost) if cadence else 0.0
 

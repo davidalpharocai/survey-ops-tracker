@@ -32,9 +32,38 @@ function devFallbackUser(): VerifiedUser | null {
   return { email, isAdmin: isAdminIdentity(email, []), claims: {} };
 }
 
+// Basic-Auth fallback, mirroring middleware.ts's gate: the browser
+// resends the Authorization header on every request in the realm, so
+// pages the middleware matcher misses (the bare basePath root) can still
+// resolve the signed-in user. Same rules: shared password + @domain email.
+async function basicAuthFallbackUser(): Promise<VerifiedUser | null> {
+  const password = process.env.BASIC_AUTH_PASSWORD || '';
+  if (COGNITO_ENABLED || !password) return null;
+  const header = (await headers()).get('authorization') || '';
+  if (!header.toLowerCase().startsWith('basic ')) return null;
+  let decoded = '';
+  try {
+    decoded = Buffer.from(header.slice(6).trim(), 'base64').toString('utf8');
+  } catch {
+    return null;
+  }
+  const sep = decoded.indexOf(':');
+  if (sep < 0) return null;
+  const email = decoded.slice(0, sep).trim().toLowerCase();
+  const given = decoded.slice(sep + 1);
+  if (given !== password) return null;
+  const domain = process.env.ALLOWED_DOMAIN || 'alpharoc.ai';
+  if (!email.endsWith('@' + domain)) return null;
+  return { email, isAdmin: isAdminIdentity(email, []), claims: {} };
+}
+
 async function userFromCookie(): Promise<VerifiedUser | null> {
   const token = (await cookies()).get(COOKIE_ID_TOKEN)?.value;
-  return (await verifyIdToken(token)) ?? devFallbackUser();
+  return (
+    (await verifyIdToken(token)) ??
+    (await basicAuthFallbackUser()) ??
+    devFallbackUser()
+  );
 }
 
 export async function currentUserEmail(): Promise<string> {

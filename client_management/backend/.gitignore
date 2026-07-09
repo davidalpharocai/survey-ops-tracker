@@ -20,3 +20,6 @@ env/
 ._*
 .idea/
 .vscode/
+
+.vercel
+.env*
