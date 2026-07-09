@@ -126,6 +126,20 @@ async function orNull<T>(promise: Promise<T>): Promise<T | null> {
   }
 }
 
+/**
+ * A `.catch` handler that swallows ONLY a 404 (returning `fallback`) and
+ * rethrows everything else. Use when a page fetches per-client data
+ * optimistically: an archived/stale client id degrades to the empty state,
+ * but a transient 5xx still surfaces as an error rather than silently
+ * rendering fabricated data (e.g. a fake $0 balance for a real client).
+ */
+export function onlyNotFound<T>(fallback: T) {
+  return (e: unknown): T => {
+    if (e instanceof ApiError && e.status === 404) return fallback;
+    throw e;
+  };
+}
+
 export interface ApiClient {
   listClients(): Promise<Client[]>;
   listClientsWithUsers(): Promise<Client[]>;

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 
 import { apiForRequest, parseId } from '../../../lib/action';
+import { onlyNotFound } from '../../../lib/api';
 import { todayIsoDate } from '../../../lib/dates';
 import { isoDate } from '../../../lib/format';
 import { TIP } from '../../../lib/tooltips';
@@ -27,16 +28,19 @@ export default async function NewContractPage({ searchParams }: PageProps) {
   const preselect = parseId(sp?.client_id);
 
   const api = await apiForRequest();
-  const clients = await api.listClients();
+  // One parallel wave: the per-client contracts read only needs `preselect`
+  // (a URL int), so it need not wait for the client list. A stale preselect
+  // 404s to an empty list; other errors still surface.
+  type ContractRows = Awaited<ReturnType<typeof api.listContractsByClient>>;
+  const [clients, fetchedContracts] = await Promise.all([
+    api.listClients(),
+    preselect
+      ? api.listContractsByClient(preselect).catch(onlyNotFound([] as ContractRows))
+      : Promise.resolve([] as ContractRows),
+  ]);
 
-  let selectedClient = null;
-  let existingContracts: Awaited<ReturnType<typeof api.listContractsByClient>> = [];
-  if (preselect) {
-    selectedClient = clients.find(c => c.id === preselect) || null;
-    if (selectedClient) {
-      existingContracts = await api.listContractsByClient(preselect);
-    }
-  }
+  const selectedClient = preselect ? clients.find(c => c.id === preselect) || null : null;
+  const existingContracts: ContractRows = selectedClient ? fetchedContracts : [];
 
   const today = todayIsoDate();
 

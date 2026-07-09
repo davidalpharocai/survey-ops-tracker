@@ -1,6 +1,7 @@
 import Link from 'next/link';
 
 import { apiForRequest, parseId } from '../../../lib/action';
+import { onlyNotFound } from '../../../lib/api';
 import {
   contractValue,
   credits as creditsFmt,
@@ -29,18 +30,25 @@ export default async function TransactionsReportPage({ searchParams }: PageProps
   const clientId = parseId(sp?.client_id);
 
   const api = await apiForRequest();
-  const [clients, selected] = await Promise.all([
+  const defaultBal: Balance = { credits: 0, dollars: 0, cyCredits: 0, cyValue: 0, cyRenewal: null };
+  // One parallel wave instead of two sequential ones: the per-client reads
+  // depend only on clientId (an int from the URL), not on the resolved
+  // `selected` object, so there is no reason to wait for getClient first.
+  // Transient errors are NOT swallowed — only a 404 (archived/stale id)
+  // degrades to the empty state; a 5xx surfaces rather than showing a fake
+  // $0 balance for a real client.
+  const [clients, selected, txResult, balResult] = await Promise.all([
     api.listClients(),
     clientId ? api.getClient(clientId) : Promise.resolve(null),
+    clientId
+      ? api.listTransactionsByClient(clientId).catch(onlyNotFound([] as Transaction[]))
+      : Promise.resolve([] as Transaction[]),
+    clientId
+      ? api.clientBalances(clientId).catch(onlyNotFound(defaultBal))
+      : Promise.resolve(defaultBal),
   ]);
-  let transactions: Transaction[] = [];
-  let bal: Balance = { credits: 0, dollars: 0, cyCredits: 0, cyValue: 0, cyRenewal: null };
-  if (clientId && selected) {
-    [transactions, bal] = await Promise.all([
-      api.listTransactionsByClient(clientId),
-      api.clientBalances(selected.id),
-    ]);
-  }
+  const transactions: Transaction[] = selected ? txResult : [];
+  const bal: Balance = selected ? balResult : defaultBal;
 
   const currentYear = new Date().getUTCFullYear();
 

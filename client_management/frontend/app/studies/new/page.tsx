@@ -1,6 +1,7 @@
 import Link from 'next/link';
 
 import { apiForRequest, parseId } from '../../../lib/action';
+import { onlyNotFound } from '../../../lib/api';
 import type { ClientUser, StudyTransaction } from '../../../lib/types';
 import AutoSubmitSelect from '../../_components/AutoSubmitSelect';
 import ExistingStudiesTable from './ExistingStudiesTable';
@@ -18,18 +19,20 @@ export default async function NewStudyPage({ searchParams }: PageProps) {
   const preselect = parseId(sp?.client_id);
 
   const api = await apiForRequest();
-  const clients = await api.listClientsWithUsers();
+  // Fetch the client list and (when arriving with a preselected client, the
+  // common path from the "+ Add study" quicklinks) that client's studies in
+  // one parallel wave — the per-client read only needs `preselect` (a URL
+  // int), so waiting for the list first was a gratuitous extra round trip.
+  const [clients, fetchedStudies] = await Promise.all([
+    api.listClientsWithUsers(),
+    preselect
+      ? api.listStudiesByClient(preselect).catch(onlyNotFound([] as StudyTransaction[]))
+      : Promise.resolve([] as StudyTransaction[]),
+  ]);
 
-  let selectedClient = null;
-  let selectedClientUsers: ClientUser[] = [];
-  let existingStudies: StudyTransaction[] = [];
-  if (preselect) {
-    selectedClient = clients.find(c => c.id === preselect) || null;
-    if (selectedClient) {
-      selectedClientUsers = selectedClient.users || [];
-      existingStudies = await api.listStudiesByClient(preselect);
-    }
-  }
+  const selectedClient = preselect ? clients.find(c => c.id === preselect) || null : null;
+  const selectedClientUsers: ClientUser[] = selectedClient?.users || [];
+  const existingStudies: StudyTransaction[] = selectedClient ? fetchedStudies : [];
 
   const pending = existingStudies.filter(t => t.isImported).length;
 

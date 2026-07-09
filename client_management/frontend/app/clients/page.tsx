@@ -1,6 +1,7 @@
 import Link from 'next/link';
 
 import { apiForRequest, parseId } from '../../lib/action';
+import { onlyNotFound } from '../../lib/api';
 import { todayIsoDate } from '../../lib/dates';
 import { contractValue, credits as creditsFmt, dollars, isoDate } from '../../lib/format';
 import { TIP } from '../../lib/tooltips';
@@ -30,16 +31,18 @@ export default async function ClientsPage({ searchParams }: PageProps) {
   const api = await apiForRequest();
   const defaultBal: Balance = { credits: 0, dollars: 0, cyCredits: 0, cyValue: 0, cyRenewal: null };
   // getClient is 404-tolerant (orNull). The per-client reads now 404 for
-  // an archived/nonexistent client too, so tolerate that here — a stale
-  // ?id= URL falls back to the empty state instead of erroring the page.
+  // an archived/nonexistent client too, so tolerate ONLY that here — a
+  // stale ?id= URL falls back to the empty state, but a transient backend
+  // error still surfaces rather than rendering a fake $0 balance for a
+  // real client.
   const [clients, selected, selectedUsers, bal] = await Promise.all([
     api.listClients(),
     selectedId ? api.getClient(selectedId) : Promise.resolve(null),
     selectedId
-      ? api.listClientUsers(selectedId).catch(() => [] as ClientUser[])
+      ? api.listClientUsers(selectedId).catch(onlyNotFound([] as ClientUser[]))
       : Promise.resolve([] as ClientUser[]),
     selectedId
-      ? api.clientBalances(selectedId).catch(() => defaultBal)
+      ? api.clientBalances(selectedId).catch(onlyNotFound(defaultBal))
       : Promise.resolve(defaultBal),
   ]);
 

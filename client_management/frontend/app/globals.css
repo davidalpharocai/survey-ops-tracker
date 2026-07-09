@@ -674,3 +674,52 @@ th .info-pop::after {
   }
   .topbar .brand { font-size: 0.95rem; flex-basis: 100%; }
 }
+
+/* --- Loading skeletons -------------------------------------------------- */
+/* Route-level loading.tsx files render these so a <Link> click paints an
+   instant, layout-matched shimmer instead of a frozen old page while the
+   server render is in flight. Pure CSS; no client JS. */
+@keyframes ccm-shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+.skeleton-line,
+.skeleton-block {
+  display: block;
+  background: linear-gradient(90deg, var(--border) 25%, #f0f1f3 37%, var(--border) 63%);
+  background-size: 800px 100%;
+  animation: ccm-shimmer 1.4s ease-in-out infinite;
+  border-radius: 6px;
+}
+.skeleton-line { height: 0.85rem; margin: 0.35rem 0; }
+.skeleton-title { height: 1.7rem; width: 18rem; max-width: 55%; margin-bottom: 0.9rem; border-radius: 8px; }
+.skeleton-sub { height: 0.8rem; width: 26rem; max-width: 80%; margin-bottom: 1.2rem; }
+/* Skeleton tables reuse .report so borders/padding match the real thing,
+   and rows match the real ~2rem row height so the swap to data is
+   shift-free (no layout jump / CLS). */
+.report.skeleton-table th .skeleton-line,
+.report.skeleton-table td .skeleton-line { margin: 0; }
+.report.skeleton-table td { padding-top: 0.72rem; padding-bottom: 0.72rem; }
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-line, .skeleton-block { animation: none; }
+}
+
+/* --- Per-tile navigation spinner (useLinkStatus) ------------------------ */
+/* Gives an immediate "this tile is loading" cue the moment a hub tile is
+   clicked, for the whole time the destination is server-rendering. */
+.hub-action, .hub-link { position: relative; }
+.link-spinner {
+  position: absolute;
+  top: 0.8rem;
+  right: 0.8rem;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: ccm-spin 0.6s linear infinite;
+}
+@keyframes ccm-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .link-spinner { animation-duration: 2s; }
+}
