@@ -7,6 +7,7 @@ import { currentUserEmail, currentUserIsAdmin } from '../lib/auth';
 import NavRibbon from './_components/NavRibbon';
 import SearchBox from './_components/SearchBox';
 import ThemeToggle from './_components/ThemeToggle';
+import UserMenu from './_components/UserMenu';
 
 export const metadata = {
   title: 'AlphaROC Client Credit Management',
@@ -42,11 +43,14 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
               future home of the global search box (roadmap ②). */}
           {userEmail && <NavRibbon isAdmin={isAdmin} />}
           {userEmail && <SearchBox />}
-          <span className="who">{userEmail || 'not signed in'}</span>
-          {userEmail && (
-            <Link className="signout" href="/api/auth/logout">Sign out</Link>
+          {userEmail ? (
+            <UserMenu userEmail={userEmail} />
+          ) : (
+            <>
+              <span className="who">not signed in</span>
+              <ThemeToggle />
+            </>
           )}
-          <ThemeToggle />
         </header>
         <main>{children}</main>
       </body>

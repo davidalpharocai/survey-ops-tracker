@@ -96,10 +96,11 @@ export default function SearchBox() {
   let lastGroup = '';
   return (
     <div className="search-box" ref={boxRef}>
+      <span className="search-icon" aria-hidden="true">🔍</span>
       <input
         type="search"
         className="search-input"
-        placeholder="Search clients, contracts, surveys, contacts…"
+        placeholder="Search clients, surveys, contacts…"
         value={q}
         onChange={e => setQ(e.target.value)}
         onFocus={() => items.length && setOpen(true)}
