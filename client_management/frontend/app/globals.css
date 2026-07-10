@@ -928,6 +928,11 @@ button:hover, .btn:hover { background: var(--accent-hover); }
 .report a:hover { text-decoration: underline; }
 .report.compact th, .report.compact td { padding: 0.4rem 0.6rem; }
 .report .row-actions { display: flex; gap: 0.4rem; align-items: center; white-space: nowrap; }
+/* Separate a trailing destructive control (Delete/Archive) from Save/edit so
+   it sits in its own right-hand slot and can't be mis-clicked (audit #2/#46).
+   Only bites when the LAST control is destructive. */
+.row-actions > form.inline-form:last-child,
+.row-actions > .btn-danger:last-child { margin-left: auto; }
 .report .inline-form { display: inline; margin: 0; }
 .report input { padding: 0.35rem 0.5rem; }
 
