@@ -196,11 +196,7 @@ export default function ProjectDetailPage() {
             {project.project_code}
           </span>
         )}
-        {project.project_type && (
-          <span className={`text-xs px-2 py-1 rounded ${TYPE_BADGE[project.project_type] ?? ''}`}>
-            {project.project_type}
-          </span>
-        )}
+        <EditableType value={project.project_type} onSave={v => updateProject.mutate({ id, updates: { project_type: v as 'PS' | 'B2B' | 'Rerun' } })} />
         <span
           className={`text-xs px-2 py-1 rounded ${
             project.status === 'Open'
@@ -1175,6 +1171,37 @@ function EditableTitle({ value, onSave }: { value: string; onSave: (next: string
     >
       {value}
     </h1>
+  )
+}
+
+function EditableType({ value, onSave }: { value: string | null; onSave: (next: string) => void }) {
+  const [editing, setEditing] = useState(false)
+  if (editing) {
+    return (
+      <select
+        autoFocus
+        defaultValue={value ?? ''}
+        onChange={e => { if (e.target.value) onSave(e.target.value); setEditing(false) }}
+        onBlur={() => setEditing(false)}
+        className="text-xs px-1.5 py-1 rounded border border-border bg-background focus:outline-none focus:border-ring"
+      >
+        <option value="" disabled>Type…</option>
+        <option value="PS">PS</option>
+        <option value="B2B">B2B</option>
+        <option value="Rerun">Rerun</option>
+      </select>
+    )
+  }
+  return (
+    <button
+      onClick={() => setEditing(true)}
+      title="Click to change project type"
+      className={`text-xs px-2 py-1 rounded cursor-pointer hover:opacity-80 transition-opacity ${
+        value ? (TYPE_BADGE[value] ?? '') : 'border border-dashed border-border text-muted-foreground'
+      }`}
+    >
+      {value ?? '+ type'}
+    </button>
   )
 }
 
