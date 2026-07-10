@@ -7,6 +7,10 @@
   --accent-bg: #eff6ff;
   --accent-bg-strong: #e0ecff;
   --border: #e5e7eb;
+  /* A more defined edge for cards/tiles so white surfaces don't dissolve
+     into the near-white page background. Stronger than --border, which
+     stays subtle for tables/inputs. */
+  --card-border: #cbd2dc;
   --card: #ffffff;
   --surface-2: #fafafa;
   --skeleton-hi: #eef1f4;
@@ -39,6 +43,7 @@
     --accent-bg: #17233b;
     --accent-bg-strong: #1f3255;
     --border: #2a313c;
+    --card-border: #3a4350;
     --card: #161a20;
     --surface-2: #1b2028;
     --skeleton-hi: #232a34;
@@ -68,6 +73,7 @@
   --accent-bg: #17233b;
   --accent-bg-strong: #1f3255;
   --border: #2a313c;
+  --card-border: #3a4350;
   --card: #161a20;
   --surface-2: #1b2028;
   --skeleton-hi: #232a34;
@@ -433,7 +439,7 @@ h3 { font-size: 1rem; }
 }
 .panel {
   background: var(--card);
-  border: 1px solid var(--border);
+  border: 1px solid var(--card-border);
   border-radius: 10px;
   padding: 1.25rem;
   box-shadow: var(--shadow);
@@ -450,7 +456,7 @@ h3 { font-size: 1rem; }
 .hub-link {
   display: block;
   background: var(--card);
-  border: 1px solid var(--border);
+  border: 1px solid var(--card-border);
   border-radius: 8px;
   padding: 0.9rem 1rem;
   margin-bottom: 0.75rem;
@@ -479,7 +485,7 @@ h3 { font-size: 1rem; }
 
 .card {
   background: var(--card);
-  border: 1px solid var(--border);
+  border: 1px solid var(--card-border);
   border-radius: 8px;
   padding: 1rem 1.1rem;
   margin-bottom: 1rem;
@@ -961,6 +967,25 @@ th .info-pop::after {
   border-radius: 6px;
 }
 .ledger-control-actions { display: flex; gap: 0.4rem; }
+/* Draggable data-column headers (name + actions columns stay pinned). */
+.ledger-table th.ledger-th-move {
+  cursor: grab;
+  user-select: none;
+  white-space: nowrap;
+}
+.ledger-table th.ledger-th-move:active { cursor: grabbing; }
+.ledger-table th.ledger-th-move.is-drop {
+  outline: 2px dashed var(--accent);
+  outline-offset: -2px;
+  background: var(--accent-bg);
+}
+.ledger-th-grip {
+  color: var(--muted);
+  opacity: 0.45;
+  margin-right: 0.35rem;
+  font-size: 0.85em;
+  cursor: grab;
+}
 .ledger-table .ledger-contract td { background: var(--surface-2); font-weight: 600; }
 .ledger-table .ledger-contract .tag { font-weight: 600; margin-right: 0.4rem; }
 .ledger-table .ledger-indent { padding-left: 2.2rem; }

@@ -19,7 +19,6 @@ export default async function HomePage() {
 
       {userEmail ? (
         <>
-          <p className="hub-eyebrow">Record a transaction</p>
           {/* Tiles use default <Link> prefetch + per-route loading.tsx for an
               instant shell; LinkPending gives immediate click feedback. Do
               not set prefetch={false} (it would kill the instant shell). */}
