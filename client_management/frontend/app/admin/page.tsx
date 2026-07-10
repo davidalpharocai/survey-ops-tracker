@@ -66,6 +66,11 @@ export default async function AdminHubPage() {
             <span className="hub-link-sub">Manage the salespeople clients are assigned to · set emails to power the &ldquo;my clients&rdquo; dashboard view.</span>
             <LinkPending />
           </Link>
+          <Link className="hub-link" href="/admin/impersonate">
+            <span className="hub-link-title">View as user</span>
+            <span className="hub-link-sub">See CCM exactly as a teammate does — confirm a salesperson only sees their own clients. Read-only.</span>
+            <LinkPending />
+          </Link>
         </section>
       </div>
     </>

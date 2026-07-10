@@ -5,7 +5,7 @@
 // returned in camelCase, and ISO date strings are revived into `Date`
 // objects so the formatters in lib/format.ts keep working unchanged.
 
-import { cookies } from 'next/headers';
+import { cookies, headers as nextHeaders } from 'next/headers';
 
 import type {
   Balance,
@@ -97,6 +97,11 @@ async function request<T>(
   };
   if (SHARED_SECRET) headers['X-Internal-Auth'] = SHARED_SECRET;
   if (idToken) headers.Authorization = `Bearer ${idToken}`;
+  // Propagate the impersonation marker (set by middleware only for an admin
+  // with an active "view as user" session). The backend rejects writes while
+  // it is present, so an admin can never mutate data as someone else.
+  const impersonatedBy = (await nextHeaders()).get('x-impersonated-by') || '';
+  if (impersonatedBy) headers['X-Impersonated-By'] = impersonatedBy;
   const res = await fetch(BASE + path, {
     method,
     headers,

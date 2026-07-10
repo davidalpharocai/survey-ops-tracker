@@ -103,3 +103,12 @@ export async function currentUserIsApprover(): Promise<boolean> {
 export async function currentUserIsRestricted(): Promise<boolean> {
   return (await currentUserRole()) === 'restricted';
 }
+
+// The real admin's email when an admin is viewing the app AS another user,
+// otherwise null. Set by middleware as `x-impersonated-by` — while it is
+// present, currentUserEmail()/Role()/IsAdmin() all reflect the IMPERSONATED
+// user, so the whole UI renders exactly as that user sees it.
+export async function currentImpersonatedBy(): Promise<string | null> {
+  const h = await headers();
+  return h.get('x-impersonated-by');
+}

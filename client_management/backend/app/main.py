@@ -80,12 +80,42 @@ app.add_middleware(
     allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "X-User-Email"],
+    allow_headers=[
+        "Authorization",
+        "Content-Type",
+        "X-User-Email",
+        "X-Impersonated-By",
+    ],
 )
 
 # Audit every mutating request (writes + denied attempts) as a structured
 # CloudWatch log line for the S3/Athena audit trail.
 app.add_middleware(AuditMiddleware)
+
+
+@app.middleware("http")
+async def _impersonation_readonly(request: Request, call_next):
+    """Block writes while an admin is viewing the app as another user.
+
+    The frontend sets ``X-Impersonated-By`` (the real admin's email) only
+    when an admin has an active impersonation session. Any mutating method
+    carrying that header is rejected so an admin can never change data while
+    wearing someone else's identity; reads pass through so they can confirm
+    the impersonated user's scoped view.
+    """
+    if request.headers.get("x-impersonated-by") and request.method not in (
+        "GET",
+        "HEAD",
+        "OPTIONS",
+    ):
+        return JSONResponse(
+            status_code=403,
+            content={
+                "detail": "You're viewing as another user (read-only). "
+                "Exit to make changes."
+            },
+        )
+    return await call_next(request)
 
 app.include_router(health.router)
 app.include_router(me.router)

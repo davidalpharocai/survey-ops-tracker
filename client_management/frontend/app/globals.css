@@ -649,6 +649,25 @@ h3 { font-size: 1rem; }
 @media (max-width: 620px) { .sp-new { grid-template-columns: 1fr; } }
 .inline-add { margin: -0.2rem 0 0.2rem; }
 
+/* Impersonation ("view as user") */
+.imp-banner {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 0.5rem 1rem;
+  background: var(--warn-bg, #fff4e5);
+  color: var(--warn-fg, #7a4b00);
+  border-bottom: 1px solid var(--warn-border, #e0a969);
+  font-size: 0.9rem;
+}
+.imp-banner-text strong { font-weight: 700; }
+.impersonate-quick { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+
 label {
   display: flex;
   flex-direction: column;

@@ -3,7 +3,13 @@ import './globals.css';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 
-import { currentUserEmail, currentUserIsAdmin, currentUserIsApprover } from '../lib/auth';
+import {
+  currentImpersonatedBy,
+  currentUserEmail,
+  currentUserIsAdmin,
+  currentUserIsApprover,
+} from '../lib/auth';
+import ImpersonationBanner from './_components/ImpersonationBanner';
 import NavRibbon from './_components/NavRibbon';
 import SearchBox from './_components/SearchBox';
 import ThemeToggle from './_components/ThemeToggle';
@@ -18,10 +24,11 @@ export const metadata = {
 const THEME_INIT = `(function(){try{var t=localStorage.getItem('ccm-theme');if(t==='dark'||t==='light'){document.documentElement.setAttribute('data-theme',t);}}catch(e){}})();`;
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
-  const [userEmail, isAdmin, isApprover] = await Promise.all([
+  const [userEmail, isAdmin, isApprover, impersonatedBy] = await Promise.all([
     currentUserEmail(),
     currentUserIsAdmin(),
     currentUserIsApprover(),
+    currentImpersonatedBy(),
   ]);
   return (
     <html lang="en" suppressHydrationWarning>
@@ -53,6 +60,9 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
             </>
           )}
         </header>
+        {impersonatedBy && userEmail && (
+          <ImpersonationBanner viewingAs={userEmail} by={impersonatedBy} />
+        )}
         <main>{children}</main>
       </body>
     </html>
