@@ -19,6 +19,18 @@ const CAP = 8;
 const PULSE_TIP =
   'A quick read on your clients: who is negative or running low, and whose contracts renew soon. “My clients” shows the ones assigned to you; switch to “All clients” to see everyone. Nothing is hidden — this is just a filter.';
 
+// Every number/section respects the My/All toggle above.
+const KPI_TIPS = {
+  negative: 'How many clients have a credit or dollar balance below zero (over-drawn). Counts the clients shown by the toggle above.',
+  low: 'How many clients are projected to run out of credits or dollars within about 60 days, based on their recent burn rate.',
+  renewals30: 'How many contracts have a renewal date within the next 30 days.',
+  cyValue: 'Total dollar value of contracts dated this calendar year, summed across the clients shown.',
+};
+const ATTENTION_TIP =
+  'Your call-today list: clients that are over-drawn or running low, worst first. Click a client to open their contracts & surveys.';
+const RENEWALS_TIP =
+  'Contracts coming up for renewal, soonest first. Click a client to open their contracts & surveys.';
+
 function statusChip(status: BalanceHealthRow['status']) {
   if (status === 'negative') return <span className="pulse-chip is-neg">Negative</span>;
   if (status === 'low') return <span className="pulse-chip is-low">Low</span>;
@@ -85,19 +97,19 @@ export default function ClientPulseView({
 
       <div className="pulse-kpis">
         <div className="pulse-kpi">
-          <span className="pulse-kpi-label">Clients negative</span>
+          <span className="pulse-kpi-label">Clients negative <InfoTooltip text={KPI_TIPS.negative} align="left" /></span>
           <span className="pulse-kpi-value is-neg">{kpis.negative}</span>
         </div>
         <div className="pulse-kpi">
-          <span className="pulse-kpi-label">Running low &lt; 60d</span>
+          <span className="pulse-kpi-label">Running low &lt; 60d <InfoTooltip text={KPI_TIPS.low} /></span>
           <span className="pulse-kpi-value is-low">{kpis.low}</span>
         </div>
         <div className="pulse-kpi">
-          <span className="pulse-kpi-label">Renewals in 30d</span>
+          <span className="pulse-kpi-label">Renewals in 30d <InfoTooltip text={KPI_TIPS.renewals30} /></span>
           <span className="pulse-kpi-value is-accent">{kpis.renewals30}</span>
         </div>
         <div className="pulse-kpi">
-          <span className="pulse-kpi-label">This-year $ value</span>
+          <span className="pulse-kpi-label">This-year $ value <InfoTooltip text={KPI_TIPS.cyValue} align="right" /></span>
           <span className="pulse-kpi-value">{dollars(kpis.cyValue)}</span>
         </div>
       </div>
@@ -111,7 +123,7 @@ export default function ClientPulseView({
         <div className="pulse-cards">
           <div className="panel pulse-panel">
             <div className="pulse-panel-head">
-              <h3>Needs attention</h3>
+              <h3>Needs attention <InfoTooltip text={ATTENTION_TIP} /></h3>
               <Link href="/reports/health" className="pulse-viewall">Balance health →</Link>
             </div>
             {attention.length ? (
@@ -149,7 +161,7 @@ export default function ClientPulseView({
 
           <div className="panel pulse-panel">
             <div className="pulse-panel-head">
-              <h3>Renewals due</h3>
+              <h3>Renewals due <InfoTooltip text={RENEWALS_TIP} /></h3>
               <Link href="/reports/renewals" className="pulse-viewall">Renewal radar →</Link>
             </div>
             {dueSoon.length ? (
