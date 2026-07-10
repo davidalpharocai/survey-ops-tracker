@@ -1,7 +1,7 @@
 import Link from 'next/link';
 
 import { apiForRequest } from '../../lib/action';
-import { currentUserEmail } from '../../lib/auth';
+import { currentUserEmail, currentUserIsRestricted } from '../../lib/auth';
 import type { ContractListRow } from '../../lib/types';
 import TxnListView from '../_components/TxnListView';
 
@@ -10,8 +10,9 @@ export const metadata = { title: 'Contracts · AlphaROC' };
 
 export default async function ContractsPage() {
   const api = await apiForRequest();
-  const [email, rows] = await Promise.all([
+  const [email, restricted, rows] = await Promise.all([
     currentUserEmail(),
+    currentUserIsRestricted(),
     api.listAllContracts().catch(() => [] as ContractListRow[]),
   ]);
 
@@ -23,7 +24,7 @@ export default async function ContractsPage() {
         Every contract across all clients. Add a new one with the button, or switch to
         <strong> My contracts</strong> to focus on your own clients.
       </p>
-      <TxnListView kind="contract" email={email} rows={rows} />
+      <TxnListView kind="contract" email={email} rows={rows} canCreate={!restricted} />
     </>
   );
 }

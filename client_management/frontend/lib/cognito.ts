@@ -37,6 +37,39 @@ export function isAdminIdentity(email: string, groups: string[]): boolean {
   return ADMIN_EMAILS.has(email.trim().toLowerCase()) || groups.includes(ADMIN_GROUP);
 }
 
+// Role allow-lists mirroring the backend (config.py) so both tiers agree.
+const APPROVER_GROUP = process.env.COGNITO_APPROVER_GROUP || 'ccm-credit-approvers';
+const FULL_ACCESS_GROUP = process.env.COGNITO_FULL_ACCESS_GROUP || 'ccm-staff';
+const APPROVER_EMAILS = new Set(
+  (process.env.CCM_CREDIT_APPROVER_EMAILS ||
+    'vineet@alpharoc.ai,shanu@alpharoc.ai,david@alpharoc.ai')
+    .split(',').map(e => e.trim().toLowerCase()).filter(Boolean),
+);
+const FULL_ACCESS_EMAILS = new Set(
+  (process.env.CCM_FULL_ACCESS_EMAILS || '')
+    .split(',').map(e => e.trim().toLowerCase()).filter(Boolean),
+);
+
+export type Role = 'admin' | 'approver' | 'full_access' | 'restricted';
+
+/** Whether an identity may approve credit requests. */
+export function isApproverIdentity(email: string, groups: string[]): boolean {
+  return APPROVER_EMAILS.has(email.trim().toLowerCase()) || groups.includes(APPROVER_GROUP);
+}
+
+/** Whether an identity reads all clients without being an admin. */
+export function isFullAccessIdentity(email: string, groups: string[]): boolean {
+  return FULL_ACCESS_EMAILS.has(email.trim().toLowerCase()) || groups.includes(FULL_ACCESS_GROUP);
+}
+
+/** Resolve the identity to one role (admin > approver > full_access > restricted). */
+export function resolveRole(email: string, groups: string[]): Role {
+  if (isAdminIdentity(email, groups)) return 'admin';
+  if (isApproverIdentity(email, groups)) return 'approver';
+  if (isFullAccessIdentity(email, groups)) return 'full_access';
+  return 'restricted';
+}
+
 // CLIENT_SECRET is only used server-side (token exchange); do not gate
 // COGNITO_ENABLED on it — Edge middleware never has access to the secret.
 export const COGNITO_ENABLED = Boolean(DOMAIN && ISSUER && CLIENT_ID);
@@ -56,6 +89,7 @@ function getJwks(): ReturnType<typeof createRemoteJWKSet> {
 export interface VerifiedUser {
   email: string;
   isAdmin: boolean;
+  role: Role;
   claims: JWTPayload;
 }
 
@@ -81,7 +115,12 @@ export async function verifyIdToken(token: string | undefined): Promise<Verified
     const email = String(payload.email || '').toLowerCase();
     if (!email || !email.endsWith('@' + ALLOWED_DOMAIN)) return null;
 
-    return { email, isAdmin: isAdminIdentity(email, groups), claims: payload };
+    return {
+      email,
+      isAdmin: isAdminIdentity(email, groups),
+      role: resolveRole(email, groups),
+      claims: payload,
+    };
   } catch {
     return null;
   }

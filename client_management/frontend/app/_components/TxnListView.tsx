@@ -18,11 +18,12 @@ const TIP =
   'Shows the records for clients whose salesperson is you (matched by your sign-in email). It is only a filter — switch to “All” to see everyone. Your choice is remembered on this device.';
 
 type Props =
-  | { kind: 'study'; email: string; rows: StudyListRow[] }
-  | { kind: 'contract'; email: string; rows: ContractListRow[] };
+  | { kind: 'study'; email: string; rows: StudyListRow[]; canCreate?: boolean }
+  | { kind: 'contract'; email: string; rows: ContractListRow[]; canCreate?: boolean };
 
 export default function TxnListView(props: Props) {
   const { kind, email } = props;
+  const canCreate = props.canCreate !== false;
   const noun = kind === 'study' ? 'studies' : 'contracts';
   const lsKey = `ccm-${noun}-mode`;
   const newHref = kind === 'study' ? '/studies/new' : '/contracts/new';
@@ -65,7 +66,11 @@ export default function TxnListView(props: Props) {
   return (
     <div className="txnlist">
       <div className="list-head">
-        <Link className="btn" href={newHref}>{newLabel}</Link>
+        {canCreate ? (
+          <Link className="btn" href={newHref}>{newLabel}</Link>
+        ) : kind === 'contract' ? (
+          <Link className="btn" href="/credit-requests/new">+ Request credits</Link>
+        ) : null}
         <input
           type="search"
           className="ledger-search"
@@ -156,7 +161,9 @@ export default function TxnListView(props: Props) {
                       <td className="num">{Number(c.dollarsAmount) ? dollars(c.dollarsAmount) : '—'}</td>
                       <td>{c.renewalOn ? isoDate(c.renewalOn) : '—'}</td>
                       <td className="row-actions">
-                        <Link className="btn-sm" href={`/contracts/new?client_id=${c.client.id}#c${c.id}`}>Edit</Link>
+                        {canCreate && (
+                          <Link className="btn-sm" href={`/contracts/new?client_id=${c.client.id}#c${c.id}`}>Edit</Link>
+                        )}
                       </td>
                     </tr>
                   ))}

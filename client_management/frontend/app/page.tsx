@@ -1,16 +1,22 @@
 import Link from 'next/link';
 import { Suspense } from 'react';
 
-import { currentUserEmail } from '../lib/auth';
+import {
+  currentUserEmail,
+  currentUserIsApprover,
+  currentUserIsRestricted,
+} from '../lib/auth';
 import ClientPulse from './_components/ClientPulse';
 import LinkPending from './_components/LinkPending';
 
 export const metadata = { title: 'AlphaROC Credit Management' };
 
-const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || '';
-
 export default async function HomePage() {
-  const userEmail = await currentUserEmail();
+  const [userEmail, isRestricted, isApprover] = await Promise.all([
+    currentUserEmail(),
+    currentUserIsRestricted(),
+    currentUserIsApprover(),
+  ]);
 
   return (
     <div className="hub">
@@ -27,11 +33,19 @@ export default async function HomePage() {
               <span className="hub-link-sub">Log a survey that draws down a client&apos;s credits or dollars, attributed to one of their contacts.</span>
               <LinkPending />
             </Link>
-            <Link className="hub-action" href="/contracts/new">
-              <span className="hub-link-title">Add a Contract</span>
-              <span className="hub-link-sub">Top up a client&apos;s available credits and/or dollars — funds their studies.</span>
-              <LinkPending />
-            </Link>
+            {isRestricted ? (
+              <Link className="hub-action" href="/credit-requests/new">
+                <span className="hub-link-title">Request Credits</span>
+                <span className="hub-link-sub">Ask an approver to add credits or dollars to one of your clients.</span>
+                <LinkPending />
+              </Link>
+            ) : (
+              <Link className="hub-action" href="/contracts/new">
+                <span className="hub-link-title">Add a Contract</span>
+                <span className="hub-link-sub">Top up a client&apos;s available credits and/or dollars — funds their studies.</span>
+                <LinkPending />
+              </Link>
+            )}
           </div>
 
           {/* Client Pulse dashboard — reuses the existing report endpoints;
@@ -64,12 +78,25 @@ export default async function HomePage() {
                 <span className="hub-link-sub">Search and browse every contact across all clients.</span>
                 <LinkPending />
               </Link>
-              <Link className="hub-link" href="/salespeople">
-                <span className="hub-link-title">Salespeople</span>
-                <span className="hub-link-sub">Manage the salespeople clients are assigned to · set emails to power the &ldquo;my clients&rdquo; dashboard view.</span>
-                <LinkPending />
-              </Link>
+              {!isRestricted && (
+                <Link className="hub-link" href="/salespeople">
+                  <span className="hub-link-title">Salespeople</span>
+                  <span className="hub-link-sub">Manage the salespeople clients are assigned to · set emails to power the &ldquo;my clients&rdquo; dashboard view.</span>
+                  <LinkPending />
+                </Link>
+              )}
             </section>
+
+            {isApprover && (
+              <section className="panel">
+                <h2>Approvals</h2>
+                <Link className="hub-link" href="/approvals">
+                  <span className="hub-link-title">Credit Approvals</span>
+                  <span className="hub-link-sub">Review and approve the sales team&apos;s requests to add credits to clients.</span>
+                  <LinkPending />
+                </Link>
+              </section>
+            )}
           </div>
         </>
       ) : (

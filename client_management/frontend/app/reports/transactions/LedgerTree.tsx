@@ -136,7 +136,7 @@ function StudyRow({
   );
 }
 
-export default function LedgerTree({ ledger, clientId }: { ledger: Ledger; clientId: number }) {
+export default function LedgerTree({ ledger, clientId, canEditMoney = true }: { ledger: Ledger; clientId: number; canEditMoney?: boolean }) {
   const [q, setQ] = useState('');
   const [collapsed, setCollapsed] = useState<Set<number>>(new Set());
 
@@ -274,12 +274,16 @@ export default function LedgerTree({ ledger, clientId }: { ledger: Ledger; clien
                   </td>
                   {dataCells(order, 'contract', c)}
                   <td className="row-actions">
-                    <Link className="btn-sm" href={`/contracts/new?client_id=${clientId}#c${c.id}`}>Edit</Link>
-                    {canDelete ? (
-                      <DeleteConfirm action={deleteLedgerContractAction} id={c.id} clientId={clientId} name={c.name} />
-                    ) : (
-                      <span className="muted small" title="Unlink or archive its surveys first">has surveys</span>
-                    )}
+                    {canEditMoney ? (
+                      <>
+                        <Link className="btn-sm" href={`/contracts/new?client_id=${clientId}#c${c.id}`}>Edit</Link>
+                        {canDelete ? (
+                          <DeleteConfirm action={deleteLedgerContractAction} id={c.id} clientId={clientId} name={c.name} />
+                        ) : (
+                          <span className="muted small" title="Unlink or archive its surveys first">has surveys</span>
+                        )}
+                      </>
+                    ) : null}
                   </td>
                 </tr>
                 {!isCollapsed && c.studies.map((s) => <StudyRow key={s.id} s={s} clientId={clientId} order={order} />)}

@@ -53,6 +53,26 @@ export interface UserListRow {
   client: { id: number; name: string };
 }
 
+export type CreditRequestStatus = 'pending' | 'approved' | 'rejected' | 'canceled';
+
+// Credit-approval queue row (GET /api/credit-requests).
+export interface CreditRequest {
+  id: number;
+  clientId: number;
+  transactionId?: number | null;
+  creditsDelta: number;
+  dollarsDelta: number;
+  note: string;
+  status: CreditRequestStatus;
+  requestedByEmail: string;
+  createdAt: Date;
+  decidedByEmail?: string | null;
+  decidedAt?: Date | null;
+  decisionNote?: string | null;
+  resultingTransactionId?: number | null;
+  client?: Client;
+}
+
 // GET /api/users/{id}/studies — a contact and the surveys they requested.
 export interface ContactStudies {
   contact: ClientUser;

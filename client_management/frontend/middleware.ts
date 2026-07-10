@@ -15,8 +15,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
   COGNITO_ENABLED,
   COOKIE_ID_TOKEN,
-  isAdminIdentity,
+  resolveRole,
   verifyIdToken,
+  type Role,
 } from './lib/cognito';
 
 const ALLOWED_DOMAIN = process.env.ALLOWED_DOMAIN || 'alpharoc.ai';
@@ -68,10 +69,11 @@ function basicAuthGate(req: NextRequest): NextResponse | { email: string } {
   return { email };
 }
 
-function forward(req: NextRequest, email: string, isAdmin: boolean): NextResponse {
+function forward(req: NextRequest, email: string, role: Role): NextResponse {
   const headers = new Headers(req.headers);
   headers.set('x-user-email', email);
-  headers.set('x-user-admin', isAdmin ? '1' : '0');
+  headers.set('x-user-admin', role === 'admin' ? '1' : '0');
+  headers.set('x-user-role', role);
   return NextResponse.next({ request: { headers } });
 }
 
@@ -84,7 +86,7 @@ export async function middleware(req: NextRequest): Promise<NextResponse> {
   if (!COGNITO_ENABLED && BASIC_AUTH_PASSWORD) {
     const result = basicAuthGate(req);
     if (result instanceof NextResponse) return result;
-    return forward(req, result.email, isAdminIdentity(result.email, []));
+    return forward(req, result.email, resolveRole(result.email, []));
   }
 
   if (!COGNITO_ENABLED) {
@@ -98,7 +100,7 @@ export async function middleware(req: NextRequest): Promise<NextResponse> {
     ) {
       // Local dev has no IdP; admin rights follow the CCM_ADMIN_EMAILS
       // allow-list (same as production), not an automatic grant.
-      return forward(req, devEmail, isAdminIdentity(devEmail, []));
+      return forward(req, devEmail, resolveRole(devEmail, []));
     }
     return new NextResponse(
       'Auth not configured. Set Cognito env vars, or DEV_USER_EMAIL for local dev.',
@@ -115,7 +117,7 @@ const loginUrl = new URL(req.nextUrl.basePath + '/login', req.url);
     return NextResponse.redirect(loginUrl);
   }
 
-  return forward(req, user.email, user.isAdmin);
+  return forward(req, user.email, user.role);
 }
 
 export const config = {

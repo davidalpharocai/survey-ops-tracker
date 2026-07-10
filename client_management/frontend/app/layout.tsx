@@ -3,7 +3,7 @@ import './globals.css';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 
-import { currentUserEmail, currentUserIsAdmin } from '../lib/auth';
+import { currentUserEmail, currentUserIsAdmin, currentUserIsApprover } from '../lib/auth';
 import NavRibbon from './_components/NavRibbon';
 import SearchBox from './_components/SearchBox';
 import ThemeToggle from './_components/ThemeToggle';
@@ -18,9 +18,10 @@ export const metadata = {
 const THEME_INIT = `(function(){try{var t=localStorage.getItem('ccm-theme');if(t==='dark'||t==='light'){document.documentElement.setAttribute('data-theme',t);}}catch(e){}})();`;
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
-  const [userEmail, isAdmin] = await Promise.all([
+  const [userEmail, isAdmin, isApprover] = await Promise.all([
     currentUserEmail(),
     currentUserIsAdmin(),
+    currentUserIsApprover(),
   ]);
   return (
     <html lang="en" suppressHydrationWarning>
@@ -41,7 +42,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
           </Link>
           {/* Persistent primary nav; Admin entry only for admins. Also the
               future home of the global search box (roadmap ②). */}
-          {userEmail && <NavRibbon isAdmin={isAdmin} />}
+          {userEmail && <NavRibbon isAdmin={isAdmin} isApprover={isApprover} />}
           {userEmail && <SearchBox />}
           {userEmail ? (
             <UserMenu userEmail={userEmail} />

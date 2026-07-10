@@ -2,6 +2,7 @@ import Link from 'next/link';
 
 import { apiForRequest, parseId } from '../../../lib/action';
 import { onlyNotFound } from '../../../lib/api';
+import { currentUserIsRestricted } from '../../../lib/auth';
 import {
   contractValue,
   credits as creditsFmt,
@@ -59,6 +60,7 @@ export default async function TransactionsReportPage({ searchParams }: PageProps
   ].map(s => ({ id: s.id, name: s.name }));
 
   const currentYear = new Date().getUTCFullYear();
+  const restricted = await currentUserIsRestricted();
 
   return (
     <>
@@ -105,35 +107,41 @@ export default async function TransactionsReportPage({ searchParams }: PageProps
           </div>
 
           {hasRows ? (
-            <LedgerTree ledger={ledger} clientId={selected.id} />
+            <LedgerTree ledger={ledger} clientId={selected.id} canEditMoney={!restricted} />
           ) : (
             <p className="muted">No contracts or surveys yet for this client.</p>
           )}
 
-          <section className="panel" style={{ marginTop: 16 }}>
-            <h2>Add adjustment</h2>
-            <p className="muted small">
-              Corrections are recorded as new ledger rows — history is never
-              edited. Signed amounts: negative subtracts, positive adds.
+          {restricted ? (
+            <p className="muted" style={{ marginTop: 16 }}>
+              Need to add credits? <Link href="/credit-requests/new">Request credits</Link> — an approver will apply it to this client&apos;s balance.
             </p>
-            <form action={createAdjustmentAction} className="add-row-form">
-              <input type="hidden" name="client_id" value={selected.id} />
-              <label>Credits Δ
-                <input name="credits_delta" placeholder="e.g. -100" />
-              </label>
-              <label>Dollars Δ
-                <input name="dollars_delta" placeholder="e.g. 250" />
-              </label>
-              <label>Note
-                <input
-                  name="note"
-                  required
-                  placeholder="Why this correction is needed"
-                />
-              </label>
-              <SubmitButton className="btn" pendingLabel="Recording…">Record adjustment</SubmitButton>
-            </form>
-          </section>
+          ) : (
+            <section className="panel" style={{ marginTop: 16 }}>
+              <h2>Add adjustment</h2>
+              <p className="muted small">
+                Corrections are recorded as new ledger rows — history is never
+                edited. Signed amounts: negative subtracts, positive adds.
+              </p>
+              <form action={createAdjustmentAction} className="add-row-form">
+                <input type="hidden" name="client_id" value={selected.id} />
+                <label>Credits Δ
+                  <input name="credits_delta" placeholder="e.g. -100" />
+                </label>
+                <label>Dollars Δ
+                  <input name="dollars_delta" placeholder="e.g. 250" />
+                </label>
+                <label>Note
+                  <input
+                    name="note"
+                    required
+                    placeholder="Why this correction is needed"
+                  />
+                </label>
+                <SubmitButton className="btn" pendingLabel="Recording…">Record adjustment</SubmitButton>
+              </form>
+            </section>
+          )}
         </>
       ) : (
         <p className="muted">Pick a client above to see their contracts &amp; surveys.</p>

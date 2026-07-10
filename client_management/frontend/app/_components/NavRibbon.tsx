@@ -24,14 +24,19 @@ const LINKS: NavItem[] = [
 ];
 
 const ADMIN_LINK: NavItem = { href: '/admin', label: 'Admin' };
+const APPROVALS_LINK: NavItem = { href: '/approvals', label: 'Approvals' };
 
-export default function NavRibbon({ isAdmin }: { isAdmin: boolean }) {
+export default function NavRibbon({ isAdmin, isApprover }: { isAdmin: boolean; isApprover?: boolean }) {
   // usePathname() normally excludes basePath, but strip it defensively so
   // active-state works regardless of how the host reports the path.
   const raw = usePathname() || '/';
   const path = BASE && raw.startsWith(BASE) ? raw.slice(BASE.length) || '/' : raw;
 
-  const links = isAdmin ? [...LINKS, ADMIN_LINK] : LINKS;
+  const links = [
+    ...LINKS,
+    ...(isApprover ? [APPROVALS_LINK] : []),
+    ...(isAdmin ? [ADMIN_LINK] : []),
+  ];
 
   const isActive = (item: NavItem): boolean =>
     item.exact ? path === item.href : path === item.href || path.startsWith(item.href + '/');

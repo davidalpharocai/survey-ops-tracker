@@ -18,6 +18,7 @@ from app.routers import (
     contracts,
     credit_requests,
     health,
+    me,
     reports,
     salespeople,
     search,
@@ -87,6 +88,7 @@ app.add_middleware(
 app.add_middleware(AuditMiddleware)
 
 app.include_router(health.router)
+app.include_router(me.router)
 app.include_router(clients.router)
 app.include_router(users.router)
 app.include_router(contracts.router)

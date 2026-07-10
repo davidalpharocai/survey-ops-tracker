@@ -16,6 +16,7 @@ import type {
   ContactStudies,
   ContractTransaction,
   ContractListRow,
+  CreditRequest,
   Ledger,
   RenewalRow,
   Salesperson,
@@ -51,6 +52,7 @@ const DATE_KEYS = new Set([
   'occurredOn',
   'renewalOn',
   'cyRenewal',
+  'decidedAt',
 ]);
 
 /** Error carrying the backend's HTTP status and human-readable detail. */
@@ -195,6 +197,12 @@ export interface ApiClient {
 
   createAdjustment(d: Record<string, unknown>): Promise<AdjustmentResult>;
 
+  listCreditRequests(status?: string): Promise<CreditRequest[]>;
+  submitCreditRequest(d: Record<string, unknown>): Promise<CreditRequest>;
+  approveCreditRequest(id: number, note?: string): Promise<CreditRequest>;
+  rejectCreditRequest(id: number, note?: string): Promise<CreditRequest>;
+  cancelCreditRequest(id: number): Promise<CreditRequest>;
+
   listAuditLogs(filters: AuditLogFilters): Promise<AuditLogPage>;
 
   listArchived(): Promise<ArchiveList>;
@@ -318,6 +326,15 @@ export function api(userEmail: string): ApiClient {
     search: (q, limit = 6) => r('GET', `/api/search?q=${encodeURIComponent(q)}&limit=${limit}`),
 
     createAdjustment: d => r('POST', '/api/adjustments', d),
+
+    listCreditRequests: status =>
+      r('GET', `/api/credit-requests${status ? `?status=${encodeURIComponent(status)}` : ''}`),
+    submitCreditRequest: d => r('POST', '/api/credit-requests', d),
+    approveCreditRequest: (id, note) =>
+      r('POST', `/api/credit-requests/${id}/approve`, note != null ? { decision_note: note } : {}),
+    rejectCreditRequest: (id, note) =>
+      r('POST', `/api/credit-requests/${id}/reject`, note != null ? { decision_note: note } : {}),
+    cancelCreditRequest: id => r('POST', `/api/credit-requests/${id}/cancel`),
 
     listArchived: () => r('GET', '/api/admin/archive'),
     restoreArchived: d => r('POST', '/api/admin/archive/restore', d),

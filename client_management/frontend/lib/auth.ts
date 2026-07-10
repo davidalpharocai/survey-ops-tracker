@@ -16,7 +16,9 @@ import {
   COGNITO_ENABLED,
   COOKIE_ID_TOKEN,
   isAdminIdentity,
+  resolveRole,
   verifyIdToken,
+  type Role,
   type VerifiedUser,
 } from './cognito';
 
@@ -29,7 +31,7 @@ function devFallbackUser(): VerifiedUser | null {
   const email = (process.env.DEV_USER_EMAIL || '').toLowerCase();
   const domain = process.env.ALLOWED_DOMAIN || 'alpharoc.ai';
   if (!email.endsWith('@' + domain)) return null;
-  return { email, isAdmin: isAdminIdentity(email, []), claims: {} };
+  return { email, isAdmin: isAdminIdentity(email, []), role: resolveRole(email, []), claims: {} };
 }
 
 // Basic-Auth fallback, mirroring middleware.ts's gate: the browser
@@ -54,7 +56,7 @@ async function basicAuthFallbackUser(): Promise<VerifiedUser | null> {
   if (given !== password) return null;
   const domain = process.env.ALLOWED_DOMAIN || 'alpharoc.ai';
   if (!email.endsWith('@' + domain)) return null;
-  return { email, isAdmin: isAdminIdentity(email, []), claims: {} };
+  return { email, isAdmin: isAdminIdentity(email, []), role: resolveRole(email, []), claims: {} };
 }
 
 async function userFromCookie(): Promise<VerifiedUser | null> {
@@ -80,4 +82,24 @@ export async function currentUserIsAdmin(): Promise<boolean> {
   const fromHeader = h.get('x-user-admin');
   if (fromHeader !== null) return fromHeader === '1';
   return (await userFromCookie())?.isAdmin ?? false;
+}
+
+// The caller's role, set by middleware as `x-user-role` (falls back to the
+// cookie-derived identity). Drives UI gating; the backend stays authoritative.
+export async function currentUserRole(): Promise<Role> {
+  const h = await headers();
+  const fromHeader = h.get('x-user-role');
+  if (fromHeader) return fromHeader as Role;
+  return (await userFromCookie())?.role ?? 'restricted';
+}
+
+/** Whether the caller may approve credit requests (approver or admin). */
+export async function currentUserIsApprover(): Promise<boolean> {
+  const role = await currentUserRole();
+  return role === 'approver' || role === 'admin';
+}
+
+/** Whether the caller is a restricted salesperson (scoped to their clients). */
+export async function currentUserIsRestricted(): Promise<boolean> {
+  return (await currentUserRole()) === 'restricted';
 }
