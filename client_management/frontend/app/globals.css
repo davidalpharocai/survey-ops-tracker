@@ -1,33 +1,37 @@
+/* AlphaROC brand palette (navy + white + teal accent, navy-tinted ink scale).
+   Ink: 50 #F4F6FA · 100 #E7EBF1 · 300 #C2CAD8 · 500 #8A93A3 · 600 #5B6472 ·
+   700 #2A3550 · 900 #010B40. Teal accent #0076AF · data teal #0097A7 ·
+   teal tint #EAF6F6. Semantic tokens below map onto these. */
 :root {
-  --bg: #f7f7f8;
-  --fg: #1a1a1a;
-  --muted: #6b7280;
-  --accent: #2563eb;
-  --accent-hover: #1d4ed8;
-  --accent-bg: #eff6ff;
-  --accent-bg-strong: #e0ecff;
-  --border: #e5e7eb;
+  --bg: #f4f6fa;            /* ink-50 (surface-muted) */
+  --fg: #010b40;            /* navy (text-primary) */
+  --muted: #5b6472;         /* ink-600 (text-secondary) */
+  --accent: #0076af;        /* teal (link/primary) */
+  --accent-hover: #00618f;  /* darker teal */
+  --accent-bg: #eaf6f6;     /* teal tint (surface-tint) */
+  --accent-bg-strong: #d6ecee;
+  --border: #e7ebf1;        /* ink-100 */
   /* A more defined edge for cards/tiles so white surfaces don't dissolve
      into the near-white page background. Stronger than --border, which
      stays subtle for tables/inputs. */
-  --card-border: #cbd2dc;
-  --card: #ffffff;
-  --surface-2: #fafafa;
-  --skeleton-hi: #eef1f4;
-  --pos: #047857;
-  --neg: #b91c1c;
+  --card-border: #c2cad8;   /* ink-300 */
+  --card: #ffffff;          /* white */
+  --surface-2: #fafbfd;
+  --skeleton-hi: #e7ebf1;
+  --pos: #1f8a5b;           /* brand success */
+  --neg: #b42318;           /* brand destructive */
   --warn-bg: #fef3c7;
   --warn-fg: #92400e;
-  --danger: #dc2626;
-  --err-bg: #fef2f2;
-  --err-border: #fecaca;
-  --tag-contract-bg: #dbeafe; --tag-contract-fg: #1e40af;
-  --tag-study-bg: #fce7f3;    --tag-study-fg: #9d174d;
+  --danger: #b42318;
+  --err-bg: #fbeae8;
+  --err-border: #f3c9c3;
+  --tag-contract-bg: #eaf6f6; --tag-contract-fg: #0076af;
+  --tag-study-bg: #ddf0f2;    --tag-study-fg: #00707d;
   --tag-adj-bg: #fef3c7;      --tag-adj-fg: #92400e;
-  --tag-ok-bg: #d1fae5;       --tag-err-bg: #fee2e2;
+  --tag-ok-bg: #dcefe6;       --tag-err-bg: #fbe3e0;
   --pending-bg: #fffbeb;      --pending-border: #f59e0b;
-  --shadow: 0 1px 3px rgba(16, 24, 40, 0.12);
-  --shadow-md: 0 4px 14px rgba(16, 24, 40, 0.12);
+  --shadow: 0 1px 3px rgba(1, 11, 64, 0.10);
+  --shadow-md: 0 4px 14px rgba(1, 11, 64, 0.12);
   color-scheme: light;
 }
 
@@ -35,29 +39,29 @@
    Follow the OS by default; an explicit toggle (data-theme) always wins. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
-    --bg: #0f1216;
-    --fg: #e6e8ec;
-    --muted: #98a1af;
-    --accent: #5b9bf6;
-    --accent-hover: #7db0f8;
-    --accent-bg: #17233b;
-    --accent-bg-strong: #1f3255;
-    --border: #2a313c;
-    --card-border: #3a4350;
-    --card: #161a20;
-    --surface-2: #1b2028;
-    --skeleton-hi: #232a34;
-    --pos: #34d399;
-    --neg: #f87171;
+    --bg: #060c22;
+    --fg: #e6e9f2;
+    --muted: #98a1b5;
+    --accent: #3fa7d6;
+    --accent-hover: #63b9e0;
+    --accent-bg: #10273a;
+    --accent-bg-strong: #17364c;
+    --border: #232e4a;
+    --card-border: #33405f;
+    --card: #0f1836;
+    --surface-2: #0b1330;
+    --skeleton-hi: #1c2748;
+    --pos: #3fb883;
+    --neg: #e4695c;
     --warn-bg: #3a2f12;
     --warn-fg: #fcd34d;
-    --danger: #ef4444;
-    --err-bg: #2a1414;
-    --err-border: #5b2626;
-    --tag-contract-bg: #1e3a8a; --tag-contract-fg: #bfdbfe;
-    --tag-study-bg: #7d1d54;    --tag-study-fg: #fbcfe8;
+    --danger: #e4695c;
+    --err-bg: #2e1512;
+    --err-border: #5c2a24;
+    --tag-contract-bg: #0f2a3a; --tag-contract-fg: #8fd2ef;
+    --tag-study-bg: #0c343a;    --tag-study-fg: #7fdfe8;
     --tag-adj-bg: #3f320f;      --tag-adj-fg: #fde68a;
-    --tag-ok-bg: #0b3d2e;       --tag-err-bg: #4c1d1d;
+    --tag-ok-bg: #0b3d2e;       --tag-err-bg: #4a1e19;
     --pending-bg: #2a2410;      --pending-border: #b7791f;
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
     --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.5);
@@ -65,29 +69,29 @@
   }
 }
 :root[data-theme="dark"] {
-  --bg: #0f1216;
-  --fg: #e6e8ec;
-  --muted: #98a1af;
-  --accent: #5b9bf6;
-  --accent-hover: #7db0f8;
-  --accent-bg: #17233b;
-  --accent-bg-strong: #1f3255;
-  --border: #2a313c;
-  --card-border: #3a4350;
-  --card: #161a20;
-  --surface-2: #1b2028;
-  --skeleton-hi: #232a34;
-  --pos: #34d399;
-  --neg: #f87171;
+  --bg: #060c22;
+  --fg: #e6e9f2;
+  --muted: #98a1b5;
+  --accent: #3fa7d6;
+  --accent-hover: #63b9e0;
+  --accent-bg: #10273a;
+  --accent-bg-strong: #17364c;
+  --border: #232e4a;
+  --card-border: #33405f;
+  --card: #0f1836;
+  --surface-2: #0b1330;
+  --skeleton-hi: #1c2748;
+  --pos: #3fb883;
+  --neg: #e4695c;
   --warn-bg: #3a2f12;
   --warn-fg: #fcd34d;
-  --danger: #ef4444;
-  --err-bg: #2a1414;
-  --err-border: #5b2626;
-  --tag-contract-bg: #1e3a8a; --tag-contract-fg: #bfdbfe;
-  --tag-study-bg: #7d1d54;    --tag-study-fg: #fbcfe8;
+  --danger: #e4695c;
+  --err-bg: #2e1512;
+  --err-border: #5c2a24;
+  --tag-contract-bg: #0f2a3a; --tag-contract-fg: #8fd2ef;
+  --tag-study-bg: #0c343a;    --tag-study-fg: #7fdfe8;
   --tag-adj-bg: #3f320f;      --tag-adj-fg: #fde68a;
-  --tag-ok-bg: #0b3d2e;       --tag-err-bg: #4c1d1d;
+  --tag-ok-bg: #0b3d2e;       --tag-err-bg: #4a1e19;
   --pending-bg: #2a2410;      --pending-border: #b7791f;
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
   --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.5);
@@ -709,7 +713,7 @@ button:hover, .btn:hover { background: var(--accent-hover); }
   font-size: 0.85rem;
 }
 .btn-danger { background: var(--danger); }
-.btn-danger:hover { background: #991b1b; }
+.btn-danger:hover { background: #8f1c13; }
 
 .actions { display: flex; gap: 0.75rem; align-items: center; margin-top: 0.5rem; }
 .actions a, .actions button[type="button"] {
@@ -1045,7 +1049,7 @@ button:hover, .btn:hover { background: var(--accent-hover); }
   transform: translateX(-50%);
   width: max-content;
   max-width: 260px;
-  background: #111827;
+  background: #2a3550;
   color: #fff;
   padding: 0.5rem 0.65rem;
   border-radius: 6px;
@@ -1071,7 +1075,7 @@ button:hover, .btn:hover { background: var(--accent-hover); }
   left: 50%;
   transform: translateX(-50%);
   border: 5px solid transparent;
-  border-top-color: #111827;
+  border-top-color: #2a3550;
 }
 .info:hover .info-pop,
 .info:focus .info-pop,
@@ -1103,7 +1107,7 @@ th .info-pop::after {
   top: auto;
   bottom: 100%;
   border-top-color: transparent;
-  border-bottom-color: #111827;
+  border-bottom-color: #2a3550;
 }
 
 /* ---------- Mobile ---------- */
