@@ -35,10 +35,35 @@ export default function SearchBox() {
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
   const boxRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // ⌘K / Ctrl-K from anywhere focuses search; "/" focuses it too unless the
+  // user is already typing in a field. Search is the most-repeated action.
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        inputRef.current?.focus();
+        return;
+      }
+      if (e.key === '/' && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        const el = document.activeElement as HTMLElement | null;
+        const tag = el?.tagName;
+        if (tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT' && !el?.isContentEditable) {
+          e.preventDefault();
+          inputRef.current?.focus();
+        }
+      }
+    }
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, []);
 
   useEffect(() => {
     const term = q.trim();
-    if (!term) {
+    // Two-character floor: single letters match everything and each keystroke
+    // hits the (cold-start-prone) backend for no useful result.
+    if (term.length < 2) {
       setItems([]);
       setOpen(false);
       return;
@@ -98,6 +123,7 @@ export default function SearchBox() {
     <div className="search-box" ref={boxRef}>
       <span className="search-icon" aria-hidden="true">🔍</span>
       <input
+        ref={inputRef}
         type="search"
         className="search-input"
         placeholder="Search clients, studies, contacts…"

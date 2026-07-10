@@ -90,7 +90,7 @@ export default function ImportClient() {
           <h2>
             Preview — {plan.fileName}{' '}
             <span className="muted" style={{ fontWeight: 'normal', fontSize: '0.85em' }}>
-              (detected: {plan.format === 'socc' ? 'Survey Ops export' : 'CMS template'})
+              (detected: {plan.format === 'socc' ? 'Survey Ops export' : 'CCM import template'})
             </span>
           </h2>
           <p>

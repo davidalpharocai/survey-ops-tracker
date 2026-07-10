@@ -18,7 +18,7 @@ export default async function ImportPage() {
       <h1>Import Data</h1>
       <p className="muted">
         Upload a spreadsheet, review exactly what will change, then apply. Accepts the{' '}
-        <strong>CMS template</strong> (
+        <strong>CCM import template</strong> (
         <a href={`${BASE}/admin/import/template`} download>download blank template</a>
         ; the only format that carries costs and contract amounts) or a{' '}
         <strong>Survey Ops export</strong> (adds new clients/studies only — never

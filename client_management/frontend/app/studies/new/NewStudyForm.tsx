@@ -190,7 +190,7 @@ export default function NewStudyForm({ clientId, users, contracts }: Props) {
       </label>
 
       <div className="actions">
-        <SubmitButton disabled={disabled || !hasContact} pendingLabel="Publishing…">Publish study</SubmitButton>
+        <SubmitButton disabled={disabled || !hasContact} pendingLabel="Recording…">Record study</SubmitButton>
         {!disabled && !hasContact && (
           <span className="muted small">Select a contact above or add a new one.</span>
         )}

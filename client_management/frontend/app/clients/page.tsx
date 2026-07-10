@@ -114,7 +114,7 @@ export default async function ClientsPage({ searchParams }: PageProps) {
                   <Link href={`/reports/transactions?client_id=${selected.id}`}>Contracts &amp; Studies →</Link>
                   <Link href={`/contracts/new?client_id=${selected.id}`}>+ Add contract</Link>
                   <Link href={`/studies/new?client_id=${selected.id}`}>+ Add study</Link>
-                  <a href="#delete-client" className="quicklink-danger">Delete client…</a>
+                  <a href="#delete-client" className="quicklink-danger">Archive client…</a>
                 </p>
               </div>
 

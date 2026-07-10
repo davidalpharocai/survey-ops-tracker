@@ -159,7 +159,7 @@ export async function GET(): Promise<NextResponse> {
     `  Studies:      ${studyCount}`,
     `  Ledger rows:  ${txnCount}`,
     '',
-    'The .xlsx uses the CMS import template layout, so re-uploading it via',
+    'The .xlsx uses the CCM import template layout, so re-uploading it via',
     'Admin → Import Data reproduces this dataset (matched by name; existing',
     'rows update only changed fields; nothing is deleted).',
   ].join('\n');

@@ -39,7 +39,7 @@ export async function GET(): Promise<NextResponse> {
   const readme = wb.addWorksheet('Read Me');
   readme.getColumn(1).width = 110;
   const lines = [
-    'CMS import template — fill any or all of the four tabs, then upload at Admin → Import Data.',
+    'CCM import template — fill any or all of the four tabs, then upload at Admin → Import Data.',
     '',
     'Rules:',
     '• Rows are matched by name (client name; contract/study name within their client), case-insensitive.',

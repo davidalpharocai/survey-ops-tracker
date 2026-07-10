@@ -31,7 +31,7 @@ export default function NewClientDialog({
           <h2>New client</h2>
           <div className="form-grid">
             <label>Client name <input name="name" type="text" required autoFocus /></label>
-            <label>Became a client on <input name="became_on" type="date" defaultValue={today} required /></label>
+            <label>Client since <input name="became_on" type="date" defaultValue={today} required /></label>
             <label>Primary contact name <input name="primary_contact_name" type="text" /></label>
             <label>Primary contact cell <input name="primary_contact_cell" type="tel" /></label>
             <label>Primary contact email <input name="primary_contact_email" type="email" /></label>
