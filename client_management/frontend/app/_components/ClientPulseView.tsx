@@ -9,7 +9,7 @@ import {
   ownsAny,
   type PulseMode,
 } from '../../lib/clientPulse';
-import { credits as creditsFmt, dollars, isoDate } from '../../lib/format';
+import { contractValue, credits as creditsFmt, dollars, isoDate } from '../../lib/format';
 import type { BalanceHealthRow, BalanceRow, RenewalRow } from '../../lib/types';
 import InfoTooltip from './InfoTooltip';
 
@@ -24,7 +24,7 @@ const KPI_TIPS = {
   negative: 'How many clients have a credit or dollar balance below zero (over-drawn). Counts the clients shown by the toggle above.',
   low: 'How many clients are projected to run out of credits or dollars within about 60 days, based on their recent burn rate.',
   renewals30: 'How many contracts have a renewal date within the next 30 days.',
-  cyValue: 'Total dollar value of contracts dated this calendar year, summed across the clients shown.',
+  cyValue: 'This calendar year’s contract value, summed across the clients shown — credits and/or dollars, since contracts can be denominated in either.',
 };
 const ATTENTION_TIP =
   'Your call-today list: clients that are over-drawn or running low, worst first. Click a client to open their contracts & surveys.';
@@ -109,8 +109,8 @@ export default function ClientPulseView({
           <span className="pulse-kpi-value is-accent">{kpis.renewals30}</span>
         </div>
         <div className="pulse-kpi">
-          <span className="pulse-kpi-label">This-year $ value <InfoTooltip text={KPI_TIPS.cyValue} align="right" /></span>
-          <span className="pulse-kpi-value">{dollars(kpis.cyValue)}</span>
+          <span className="pulse-kpi-label">This-year value <InfoTooltip text={KPI_TIPS.cyValue} align="right" /></span>
+          <span className="pulse-kpi-value">{contractValue(kpis.cyCredits, kpis.cyValue)}</span>
         </div>
       </div>
 

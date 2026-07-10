@@ -80,6 +80,7 @@ describe('computeKpis', () => {
       negative: 1,
       low: 2,
       renewals30: 1,
+      cyCredits: 0,
       cyValue: 1240,
     });
   });

@@ -41,6 +41,8 @@ export interface PulseKpis {
   low: number;
   /** Contract renewals due within 30 days. */
   renewals30: number;
+  /** Sum of current-year contract credits across the given clients. */
+  cyCredits: number;
   /** Sum of current-year dollar contract value across the given clients. */
   cyValue: number;
 }
@@ -55,6 +57,7 @@ export function computeKpis(
     negative: health.filter(h => h.status === 'negative').length,
     low: health.filter(h => h.status === 'low').length,
     renewals30: renewals.filter(r => r.daysUntil <= 30).length,
+    cyCredits: balances.reduce((sum, b) => sum + (Number(b.cyCredits) || 0), 0),
     cyValue: balances.reduce((sum, b) => sum + (Number(b.cyValue) || 0), 0),
   };
 }
