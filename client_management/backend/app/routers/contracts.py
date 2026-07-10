@@ -291,6 +291,7 @@ async def create_contract(
         dollars_delta=dollars_amount,
         actor_email=user,
         idem_key=idem,
+        description=(body.description or "").strip() or None,
     )
     client_name = client.name  # read before commit/rollback expires it
     session.add(t)
@@ -361,6 +362,10 @@ async def update_contract(
     t.renewal_on = renewal_on
     t.credits_delta = credits_amount
     t.dollars_delta = dollars_amount
+    # Preserve the description when the caller omits the field entirely (the
+    # compact inline edit row does not carry it); an explicit blank clears it.
+    if body.description is not None:
+        t.description = body.description.strip() or None
     t.updated_by_email = user
     t.updated_at = utc_now()
     await session.commit()

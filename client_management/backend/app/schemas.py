@@ -67,6 +67,7 @@ class ContractIn(BaseModel):
     renewal_on: str | None = None
     credits_amount: float | str | None = None
     dollars_amount: float | str | None = None
+    description: str | None = None
 
 
 class StudyIn(BaseModel):

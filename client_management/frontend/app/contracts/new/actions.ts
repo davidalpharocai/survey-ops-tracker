@@ -15,6 +15,7 @@ export async function createContractAction(formData: FormData): Promise<void> {
     renewal_on: formData.get('renewal_on'),
     credits_amount: formData.get('credits_amount'),
     dollars_amount: formData.get('dollars_amount'),
+    description: formData.get('description'),
   });
   revalidatePath('/', 'layout');
   redirectTo(`/contracts/new?client_id=${clientId}`);
@@ -32,6 +33,9 @@ export async function updateContractAction(formData: FormData): Promise<void> {
     renewal_on: formData.get('renewal_on'),
     credits_amount: formData.get('credits_amount'),
     dollars_amount: formData.get('dollars_amount'),
+    // Absent (compact inline row) → null → backend preserves the existing
+    // description; present but blank → clears it.
+    description: formData.get('description'),
   });
   revalidatePath('/', 'layout');
   redirectTo(`/contracts/new?client_id=${t.clientId}`);

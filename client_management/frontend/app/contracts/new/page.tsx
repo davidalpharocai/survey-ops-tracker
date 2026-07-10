@@ -83,6 +83,7 @@ export default async function NewContractPage({ searchParams }: PageProps) {
                       <th className="num">Credits</th>
                       <th className="num">Dollars</th>
                       <th>Renewal</th>
+                      <th>Description</th>
                       <th></th>
                     </tr>
                   </thead>
@@ -108,6 +109,9 @@ export default async function NewContractPage({ searchParams }: PageProps) {
                           </td>
                           <td>
                             <input form={fid} name="renewal_on" type="date" defaultValue={t.renewalOn ? isoDate(t.renewalOn) : ''} required />
+                          </td>
+                          <td>
+                            <input form={fid} name="description" type="text" defaultValue={t.description || ''} placeholder="—" />
                           </td>
                           <td className="row-actions">
                             <button type="submit" form={fid} className="btn-sm">Save</button>
@@ -160,8 +164,13 @@ export default async function NewContractPage({ searchParams }: PageProps) {
             </div>
             <p className="muted small">Enter at least one of credits or dollars. Both are optional individually.</p>
 
+            <label>Description (optional)
+              <InfoTooltip text="A short note about this contract — scope, terms, or anything worth remembering." />
+              <textarea name="description" rows={2} placeholder="Short description of this contract" disabled={!selectedClient} />
+            </label>
+
             <div className="actions">
-              <SubmitButton disabled={!selectedClient} pendingLabel="Recording…">Record contract</SubmitButton>
+              <SubmitButton disabled={!selectedClient} pendingLabel="Saving…">Save Contract</SubmitButton>
             </div>
           </form>
 

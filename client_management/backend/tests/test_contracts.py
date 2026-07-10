@@ -239,3 +239,31 @@ async def test_contract_without_key_never_deduplicates(client, db):
         assert r.status_code == 201
     count = await db.fetchval("SELECT count(*) FROM transactions")
     assert count == 2
+
+
+async def test_contract_description_round_trip_edit_and_clear(client):
+    made = await make_client(client)
+    r = await client.post(
+        "/api/contracts",
+        json=_payload(made["id"], description="Annual master agreement"),
+        headers=ADMIN,
+    )
+    assert r.status_code == 201, r.text
+    cid = r.json()["id"]
+    assert r.json()["description"] == "Annual master agreement"
+
+    # Editing without the field (compact inline row omits it) preserves it.
+    r2 = await client.patch(
+        f"/api/contracts/{cid}", json=_payload(made["id"]), headers=ADMIN
+    )
+    assert r2.status_code == 200, r2.text
+    assert r2.json()["description"] == "Annual master agreement"
+
+    # An explicit blank clears it.
+    r3 = await client.patch(
+        f"/api/contracts/{cid}",
+        json=_payload(made["id"], description=""),
+        headers=ADMIN,
+    )
+    assert r3.status_code == 200, r3.text
+    assert r3.json()["description"] is None
