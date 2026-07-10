@@ -446,9 +446,11 @@ async def balance_health(
     """Burn rate and projected run-out for every client with activity.
 
     One row per ACTIVE client that has at least one ACTIVE transaction.
-    Monthly burn is the credits/dollars consumed by ACTIVE studies over
-    the trailing :data:`BURN_WINDOW_DAYS` days divided by 3; the run-out
-    date projects the current balance forward at that pace.
+    Monthly burn is the credits/dollars consumed by SINGLE (non-tracker)
+    studies over the trailing :data:`BURN_WINDOW_DAYS` days divided by 3;
+    the run-out date projects the current balance forward at that pace.
+    Recurring trackers book their full year as one lump at creation, so
+    they are excluded from burn (they still reduce the balance).
 
     Parameters
     ----------
@@ -466,8 +468,14 @@ async def balance_health(
         first, then low by soonest run-out, then ok by client name.
     """
     today = utc_today()
+    # Burn = trailing-window consumption by SINGLE studies only. Recurring
+    # trackers book their whole year as one lump at creation, so counting that
+    # lump would massively overstate burn (a monthly tracker booked this week
+    # would read as ~4x its true monthly rate) and project run-out far too
+    # soon. Trackers still reduce the balance; they just aren't ongoing burn.
     is_recent_study = (
         (Transaction.kind == "study")
+        & (Transaction.cadence.is_(None))
         & (Transaction.occurred_on >= today - timedelta(days=BURN_WINDOW_DAYS))
     )
     agg = {
