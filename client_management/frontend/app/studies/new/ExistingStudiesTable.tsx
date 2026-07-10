@@ -21,7 +21,7 @@ interface ColumnDef {
 const COLUMNS: ColumnDef[] = [
   { key: 'date', type: 'date', label: 'Date' },
   { key: 'name', type: 'text', label: 'Name' },
-  { key: 'users', type: 'text', label: 'Users' },
+  { key: 'users', type: 'text', label: 'Contacts' },
   { key: 'cadence', type: 'text', label: 'Cadence' },
   { key: 'costType', type: 'text', label: 'Cost type' },
   { key: 'costPerRun', type: 'num', label: 'Cost / run' },

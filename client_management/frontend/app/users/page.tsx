@@ -48,7 +48,7 @@ export default async function UsersPage({ searchParams }: PageProps) {
           <thead>
             <tr>
               <th>Client</th>
-              <th>User</th>
+              <th>Contact</th>
               <th>Email</th>
               <th></th>
             </tr>
@@ -69,7 +69,7 @@ export default async function UsersPage({ searchParams }: PageProps) {
           </tbody>
         </table>
       ) : (
-        <p className="muted">No users match those filters.</p>
+        <p className="muted">No contacts match those filters.</p>
       )}
     </>
   );

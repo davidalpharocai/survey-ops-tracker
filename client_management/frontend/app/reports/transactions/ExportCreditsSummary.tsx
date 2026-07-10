@@ -8,7 +8,7 @@ const COLS: { key: string; label: string }[] = [
   { key: 'date', label: 'Date' },
   { key: 'type', label: 'Type' },
   { key: 'name', label: 'Name' },
-  { key: 'contact', label: 'For user' },
+  { key: 'contact', label: 'Contact' },
   { key: 'credits', label: 'Credits' },
   { key: 'dollars', label: 'Dollars' },
   { key: 'renewal', label: 'Renewal' },

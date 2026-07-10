@@ -9,11 +9,11 @@ export const TIP = {
   relationshipManager:
     'The AlphaROC person who owns this client relationship (e.g. the salesperson). Shown on the balances report.',
   primaryContact:
-    'The main person to reach at the client. Optional, and separate from the “users” below who studies get attributed to.',
+    'The main person to reach at the client. Optional, and separate from the contacts below who studies get attributed to.',
 
-  // Client users
+  // Client contacts
   clientUser:
-    'A person on the client’s side. Every study is attributed to one of these users, so add the people who request work.',
+    'A person on the client’s side. Every study is attributed to one of these contacts, so add the people who request work.',
 
   // Contract
   contract:
@@ -39,7 +39,7 @@ export const TIP = {
   setupCost:
     'A one-time setup charge for recurring trackers, always in credits. Added once on top of the per-run costs. Leave 0 if none.',
   studyUser:
-    'The client-side person this study is for. Pick from this client’s users; it attributes the spend to them.',
+    'The client-side person this study is for. Pick from this client’s contacts; it attributes the spend to them.',
   studyContract:
     'Optionally roll this study up to one of the client’s contracts, so that contract shows its own remaining balance. Leave as “none” to keep the study Unassigned; it still draws down the client total either way.',
 

@@ -114,7 +114,7 @@ export default function TxnListView(props: Props) {
                     <th>Date</th>
                     <th>Client</th>
                     <th>Study</th>
-                    <th>For</th>
+                    <th>Contact</th>
                     <th className="num">Credits Δ</th>
                     <th className="num">Dollars Δ</th>
                     <th></th>

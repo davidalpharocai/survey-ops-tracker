@@ -56,7 +56,7 @@ interface ColumnDef {
 
 const COLUMNS: Record<DataColumnId, ColumnDef> = {
   forUser: {
-    header: 'For user',
+    header: 'Contact',
     thClass: '',
     contract: () => <td />,
     study: (s) => <td>{s.clientUser ? s.clientUser.name : ''}</td>,
