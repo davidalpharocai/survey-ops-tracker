@@ -126,6 +126,125 @@ async def client_balances(
     }
 
 
+@router.get("/clients/{client_id}/family")
+async def client_family(
+    client_id: int,
+    session: AsyncSession = Depends(get_session),
+    scope: AccessScope = Depends(require_scope),
+) -> dict:
+    """Parent/children rollup for a client (flat macro/micro view).
+
+    Returns the client, its parent (if any, and visible to the caller), its
+    visible children with balances, and a rollup summing the client's own
+    balance plus every visible child. ``partial`` is true when scoping hides
+    some children, so the UI can label the total "your clients in this family".
+    """
+    client = await scoped_client_or_404(session, client_id, scope)
+
+    parent = None
+    if client.parent_id is not None:
+        p = (
+            await session.execute(
+                select(Client).where(
+                    Client.id == client.parent_id,
+                    Client.deleted_at.is_(None),
+                    scope.client_filter(),
+                )
+            )
+        ).scalar_one_or_none()
+        if p is not None:
+            parent = {"id": p.id, "name": p.name}
+
+    total_children = (
+        await session.execute(
+            select(func.count()).select_from(Client).where(
+                Client.parent_id == client_id, Client.deleted_at.is_(None)
+            )
+        )
+    ).scalar_one()
+    visible_children = (
+        await session.execute(
+            select(Client)
+            .where(
+                Client.parent_id == client_id,
+                Client.deleted_at.is_(None),
+                scope.client_filter(),
+            )
+            .order_by(Client.name.asc())
+        )
+    ).scalars().all()
+    partial = total_children > len(visible_children)
+
+    soy, eoy, _ = current_year_window()
+    is_cy_contract = (
+        (Transaction.kind == "contract")
+        & (Transaction.occurred_on >= soy)
+        & (Transaction.occurred_on < eoy)
+    )
+    is_upcoming_renewal = (
+        (Transaction.kind == "contract")
+        & (Transaction.renewal_on.is_not(None))
+        & (Transaction.renewal_on >= utc_today())
+    )
+    ids = [client.id] + [c.id for c in visible_children]
+    agg = {
+        row.client_id: row
+        for row in await session.execute(
+            select(
+                Transaction.client_id.label("client_id"),
+                func.coalesce(func.sum(Transaction.credits_delta), 0).label("credits"),
+                func.coalesce(func.sum(Transaction.dollars_delta), 0).label("dollars"),
+                func.coalesce(func.sum(case((is_cy_contract, Transaction.credits_delta), else_=0)), 0).label("cy_credits"),
+                func.coalesce(func.sum(case((is_cy_contract, Transaction.dollars_delta), else_=0)), 0).label("cy_value"),
+                func.min(case((is_upcoming_renewal, Transaction.renewal_on))).label("cy_renewal"),
+            )
+            .where(Transaction.client_id.in_(ids), Transaction.deleted_at.is_(None))
+            .group_by(Transaction.client_id)
+        )
+    }
+
+    def _bal(cid: int):
+        r = agg.get(cid)
+        if r is None:
+            return (0.0, 0.0, 0.0, 0.0, None)
+        return (float(r.credits), float(r.dollars), float(r.cy_credits), float(r.cy_value), r.cy_renewal)
+
+    roll = {"credits": 0.0, "dollars": 0.0, "cyCredits": 0.0, "cyValue": 0.0}
+    renewals = []
+
+    def _add(cid: int):
+        cr, dl, cyc, cyv, ren = _bal(cid)
+        roll["credits"] += cr
+        roll["dollars"] += dl
+        roll["cyCredits"] += cyc
+        roll["cyValue"] += cyv
+        if ren is not None:
+            renewals.append(ren)
+        return cr, dl, cyv, ren
+
+    _add(client.id)  # the client's own balance seeds the rollup
+    children = []
+    for c in visible_children:
+        cr, dl, cyv, ren = _add(c.id)
+        children.append({
+            "id": c.id,
+            "name": c.name,
+            "credits": cr,
+            "dollars": dl,
+            "cyValue": cyv,
+            "cyRenewal": _iso(ren),
+        })
+
+    roll["nextRenewal"] = _iso(min(renewals)) if renewals else None
+    return {
+        "client": {"id": client.id, "name": client.name},
+        "parent": parent,
+        "children": children,
+        "rollup": roll,
+        "partial": partial,
+    }
+
+
 @router.get("/reports/balances")
 async def all_balances(
     session: AsyncSession = Depends(get_session),
