@@ -43,6 +43,47 @@ def _clean(v: str | None) -> str | None:
     return v or None
 
 
+async def _validate_parent_id(
+    session: AsyncSession, *, parent_id: int | None, child_id: int | None
+) -> int | None:
+    """Validate a flat Parent->Child link, or raise 400.
+
+    Enforces the one-level invariants: no self-parent; the chosen parent
+    must itself be top-level (so no third tier forms); and a client that
+    already has children can't itself become a child. ``None`` = detach.
+    """
+    if parent_id is None:
+        return None
+    if child_id is not None and parent_id == child_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A client can't be its own parent account.",
+        )
+    parent = await session.get(Client, parent_id)
+    if parent is None or parent.deleted_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Parent account not found.",
+        )
+    if parent.parent_id is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="That client is already a sub-account, so it can't also be a parent (one level only).",
+        )
+    if child_id is not None:
+        kids = await session.execute(
+            select(Client.id).where(
+                Client.parent_id == child_id, Client.deleted_at.is_(None)
+            ).limit(1)
+        )
+        if kids.first() is not None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="This client has sub-accounts, so it can't also be a sub-account.",
+            )
+    return parent_id
+
+
 async def _resolve_salesperson(
     session: AsyncSession,
     salesperson_id: int | None,
@@ -257,10 +298,16 @@ async def create_client(
                 detail=f"Client code '{socc_code}' is already in use.",
             )
     sp = await _resolve_salesperson(session, body.salesperson_id)
+    parent_id = (
+        await _validate_parent_id(session, parent_id=body.parent_id, child_id=None)
+        if "parent_id" in body.model_fields_set
+        else None
+    )
     client = Client(
         name=name,
         socc_code=socc_code,
         became_client_on=became_client_on,
+        parent_id=parent_id,
         primary_contact_name=_clean(body.primary_contact_name),
         primary_contact_cell=_clean(body.primary_contact_cell),
         primary_contact_email=_clean(body.primary_contact_email),
@@ -394,6 +441,18 @@ async def update_client(
             client.salesperson_id = sp2.id if sp2 else None
             client.salesperson_name = sp2.name if sp2 else None
             client.salesperson_email = sp2.email if sp2 else None
+    # Parent account: only touched when explicitly present (so imports/legacy
+    # PATCHes never detach). Structure is an admin/approver decision, not a
+    # restricted rep's — same rule as salesperson reassignment.
+    if "parent_id" in body.model_fields_set:
+        if scope.restricted and body.parent_id != client.parent_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only an admin can set a client's parent account.",
+            )
+        client.parent_id = await _validate_parent_id(
+            session, parent_id=body.parent_id, child_id=client.id
+        )
     client.updated_by_email = user
     client.updated_at = utc_now()
     await session.commit()

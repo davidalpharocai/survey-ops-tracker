@@ -76,6 +76,7 @@ def client_dict(c: Client) -> dict:
         "salespersonId": c.salesperson_id,
         "salespersonName": c.salesperson_name,
         "salespersonEmail": c.salesperson_email,
+        "parentId": c.parent_id,
         "createdByEmail": c.created_by_email,
         "createdAt": _iso(c.created_at),
     }

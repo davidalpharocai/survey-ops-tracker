@@ -24,6 +24,10 @@ class ClientIn(BaseModel):
     # imports/back-compat; the client form requires it. When set, the
     # backend snapshots the salesperson's name/email onto the client.
     salesperson_id: int | None = None
+    # Optional parent account (flat Parent->Child). Only applied when the
+    # field is explicitly present (model_fields_set) so an omitting caller
+    # never detaches; None = detach. Admin/approver/full-access only.
+    parent_id: int | None = None
 
 
 class ClientUserIn(BaseModel):

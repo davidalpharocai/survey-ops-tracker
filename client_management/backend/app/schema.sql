@@ -148,6 +148,13 @@ ALTER TABLE clients ADD COLUMN IF NOT EXISTS salesperson_id INTEGER
 -- name/email is edited (the PATCH propagates to linked clients).
 ALTER TABLE clients ADD COLUMN IF NOT EXISTS salesperson_name TEXT;
 ALTER TABLE clients ADD COLUMN IF NOT EXISTS salesperson_email TEXT;
+
+-- Optional parent account (flat Parent->Child; NULL = top-level). Self-
+-- referential; the one-level invariants are enforced in the application
+-- layer. Additive + nullable — existing clients are untouched.
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS parent_id INTEGER
+    REFERENCES clients(id) ON DELETE SET NULL ON UPDATE CASCADE;
+CREATE INDEX IF NOT EXISTS clients_parent_id_idx ON clients (parent_id);
 CREATE INDEX IF NOT EXISTS clients_salesperson_email_idx
     ON clients (lower(salesperson_email)) WHERE salesperson_email IS NOT NULL;
 

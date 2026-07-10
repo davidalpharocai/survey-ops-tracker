@@ -101,6 +101,9 @@ class Client(Base):
     )
     salesperson_name: Mapped[str | None] = mapped_column(String, nullable=True)
     salesperson_email: Mapped[str | None] = mapped_column(String, nullable=True)
+    # Optional parent account (flat Parent->Child; NULL = top-level). Self-
+    # referential; the one-level invariants are enforced in the app layer.
+    parent_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_by_email: Mapped[str] = mapped_column(String)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now()
