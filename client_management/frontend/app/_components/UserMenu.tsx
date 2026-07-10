@@ -36,6 +36,9 @@ export default function UserMenu({ userEmail }: { userEmail: string }) {
       </button>
       {open && (
         <div className="user-menu-pop" role="menu">
+          <Link className="user-menu-item" role="menuitem" href="/guide" onClick={() => setOpen(false)}>
+            User guide
+          </Link>
           <button type="button" className="user-menu-item" role="menuitem" onClick={toggle}>
             {themeLabel}
           </button>

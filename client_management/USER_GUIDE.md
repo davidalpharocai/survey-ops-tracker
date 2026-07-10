@@ -79,8 +79,8 @@ For this to know which clients are yours, each client has a **salesperson**
 
 - **Client Balances** (Home → Balances & Reports): every client's remaining
   credits and dollars, this year's contract value, and their next renewal.
-  Click a client for their transaction log, or **Download PDF** for a
-  client-ready statement.
+  Click a client for their transaction log, or **Export Credits Summary** for
+  a client-ready PDF (choose the time frame, columns, and which records).
 - **The transaction log is grouped by contract**: each contract is a row
   showing its own **remaining** balance (its funding minus the studies that
   roll up to it — red if over-drawn), with those studies indented beneath it.
@@ -94,6 +94,9 @@ For this to know which clients are yours, each client has a **salesperson**
 - **Salespeople** (Home → Clients & Contacts): the list of salespeople clients
   can be assigned to. Add a salesperson's **email** here so their "my clients"
   view works when they sign in.
+- **A contact's surveys**: click any contact — in the search box, on their
+  client's record, or in the Contacts list — to see every survey they
+  requested.
 
 ## Fixing mistakes
 
@@ -106,16 +109,19 @@ For this to know which clients are yours, each client has a **salesperson**
 
 ## Admin-only (David, Tedi, Nachi)
 
-The **Administration** panel on the home page:
+Click **Admin** in the top nav for the Administration hub:
 
 - **Audit Log** — every change and denied attempt, by whom, when.
 - **Import Data** — upload a spreadsheet (the CCM template, downloadable on
   the page, or a Survey Ops export). You get a full preview of what will be
   created/updated before anything is applied. Empty cells never overwrite;
   nothing is ever deleted by an import.
+- **Sync from SOCC** — upload a Survey Ops export to stamp each survey's
+  current SOCC stage. Status only; never touches money.
 - **Export Data** — a ZIP of everything: a re-importable workbook plus a raw
   transaction ledger.
 - **AlphaROC Team** — invite @alpharoc.ai staff and manage who's an admin.
+- **Salespeople** — manage the salesperson roster and their emails.
 
 ## Quick rules that keep the data clean
 
