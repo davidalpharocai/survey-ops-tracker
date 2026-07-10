@@ -43,11 +43,13 @@ export default function ClientPulseView({
   balances,
   renewals,
   health,
+  restricted = false,
 }: {
   email: string;
   balances: BalanceRow[];
   renewals: RenewalRow[];
   health: BalanceHealthRow[];
+  restricted?: boolean;
 }) {
   // SSR renders "all"; after mount adopt the saved choice, or default to
   // "mine" when the signed-in user actually owns clients.
@@ -67,9 +69,13 @@ export default function ClientPulseView({
     }
   };
 
-  const fHealth = filterOwned(health, email, mode);
-  const fRenewals = filterOwned(renewals, email, mode);
-  const fBalances = filterOwned(balances, email, mode);
+  // Restricted salespeople only ever receive their own clients from the
+  // backend, so the My/All toggle is a no-op for them — hide it and show
+  // everything returned (which is already just their book).
+  const effectiveMode: PulseMode = restricted ? 'all' : mode;
+  const fHealth = filterOwned(health, email, effectiveMode);
+  const fRenewals = filterOwned(renewals, email, effectiveMode);
+  const fBalances = filterOwned(balances, email, effectiveMode);
   const kpis = computeKpis(fHealth, fRenewals, fBalances);
 
   const attention = fHealth.filter(h => h.status !== 'ok');
@@ -80,20 +86,22 @@ export default function ClientPulseView({
     <section className="pulse">
       <div className="pulse-head">
         <h2 className="pulse-title">Client pulse <InfoTooltip text={PULSE_TIP} /></h2>
-        <div className="pulse-toggle" role="group" aria-label="Which clients to show">
-          <button
-            type="button"
-            className={mode === 'mine' ? 'is-active' : ''}
-            aria-pressed={mode === 'mine'}
-            onClick={() => choose('mine')}
-          >My clients</button>
-          <button
-            type="button"
-            className={mode === 'all' ? 'is-active' : ''}
-            aria-pressed={mode === 'all'}
-            onClick={() => choose('all')}
-          >All clients</button>
-        </div>
+        {!restricted && (
+          <div className="pulse-toggle" role="group" aria-label="Which clients to show">
+            <button
+              type="button"
+              className={mode === 'mine' ? 'is-active' : ''}
+              aria-pressed={mode === 'mine'}
+              onClick={() => choose('mine')}
+            >My clients</button>
+            <button
+              type="button"
+              className={mode === 'all' ? 'is-active' : ''}
+              aria-pressed={mode === 'all'}
+              onClick={() => choose('all')}
+            >All clients</button>
+          </div>
+        )}
       </div>
 
       <div className="pulse-kpis">

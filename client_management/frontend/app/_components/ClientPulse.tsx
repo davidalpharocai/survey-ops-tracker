@@ -1,4 +1,5 @@
 import { apiForRequest } from '../../lib/action';
+import { currentUserIsRestricted } from '../../lib/auth';
 import type { BalanceHealthRow, BalanceRow, RenewalRow } from '../../lib/types';
 import ClientPulseView from './ClientPulseView';
 
@@ -13,10 +14,11 @@ import ClientPulseView from './ClientPulseView';
  */
 export default async function ClientPulse({ email }: { email: string }) {
   const api = await apiForRequest();
-  const [balances, renewals, health] = await Promise.all([
+  const [balances, renewals, health, restricted] = await Promise.all([
     api.allBalances().catch(() => [] as BalanceRow[]),
     api.listRenewals().catch(() => [] as RenewalRow[]),
     api.balanceHealth().catch(() => [] as BalanceHealthRow[]),
+    currentUserIsRestricted(),
   ]);
 
   // Nothing to show on a fresh/empty database — skip the section entirely.
@@ -30,6 +32,7 @@ export default async function ClientPulse({ email }: { email: string }) {
       balances={balances}
       renewals={renewals}
       health={health}
+      restricted={restricted}
     />
   );
 }

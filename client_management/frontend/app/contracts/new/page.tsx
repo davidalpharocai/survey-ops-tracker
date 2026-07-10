@@ -2,7 +2,7 @@ import Link from 'next/link';
 
 import { apiForRequest, parseId } from '../../../lib/action';
 import { onlyNotFound } from '../../../lib/api';
-import { currentUserReadOnly } from '../../../lib/auth';
+import { currentUserIsRestricted, currentUserReadOnly } from '../../../lib/auth';
 import { todayIsoDate } from '../../../lib/dates';
 import { isoDate } from '../../../lib/format';
 import { TIP } from '../../../lib/tooltips';
@@ -33,16 +33,20 @@ export default async function NewContractPage({ searchParams }: PageProps) {
   // (a URL int), so it need not wait for the client list. A stale preselect
   // 404s to an empty list; other errors still surface.
   type ContractRows = Awaited<ReturnType<typeof api.listContractsByClient>>;
-  const [clients, fetchedContracts, readOnly] = await Promise.all([
+  const [clients, fetchedContracts, readOnly, restricted] = await Promise.all([
     api.listClients(),
     preselect
       ? api.listContractsByClient(preselect).catch(onlyNotFound([] as ContractRows))
       : Promise.resolve([] as ContractRows),
     currentUserReadOnly(),
+    currentUserIsRestricted(),
   ]);
 
   const selectedClient = preselect ? clients.find(c => c.id === preselect) || null : null;
   const existingContracts: ContractRows = selectedClient ? fetchedContracts : [];
+  // Restricted reps can't create/edit contracts (they Request Credits instead);
+  // impersonating admins are read-only. Either way, hide the edit controls.
+  const noEdit = readOnly || restricted;
 
   const today = todayIsoDate();
 
@@ -116,7 +120,7 @@ export default async function NewContractPage({ searchParams }: PageProps) {
                             <input form={fid} name="description" type="text" defaultValue={t.description || ''} placeholder="—" />
                           </td>
                           <td className="row-actions">
-                            {!readOnly && (
+                            {!noEdit && (
                               <>
                                 <button type="submit" form={fid} className="btn-sm">Save</button>
                                 <form action={deleteContractAction} className="inline-form">
@@ -139,11 +143,19 @@ export default async function NewContractPage({ searchParams }: PageProps) {
 
           <h2>Record a new contract</h2>
 
-          {readOnly && (
-            <p className="muted">You&apos;re viewing as another user (read-only) — exit to add or edit contracts.</p>
+          {noEdit && (
+            restricted && !readOnly ? (
+              <p className="muted">
+                Salespeople don&apos;t add contracts directly.{' '}
+                <Link href="/credit-requests/new">Request credits</Link> and an approver
+                will apply them to the client&apos;s balance.
+              </p>
+            ) : (
+              <p className="muted">You&apos;re viewing as another user (read-only) — exit to add or edit contracts.</p>
+            )
           )}
 
-          {!readOnly && (
+          {!noEdit && (
           <form action={createContractAction} className="card form-narrow">
             <input type="hidden" name="client_id" value={selectedClient ? selectedClient.id : ''} />
 
@@ -186,7 +198,7 @@ export default async function NewContractPage({ searchParams }: PageProps) {
           </form>
           )}
 
-          {selectedClient && !readOnly && <RenewalAutofill />}
+          {selectedClient && !noEdit && <RenewalAutofill />}
         </>
       )}
     </>

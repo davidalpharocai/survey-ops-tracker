@@ -18,12 +18,13 @@ const TIP =
   'Shows the records for clients whose salesperson is you (matched by your sign-in email). It is only a filter — switch to “All” to see everyone. Your choice is remembered on this device.';
 
 type Props =
-  | { kind: 'study'; email: string; rows: StudyListRow[]; canCreate?: boolean }
-  | { kind: 'contract'; email: string; rows: ContractListRow[]; canCreate?: boolean };
+  | { kind: 'study'; email: string; rows: StudyListRow[]; canCreate?: boolean; restricted?: boolean }
+  | { kind: 'contract'; email: string; rows: ContractListRow[]; canCreate?: boolean; restricted?: boolean };
 
 export default function TxnListView(props: Props) {
   const { kind, email } = props;
   const canCreate = props.canCreate !== false;
+  const restricted = props.restricted === true;
   const noun = kind === 'study' ? 'studies' : 'contracts';
   const lsKey = `ccm-${noun}-mode`;
   const newHref = kind === 'study' ? '/studies/new' : '/contracts/new';
@@ -47,11 +48,15 @@ export default function TxnListView(props: Props) {
     }
   };
 
+  // Restricted reps only receive their own records from the backend, so the
+  // My/All toggle is a no-op — force "all" (= everything returned) for them.
+  const effectiveMode = restricted ? 'all' : mode;
   const view = useMemo(() => {
+    // The per-kind branch narrows props.rows to a single row type.
     const owned =
       kind === 'study'
-        ? filterOwned(props.rows, email, mode)
-        : filterOwned(props.rows, email, mode);
+        ? filterOwned(props.rows, email, effectiveMode)
+        : filterOwned(props.rows, email, effectiveMode);
     const term = q.trim().toLowerCase();
     if (!term) return owned;
     return owned.filter(
@@ -61,7 +66,7 @@ export default function TxnListView(props: Props) {
         (r.soccProjectCode || '').toLowerCase().includes(term),
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [props.rows, email, mode, q, kind]);
+  }, [props.rows, email, effectiveMode, q, kind]);
 
   return (
     <div className="txnlist">
@@ -78,15 +83,19 @@ export default function TxnListView(props: Props) {
           value={q}
           onChange={e => setQ(e.target.value)}
         />
-        <span className="pulse-toggle" role="group" aria-label="Which records to show">
-          <button type="button" className={mode === 'mine' ? 'is-active' : ''} aria-pressed={mode === 'mine'} onClick={() => choose('mine')}>
-            My {noun}
-          </button>
-          <button type="button" className={mode === 'all' ? 'is-active' : ''} aria-pressed={mode === 'all'} onClick={() => choose('all')}>
-            All {noun}
-          </button>
-        </span>
-        <InfoTooltip text={TIP} align="right" />
+        {!restricted && (
+          <>
+            <span className="pulse-toggle" role="group" aria-label="Which records to show">
+              <button type="button" className={mode === 'mine' ? 'is-active' : ''} aria-pressed={mode === 'mine'} onClick={() => choose('mine')}>
+                My {noun}
+              </button>
+              <button type="button" className={mode === 'all' ? 'is-active' : ''} aria-pressed={mode === 'all'} onClick={() => choose('all')}>
+                All {noun}
+              </button>
+            </span>
+            <InfoTooltip text={TIP} align="right" />
+          </>
+        )}
       </div>
 
       {view.length === 0 ? (

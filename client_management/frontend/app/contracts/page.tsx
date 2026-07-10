@@ -21,10 +21,11 @@ export default async function ContractsPage() {
       <Link className="back" href="/">← Home</Link>
       <h1>Contracts</h1>
       <p className="muted">
-        Every contract across all clients. Add a new one with the button, or switch to
-        <strong> My contracts</strong> to focus on your own clients.
+        {restricted
+          ? 'Every contract for your clients.'
+          : 'Every contract across all clients. Add a new one with the button, or switch to My contracts to focus on your own clients.'}
       </p>
-      <TxnListView kind="contract" email={email} rows={rows} canCreate={!restricted} />
+      <TxnListView kind="contract" email={email} rows={rows} canCreate={!restricted} restricted={restricted} />
     </>
   );
 }

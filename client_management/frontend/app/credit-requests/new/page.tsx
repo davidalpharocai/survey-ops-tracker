@@ -3,8 +3,10 @@ import Link from 'next/link';
 import { apiForRequest } from '../../../lib/action';
 import { currentUserReadOnly } from '../../../lib/auth';
 import { credits as creditsFmt, dollars, isoDate } from '../../../lib/format';
+import { TIP } from '../../../lib/tooltips';
 import type { Client, CreditRequest } from '../../../lib/types';
 import ConfirmButton from '../../clients/ConfirmButton';
+import InfoTooltip from '../../_components/InfoTooltip';
 import SubmitButton from '../../_components/SubmitButton';
 import { cancelMyCreditRequestAction, submitCreditRequestAction } from './actions';
 
@@ -52,15 +54,15 @@ export default async function RequestCreditsPage({ searchParams }: PageProps) {
           </select>
         </label>
         <div className="amounts-row">
-          <label>Credits to add
+          <label>Credits to add <InfoTooltip text={TIP.creditsToAdd} />
             <input name="credits" type="number" step="0.01" min="0" placeholder="0" />
           </label>
-          <label>Dollars to add
+          <label>Dollars to add <InfoTooltip text={TIP.dollarsToAdd} />
             <input name="dollars" type="number" step="0.01" min="0" placeholder="0" />
           </label>
         </div>
         <p className="muted small">Enter at least one of credits or dollars.</p>
-        <label>Reason
+        <label>Reason <InfoTooltip text="Why these credits are needed — the approver sees this when deciding." />
           <input name="note" required placeholder="Why these credits are needed" />
         </label>
         <div className="actions">
