@@ -65,6 +65,19 @@ export default async function NewStudyPage({ searchParams }: PageProps) {
             </label>
           </form>
 
+          {readOnly ? (
+            <p className="muted">You&apos;re viewing as another user (read-only) — exit to record or edit studies.</p>
+          ) : (
+            <>
+              <h2>Record a new study</h2>
+              <NewStudyForm
+                clientId={selectedClient ? selectedClient.id : null}
+                users={selectedClientUsers}
+                contracts={clientContracts}
+              />
+            </>
+          )}
+
           {selectedClient && (
             <>
               <h2>
@@ -89,19 +102,6 @@ export default async function NewStudyPage({ searchParams }: PageProps) {
                   />
                 </>
               )}
-            </>
-          )}
-
-          {readOnly ? (
-            <p className="muted">You&apos;re viewing as another user (read-only) — exit to record or edit studies.</p>
-          ) : (
-            <>
-              <h2>Record a new study</h2>
-              <NewStudyForm
-                clientId={selectedClient ? selectedClient.id : null}
-                users={selectedClientUsers}
-                contracts={clientContracts}
-              />
             </>
           )}
         </>
