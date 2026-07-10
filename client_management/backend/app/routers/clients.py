@@ -12,7 +12,7 @@ from sqlalchemy.orm import selectinload
 from app.auth import require_user
 from app.db import get_session
 from app.helpers import parse_date, utc_now
-from app.models import Client
+from app.models import Client, Salesperson
 from app.schemas import ClientIn
 from app.serializers import client_dict, client_user_dict
 
@@ -40,6 +40,39 @@ def _clean(v: str | None) -> str | None:
         return None
     v = v.strip()
     return v or None
+
+
+async def _resolve_salesperson(
+    session: AsyncSession, salesperson_id: int | None
+) -> Salesperson | None:
+    """Look up an active salesperson by id, or raise ``400``.
+
+    Parameters
+    ----------
+    session : AsyncSession
+        Active database session.
+    salesperson_id : int or None
+        Chosen salesperson; ``None`` means "not provided" (import/legacy).
+
+    Returns
+    -------
+    Salesperson or None
+        The salesperson, or ``None`` when no id was provided.
+
+    Raises
+    ------
+    HTTPException
+        ``400`` if an id was provided but no active salesperson matches.
+    """
+    if salesperson_id is None:
+        return None
+    sp = await session.get(Salesperson, salesperson_id)
+    if sp is None or sp.deleted_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Selected salesperson was not found.",
+        )
+    return sp
 
 
 async def _get_or_404(session: AsyncSession, client_id: int) -> Client:
@@ -201,6 +234,7 @@ async def create_client(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=f"Client code '{socc_code}' is already in use.",
             )
+    sp = await _resolve_salesperson(session, body.salesperson_id)
     client = Client(
         name=name,
         socc_code=socc_code,
@@ -208,7 +242,13 @@ async def create_client(
         primary_contact_name=_clean(body.primary_contact_name),
         primary_contact_cell=_clean(body.primary_contact_cell),
         primary_contact_email=_clean(body.primary_contact_email),
-        relationship_manager=_clean(body.relationship_manager),
+        # A chosen salesperson takes precedence and mirrors into the legacy
+        # relationship_manager column; otherwise fall back to whatever the
+        # (import/legacy) caller supplied.
+        relationship_manager=(sp.name if sp else _clean(body.relationship_manager)),
+        salesperson_id=(sp.id if sp else None),
+        salesperson_name=(sp.name if sp else None),
+        salesperson_email=(sp.email if sp else None),
         created_by_email=user,
     )
     session.add(client)
@@ -284,6 +324,7 @@ async def update_client(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=f"Client code '{socc_code}' is already in use.",
             )
+    sp = await _resolve_salesperson(session, body.salesperson_id)
     client.name = new_name
     if socc_code is not None:  # only overwrite when a code was supplied
         client.socc_code = socc_code
@@ -291,7 +332,17 @@ async def update_client(
     client.primary_contact_name = _clean(body.primary_contact_name)
     client.primary_contact_cell = _clean(body.primary_contact_cell)
     client.primary_contact_email = _clean(body.primary_contact_email)
-    client.relationship_manager = _clean(body.relationship_manager)
+    if sp is not None:
+        # Form path: the chosen salesperson drives the snapshot + the
+        # legacy relationship_manager mirror.
+        client.salesperson_id = sp.id
+        client.salesperson_name = sp.name
+        client.salesperson_email = sp.email
+        client.relationship_manager = sp.name
+    else:
+        # No salesperson supplied (import/legacy caller): leave the existing
+        # assignment intact and only update the free-text mirror.
+        client.relationship_manager = _clean(body.relationship_manager)
     client.updated_by_email = user
     client.updated_at = utc_now()
     await session.commit()

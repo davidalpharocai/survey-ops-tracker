@@ -10,6 +10,7 @@ from datetime import datetime
 from decimal import Decimal
 
 from sqlalchemy import (
+    Boolean,
     DateTime,
     ForeignKey,
     Integer,
@@ -21,6 +22,38 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
+
+
+class Salesperson(Base):
+    """An AlphaROC salesperson (account owner) a client can be assigned to.
+
+    Maps to the ``salespeople`` table. Purely a filter/label dimension —
+    assignment never restricts who can see a client. ``email`` (optional)
+    links a salesperson to a signed-in user so the dashboard can default
+    to that rep's own clients.
+
+    Attributes
+    ----------
+    id : int
+        Primary key.
+    name : str
+        Display name (unique among active salespeople, case-insensitive).
+    email : str or None
+        Login email used to match the signed-in user, if known.
+    active : bool
+        Whether the salesperson appears in the picker.
+    """
+
+    __tablename__ = "salespeople"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String)
+    email: Mapped[str | None] = mapped_column(String, nullable=True)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now()
+    )
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
 class Client(Base):
@@ -59,6 +92,15 @@ class Client(Base):
     primary_contact_cell: Mapped[str | None] = mapped_column(String, nullable=True)
     primary_contact_email: Mapped[str | None] = mapped_column(String, nullable=True)
     relationship_manager: Mapped[str | None] = mapped_column(String, nullable=True)
+    # Structured salesperson (account owner) + a denormalized snapshot of
+    # their name/email so client_dict serializes with no join. Nullable for
+    # imports/legacy rows; the client form requires it going forward.
+    salesperson_id: Mapped[int | None] = mapped_column(
+        ForeignKey("salespeople.id", ondelete="SET NULL", onupdate="CASCADE"),
+        nullable=True,
+    )
+    salesperson_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    salesperson_email: Mapped[str | None] = mapped_column(String, nullable=True)
     created_by_email: Mapped[str] = mapped_column(String)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now()

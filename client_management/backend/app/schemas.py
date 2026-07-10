@@ -20,6 +20,10 @@ class ClientIn(BaseModel):
     primary_contact_cell: str | None = None
     primary_contact_email: str | None = None
     relationship_manager: str | None = None
+    # Structured salesperson (account owner). Optional at the API for
+    # imports/back-compat; the client form requires it. When set, the
+    # backend snapshots the salesperson's name/email onto the client.
+    salesperson_id: int | None = None
 
 
 class ClientUserIn(BaseModel):
@@ -27,6 +31,14 @@ class ClientUserIn(BaseModel):
 
     name: str = ""
     email: str | None = None
+
+
+class SalespersonIn(BaseModel):
+    """Create/update payload for a salesperson."""
+
+    name: str = ""
+    email: str | None = None
+    active: bool | None = None
 
 
 class ContractIn(BaseModel):

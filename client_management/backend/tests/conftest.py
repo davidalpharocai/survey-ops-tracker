@@ -93,8 +93,8 @@ async def _clean_tables(_database):
     conn = await asyncpg.connect(TEST_DSN)
     try:
         await conn.execute(
-            "TRUNCATE transaction_users, transactions, client_users, clients "
-            "RESTART IDENTITY CASCADE"
+            "TRUNCATE transaction_users, transactions, client_users, clients, "
+            "salespeople RESTART IDENTITY CASCADE"
         )
     finally:
         await conn.close()

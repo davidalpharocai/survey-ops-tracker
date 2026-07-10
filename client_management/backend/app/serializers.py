@@ -13,7 +13,7 @@ them into ``Date`` objects so the existing formatters keep working.
 from datetime import datetime
 from decimal import Decimal
 
-from app.models import Client, ClientUser, Transaction
+from app.models import Client, ClientUser, Salesperson, Transaction
 
 
 def _iso(dt: datetime | None) -> str | None:
@@ -72,8 +72,34 @@ def client_dict(c: Client) -> dict:
         "primaryContactCell": c.primary_contact_cell,
         "primaryContactEmail": c.primary_contact_email,
         "relationshipManager": c.relationship_manager,
+        # Structured salesperson (from the denormalized snapshot — no join).
+        "salespersonId": c.salesperson_id,
+        "salespersonName": c.salesperson_name,
+        "salespersonEmail": c.salesperson_email,
         "createdByEmail": c.created_by_email,
         "createdAt": _iso(c.created_at),
+    }
+
+
+def salesperson_dict(s: Salesperson) -> dict:
+    """Serialise a :class:`~app.models.Salesperson`.
+
+    Parameters
+    ----------
+    s : Salesperson
+        Salesperson row.
+
+    Returns
+    -------
+    dict
+        camelCase representation for the picker and roster page.
+    """
+    return {
+        "id": s.id,
+        "name": s.name,
+        "email": s.email,
+        "active": s.active,
+        "createdAt": _iso(s.created_at),
     }
 
 

@@ -18,6 +18,7 @@ from app.routers import (
     contracts,
     health,
     reports,
+    salespeople,
     search,
     socc,
     studies,
@@ -92,6 +93,7 @@ app.include_router(studies.router)
 app.include_router(adjustments.router)
 app.include_router(transactions.router)
 app.include_router(reports.router)
+app.include_router(salespeople.router)
 app.include_router(search.router)
 app.include_router(socc.router)
 app.include_router(admin.router)

@@ -113,3 +113,32 @@ CREATE INDEX IF NOT EXISTS transactions_contract_id_idx
 -- informational — never affects credits/dollars or any report math.
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS socc_board_column TEXT;
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS socc_synced_at TIMESTAMP(3);
+
+-- Structured salesperson (account owner). Each client is assigned one
+-- salesperson, chosen from this list (with add-new on the client form).
+-- This is purely a filter/label dimension — there is NO access restriction
+-- anywhere; anyone can still see every client. `email` links a salesperson
+-- to a signed-in user so the dashboard can default to "my clients".
+CREATE TABLE IF NOT EXISTS salespeople (
+    id         SERIAL PRIMARY KEY,
+    name       TEXT NOT NULL,
+    email      TEXT,
+    active     BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP(3)
+);
+-- No two active salespeople share a name (case-insensitive), so "add new"
+-- stays idempotent and the picker list is clean.
+CREATE UNIQUE INDEX IF NOT EXISTS salespeople_name_active_key
+    ON salespeople (lower(name)) WHERE deleted_at IS NULL;
+
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS salesperson_id INTEGER
+    REFERENCES salespeople(id) ON DELETE SET NULL ON UPDATE CASCADE;
+-- Denormalized snapshot of the assigned salesperson so client_dict can be
+-- serialized with NO join (the reports embed client_dict on every row).
+-- Kept in sync when a client is (re)assigned and when a salesperson's
+-- name/email is edited (the PATCH propagates to linked clients).
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS salesperson_name TEXT;
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS salesperson_email TEXT;
+CREATE INDEX IF NOT EXISTS clients_salesperson_email_idx
+    ON clients (lower(salesperson_email)) WHERE salesperson_email IS NOT NULL;
