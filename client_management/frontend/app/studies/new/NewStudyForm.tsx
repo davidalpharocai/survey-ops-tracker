@@ -169,7 +169,7 @@ export default function NewStudyForm({ clientId, users, contracts }: Props) {
       </label>
 
       <label>Audience (optional)
-        <InfoTooltip text="Who this study surveys — e.g. 'Institutional investors', 'US registered voters'. Free text, for your reference." />
+        <InfoTooltip text="Who this study is about — e.g. 'Institutional investors', 'US registered voters'. Free text, for your reference." />
         <input name="audience" type="text" placeholder="e.g. Institutional investors" disabled={disabled} />
       </label>
 

@@ -28,9 +28,9 @@ const KPI_TIPS = {
   cyCredits: 'Total credits granted by contracts dated this calendar year, summed across the clients shown.',
 };
 const ATTENTION_TIP =
-  'Your call-today list: clients that are over-drawn or running low, worst first. Click a client to open their contracts & surveys.';
+  'Your call-today list: clients that are over-drawn or running low, worst first. Click a client to open their contracts & studies.';
 const RENEWALS_TIP =
-  'Contracts coming up for renewal, soonest first. Click a client to open their contracts & surveys.';
+  'Contracts coming up for renewal, soonest first. Click a client to open their contracts & studies.';
 
 function statusChip(status: BalanceHealthRow['status']) {
   if (status === 'negative') return <span className="pulse-chip is-neg">Negative</span>;

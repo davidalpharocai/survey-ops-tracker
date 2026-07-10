@@ -21,7 +21,7 @@ import { createAdjustmentAction } from './actions';
 const EMPTY_LEDGER: Ledger = { contracts: [], unassigned: [], adjustments: [], totals: { credits: 0, dollars: 0 } };
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'Contracts & Surveys · AlphaROC' };
+export const metadata = { title: 'Contracts & Studies · AlphaROC' };
 
 interface PageProps {
   searchParams: Promise<{ client_id?: string }>;
@@ -68,7 +68,7 @@ export default async function TransactionsReportPage({ searchParams }: PageProps
   return (
     <>
       <Link className="back" href="/reports">← Reports</Link>
-      <h1>Contracts &amp; Surveys</h1>
+      <h1>Contracts &amp; Studies</h1>
 
       <form method="get" className="filterbar">
         <label>Client
@@ -112,7 +112,7 @@ export default async function TransactionsReportPage({ searchParams }: PageProps
           {hasRows ? (
             <LedgerTree ledger={ledger} clientId={selected.id} canEditMoney={!restricted && !readOnly} />
           ) : (
-            <p className="muted">No contracts or surveys yet for this client.</p>
+            <p className="muted">No contracts or studies yet for this client.</p>
           )}
 
           {readOnly ? (
@@ -151,7 +151,7 @@ export default async function TransactionsReportPage({ searchParams }: PageProps
           )}
         </>
       ) : (
-        <p className="muted">Pick a client above to see their contracts &amp; surveys.</p>
+        <p className="muted">Pick a client above to see their contracts &amp; studies.</p>
       )}
     </>
   );

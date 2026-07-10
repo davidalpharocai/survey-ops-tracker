@@ -38,14 +38,14 @@ export default async function ContactPage({ params }: PageProps) {
       </p>
 
       <div className="card">
-        <h3>Surveys requested <span className="muted small">({studies.length})</span></h3>
+        <h3>Studies requested <span className="muted small">({studies.length})</span></h3>
         {studies.length > 0 ? (
           <div className="table-scroll">
             <table className="report compact">
               <thead>
                 <tr>
                   <th>Date</th>
-                  <th>Survey</th>
+                  <th>Study</th>
                   <th className="num">Credits</th>
                   <th className="num">Dollars</th>
                   <th></th>
@@ -79,7 +79,7 @@ export default async function ContactPage({ params }: PageProps) {
             </table>
           </div>
         ) : (
-          <p className="muted">No surveys are attributed to {contact.name} yet.</p>
+          <p className="muted">No studies are attributed to {contact.name} yet.</p>
         )}
       </div>
     </>

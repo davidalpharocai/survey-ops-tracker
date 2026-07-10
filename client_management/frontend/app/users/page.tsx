@@ -25,7 +25,7 @@ export default async function UsersPage({ searchParams }: PageProps) {
     <>
       <Link className="back" href="/">← Home</Link>
       <h1>Client Contacts</h1>
-      <p className="muted">Every contact across every client. Click a name to see the surveys they requested; edits happen on the client&apos;s record.</p>
+      <p className="muted">Every contact across every client. Click a name to see the studies they requested; edits happen on the client&apos;s record.</p>
 
       <form method="get" className="filterbar">
         <label>Filter by client
@@ -60,7 +60,7 @@ export default async function UsersPage({ searchParams }: PageProps) {
                 <td><Link href={`/users/${u.id}`}>{u.name}</Link></td>
                 <td>{u.email || ''}</td>
                 <td>
-                  <Link href={`/users/${u.id}`}>Surveys →</Link>
+                  <Link href={`/users/${u.id}`}>Studies →</Link>
                   {' · '}
                   <Link href={`/clients?id=${u.client.id}`}>Client →</Link>
                 </td>

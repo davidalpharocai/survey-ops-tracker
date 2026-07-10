@@ -22,7 +22,7 @@ function toItems(r: SearchResults): Item[] {
   r.contracts.forEach(t =>
     out.push({ key: `co${t.id}`, label: t.name, sub: `Contract · ${t.clientName}`, href: `/reports/transactions?client_id=${t.clientId}`, group: 'Contracts' }));
   r.studies.forEach(t =>
-    out.push({ key: `st${t.id}`, label: t.name, sub: `Survey · ${t.clientName}`, href: `/reports/transactions?client_id=${t.clientId}`, group: 'Surveys' }));
+    out.push({ key: `st${t.id}`, label: t.name, sub: `Study · ${t.clientName}`, href: `/reports/transactions?client_id=${t.clientId}`, group: 'Studies' }));
   r.contacts.forEach(u =>
     out.push({ key: `ct${u.id}`, label: u.name, sub: `Contact · ${u.clientName}`, href: `/users/${u.id}`, group: 'Contacts' }));
   return out;
@@ -100,7 +100,7 @@ export default function SearchBox() {
       <input
         type="search"
         className="search-input"
-        placeholder="Search clients, surveys, contacts…"
+        placeholder="Search clients, studies, contacts…"
         value={q}
         onChange={e => setQ(e.target.value)}
         onFocus={() => items.length && setOpen(true)}

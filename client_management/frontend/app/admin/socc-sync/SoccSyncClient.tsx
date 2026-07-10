@@ -44,13 +44,13 @@ export default function SoccSyncClient() {
       {result && (
         <div style={{ marginTop: '1rem' }}>
           <p>
-            <strong>{result.matchedCount.toLocaleString()}</strong> survey(s) updated ·{' '}
+            <strong>{result.matchedCount.toLocaleString()}</strong> studies updated ·{' '}
             <strong>{result.unmatchedCount.toLocaleString()}</strong> SOCC project(s) with no match.
           </p>
 
           {result.matched.length > 0 && (
             <table className="report compact" style={{ marginBottom: '1rem' }}>
-              <thead><tr><th>PR code</th><th>Survey</th><th>Client</th><th>SOCC stage</th></tr></thead>
+              <thead><tr><th>PR code</th><th>Study</th><th>Client</th><th>SOCC stage</th></tr></thead>
               <tbody>
                 {result.matched.map(m => (
                   <tr key={m.studyId}>
@@ -67,7 +67,7 @@ export default function SoccSyncClient() {
           {result.unmatched.length > 0 && (
             <>
               <h3>Needs reconciling ({result.unmatchedCount})</h3>
-              <p className="muted small">SOCC projects with no matching CCM survey (by PR code) — create or link these in CCM.</p>
+              <p className="muted small">SOCC projects with no matching CCM study (by PR code) — create or link these in CCM.</p>
               <table className="report compact">
                 <thead><tr><th>PR code</th><th>Project</th><th>Client</th><th>SOCC stage</th></tr></thead>
                 <tbody>

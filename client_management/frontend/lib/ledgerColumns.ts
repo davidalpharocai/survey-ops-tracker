@@ -1,4 +1,4 @@
-// Pure helpers for the reorderable data columns on the Contracts & Surveys
+// Pure helpers for the reorderable data columns on the Contracts & Studies
 // ledger. The name column (col 0) and the actions column (last) are pinned
 // and never part of this order — only the middle data columns move.
 //

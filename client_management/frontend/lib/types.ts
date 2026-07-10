@@ -73,7 +73,7 @@ export interface CreditRequest {
   client?: Client;
 }
 
-// GET /api/users/{id}/studies — a contact and the surveys they requested.
+// GET /api/users/{id}/studies — a contact and the studies they requested.
 export interface ContactStudies {
   contact: ClientUser;
   client: Client | null;

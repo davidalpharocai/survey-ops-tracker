@@ -67,7 +67,7 @@ export default function ExportCreditsSummary({
             <select value={scope} onChange={e => { setScope(e.target.value as Scope); setTargetId(''); }}>
               <option value="all">Everything (this client)</option>
               <option value="contract">A single contract</option>
-              <option value="survey">A single survey</option>
+              <option value="survey">A single study</option>
             </select>
           </label>
 
@@ -82,9 +82,9 @@ export default function ExportCreditsSummary({
           )}
           {scope === 'survey' && (
             <label className="export-field">
-              <span>Survey</span>
+              <span>Study</span>
               <select value={targetId} onChange={e => setTargetId(e.target.value)}>
-                <option value="">— pick a survey —</option>
+                <option value="">— pick a study —</option>
                 {surveys.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
             </label>

@@ -15,8 +15,8 @@ export default function ReportsIndexPage() {
           <p>Every client&apos;s current credits balance, dollars balance, current-year contract value, and next renewal date.</p>
         </Link>
         <Link className="report-card" href="/reports/transactions">
-          <h3>Contracts &amp; Surveys (per client)</h3>
-          <p>Pick a client and see their contracts with each one&apos;s surveys and remaining balance.</p>
+          <h3>Contracts &amp; Studies (per client)</h3>
+          <p>Pick a client and see their contracts with each one&apos;s studies and remaining balance.</p>
         </Link>
         <Link className="report-card" href="/reports/renewals">
           <h3>Renewal Radar</h3>

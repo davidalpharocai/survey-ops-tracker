@@ -33,7 +33,7 @@ export default async function HomePage() {
             <div className="hub-actions">
               <Link className="hub-action" href="/studies/new">
                 <span className="hub-link-title">Record a Study</span>
-                <span className="hub-link-sub">Log a survey that draws down a client&apos;s credits or dollars, attributed to one of their contacts.</span>
+                <span className="hub-link-sub">Log a study that draws down a client&apos;s credits or dollars, attributed to one of their contacts.</span>
                 <LinkPending />
               </Link>
               {isRestricted ? (

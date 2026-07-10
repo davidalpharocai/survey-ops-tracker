@@ -45,7 +45,7 @@ export default async function AdminHubPage() {
           </Link>
           <Link className="hub-link" href="/admin/socc-sync">
             <span className="hub-link-title">Sync from SOCC</span>
-            <span className="hub-link-sub">Upload a Survey Ops export to stamp each survey&apos;s current SOCC stage (e.g. Fielding). Status only — never touches money.</span>
+            <span className="hub-link-sub">Upload a Survey Ops export to stamp each study&apos;s current SOCC stage (e.g. Fielding). Status only — never touches money.</span>
             <LinkPending />
           </Link>
           <a className="hub-link" href={`${BASE_PATH}/admin/export`} download>

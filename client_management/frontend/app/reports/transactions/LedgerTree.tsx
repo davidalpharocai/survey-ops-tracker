@@ -280,7 +280,7 @@ export default function LedgerTree({ ledger, clientId, canEditMoney = true }: { 
                         {canDelete ? (
                           <DeleteConfirm action={deleteLedgerContractAction} id={c.id} clientId={clientId} name={c.name} />
                         ) : (
-                          <span className="muted small" title="Unlink or archive its surveys first">has surveys</span>
+                          <span className="muted small" title="Unlink or archive its studies first">has studies</span>
                         )}
                       </>
                     ) : null}

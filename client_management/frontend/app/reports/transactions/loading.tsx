@@ -6,7 +6,7 @@ export default function Loading() {
   return (
     <>
       <Link className="back" href="/reports">← Reports</Link>
-      <h1>Contracts &amp; Surveys</h1>
+      <h1>Contracts &amp; Studies</h1>
       <div className="filterbar">
         <SkeletonBlock height="2.4rem" width="18rem" />
       </div>

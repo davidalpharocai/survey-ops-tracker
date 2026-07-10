@@ -29,7 +29,7 @@ export const TIP = {
 
   // Study
   study:
-    'A study CONSUMES a client’s balance — the survey work delivered. It subtracts from the credits or dollars a contract added.',
+    'A study CONSUMES a client’s balance — the research work delivered. It subtracts from the credits or dollars a contract added.',
   costType:
     'Whether this study is billed in credits or in dollars. It draws down that side of the client’s balance.',
   cadence:

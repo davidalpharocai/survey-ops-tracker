@@ -43,7 +43,7 @@ function staffName(email: string | null | undefined): string {
 function typeLabel(kind: string): string {
   if (kind === 'contract') return 'Contract';
   if (kind === 'adjustment') return 'Adjustment';
-  return 'Survey';
+  return 'Study';
 }
 
 interface Column {
@@ -101,14 +101,14 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
   // Scope selection.
   let rows: Transaction[];
-  let scopeLabel = 'All contracts & surveys';
+  let scopeLabel = 'All contracts & studies';
   if (scope === 'survey' && targetId != null) {
     // Respect the selected date range like the "all" scope does; keep a
     // separate lookup so the label still names the survey even if it falls
     // outside the range.
     const survey = transactions.find(t => t.id === targetId);
     rows = survey && inRange(survey) ? [survey] : [];
-    scopeLabel = `Survey: ${survey?.name ?? targetId}`;
+    scopeLabel = `Study: ${survey?.name ?? targetId}`;
   } else if (scope === 'contract' && targetId != null) {
     const contract = transactions.find(t => t.id === targetId);
     const contractRow = contract && inRange(contract) ? [contract] : [];

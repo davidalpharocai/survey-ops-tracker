@@ -111,7 +111,7 @@ export default async function ClientsPage({ searchParams }: PageProps) {
                   </div>
                 </div>
                 <p className="detail-quicklinks">
-                  <Link href={`/reports/transactions?client_id=${selected.id}`}>Contracts &amp; Surveys →</Link>
+                  <Link href={`/reports/transactions?client_id=${selected.id}`}>Contracts &amp; Studies →</Link>
                   <Link href={`/contracts/new?client_id=${selected.id}`}>+ Add contract</Link>
                   <Link href={`/studies/new?client_id=${selected.id}`}>+ Add study</Link>
                   <a href="#delete-client" className="quicklink-danger">Delete client…</a>
@@ -200,7 +200,7 @@ function UserRow({ user }: { user: ClientUser }) {
         <input name="email" type="email" defaultValue={user.email || ''} form={formId} />
       </td>
       <td className="row-actions">
-        <Link className="btn-sm" href={`/users/${user.id}`}>Surveys →</Link>
+        <Link className="btn-sm" href={`/users/${user.id}`}>Studies →</Link>
         <button type="submit" form={formId} className="btn-sm">Save</button>
         <form action={deleteClientUserAction} className="inline-form">
           <input type="hidden" name="id" value={user.id} />
