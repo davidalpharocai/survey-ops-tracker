@@ -1,6 +1,6 @@
 'use client'
-import { useState } from 'react'
 import { useReviewQueue, useProjectOptions, useResolveDeliverable, useDismissDeliverable, type QueueRow } from '@/lib/hooks/useReviewQueue'
+import { ProjectPicker } from '@/components/shared/ProjectPicker'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
 import { Badge } from '@/components/ui/badge'
 import { toast } from '@/lib/utils/toast'
@@ -11,7 +11,6 @@ function QueueCard({ row }: { row: QueueRow }) {
   const options = useProjectOptions()
   const resolve = useResolveDeliverable()
   const dismiss = useDismissDeliverable()
-  const [manual, setManual] = useState('')
   const busy = resolve.isPending || dismiss.isPending
 
   function file(projectId: string) {
@@ -57,21 +56,7 @@ function QueueCard({ row }: { row: QueueRow }) {
       </div>
 
       <div className="mt-2 flex flex-wrap items-center gap-2">
-        <select
-          value={manual}
-          onChange={(e) => setManual(e.target.value)}
-          className="text-xs px-2 py-1.5 rounded-lg border border-border bg-background flex-1 min-w-48"
-        >
-          <option value="">Search / pick another project…</option>
-          {(options.data ?? []).map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
-        </select>
-        <button
-          disabled={busy || !manual}
-          onClick={() => file(manual)}
-          className="text-xs px-3 py-1.5 rounded-lg border border-border hover:bg-muted transition-colors disabled:opacity-40"
-        >
-          File here
-        </button>
+        <ProjectPicker options={options.data ?? []} disabled={busy} onPick={file} placeholder="Search projects by any word…" />
         <button
           disabled={busy}
           onClick={() => dismiss.mutate({ id: row.id }, { onSuccess: () => toast('Dismissed', 'success'), onError: (e) => toast(String((e as Error).message)) })}
