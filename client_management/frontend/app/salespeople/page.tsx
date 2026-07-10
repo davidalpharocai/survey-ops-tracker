@@ -7,6 +7,7 @@ import InfoTooltip from '../_components/InfoTooltip';
 import {
   createSalespersonAction,
   deleteSalespersonAction,
+  restoreSalespersonAction,
   updateSalespersonAction,
 } from './actions';
 
@@ -18,7 +19,9 @@ const EMAIL_TIP =
 
 export default async function SalespeoplePage() {
   const api = await apiForRequest();
-  const salespeople = await api.listSalespeople(); // active only
+  const all = await api.listSalespeople(true); // include archived
+  const salespeople = all.filter(s => s.active);
+  const archived = all.filter(s => !s.active);
 
   return (
     <>
@@ -55,6 +58,30 @@ export default async function SalespeoplePage() {
           <p className="muted">No salespeople yet — add one above, or add one inline while creating a client.</p>
         )}
       </div>
+
+      {archived.length > 0 && (
+        <div className="card">
+          <h3>Archived</h3>
+          <table className="report compact">
+            <thead><tr><th>Name</th><th>Email</th><th></th></tr></thead>
+            <tbody>
+              {archived.map(s => (
+                <tr key={s.id}>
+                  <td className="muted">{s.name}</td>
+                  <td className="muted">{s.email || ''}</td>
+                  <td className="row-actions">
+                    <form action={restoreSalespersonAction} className="inline-form">
+                      <input type="hidden" name="id" value={s.id} />
+                      <input type="hidden" name="name" value={s.name} />
+                      <button type="submit" className="btn-sm">Restore</button>
+                    </form>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </>
   );
 }

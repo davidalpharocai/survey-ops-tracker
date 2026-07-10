@@ -13,6 +13,7 @@ import type {
   BalanceRow,
   Client,
   ClientUser,
+  ContactStudies,
   ContractTransaction,
   Ledger,
   RenewalRow,
@@ -164,6 +165,7 @@ export interface ApiClient {
   updateClientUser(id: number, d: Record<string, unknown>): Promise<ClientUser>;
   deleteClientUser(id: number): Promise<{ name: string; clientId: number }>;
   listUsersFiltered(opts: { clientId: number | null; q: string }): Promise<UserListRow[]>;
+  contactStudies(id: number): Promise<ContactStudies | null>;
 
   getTransaction(id: number): Promise<Transaction | null>;
 
@@ -278,6 +280,7 @@ export function api(userEmail: string): ApiClient {
     getClientUser: id => orNull(r('GET', `/api/users/${id}`)),
     updateClientUser: (id, d) => r('PATCH', `/api/users/${id}`, d),
     deleteClientUser: id => r('DELETE', `/api/users/${id}`),
+    contactStudies: id => orNull(r('GET', `/api/users/${id}/studies`)),
     listUsersFiltered: ({ clientId, q }) => {
       const qs = new URLSearchParams();
       if (clientId) qs.set('client_id', String(clientId));

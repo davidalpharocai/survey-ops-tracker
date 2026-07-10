@@ -488,6 +488,7 @@ h3 { font-size: 1rem; }
 
 /* ---------- Client Pulse dashboard (home) ---------- */
 .pulse { margin: 0 0 1.75rem; }
+.pulse-skeleton { height: 220px; border-radius: 12px; margin: 0 0 1.75rem; }
 .pulse-head {
   display: flex;
   align-items: center;
@@ -587,6 +588,17 @@ h3 { font-size: 1rem; }
 }
 .form-narrow { max-width: 560px; }
 .amounts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+
+/* Deep-linked row highlight: the ledger "Edit" links jump to a specific
+   contract/study (#c<id> / #s<id>) on its editor page. Offset the scroll so
+   the sticky top bar doesn't cover the row. */
+.contracts-table tr[id]:target,
+.studies-table tr[id]:target { scroll-margin-top: 96px; }
+.contracts-table tr[id]:target td,
+.studies-table tr[id]:target td {
+  background: var(--accent-bg);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
 
 /* Salesperson picker on the client forms (required select + inline add). */
 .sp-picker { display: flex; flex-direction: column; gap: 0.6rem; margin: 0.2rem 0 0.4rem; }

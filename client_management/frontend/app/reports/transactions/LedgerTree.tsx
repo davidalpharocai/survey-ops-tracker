@@ -129,7 +129,7 @@ function StudyRow({
       </td>
       {dataCells(order, 'study', s)}
       <td className="row-actions">
-        <Link className="btn-sm" href={`/studies/new?client_id=${clientId}`}>Edit</Link>
+        <Link className="btn-sm" href={`/studies/new?client_id=${clientId}#s${s.id}`}>Edit</Link>
         <DeleteConfirm action={deleteLedgerStudyAction} id={s.id} clientId={clientId} name={s.name} />
       </td>
     </tr>
@@ -274,7 +274,7 @@ export default function LedgerTree({ ledger, clientId }: { ledger: Ledger; clien
                   </td>
                   {dataCells(order, 'contract', c)}
                   <td className="row-actions">
-                    <Link className="btn-sm" href={`/contracts/new?client_id=${clientId}`}>Edit</Link>
+                    <Link className="btn-sm" href={`/contracts/new?client_id=${clientId}#c${c.id}`}>Edit</Link>
                     {canDelete ? (
                       <DeleteConfirm action={deleteLedgerContractAction} id={c.id} clientId={clientId} name={c.name} />
                     ) : (

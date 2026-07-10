@@ -128,7 +128,7 @@ export default async function ClientsPage({ searchParams }: PageProps) {
                   <label>Primary contact cell <input name="primary_contact_cell" type="tel" defaultValue={selected.primaryContactCell || ''} /></label>
                   <label>Primary contact email <input name="primary_contact_email" type="email" defaultValue={selected.primaryContactEmail || ''} /></label>
                 </div>
-                <SalespersonPicker salespeople={salespeople} defaultId={selected.salespersonId ?? null} />
+                <SalespersonPicker salespeople={salespeople} defaultId={selected.salespersonId ?? null} defaultName={selected.salespersonName ?? null} />
                 <div className="actions">
                   <button type="submit">Save changes</button>
                 </div>
@@ -200,6 +200,7 @@ function UserRow({ user }: { user: ClientUser }) {
         <input name="email" type="email" defaultValue={user.email || ''} form={formId} />
       </td>
       <td className="row-actions">
+        <Link className="btn-sm" href={`/users/${user.id}`}>Surveys →</Link>
         <button type="submit" form={formId} className="btn-sm">Save</button>
         <form action={deleteClientUserAction} className="inline-form">
           <input type="hidden" name="id" value={user.id} />

@@ -340,9 +340,26 @@ async def update_client(
         client.salesperson_email = sp.email
         client.relationship_manager = sp.name
     else:
-        # No salesperson supplied (import/legacy caller): leave the existing
-        # assignment intact and only update the free-text mirror.
-        client.relationship_manager = _clean(body.relationship_manager)
+        # No salesperson supplied (import/legacy caller). Keep the structured
+        # snapshot consistent with the free-text mirror so the client list and
+        # the dashboard's "my clients" never show a stale owner: when the RM
+        # changed, re-point to a matching active salesperson, or clear it.
+        rm = _clean(body.relationship_manager)
+        client.relationship_manager = rm
+        if (client.salesperson_name or "").lower() != (rm or "").lower():
+            sp2 = None
+            if rm:
+                sp2 = (
+                    await session.execute(
+                        select(Salesperson).where(
+                            func.lower(Salesperson.name) == rm.lower(),
+                            Salesperson.deleted_at.is_(None),
+                        )
+                    )
+                ).scalar_one_or_none()
+            client.salesperson_id = sp2.id if sp2 else None
+            client.salesperson_name = sp2.name if sp2 else None
+            client.salesperson_email = sp2.email if sp2 else None
     client.updated_by_email = user
     client.updated_at = utc_now()
     await session.commit()

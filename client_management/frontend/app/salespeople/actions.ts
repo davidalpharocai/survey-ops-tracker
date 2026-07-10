@@ -38,3 +38,13 @@ export async function deleteSalespersonAction(formData: FormData): Promise<void>
   revalidatePath('/', 'layout');
   redirectTo('/salespeople');
 }
+
+export async function restoreSalespersonAction(formData: FormData): Promise<void> {
+  const id = parseId(formData.get('id'));
+  if (id == null) redirectTo('/salespeople');
+  const api = await apiForRequest();
+  // active:true reactivates; email omitted so it's left unchanged.
+  await api.updateSalesperson(id, { name: str(formData.get('name')), active: true });
+  revalidatePath('/', 'layout');
+  redirectTo('/salespeople');
+}

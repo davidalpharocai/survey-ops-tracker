@@ -129,6 +129,53 @@ async def test_delete_archives_and_hides_from_default_list(client):
     assert [s["name"] for s in allsp.json()] == ["Temp"]
 
 
+async def test_legacy_rm_update_repoints_snapshot(client):
+    # Importer/legacy path: update sends relationship_manager, no salesperson_id.
+    await _mk_salesperson(client, "Jenna", "jenna@alpharoc.ai")
+    alex = await _mk_salesperson(client, "Alex", "alex@alpharoc.ai")
+    c = await make_client(client, name="Rebooked", salesperson_id=None,
+                          relationship_manager="Jenna")
+    # snapshot should have resolved Jenna on create? No — create only snapshots
+    # from salesperson_id. Legacy create leaves it blank; that's fine.
+    r = await client.patch(
+        f"/api/clients/{c['id']}",
+        json={"name": "Rebooked", "became_on": "2024-01-15", "relationship_manager": "Alex"},
+        headers=ADMIN,
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["relationshipManager"] == "Alex"
+    assert body["salespersonId"] == alex["id"]
+    assert body["salespersonEmail"] == "alex@alpharoc.ai"
+
+
+async def test_legacy_rm_update_clears_snapshot_when_unmatched(client):
+    jenna = await _mk_salesperson(client, "Jenna", "jenna@alpharoc.ai")
+    c = await make_client(client, name="Orphan", salesperson_id=jenna["id"])
+    assert c["salespersonEmail"] == "jenna@alpharoc.ai"
+    r = await client.patch(
+        f"/api/clients/{c['id']}",
+        json={"name": "Orphan", "became_on": "2024-01-15", "relationship_manager": "Nobody"},
+        headers=ADMIN,
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["relationshipManager"] == "Nobody"
+    assert body["salespersonId"] is None
+    assert body["salespersonEmail"] is None
+
+
+async def test_patch_salesperson_rename_keeps_email_when_omitted(client):
+    sp = await _mk_salesperson(client, "Jenna", "jenna@alpharoc.ai")
+    r = await client.patch(
+        f"/api/salespeople/{sp['id']}",
+        json={"name": "Jenna S"},  # email omitted -> must not blank it
+        headers=ADMIN,
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["email"] == "jenna@alpharoc.ai"
+
+
 async def test_reports_balances_include_salesperson(client):
     sp = await _mk_salesperson(client, "Jenna", "jenna@alpharoc.ai")
     await make_client(client, name="Reportable", salesperson_id=sp["id"])

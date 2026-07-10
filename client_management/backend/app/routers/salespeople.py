@@ -9,6 +9,7 @@ stays correct for their whole book.
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import require_user
@@ -106,7 +107,17 @@ async def create_salesperson(
         return salesperson_dict(existing)
     sp = Salesperson(name=name, email=_clean_email(body.email), active=True)
     session.add(sp)
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError:
+        # Race on salespeople_name_active_key: a concurrent request created
+        # this active name first. Return its row rather than 500-ing, keeping
+        # "add new" idempotent (mirrors contracts/adjustments routers).
+        await session.rollback()
+        existing = await _active_by_name(session, name)
+        if existing is not None:
+            return salesperson_dict(existing)
+        raise
     await session.refresh(sp)
     return salesperson_dict(sp)
 
@@ -173,7 +184,11 @@ async def update_salesperson(
                 detail=f"Another salesperson is already named '{new_name}'.",
             )
     sp.name = new_name
-    sp.email = _clean_email(body.email)
+    # Only overwrite the email when the caller actually sent the field, so a
+    # PATCH that omits it (e.g. a rename) doesn't blank it and propagate an
+    # empty email to every linked client, breaking their "my clients".
+    if "email" in body.model_fields_set:
+        sp.email = _clean_email(body.email)
     if body.active is not None:
         sp.active = body.active
     await _propagate_snapshot(session, sp)

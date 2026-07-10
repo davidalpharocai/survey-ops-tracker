@@ -53,6 +53,13 @@ export interface UserListRow {
   client: { id: number; name: string };
 }
 
+// GET /api/users/{id}/studies — a contact and the surveys they requested.
+export interface ContactStudies {
+  contact: ClientUser;
+  client: Client | null;
+  studies: StudyTransaction[];
+}
+
 interface TransactionBase {
   id: number;
   clientId: number;

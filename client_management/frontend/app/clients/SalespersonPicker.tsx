@@ -17,12 +17,18 @@ const TIP =
 export default function SalespersonPicker({
   salespeople,
   defaultId = null,
+  defaultName = null,
 }: {
   salespeople: Salesperson[];
   defaultId?: number | null;
+  defaultName?: string | null;
 }) {
   const [mode, setMode] = useState<string>(defaultId ? String(defaultId) : '');
   const isNew = mode === '__new__';
+  // The currently-assigned salesperson may have been archived (not in the
+  // active list). Keep them selectable so the required select isn't blank and
+  // editing an unrelated field doesn't force a reassignment.
+  const missing = defaultId != null && !salespeople.some(s => s.id === defaultId);
   return (
     <div className="sp-picker">
       <label>
@@ -34,6 +40,11 @@ export default function SalespersonPicker({
           onChange={e => setMode(e.target.value)}
         >
           <option value="">— select salesperson —</option>
+          {missing && (
+            <option value={String(defaultId)}>
+              {defaultName ? `${defaultName} (archived)` : 'Current (archived)'}
+            </option>
+          )}
           {salespeople.map(s => (
             <option key={s.id} value={String(s.id)}>
               {s.name}

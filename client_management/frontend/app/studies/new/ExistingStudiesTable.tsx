@@ -144,7 +144,7 @@ export default function ExistingStudiesTable({ studies, clientUsers, clientId }:
             const annual = parseFloat(r.cost || '0') * runs;
             const isSingle = r.cadence === 'single';
             return (
-              <tr key={r.id} className={`study-row${r.isImported ? ' is-pending' : ''}`}>
+              <tr key={r.id} id={`s${r.id}`} className={`study-row${r.isImported ? ' is-pending' : ''}`}>
                 <td>
                   <input
                     form="bulk-form"

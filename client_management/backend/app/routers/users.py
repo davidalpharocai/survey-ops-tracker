@@ -8,13 +8,14 @@ attributed to transactions" guard is enforced here.
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.auth import require_user
 from app.db import get_session
 from app.helpers import utc_now
-from app.models import Client, ClientUser, Transaction
+from app.models import Client, ClientUser, Transaction, TransactionUser
 from app.schemas import ClientUserIn
-from app.serializers import client_dict, client_user_dict
+from app.serializers import client_dict, client_user_dict, transaction_dict
 
 router = APIRouter(tags=["users"], dependencies=[Depends(require_user)])
 
@@ -214,6 +215,60 @@ async def get_user(
         ``404`` if absent.
     """
     return client_user_dict(await _user_or_404(session, user_id))
+
+
+@router.get("/api/users/{user_id}/studies")
+async def user_studies(
+    user_id: int, session: AsyncSession = Depends(get_session)
+) -> dict:
+    """Every survey a contact is attributed to, newest first.
+
+    Attribution is the union of the modern many-to-many
+    (``transaction_users``) and the legacy single ``client_user_id``
+    column, so no study is missed regardless of how it was recorded.
+
+    Parameters
+    ----------
+    user_id : int
+        The contact.
+    session : AsyncSession
+        Injected request-scoped database session.
+
+    Returns
+    -------
+    dict
+        ``{"contact": {...}, "client": {...}, "studies": [...]}`` — the
+        contact, their owning client, and the attributed studies.
+
+    Raises
+    ------
+    HTTPException
+        ``404`` if the contact does not exist (or is archived).
+    """
+    cu = await _user_or_404(session, user_id)
+    client = await session.get(Client, cu.client_id)
+    attributed = select(TransactionUser.transaction_id).where(
+        TransactionUser.client_user_id == user_id
+    )
+    result = await session.execute(
+        select(Transaction)
+        .where(
+            Transaction.kind == "study",
+            Transaction.deleted_at.is_(None),
+            or_(
+                Transaction.id.in_(attributed),
+                Transaction.client_user_id == user_id,
+            ),
+        )
+        .order_by(Transaction.occurred_on.desc(), Transaction.id.desc())
+        .options(selectinload(Transaction.client_user))
+    )
+    studies = result.scalars().all()
+    return {
+        "contact": client_user_dict(cu),
+        "client": client_dict(client) if client else None,
+        "studies": [transaction_dict(s, with_client_user=True) for s in studies],
+    }
 
 
 @router.patch("/api/users/{user_id}")

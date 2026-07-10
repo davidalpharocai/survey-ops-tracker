@@ -1,6 +1,7 @@
 import Link from 'next/link';
+import { Suspense } from 'react';
 
-import { currentUserEmail, currentUserIsAdmin } from '../lib/auth';
+import { currentUserEmail } from '../lib/auth';
 import ClientPulse from './_components/ClientPulse';
 import LinkPending from './_components/LinkPending';
 
@@ -9,10 +10,7 @@ export const metadata = { title: 'AlphaROC Credit Management' };
 const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || '';
 
 export default async function HomePage() {
-  const [userEmail, isAdmin] = await Promise.all([
-    currentUserEmail(),
-    currentUserIsAdmin(),
-  ]);
+  const userEmail = await currentUserEmail();
 
   return (
     <div className="hub">
@@ -37,8 +35,12 @@ export default async function HomePage() {
           </div>
 
           {/* Client Pulse dashboard — reuses the existing report endpoints;
-              defaults to the signed-in salesperson's clients (no restriction). */}
-          <ClientPulse email={userEmail} />
+              defaults to the signed-in salesperson's clients (no restriction).
+              In its own Suspense boundary so the action tiles + panels stream
+              immediately instead of waiting on the three report queries. */}
+          <Suspense fallback={<div className="pulse-skeleton skeleton-block" aria-hidden="true" />}>
+            <ClientPulse email={userEmail} />
+          </Suspense>
 
           <div className="hub-panels">
             <section className="panel">
@@ -68,41 +70,6 @@ export default async function HomePage() {
                 <LinkPending />
               </Link>
             </section>
-
-            {isAdmin && (
-              <section className="panel">
-                <h2>Administration</h2>
-                <Link className="hub-link" href="/admin">
-                  <span className="hub-link-title">Audit Log</span>
-                  <span className="hub-link-sub">Every change made and every blocked attempt, across all team members.</span>
-                  <LinkPending />
-                </Link>
-                <Link className="hub-link" href="/admin/import">
-                  <span className="hub-link-title">Import Data</span>
-                  <span className="hub-link-sub">Upload a spreadsheet (CCM import template or Survey Ops export), preview, apply.</span>
-                  <LinkPending />
-                </Link>
-                <Link className="hub-link" href="/admin/socc-sync">
-                  <span className="hub-link-title">Sync from SOCC</span>
-                  <span className="hub-link-sub">Upload a Survey Ops export to stamp each survey&apos;s current SOCC stage (e.g. Fielding). Status only — never touches money.</span>
-                  <LinkPending />
-                </Link>
-                <a className="hub-link" href={`${BASE_PATH}/admin/export`} download>
-                  <span className="hub-link-title">Export Data</span>
-                  <span className="hub-link-sub">Download all clients, contracts &amp; studies as a ZIP (re-importable workbook + raw ledger).</span>
-                </a>
-                <Link className="hub-link" href="/admin/archive">
-                  <span className="hub-link-title">Recently Archived</span>
-                  <span className="hub-link-sub">Restore archived clients, contacts, contracts &amp; studies — nothing is ever destroyed.</span>
-                  <LinkPending />
-                </Link>
-                <Link className="hub-link" href="/admin/team">
-                  <span className="hub-link-title">AlphaROC Team</span>
-                  <span className="hub-link-sub">Invite or remove @alpharoc.ai staff and set who is an admin.</span>
-                  <LinkPending />
-                </Link>
-              </section>
-            )}
           </div>
         </>
       ) : (

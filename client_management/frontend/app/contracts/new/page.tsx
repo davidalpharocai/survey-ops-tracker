@@ -90,7 +90,7 @@ export default async function NewContractPage({ searchParams }: PageProps) {
                     {existingContracts.map(t => {
                       const fid = `contract-form-${t.id}`;
                       return (
-                        <tr key={t.id}>
+                        <tr key={t.id} id={`c${t.id}`}>
                           <td>
                             <form id={fid} action={updateContractAction}>
                               <input type="hidden" name="id" value={t.id} />

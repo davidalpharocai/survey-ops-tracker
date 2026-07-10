@@ -24,7 +24,7 @@ function toItems(r: SearchResults): Item[] {
   r.studies.forEach(t =>
     out.push({ key: `st${t.id}`, label: t.name, sub: `Survey · ${t.clientName}`, href: `/reports/transactions?client_id=${t.clientId}`, group: 'Surveys' }));
   r.contacts.forEach(u =>
-    out.push({ key: `ct${u.id}`, label: u.name, sub: `Contact · ${u.clientName}`, href: `/clients?id=${u.clientId}`, group: 'Contacts' }));
+    out.push({ key: `ct${u.id}`, label: u.name, sub: `Contact · ${u.clientName}`, href: `/users/${u.id}`, group: 'Contacts' }));
   return out;
 }
 
