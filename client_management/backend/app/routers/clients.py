@@ -14,6 +14,7 @@ from app.db import get_session
 from app.helpers import parse_date, utc_now
 from app.models import Client, Salesperson
 from app.schemas import ClientIn
+from app.scoping import AccessScope, require_scope, scoped_client_or_404
 from app.serializers import client_dict, client_user_dict
 
 router = APIRouter(
@@ -117,6 +118,7 @@ async def _get_or_404(session: AsyncSession, client_id: int) -> Client:
 async def list_clients(
     include: str | None = Query(default=None),
     session: AsyncSession = Depends(get_session),
+    scope: AccessScope = Depends(require_scope),
 ) -> list[dict]:
     """List all clients ascending by name.
 
@@ -136,7 +138,7 @@ async def list_clients(
     want_users = include == "users"
     stmt = (
         select(Client)
-        .where(Client.deleted_at.is_(None))
+        .where(Client.deleted_at.is_(None), scope.client_filter())
         .order_by(Client.name.asc())
     )
     if want_users:
@@ -158,7 +160,9 @@ async def list_clients(
 
 @router.get("/{client_id}")
 async def get_client(
-    client_id: int, session: AsyncSession = Depends(get_session)
+    client_id: int,
+    session: AsyncSession = Depends(get_session),
+    scope: AccessScope = Depends(require_scope),
 ) -> dict:
     """Fetch a single client by id.
 
@@ -177,9 +181,9 @@ async def get_client(
     Raises
     ------
     HTTPException
-        ``404`` if no client has the given id.
+        ``404`` if no client has the given id (or the caller can't see it).
     """
-    return client_dict(await _get_or_404(session, client_id))
+    return client_dict(await scoped_client_or_404(session, client_id, scope))
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
@@ -187,6 +191,7 @@ async def create_client(
     body: ClientIn,
     session: AsyncSession = Depends(get_session),
     user: str = Depends(require_user),
+    scope: AccessScope = Depends(require_scope),
 ) -> dict:
     """Create a client.
 
@@ -209,6 +214,13 @@ async def create_client(
     HTTPException
         ``400`` if the name is blank, ``409`` if the name is taken.
     """
+    if scope.restricted:
+        # A restricted salesperson can't create clients (they'd assign the
+        # scope key to themselves). Admin / full-access / approver only.
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only an admin can add a client.",
+        )
     name = (body.name or "").strip()
     if not name:
         raise HTTPException(
@@ -273,6 +285,7 @@ async def update_client(
     body: ClientIn,
     session: AsyncSession = Depends(get_session),
     user: str = Depends(require_user),
+    scope: AccessScope = Depends(require_scope),
 ) -> dict:
     """Update a client.
 
@@ -296,7 +309,16 @@ async def update_client(
         ``404`` if absent, ``400`` if the name is blank, ``409`` if the
         new name collides with another client.
     """
-    client = await _get_or_404(session, client_id)
+    client = await scoped_client_or_404(session, client_id, scope)
+    # A restricted salesperson may edit their own client's details but must
+    # not reassign the salesperson (that is the scope key — self-grant risk).
+    if scope.restricted and body.salesperson_id is not None and (
+        body.salesperson_id != client.salesperson_id
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only an admin can change a client's salesperson.",
+        )
     new_name = (body.name or "").strip()
     if not new_name:
         raise HTTPException(
@@ -384,6 +406,7 @@ async def delete_client(
     client_id: int,
     session: AsyncSession = Depends(get_session),
     user: str = Depends(require_user),
+    scope: AccessScope = Depends(require_scope),
 ) -> dict:
     """Archive a client (soft delete) — its ledger is never destroyed.
 
@@ -412,7 +435,12 @@ async def delete_client(
     HTTPException
         ``404`` if no client has the given id (or it is already archived).
     """
-    client = await _get_or_404(session, client_id)
+    if scope.restricted:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only an admin can archive a client.",
+        )
+    client = await scoped_client_or_404(session, client_id, scope)
     client.deleted_at = utc_now()
     client.updated_by_email = user
     client.updated_at = utc_now()

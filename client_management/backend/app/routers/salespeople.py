@@ -17,6 +17,7 @@ from app.db import get_session
 from app.helpers import utc_now
 from app.models import Client, Salesperson
 from app.schemas import SalespersonIn
+from app.scoping import require_unrestricted
 from app.serializers import salesperson_dict
 
 router = APIRouter(
@@ -73,7 +74,7 @@ async def list_salespeople(
     return [salesperson_dict(s) for s in result.scalars().all()]
 
 
-@router.post("")
+@router.post("", dependencies=[Depends(require_unrestricted)])
 async def create_salesperson(
     body: SalespersonIn,
     session: AsyncSession = Depends(get_session),
@@ -141,7 +142,7 @@ async def _propagate_snapshot(session: AsyncSession, sp: Salesperson) -> None:
     )
 
 
-@router.patch("/{salesperson_id}")
+@router.patch("/{salesperson_id}", dependencies=[Depends(require_unrestricted)])
 async def update_salesperson(
     salesperson_id: int,
     body: SalespersonIn,
@@ -207,7 +208,7 @@ async def update_salesperson(
     return salesperson_dict(sp)
 
 
-@router.delete("/{salesperson_id}")
+@router.delete("/{salesperson_id}", dependencies=[Depends(require_unrestricted)])
 async def delete_salesperson(
     salesperson_id: int,
     session: AsyncSession = Depends(get_session),

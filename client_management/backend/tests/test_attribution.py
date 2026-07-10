@@ -5,7 +5,13 @@ original actor_email stays untouched.
 assertions go straight to the database.
 """
 
-from conftest import ADMIN, USER, make_client, make_contract, make_study, make_user
+from conftest import ADMIN, ADMIN2, make_client, make_contract, make_study, make_user
+
+# A second unrestricted admin edits records created by the first, so these
+# attribution tests verify updated_by == the caller. (A restricted member
+# can no longer edit others' records — see test_scoping.)
+EDITOR = ADMIN2
+EDITOR_EMAIL = "tedi@alpharoc.ai"
 
 
 async def test_create_sets_actor_email_only(client, db):
@@ -34,7 +40,7 @@ async def test_patch_contract_sets_updated_by_caller(client, db):
             "credits_amount": 1200,
             "dollars_amount": 0,
         },
-        headers=USER,  # sarah edits
+        headers=EDITOR,
     )
     assert r.status_code == 200
     assert r.json()["actorEmail"] == "david@alpharoc.ai"  # unchanged
@@ -44,7 +50,7 @@ async def test_patch_contract_sets_updated_by_caller(client, db):
         body["id"],
     )
     assert row["actor_email"] == "david@alpharoc.ai"
-    assert row["updated_by_email"] == "sarah@alpharoc.ai"
+    assert row["updated_by_email"] == EDITOR_EMAIL
     assert row["updated_at"] is not None
 
 
@@ -62,7 +68,7 @@ async def test_patch_study_sets_updated_by_caller(client, db):
             "cost": 130,
             "client_user_ids": [user["id"]],
         },
-        headers=USER,
+        headers=EDITOR,
     )
     assert r.status_code == 200
     row = await db.fetchrow(
@@ -70,17 +76,17 @@ async def test_patch_study_sets_updated_by_caller(client, db):
         body["id"],
     )
     assert row["actor_email"] == "david@alpharoc.ai"
-    assert row["updated_by_email"] == "sarah@alpharoc.ai"
+    assert row["updated_by_email"] == EDITOR_EMAIL
 
 
 async def test_delete_stamps_updated_by(client, db):
     made = await make_client(client)
     body = await make_contract(client, made["id"])
-    r = await client.delete(f"/api/contracts/{body['id']}", headers=USER)
+    r = await client.delete(f"/api/contracts/{body['id']}", headers=EDITOR)
     assert r.status_code == 200
     row = await db.fetchrow(
         "SELECT updated_by_email, deleted_at FROM transactions WHERE id = $1",
         body["id"],
     )
-    assert row["updated_by_email"] == "sarah@alpharoc.ai"
+    assert row["updated_by_email"] == EDITOR_EMAIL
     assert row["deleted_at"] is not None

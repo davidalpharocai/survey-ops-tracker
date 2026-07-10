@@ -16,6 +16,7 @@ from app.auth import require_user
 from app.db import get_session
 from app.helpers import current_year_window, utc_today
 from app.models import Client, Transaction
+from app.scoping import AccessScope, require_scope, scoped_client_or_404
 from app.serializers import client_dict, transaction_dict
 
 # Balance-health tuning: burn is averaged over the trailing 90 days, a
@@ -67,7 +68,9 @@ def _iso(dt: datetime | None) -> str | None:
 
 @router.get("/clients/{client_id}/balances")
 async def client_balances(
-    client_id: int, session: AsyncSession = Depends(get_session)
+    client_id: int,
+    session: AsyncSession = Depends(get_session),
+    scope: AccessScope = Depends(require_scope),
 ) -> dict:
     """Lifetime balances + current-year contract figures for one client.
 
@@ -85,7 +88,7 @@ async def client_balances(
         lifetime credit/dollar balances, the current-year contracted
         credits and dollar value, and the next upcoming renewal date.
     """
-    await _active_client_or_404(session, client_id)
+    await scoped_client_or_404(session, client_id, scope)
     soy, eoy, _ = current_year_window()
     is_cy_contract = (
         (Transaction.kind == "contract")
@@ -126,6 +129,7 @@ async def client_balances(
 @router.get("/reports/balances")
 async def all_balances(
     session: AsyncSession = Depends(get_session),
+    scope: AccessScope = Depends(require_scope),
 ) -> list[dict]:
     """Balance summary across every client (ascending by name).
 
@@ -154,7 +158,7 @@ async def all_balances(
     clients = (
         await session.execute(
             select(Client)
-            .where(Client.deleted_at.is_(None))
+            .where(Client.deleted_at.is_(None), scope.client_filter())
             .order_by(Client.name.asc())
         )
     ).scalars().all()
@@ -199,7 +203,9 @@ async def all_balances(
 
 @router.get("/clients/{client_id}/transactions")
 async def client_transactions(
-    client_id: int, session: AsyncSession = Depends(get_session)
+    client_id: int,
+    session: AsyncSession = Depends(get_session),
+    scope: AccessScope = Depends(require_scope),
 ) -> list[dict]:
     """Full transaction log for a client, newest first.
 
@@ -220,7 +226,7 @@ async def client_transactions(
     HTTPException
         ``404`` if the client does not exist.
     """
-    await _active_client_or_404(session, client_id)
+    await scoped_client_or_404(session, client_id, scope)
     result = await session.execute(
         select(Transaction)
         .where(
@@ -238,7 +244,9 @@ async def client_transactions(
 
 @router.get("/clients/{client_id}/ledger")
 async def client_ledger(
-    client_id: int, session: AsyncSession = Depends(get_session)
+    client_id: int,
+    session: AsyncSession = Depends(get_session),
+    scope: AccessScope = Depends(require_scope),
 ) -> dict:
     """Contract-grouped ledger for a client.
 
@@ -269,7 +277,7 @@ async def client_ledger(
     HTTPException
         ``404`` if the client is absent or archived.
     """
-    await _active_client_or_404(session, client_id)
+    await scoped_client_or_404(session, client_id, scope)
     result = await session.execute(
         select(Transaction)
         .where(
@@ -347,6 +355,7 @@ def _bucket(days_until: int) -> str:
 @router.get("/reports/renewals")
 async def renewal_radar(
     session: AsyncSession = Depends(get_session),
+    scope: AccessScope = Depends(require_scope),
 ) -> list[dict]:
     """Every upcoming contract renewal, soonest first.
 
@@ -376,6 +385,7 @@ async def renewal_radar(
             Transaction.renewal_on.is_not(None),
             Transaction.renewal_on >= today,
             Client.deleted_at.is_(None),
+            scope.client_filter(),
         )
         .order_by(Transaction.renewal_on.asc(), Transaction.id.asc())
     )
@@ -431,6 +441,7 @@ def _run_out(today: datetime, balance: float, monthly_burn: float) -> datetime |
 @router.get("/reports/balance-health")
 async def balance_health(
     session: AsyncSession = Depends(get_session),
+    scope: AccessScope = Depends(require_scope),
 ) -> list[dict]:
     """Burn rate and projected run-out for every client with activity.
 
@@ -478,7 +489,9 @@ async def balance_health(
     clients = (
         await session.execute(
             select(Client).where(
-                Client.deleted_at.is_(None), Client.id.in_(agg.keys())
+                Client.deleted_at.is_(None),
+                Client.id.in_(agg.keys()),
+                scope.client_filter(),
             )
         )
     ).scalars().all()

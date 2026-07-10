@@ -87,11 +87,11 @@ async def test_update_user(client, db):
     r = await client.patch(
         f"/api/users/{u['id']}",
         json={"name": "After", "email": "after@x.com"},
-        headers={"X-User-Email": "sarah@alpharoc.ai"},
+        headers={"X-User-Email": "tedi@alpharoc.ai"},  # admin edits
     )
     assert r.status_code == 200
     assert r.json()["name"] == "After"
     row = await db.fetchrow(
         "SELECT updated_by_email FROM client_users WHERE id = $1", u["id"]
     )
-    assert row["updated_by_email"] == "sarah@alpharoc.ai"
+    assert row["updated_by_email"] == "tedi@alpharoc.ai"

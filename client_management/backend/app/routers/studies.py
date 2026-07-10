@@ -18,6 +18,7 @@ from app.db import get_session
 from app.helpers import utc_now
 from app.models import Client, ClientUser, Transaction, TransactionUser
 from app.schemas import StudyBulkUpdateIn, StudyIn
+from app.scoping import AccessScope, require_scope, scoped_client_or_404
 from app.serializers import client_dict, transaction_dict
 from app.study_logic import StudyForm, decorate_study, read_study_form
 
@@ -223,7 +224,9 @@ async def _set_attributions(
 
 @router.get("/clients/{client_id}/studies")
 async def list_studies(
-    client_id: int, session: AsyncSession = Depends(get_session)
+    client_id: int,
+    session: AsyncSession = Depends(get_session),
+    scope: AccessScope = Depends(require_scope),
 ) -> list[dict]:
     """List a client's studies, decorated and back-filled.
 
@@ -244,11 +247,7 @@ async def list_studies(
     list of dict
         Decorated study transactions.
     """
-    owner = await session.get(Client, client_id)
-    if owner is None or owner.deleted_at is not None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Client not found"
-        )
+    await scoped_client_or_404(session, client_id, scope)
     result = await session.execute(
         select(Transaction)
         .where(
@@ -293,6 +292,7 @@ async def list_studies(
 @router.get("/studies")
 async def list_all_studies(
     session: AsyncSession = Depends(get_session),
+    scope: AccessScope = Depends(require_scope),
 ) -> list[dict]:
     """Every active study across all clients, newest first.
 
@@ -318,6 +318,7 @@ async def list_all_studies(
             Transaction.kind == "study",
             Transaction.deleted_at.is_(None),
             Client.deleted_at.is_(None),
+            scope.client_filter(),
         )
         .order_by(Transaction.occurred_on.desc(), Transaction.id.desc())
         .options(
@@ -339,6 +340,7 @@ async def create_study(
     body: StudyIn,
     session: AsyncSession = Depends(get_session),
     user: str = Depends(require_user),
+    scope: AccessScope = Depends(require_scope),
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
 ) -> dict:
     """Publish a new study for a client.
@@ -375,11 +377,7 @@ async def create_study(
         out["clientName"] = prior_client.name if prior_client else None
         return out
 
-    client = await session.get(Client, body.client_id or 0)
-    if client is None or client.deleted_at is not None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Client not found"
-        )
+    client = await scoped_client_or_404(session, body.client_id or 0, scope)
     f = read_study_form(body)
     _check_common(f)
     users = await _validate_users(session, f.user_ids, client.id)
@@ -435,6 +433,7 @@ async def update_study(
     body: StudyIn,
     session: AsyncSession = Depends(get_session),
     user: str = Depends(require_user),
+    scope: AccessScope = Depends(require_scope),
 ) -> dict:
     """Update a single study.
 
@@ -458,6 +457,7 @@ async def update_study(
         ``404`` if absent/not a study, ``400`` if validation fails.
     """
     t = await _study_or_404(session, txn_id)
+    await scoped_client_or_404(session, t.client_id, scope)
     f = read_study_form(body)
     _check_common(f)
     users = await _validate_users(session, f.user_ids, t.client_id)
@@ -500,6 +500,7 @@ async def delete_study(
     txn_id: int,
     session: AsyncSession = Depends(get_session),
     user: str = Depends(require_user),
+    scope: AccessScope = Depends(require_scope),
 ) -> dict:
     """Archive a study (soft delete) — its history is preserved.
 
@@ -521,6 +522,7 @@ async def delete_study(
         ``404`` if absent or not a study.
     """
     t = await _study_or_404(session, txn_id)
+    await scoped_client_or_404(session, t.client_id, scope)
     t.deleted_at = utc_now()
     t.updated_by_email = user
     t.updated_at = utc_now()
@@ -530,7 +532,9 @@ async def delete_study(
 
 @router.post("/studies/{txn_id}/mark-reviewed")
 async def mark_reviewed(
-    txn_id: int, session: AsyncSession = Depends(get_session)
+    txn_id: int,
+    session: AsyncSession = Depends(get_session),
+    scope: AccessScope = Depends(require_scope),
 ) -> dict:
     """Clear the CSV-import note without changing cost.
 
@@ -552,6 +556,7 @@ async def mark_reviewed(
         ``404`` if absent or not a study.
     """
     t = await _study_or_404(session, txn_id)
+    await scoped_client_or_404(session, t.client_id, scope)
     if t.note and "Imported from CSV" in t.note:
         t.note = None
     await session.commit()
@@ -563,6 +568,7 @@ async def bulk_update(
     body: StudyBulkUpdateIn,
     session: AsyncSession = Depends(get_session),
     user: str = Depends(require_user),
+    scope: AccessScope = Depends(require_scope),
 ) -> dict:
     """Save every row of the existing-studies table in one shot.
 
@@ -582,6 +588,7 @@ async def bulk_update(
         ``{"updated": int, "errors": list[str]}``.
     """
     client_id = body.client_id
+    await scoped_client_or_404(session, client_id, scope)
     updated = 0
     errors: list[str] = []
 

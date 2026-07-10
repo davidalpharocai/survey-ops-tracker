@@ -44,11 +44,16 @@ async def test_adjustment_creates_new_ledger_row(client):
     assert body["occurredOn"] == f"{today}T00:00:00Z"
 
 
-async def test_adjustment_allows_plain_users(client):
+async def test_adjustment_forbidden_for_restricted_user(client):
+    # A restricted salesperson can't add credits directly — they must submit
+    # a credit request to the approval queue instead (permissions Phase 3).
     made = await make_client(client)
-    r = await make_adjustment(client, made["id"], headers=USER)
-    assert r.status_code == 201
-    assert r.json()["actorEmail"] == "sarah@alpharoc.ai"
+    r = await client.post(
+        "/api/adjustments",
+        json={"client_id": made["id"], "credits_delta": -100, "note": "x"},
+        headers=USER,
+    )
+    assert r.status_code == 403, r.text
 
 
 async def test_adjustment_flows_into_balances_and_log(client):

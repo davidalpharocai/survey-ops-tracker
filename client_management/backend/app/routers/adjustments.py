@@ -20,6 +20,7 @@ from app.auth import require_user
 from app.db import get_session
 from app.helpers import parse_money, utc_today
 from app.models import Client, Transaction
+from app.scoping import AccessScope, require_unrestricted
 from app.serializers import transaction_dict
 
 router = APIRouter(
@@ -69,6 +70,7 @@ async def create_adjustment(
     body: AdjustmentIn,
     session: AsyncSession = Depends(get_session),
     user: str = Depends(require_user),
+    _scope: AccessScope = Depends(require_unrestricted),
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
 ) -> dict:
     """Record a signed correction as a new ledger row.

@@ -50,7 +50,10 @@ import pytest_asyncio  # noqa: E402
 
 # Auth headers used throughout the suite (dev X-User-Email path).
 ADMIN = {"X-User-Email": "david@alpharoc.ai"}  # in CCM_ADMIN_EMAILS
-USER = {"X-User-Email": "sarah@alpharoc.ai"}  # plain @alpharoc.ai member
+ADMIN2 = {"X-User-Email": "tedi@alpharoc.ai"}  # second admin (unrestricted)
+# sarah@ is a plain @alpharoc.ai member -> RESTRICTED salesperson under the
+# permissions model (sees only her own clients; can't add credits).
+USER = {"X-User-Email": "sarah@alpharoc.ai"}
 
 
 async def _recreate_database() -> None:

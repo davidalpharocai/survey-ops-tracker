@@ -15,6 +15,7 @@ from app.db import get_session
 from app.helpers import utc_now
 from app.models import Client, ClientUser, Transaction, TransactionUser
 from app.schemas import ClientUserIn
+from app.scoping import AccessScope, require_scope, scoped_client_or_404
 from app.serializers import client_dict, client_user_dict, transaction_dict
 
 router = APIRouter(tags=["users"], dependencies=[Depends(require_user)])
@@ -50,7 +51,9 @@ async def _user_or_404(session: AsyncSession, user_id: int) -> ClientUser:
 
 @router.get("/api/clients/{client_id}/users")
 async def list_client_users(
-    client_id: int, session: AsyncSession = Depends(get_session)
+    client_id: int,
+    session: AsyncSession = Depends(get_session),
+    scope: AccessScope = Depends(require_scope),
 ) -> list[dict]:
     """List a client's users ascending by name.
 
@@ -66,11 +69,7 @@ async def list_client_users(
     list of dict
         Serialised client users.
     """
-    owner = await session.get(Client, client_id)
-    if owner is None or owner.deleted_at is not None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Client not found"
-        )
+    await scoped_client_or_404(session, client_id, scope)
     result = await session.execute(
         select(ClientUser)
         .where(
@@ -90,6 +89,7 @@ async def create_client_user(
     body: ClientUserIn,
     session: AsyncSession = Depends(get_session),
     user: str = Depends(require_user),
+    scope: AccessScope = Depends(require_scope),
 ) -> dict:
     """Add a user to a client.
 
@@ -114,11 +114,7 @@ async def create_client_user(
     HTTPException
         ``404`` if the client is absent, ``400`` if the name is blank.
     """
-    client = await session.get(Client, client_id)
-    if client is None or client.deleted_at is not None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Client not found"
-        )
+    await scoped_client_or_404(session, client_id, scope)
     name = (body.name or "").strip()
     if not name:
         raise HTTPException(
@@ -143,6 +139,7 @@ async def list_users_filtered(
     client_id: int | None = Query(default=None),
     q: str | None = Query(default=None),
     session: AsyncSession = Depends(get_session),
+    scope: AccessScope = Depends(require_scope),
 ) -> list[dict]:
     """Flat user list with the parent client embedded as ``client``.
 
@@ -164,7 +161,11 @@ async def list_users_filtered(
     stmt = (
         select(ClientUser, Client)
         .join(Client, Client.id == ClientUser.client_id)
-        .where(ClientUser.deleted_at.is_(None), Client.deleted_at.is_(None))
+        .where(
+            ClientUser.deleted_at.is_(None),
+            Client.deleted_at.is_(None),
+            scope.client_filter(),
+        )
         .order_by(Client.name.asc(), ClientUser.name.asc())
     )
     if client_id:
@@ -193,7 +194,9 @@ async def list_users_filtered(
 
 @router.get("/api/users/{user_id}")
 async def get_user(
-    user_id: int, session: AsyncSession = Depends(get_session)
+    user_id: int,
+    session: AsyncSession = Depends(get_session),
+    scope: AccessScope = Depends(require_scope),
 ) -> dict:
     """Fetch a single client user by id.
 
@@ -212,14 +215,18 @@ async def get_user(
     Raises
     ------
     HTTPException
-        ``404`` if absent.
+        ``404`` if absent or the caller can't see the owning client.
     """
-    return client_user_dict(await _user_or_404(session, user_id))
+    cu = await _user_or_404(session, user_id)
+    await scoped_client_or_404(session, cu.client_id, scope)
+    return client_user_dict(cu)
 
 
 @router.get("/api/users/{user_id}/studies")
 async def user_studies(
-    user_id: int, session: AsyncSession = Depends(get_session)
+    user_id: int,
+    session: AsyncSession = Depends(get_session),
+    scope: AccessScope = Depends(require_scope),
 ) -> dict:
     """Every survey a contact is attributed to, newest first.
 
@@ -246,7 +253,7 @@ async def user_studies(
         ``404`` if the contact does not exist (or is archived).
     """
     cu = await _user_or_404(session, user_id)
-    client = await session.get(Client, cu.client_id)
+    client = await scoped_client_or_404(session, cu.client_id, scope)
     attributed = select(TransactionUser.transaction_id).where(
         TransactionUser.client_user_id == user_id
     )
@@ -277,6 +284,7 @@ async def update_user(
     body: ClientUserIn,
     session: AsyncSession = Depends(get_session),
     user: str = Depends(require_user),
+    scope: AccessScope = Depends(require_scope),
 ) -> dict:
     """Update a client user's name/email.
 
@@ -300,6 +308,7 @@ async def update_user(
         ``404`` if absent, ``400`` if the name is blank.
     """
     cu = await _user_or_404(session, user_id)
+    await scoped_client_or_404(session, cu.client_id, scope)
     name = (body.name or "").strip()
     if not name:
         raise HTTPException(
@@ -320,6 +329,7 @@ async def delete_user(
     user_id: int,
     session: AsyncSession = Depends(get_session),
     user: str = Depends(require_user),
+    scope: AccessScope = Depends(require_scope),
 ) -> dict:
     """Archive a client user (soft delete), unless still attributed.
 
@@ -343,6 +353,7 @@ async def delete_user(
         one or more transactions (legacy ``client_user_id`` column).
     """
     cu = await _user_or_404(session, user_id)
+    await scoped_client_or_404(session, cu.client_id, scope)
     count = await session.scalar(
         select(func.count())
         .select_from(Transaction)

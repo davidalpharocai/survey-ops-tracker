@@ -101,10 +101,11 @@ async def test_patch_can_change_socc_code(client):
 
 async def test_patch_sets_updated_by_email(client, db):
     made = await make_client(client, name="Attr Co")
+    # A second admin edits it (a restricted member can't edit others' clients).
     r = await client.patch(
         f"/api/clients/{made['id']}",
         json={"name": "Attr Co", "became_on": "2024-01-15"},
-        headers=USER,
+        headers={"X-User-Email": "tedi@alpharoc.ai"},
     )
     assert r.status_code == 200
     row = await db.fetchrow(
@@ -113,7 +114,7 @@ async def test_patch_sets_updated_by_email(client, db):
         made["id"],
     )
     assert row["created_by_email"] == "david@alpharoc.ai"
-    assert row["updated_by_email"] == "sarah@alpharoc.ai"
+    assert row["updated_by_email"] == "tedi@alpharoc.ai"
     assert row["updated_at"] is not None
 
 

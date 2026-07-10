@@ -16,6 +16,12 @@ from app.db import get_session
 from app.helpers import add_year, parse_date, parse_money, utc_now
 from app.models import Client, Transaction
 from app.schemas import ContractIn
+from app.scoping import (
+    AccessScope,
+    require_scope,
+    require_unrestricted,
+    scoped_client_or_404,
+)
 from app.serializers import client_dict, transaction_dict
 
 router = APIRouter(
@@ -144,7 +150,9 @@ async def _contract_or_404(
 
 @router.get("/clients/{client_id}/contracts")
 async def list_contracts(
-    client_id: int, session: AsyncSession = Depends(get_session)
+    client_id: int,
+    session: AsyncSession = Depends(get_session),
+    scope: AccessScope = Depends(require_scope),
 ) -> list[dict]:
     """List a client's contracts, newest first.
 
@@ -160,11 +168,7 @@ async def list_contracts(
     list of dict
         Decorated contract transactions.
     """
-    owner = await session.get(Client, client_id)
-    if owner is None or owner.deleted_at is not None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Client not found"
-        )
+    await scoped_client_or_404(session, client_id, scope)
     result = await session.execute(
         select(Transaction)
         .where(
@@ -180,6 +184,7 @@ async def list_contracts(
 @router.get("/contracts")
 async def list_all_contracts(
     session: AsyncSession = Depends(get_session),
+    scope: AccessScope = Depends(require_scope),
 ) -> list[dict]:
     """Every active contract across all clients, newest first.
 
@@ -204,6 +209,7 @@ async def list_all_contracts(
             Transaction.kind == "contract",
             Transaction.deleted_at.is_(None),
             Client.deleted_at.is_(None),
+            scope.client_filter(),
         )
         .order_by(Transaction.occurred_on.desc(), Transaction.id.desc())
     )
@@ -220,6 +226,7 @@ async def create_contract(
     body: ContractIn,
     session: AsyncSession = Depends(get_session),
     user: str = Depends(require_user),
+    _scope: AccessScope = Depends(require_unrestricted),
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
 ) -> dict:
     """Record a contract for a client.
@@ -311,6 +318,7 @@ async def update_contract(
     body: ContractIn,
     session: AsyncSession = Depends(get_session),
     user: str = Depends(require_user),
+    _scope: AccessScope = Depends(require_unrestricted),
 ) -> dict:
     """Update an existing contract.
 
@@ -365,6 +373,7 @@ async def delete_contract(
     txn_id: int,
     session: AsyncSession = Depends(get_session),
     user: str = Depends(require_user),
+    _scope: AccessScope = Depends(require_unrestricted),
 ) -> dict:
     """Archive a contract (soft delete) — its history is preserved.
 

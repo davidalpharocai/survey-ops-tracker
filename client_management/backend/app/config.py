@@ -58,6 +58,20 @@ class Settings(BaseSettings):
         default="david@alpharoc.ai,tedi@alpharoc.ai,nachi@alpharoc.ai",
         alias="CCM_ADMIN_EMAILS",
     )
+    # Non-admins who still read ALL clients (ops who work across the book).
+    full_access_emails: str = Field(default="", alias="CCM_FULL_ACCESS_EMAILS")
+    # Credit-request approvers. They also get unrestricted READ so they can
+    # open the client/survey behind a request to judge it (David's call).
+    approver_emails: str = Field(
+        default="vineet@alpharoc.ai,shanu@alpharoc.ai,david@alpharoc.ai",
+        alias="CCM_CREDIT_APPROVER_EMAILS",
+    )
+    cognito_full_access_group: str = Field(
+        default="ccm-staff", alias="COGNITO_FULL_ACCESS_GROUP"
+    )
+    cognito_approver_group: str = Field(
+        default="ccm-credit-approvers", alias="COGNITO_APPROVER_GROUP"
+    )
 
     # Athena query path for the audit-log admin page. Populated by
     # Terraform; empty in local development (the admin endpoints then
@@ -197,6 +211,61 @@ class Settings(BaseSettings):
             email.strip().lower() in self.admin_email_set
             or self.cognito_admin_group in (groups or [])
         )
+
+    @property
+    def full_access_email_set(self) -> set[str]:
+        """Lower-cased set of non-admin emails granted full read access."""
+        return {
+            e.strip().lower()
+            for e in self.full_access_emails.split(",")
+            if e.strip()
+        }
+
+    @property
+    def approver_email_set(self) -> set[str]:
+        """Lower-cased set of credit-request approver emails."""
+        return {
+            e.strip().lower()
+            for e in self.approver_emails.split(",")
+            if e.strip()
+        }
+
+    def is_full_access(self, email: str, groups: list[str]) -> bool:
+        """Whether the identity reads all clients without being an admin."""
+        return (
+            email.strip().lower() in self.full_access_email_set
+            or self.cognito_full_access_group in (groups or [])
+        )
+
+    def is_credit_approver(self, email: str, groups: list[str]) -> bool:
+        """Whether the identity may approve/reject credit requests."""
+        return (
+            email.strip().lower() in self.approver_email_set
+            or self.cognito_approver_group in (groups or [])
+        )
+
+    def is_restricted(self, email: str, groups: list[str]) -> bool:
+        """Whether the identity is a scoped salesperson (sees only own clients).
+
+        Restricted = NOT admin, full-access, or approver. This is the single
+        predicate both read-scoping and the credit write-gate import, so the
+        two can never disagree about who is restricted.
+        """
+        return not (
+            self.is_admin(email, groups)
+            or self.is_full_access(email, groups)
+            or self.is_credit_approver(email, groups)
+        )
+
+    def resolve_role(self, email: str, groups: list[str]) -> str:
+        """Resolve the identity to one role name (admin > approver > full > restricted)."""
+        if self.is_admin(email, groups):
+            return "admin"
+        if self.is_credit_approver(email, groups):
+            return "approver"
+        if self.is_full_access(email, groups):
+            return "full_access"
+        return "restricted"
 
     @property
     def cognito_issuer(self) -> str:

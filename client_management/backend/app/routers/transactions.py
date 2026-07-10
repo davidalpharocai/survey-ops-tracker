@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth import require_user
 from app.db import get_session
 from app.models import Transaction
+from app.scoping import AccessScope, require_scope, scoped_client_or_404
 from app.serializers import transaction_dict
 
 router = APIRouter(
@@ -23,7 +24,9 @@ router = APIRouter(
 
 @router.get("/{txn_id}")
 async def get_transaction(
-    txn_id: int, session: AsyncSession = Depends(get_session)
+    txn_id: int,
+    session: AsyncSession = Depends(get_session),
+    scope: AccessScope = Depends(require_scope),
 ) -> dict:
     """Fetch a single transaction by id.
 
@@ -50,4 +53,7 @@ async def get_transaction(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Transaction not found",
         )
+    # Restricted users may only resolve transactions of clients they own
+    # (this endpoint was a cross-client IDOR before scoping).
+    await scoped_client_or_404(session, t.client_id, scope)
     return transaction_dict(t)

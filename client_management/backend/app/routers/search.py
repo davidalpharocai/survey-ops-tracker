@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth import require_user
 from app.db import get_session
 from app.models import Client, ClientUser, Transaction
+from app.scoping import AccessScope, require_scope
 
 router = APIRouter(prefix="/api", tags=["search"], dependencies=[Depends(require_user)])
 
@@ -28,6 +29,7 @@ async def search(
     q: str = Query(default=""),
     limit: int = Query(default=6),
     session: AsyncSession = Depends(get_session),
+    scope: AccessScope = Depends(require_scope),
 ) -> dict:
     """Grouped search results for the omnibox.
 
@@ -57,6 +59,7 @@ async def search(
             select(Client)
             .where(
                 Client.deleted_at.is_(None),
+                scope.client_filter(),
                 or_(
                     Client.name.ilike(like, escape="\\"),
                     func.coalesce(Client.socc_code, "").ilike(like, escape="\\"),
@@ -76,6 +79,7 @@ async def search(
                     Transaction.kind == kind,
                     Transaction.deleted_at.is_(None),
                     Client.deleted_at.is_(None),
+                    scope.client_filter(),
                     or_(
                         Transaction.name.ilike(like, escape="\\"),
                         func.coalesce(Transaction.socc_project_code, "").ilike(
@@ -105,6 +109,7 @@ async def search(
             .where(
                 ClientUser.deleted_at.is_(None),
                 Client.deleted_at.is_(None),
+                scope.client_filter(),
                 or_(
                     ClientUser.name.ilike(like, escape="\\"),
                     func.coalesce(ClientUser.email, "").ilike(like, escape="\\"),
