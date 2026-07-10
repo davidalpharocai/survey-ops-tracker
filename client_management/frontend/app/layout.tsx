@@ -3,6 +3,7 @@ import './globals.css';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 
+import { apiForRequest } from '../lib/action';
 import {
   currentImpersonatedBy,
   currentUserEmail,
@@ -30,6 +31,18 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
     currentUserIsApprover(),
     currentImpersonatedBy(),
   ]);
+  // Pending-approvals count for the nav badge — the only "work is waiting"
+  // signal an approver gets (no email/Slack yet). Approvers only; a failure
+  // degrades to no badge rather than breaking the layout.
+  let pendingApprovals = 0;
+  if (isApprover) {
+    try {
+      const api = await apiForRequest();
+      pendingApprovals = (await api.listCreditRequests('pending')).length;
+    } catch {
+      pendingApprovals = 0;
+    }
+  }
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -49,7 +62,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
           </Link>
           {/* Persistent primary nav; Admin entry only for admins. Also the
               future home of the global search box (roadmap ②). */}
-          {userEmail && <NavRibbon isAdmin={isAdmin} isApprover={isApprover} />}
+          {userEmail && <NavRibbon isAdmin={isAdmin} isApprover={isApprover} pendingApprovals={pendingApprovals} />}
           {userEmail && <SearchBox />}
           {userEmail ? (
             <UserMenu userEmail={userEmail} />

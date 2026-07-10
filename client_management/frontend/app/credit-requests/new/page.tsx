@@ -79,7 +79,7 @@ export default async function RequestCreditsPage({ searchParams }: PageProps) {
           <div className="table-scroll">
             <table className="report compact">
               <thead>
-                <tr><th>Date</th><th>Client</th><th className="num">Credits</th><th className="num">Dollars</th><th>Status</th><th></th></tr>
+                <tr><th>Date</th><th>Client</th><th className="num">Credits</th><th className="num">Dollars</th><th>Status</th><th>Reason</th><th></th></tr>
               </thead>
               <tbody>
                 {mine.map(r => (
@@ -89,6 +89,7 @@ export default async function RequestCreditsPage({ searchParams }: PageProps) {
                     <td className="num">{Number(r.creditsDelta) ? `${creditsFmt(r.creditsDelta)} cr` : '—'}</td>
                     <td className="num">{Number(r.dollarsDelta) ? dollars(r.dollarsDelta) : '—'}</td>
                     <td><span className={`pulse-chip${r.status === 'approved' ? ' is-accent' : r.status === 'rejected' ? ' is-neg' : ''}`}>{r.status}</span></td>
+                    <td className="muted small">{r.decisionNote || (r.status === 'pending' ? '' : '—')}</td>
                     <td className="row-actions">
                       {r.status === 'pending' && (
                         <form action={cancelMyCreditRequestAction} className="inline-form">

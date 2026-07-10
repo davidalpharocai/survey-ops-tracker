@@ -672,6 +672,23 @@ h3 { font-size: 1rem; }
 .imp-banner-text strong { font-weight: 700; }
 .impersonate-quick { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 
+/* Count badge on the Approvals nav item (pending credit requests) */
+.nav-badge {
+  display: inline-block;
+  min-width: 1.15rem;
+  margin-left: 0.35rem;
+  padding: 0 0.35rem;
+  font-size: 0.7rem;
+  font-weight: 500;
+  line-height: 1.15rem;
+  text-align: center;
+  color: #fff;
+  background: var(--accent);
+  border-radius: 999px;
+  vertical-align: middle;
+}
+.decision-note-input { width: 11rem; max-width: 40vw; }
+
 label {
   display: flex;
   flex-direction: column;

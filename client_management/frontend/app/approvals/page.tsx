@@ -62,6 +62,7 @@ export default async function ApprovalsPage() {
                       </form>
                       <form action={rejectCreditRequestAction} className="inline-form">
                         <input type="hidden" name="id" value={r.id} />
+                        <input name="decision_note" type="text" className="decision-note-input" placeholder="Reason (shown to requester)" />
                         <ConfirmButton type="submit" className="btn-sm btn-danger" message="Reject this credit request?">
                           Reject
                         </ConfirmButton>
@@ -81,7 +82,7 @@ export default async function ApprovalsPage() {
           <div className="table-scroll">
             <table className="report compact">
               <thead>
-                <tr><th>Client</th><th>By</th><th className="num">Credits</th><th className="num">Dollars</th><th>Status</th><th>Decided by</th></tr>
+                <tr><th>Client</th><th>By</th><th className="num">Credits</th><th className="num">Dollars</th><th>Status</th><th>Decided by</th><th>Reason</th></tr>
               </thead>
               <tbody>
                 {decided.map(r => (
@@ -92,6 +93,7 @@ export default async function ApprovalsPage() {
                     <td className="num">{Number(r.dollarsDelta) ? dollars(r.dollarsDelta) : '—'}</td>
                     <td><span className={`pulse-chip${r.status === 'approved' ? ' is-accent' : r.status === 'rejected' ? ' is-neg' : ''}`}>{r.status}</span></td>
                     <td className="muted small">{r.decidedByEmail || '—'}</td>
+                    <td className="muted small">{r.decisionNote || '—'}</td>
                   </tr>
                 ))}
               </tbody>

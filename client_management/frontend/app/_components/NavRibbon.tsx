@@ -12,6 +12,7 @@ interface NavItem {
   href: string;
   label: string;
   exact?: boolean;
+  badge?: number;
 }
 
 const LINKS: NavItem[] = [
@@ -26,7 +27,15 @@ const LINKS: NavItem[] = [
 const ADMIN_LINK: NavItem = { href: '/admin', label: 'Admin' };
 const APPROVALS_LINK: NavItem = { href: '/approvals', label: 'Approvals' };
 
-export default function NavRibbon({ isAdmin, isApprover }: { isAdmin: boolean; isApprover?: boolean }) {
+export default function NavRibbon({
+  isAdmin,
+  isApprover,
+  pendingApprovals = 0,
+}: {
+  isAdmin: boolean;
+  isApprover?: boolean;
+  pendingApprovals?: number;
+}) {
   // usePathname() normally excludes basePath, but strip it defensively so
   // active-state works regardless of how the host reports the path.
   const raw = usePathname() || '/';
@@ -34,7 +43,7 @@ export default function NavRibbon({ isAdmin, isApprover }: { isAdmin: boolean; i
 
   const links = [
     ...LINKS,
-    ...(isApprover ? [APPROVALS_LINK] : []),
+    ...(isApprover ? [{ ...APPROVALS_LINK, badge: pendingApprovals }] : []),
     ...(isAdmin ? [ADMIN_LINK] : []),
   ];
 
@@ -53,6 +62,9 @@ export default function NavRibbon({ isAdmin, isApprover }: { isAdmin: boolean; i
             aria-current={active ? 'page' : undefined}
           >
             {item.label}
+            {item.badge ? (
+              <span className="nav-badge" aria-label={`${item.badge} waiting`}>{item.badge}</span>
+            ) : null}
           </Link>
         );
       })}
