@@ -14,7 +14,17 @@ export interface Client {
   primaryContactCell?: string | null;
   primaryContactEmail?: string | null;
   relationshipManager?: string | null;
+  salespersonId?: number | null;
+  salespersonName?: string | null;
+  salespersonEmail?: string | null;
   users?: ClientUser[];
+}
+
+export interface Salesperson {
+  id: number;
+  name: string;
+  email?: string | null;
+  active: boolean;
 }
 
 export interface ClientUser {

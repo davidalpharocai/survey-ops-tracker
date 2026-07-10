@@ -2,9 +2,17 @@
 
 import { useRef } from 'react';
 
+import type { Salesperson } from '../../lib/types';
+import SalespersonPicker from './SalespersonPicker';
 import { createClientAction } from './actions';
 
-export default function NewClientDialog({ today }: { today: string }) {
+export default function NewClientDialog({
+  today,
+  salespeople,
+}: {
+  today: string;
+  salespeople: Salesperson[];
+}) {
   const ref = useRef<HTMLDialogElement>(null);
   return (
     <>
@@ -27,8 +35,9 @@ export default function NewClientDialog({ today }: { today: string }) {
             <label>Primary contact name <input name="primary_contact_name" type="text" /></label>
             <label>Primary contact cell <input name="primary_contact_cell" type="tel" /></label>
             <label>Primary contact email <input name="primary_contact_email" type="email" /></label>
-            <label>Relationship manager <input name="relationship_manager" type="text" placeholder="AlphaROC team member" /></label>
           </div>
+          <SalespersonPicker salespeople={salespeople} />
+
           <div className="actions">
             <button type="submit">Create client</button>
             <button type="button" onClick={() => ref.current?.close()}>Cancel</button>

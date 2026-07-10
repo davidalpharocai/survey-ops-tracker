@@ -5,10 +5,11 @@ import { onlyNotFound } from '../../lib/api';
 import { todayIsoDate } from '../../lib/dates';
 import { contractValue, credits as creditsFmt, dollars, isoDate } from '../../lib/format';
 import { TIP } from '../../lib/tooltips';
-import type { Balance, ClientUser } from '../../lib/types';
+import type { Balance, ClientUser, Salesperson } from '../../lib/types';
 import InfoTooltip from '../_components/InfoTooltip';
 import ConfirmButton from './ConfirmButton';
 import NewClientDialog from './NewClientDialog';
+import SalespersonPicker from './SalespersonPicker';
 import {
   createClientUserAction,
   deleteClientAction,
@@ -35,8 +36,9 @@ export default async function ClientsPage({ searchParams }: PageProps) {
   // stale ?id= URL falls back to the empty state, but a transient backend
   // error still surfaces rather than rendering a fake $0 balance for a
   // real client.
-  const [clients, selected, selectedUsers, bal] = await Promise.all([
+  const [clients, salespeople, selected, selectedUsers, bal] = await Promise.all([
     api.listClients(),
+    api.listSalespeople(),
     selectedId ? api.getClient(selectedId) : Promise.resolve(null),
     selectedId
       ? api.listClientUsers(selectedId).catch(onlyNotFound([] as ClientUser[]))
@@ -59,7 +61,7 @@ export default async function ClientsPage({ searchParams }: PageProps) {
         <aside className="pane-list">
           <div className="pane-list-header">
             <strong>Clients</strong>
-            <NewClientDialog today={today} />
+            <NewClientDialog today={today} salespeople={salespeople} />
           </div>
           <ul className="client-list">
             {clients.length === 0 ? (
@@ -69,8 +71,8 @@ export default async function ClientsPage({ searchParams }: PageProps) {
                 <li key={c.id} className={selected && c.id === selected.id ? 'is-selected' : ''}>
                   <Link href={`/clients?id=${c.id}`}>
                     <span className="cl-name">{c.name}</span>
-                    {c.relationshipManager && (
-                      <span className="cl-meta">RM · {c.relationshipManager}</span>
+                    {(c.salespersonName || c.relationshipManager) && (
+                      <span className="cl-meta">Sales · {c.salespersonName || c.relationshipManager}</span>
                     )}
                   </Link>
                 </li>
@@ -125,8 +127,8 @@ export default async function ClientsPage({ searchParams }: PageProps) {
                   <label>Primary contact name <InfoTooltip text={TIP.primaryContact} /><input name="primary_contact_name" type="text" defaultValue={selected.primaryContactName || ''} /></label>
                   <label>Primary contact cell <input name="primary_contact_cell" type="tel" defaultValue={selected.primaryContactCell || ''} /></label>
                   <label>Primary contact email <input name="primary_contact_email" type="email" defaultValue={selected.primaryContactEmail || ''} /></label>
-                  <label>Relationship manager <InfoTooltip text={TIP.relationshipManager} /><input name="relationship_manager" type="text" defaultValue={selected.relationshipManager || ''} placeholder="AlphaROC team member" /></label>
                 </div>
+                <SalespersonPicker salespeople={salespeople} defaultId={selected.salespersonId ?? null} />
                 <div className="actions">
                   <button type="submit">Save changes</button>
                 </div>

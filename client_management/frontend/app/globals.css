@@ -486,6 +486,90 @@ h3 { font-size: 1rem; }
   font-size: 0.85rem;
 }
 
+/* ---------- Client Pulse dashboard (home) ---------- */
+.pulse { margin: 0 0 1.75rem; }
+.pulse-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+}
+.pulse-title { font-size: 1rem; margin: 0; }
+.pulse-toggle {
+  display: inline-flex;
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.pulse-toggle button {
+  border: none;
+  background: var(--card);
+  color: var(--muted);
+  padding: 0.4rem 0.85rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.pulse-toggle button + button { border-left: 1px solid var(--card-border); }
+.pulse-toggle button.is-active { background: var(--accent); color: #fff; }
+.pulse-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+.pulse-kpi {
+  background: var(--surface-2);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.pulse-kpi-label { font-size: 0.8rem; color: var(--muted); }
+.pulse-kpi-value { font-size: 1.5rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.pulse-kpi-value.is-neg { color: var(--neg); }
+.pulse-kpi-value.is-low { color: var(--warn-fg); }
+.pulse-kpi-value.is-accent { color: var(--accent); }
+.pulse-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1rem;
+}
+.pulse-panel { padding: 1rem 1.1rem; }
+.pulse-panel-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+.pulse-panel-head h3 { margin: 0; font-size: 0.95rem; }
+.pulse-viewall { font-size: 0.8rem; color: var(--accent); text-decoration: none; white-space: nowrap; }
+.pulse-viewall:hover { text-decoration: underline; }
+.pulse-empty { padding: 0.5rem 0 0.25rem; }
+.pulse-chip {
+  display: inline-block;
+  font-size: 0.75rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--muted);
+}
+.pulse-chip.is-neg { background: var(--err-bg); color: var(--neg); }
+.pulse-chip.is-low { background: var(--warn-bg); color: var(--warn-fg); }
+.pulse-chip.is-accent { background: var(--accent-bg); color: var(--accent); }
+.linklike {
+  border: none;
+  background: none;
+  color: var(--accent);
+  cursor: pointer;
+  padding: 0;
+  font: inherit;
+  text-decoration: underline;
+}
+
 /* ---------- Cards & forms ---------- */
 
 .card {
@@ -503,6 +587,21 @@ h3 { font-size: 1rem; }
 }
 .form-narrow { max-width: 560px; }
 .amounts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+
+/* Salesperson picker on the client forms (required select + inline add). */
+.sp-picker { display: flex; flex-direction: column; gap: 0.6rem; margin: 0.2rem 0 0.4rem; }
+.sp-picker > label { display: flex; flex-direction: column; gap: 0.25rem; max-width: 24rem; }
+.sp-new {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  padding: 0.7rem 0.85rem;
+  border: 1px dashed var(--card-border);
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+.sp-new label { display: flex; flex-direction: column; gap: 0.25rem; margin: 0; }
+@media (max-width: 620px) { .sp-new { grid-template-columns: 1fr; } }
 
 label {
   display: flex;

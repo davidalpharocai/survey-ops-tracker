@@ -16,6 +16,7 @@ import type {
   ContractTransaction,
   Ledger,
   RenewalRow,
+  Salesperson,
   SearchResults,
   SoccStatus,
   SoccSyncResult,
@@ -152,6 +153,11 @@ export interface ApiClient {
   updateClient(id: number, d: Record<string, unknown>): Promise<Client>;
   deleteClient(id: number): Promise<{ name: string }>;
 
+  listSalespeople(includeAll?: boolean): Promise<Salesperson[]>;
+  createSalesperson(d: { name: string; email?: string | null }): Promise<Salesperson>;
+  updateSalesperson(id: number, d: { name: string; email?: string | null; active?: boolean }): Promise<Salesperson>;
+  deleteSalesperson(id: number): Promise<{ id: number; name: string }>;
+
   listClientUsers(clientId: number): Promise<ClientUser[]>;
   createClientUser(clientId: number, d: Record<string, unknown>): Promise<ClientUser>;
   getClientUser(id: number): Promise<ClientUser | null>;
@@ -260,6 +266,12 @@ export function api(userEmail: string): ApiClient {
     createClient: d => r('POST', '/api/clients', d),
     updateClient: (id, d) => r('PATCH', `/api/clients/${id}`, d),
     deleteClient: id => r('DELETE', `/api/clients/${id}`),
+
+    listSalespeople: (includeAll = false) =>
+      r('GET', `/api/salespeople${includeAll ? '?include=all' : ''}`),
+    createSalesperson: d => r('POST', '/api/salespeople', d),
+    updateSalesperson: (id, d) => r('PATCH', `/api/salespeople/${id}`, d),
+    deleteSalesperson: id => r('DELETE', `/api/salespeople/${id}`),
 
     listClientUsers: clientId => r('GET', `/api/clients/${clientId}/users`),
     createClientUser: (clientId, d) => r('POST', `/api/clients/${clientId}/users`, d),

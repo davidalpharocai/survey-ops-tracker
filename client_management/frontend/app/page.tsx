@@ -1,6 +1,7 @@
 import Link from 'next/link';
 
 import { currentUserEmail, currentUserIsAdmin } from '../lib/auth';
+import ClientPulse from './_components/ClientPulse';
 import LinkPending from './_components/LinkPending';
 
 export const metadata = { title: 'AlphaROC Credit Management' };
@@ -35,6 +36,10 @@ export default async function HomePage() {
             </Link>
           </div>
 
+          {/* Client Pulse dashboard — reuses the existing report endpoints;
+              defaults to the signed-in salesperson's clients (no restriction). */}
+          <ClientPulse email={userEmail} />
+
           <div className="hub-panels">
             <section className="panel">
               <h2>Balances &amp; Reports</h2>
@@ -55,6 +60,11 @@ export default async function HomePage() {
               <Link className="hub-link" href="/users">
                 <span className="hub-link-title">Client Contacts</span>
                 <span className="hub-link-sub">Search and browse every contact across all clients.</span>
+                <LinkPending />
+              </Link>
+              <Link className="hub-link" href="/salespeople">
+                <span className="hub-link-title">Salespeople</span>
+                <span className="hub-link-sub">Manage the salespeople clients are assigned to · set emails to power the &ldquo;my clients&rdquo; dashboard view.</span>
                 <LinkPending />
               </Link>
             </section>
