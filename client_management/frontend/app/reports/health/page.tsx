@@ -12,6 +12,7 @@ export const metadata = { title: 'Balance Health · AlphaROC' };
 const STATUS_TAG: Record<BalanceHealthStatus, string> = {
   negative: 'tag-error',
   low: 'tag-denied',
+  idle: 'tag-denied',
   ok: 'tag-success',
 };
 
@@ -23,7 +24,7 @@ export default async function BalanceHealthPage() {
     <>
       <Link className="back" href="/reports">← Reports</Link>
       <h1>Balance Health</h1>
-      <p className="muted">One row per client with recorded activity. Monthly burn is the credits or dollars consumed by studies over the trailing 90 days divided by 3; the run-out date projects the current balance forward at that pace. Clients already negative are flagged first, then anyone projected to run out within 60 days.</p>
+      <p className="muted">One row per client with recorded activity. Monthly burn is the credits or dollars consumed by studies over the trailing 90 days divided by 3; the run-out date projects the current balance forward at that pace. Clients already negative are flagged first, then anyone projected to run out within 60 days, then <strong>idle</strong> clients — funded but with no activity in the last 90 days (a re-engagement signal).</p>
 
       {rows.length > 0 ? (
         <table className="report">

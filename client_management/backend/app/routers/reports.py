@@ -487,6 +487,7 @@ async def balance_health(
                 func.coalesce(func.sum(Transaction.dollars_delta), 0).label("dollars"),
                 func.coalesce(func.sum(case((is_recent_study, -Transaction.credits_delta), else_=0)), 0).label("credit_burn"),
                 func.coalesce(func.sum(case((is_recent_study, -Transaction.dollars_delta), else_=0)), 0).label("dollar_burn"),
+                func.coalesce(func.sum(case((Transaction.occurred_on >= today - timedelta(days=BURN_WINDOW_DAYS), 1), else_=0)), 0).label("recent_any"),
             )
             .where(Transaction.deleted_at.is_(None))
             .group_by(Transaction.client_id)
@@ -519,6 +520,15 @@ async def balance_health(
             d is not None and d <= low_cutoff for d in (credits_out, dollars_out)
         ):
             health = "low"
+        elif (
+            int(row.recent_any) == 0
+            and (credits > 0 or dollars > 0)
+            and c.became_client_on < today - timedelta(days=BURN_WINDOW_DAYS)
+        ):
+            # Established client with money on the books but no transaction of
+            # any kind in the trailing window — funded but dormant, a
+            # re-engagement/churn signal rather than a healthy "ok".
+            health = "idle"
         else:
             health = "ok"
         out.append(
@@ -534,7 +544,7 @@ async def balance_health(
             }
         )
 
-    rank = {"negative": 0, "low": 1, "ok": 2}
+    rank = {"negative": 0, "low": 1, "idle": 2, "ok": 3}
 
     def _key(r: dict) -> tuple:
         soonest = ""

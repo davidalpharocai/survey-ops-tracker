@@ -386,6 +386,25 @@ async def test_balance_health_excludes_trackers_from_burn(client):
     assert row["credits"] == 20000.0 - 3600.0 - 450.0
 
 
+async def test_balance_health_flags_idle_funded_but_dormant(client):
+    # An established client with a healthy positive balance and NO recent
+    # spend is "idle" (funded-but-dormant = re-engagement/churn signal), not
+    # "ok" where it would hide among healthy accounts.
+    made = await make_client(client, name="Dormant Co")  # became a client 2024
+    await make_contract(
+        client,
+        made["id"],
+        occurred_on=_d(TODAY - timedelta(days=180)),
+        renewal_on=_d(TODAY + timedelta(days=185)),
+        credits_amount=5000,
+    )
+    r = await client.get("/api/reports/balance-health", headers=ADMIN)
+    assert r.status_code == 200
+    row = next(x for x in r.json() if x["client"]["id"] == made["id"])
+    assert row["status"] == "idle"
+    assert row["monthlyCreditBurn"] == 0
+
+
 async def test_balance_health_zero_burn_null_run_out(client):
     made = await make_client(client, name="Idle Co")
     await make_contract(

@@ -221,7 +221,7 @@ export interface RenewalRow {
   bucket: RenewalBucket;
 }
 
-export type BalanceHealthStatus = 'negative' | 'low' | 'ok';
+export type BalanceHealthStatus = 'negative' | 'low' | 'idle' | 'ok';
 
 export interface BalanceHealthRow {
   client: Client;

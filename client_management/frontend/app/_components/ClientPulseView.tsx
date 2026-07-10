@@ -35,6 +35,7 @@ const RENEWALS_TIP =
 function statusChip(status: BalanceHealthRow['status']) {
   if (status === 'negative') return <span className="pulse-chip is-neg">Negative</span>;
   if (status === 'low') return <span className="pulse-chip is-low">Low</span>;
+  if (status === 'idle') return <span className="pulse-chip">Idle</span>;
   return <span className="pulse-chip">OK</span>;
 }
 
@@ -78,7 +79,9 @@ export default function ClientPulseView({
   const fBalances = filterOwned(balances, email, effectiveMode);
   const kpis = computeKpis(fHealth, fRenewals, fBalances);
 
-  const attention = fHealth.filter(h => h.status !== 'ok');
+  // Home "needs attention" stays focused on problems (negative/low). Idle
+  // (funded-but-dormant) surfaces on the dedicated Balance Health report.
+  const attention = fHealth.filter(h => h.status === 'negative' || h.status === 'low');
   const dueSoon = fRenewals; // already soonest-first from the backend
   const nothing = attention.length === 0 && dueSoon.length === 0;
 
