@@ -505,6 +505,49 @@ async def test_study_idempotency_key_replay_returns_same_row(client, db):
     assert bal["credits"] == -100.0
 
 
+# --- Inline new-contact on study create (atomic) ----------------------------
+
+
+async def test_inline_new_contact_created_and_attributed(client):
+    made = await make_client(client)  # no contacts yet
+    payload = _study_payload(
+        made["id"],
+        [],
+        new_contact_name="Jordan Lee",
+        new_contact_email="jordan@acme.com",
+    )
+    r = await client.post("/api/studies", json=payload, headers=ADMIN)
+    assert r.status_code == 201, r.text
+
+    users = await client.get(
+        f"/api/clients/{made['id']}/users", headers=ADMIN
+    )
+    names = {u["name"] for u in users.json()}
+    assert "Jordan Lee" in names
+    # exactly one contact was created
+    assert len([u for u in users.json() if u["name"] == "Jordan Lee"]) == 1
+
+
+async def test_inline_new_contact_rolls_back_when_study_invalid(client):
+    made = await make_client(client)
+    # An invalid contract link makes study creation fail AFTER the inline
+    # contact is added — the whole request must roll back (no orphan contact).
+    payload = _study_payload(
+        made["id"],
+        [],
+        new_contact_name="Ghost Contact",
+        contract_id=999999,
+    )
+    r = await client.post("/api/studies", json=payload, headers=ADMIN)
+    assert r.status_code == 400, r.text
+
+    users = await client.get(
+        f"/api/clients/{made['id']}/users", headers=ADMIN
+    )
+    names = {u["name"] for u in users.json()}
+    assert "Ghost Contact" not in names
+
+
 # --- New study fields: audience / target N / actual N / description ---------
 
 

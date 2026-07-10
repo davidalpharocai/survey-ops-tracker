@@ -58,9 +58,10 @@ interface Props {
   studies: StudyTransaction[];
   clientUsers: ClientUser[];
   clientId: number;
+  readOnly?: boolean;
 }
 
-export default function ExistingStudiesTable({ studies, clientUsers, clientId }: Props) {
+export default function ExistingStudiesTable({ studies, clientUsers, clientId, readOnly = false }: Props) {
   const [rows, setRows] = useState<RowState[]>(() =>
     studies.map(t => ({
       id: t.id,
@@ -263,7 +264,7 @@ export default function ExistingStudiesTable({ studies, clientUsers, clientId }:
                   >
                     Details {isExp ? '▾' : '▸'}{hasMeta ? ' •' : ''}
                   </button>
-                  {r.isImported && (
+                  {!readOnly && r.isImported && (
                     <button
                       type="submit"
                       form={`reviewed-form-${r.id}`}
@@ -273,14 +274,16 @@ export default function ExistingStudiesTable({ studies, clientUsers, clientId }:
                       Mark reviewed
                     </button>
                   )}
-                  <ConfirmButton
-                    type="submit"
-                    form={`delete-form-${r.id}`}
-                    className="btn-sm btn-danger"
-                    message={`Delete study '${r.name}'?`}
-                  >
-                    Delete
-                  </ConfirmButton>
+                  {!readOnly && (
+                    <ConfirmButton
+                      type="submit"
+                      form={`delete-form-${r.id}`}
+                      className="btn-sm btn-danger"
+                      message={`Delete study '${r.name}'?`}
+                    >
+                      Delete
+                    </ConfirmButton>
+                  )}
                 </td>
               </tr>
               {/* Detail row is always rendered (hidden when collapsed) so its
@@ -342,10 +345,12 @@ export default function ExistingStudiesTable({ studies, clientUsers, clientId }:
         </tbody>
       </table>
 
-      <div className="bulk-actions">
-        <button type="submit" form="bulk-form">Save all changes</button>
-        <span className="muted small">Saves every row at once. Delete buttons act per row.</span>
-      </div>
+      {!readOnly && (
+        <div className="bulk-actions">
+          <button type="submit" form="bulk-form">Save all changes</button>
+          <span className="muted small">Saves every row at once. Delete buttons act per row.</span>
+        </div>
+      )}
     </>
   );
 }

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 
 import { apiForRequest } from '../../../lib/action';
+import { currentUserReadOnly } from '../../../lib/auth';
 import { credits as creditsFmt, dollars, isoDate } from '../../../lib/format';
 import type { Client, CreditRequest } from '../../../lib/types';
 import ConfirmButton from '../../clients/ConfirmButton';
@@ -17,9 +18,10 @@ interface PageProps {
 export default async function RequestCreditsPage({ searchParams }: PageProps) {
   const sp = await searchParams;
   const api = await apiForRequest();
-  const [clients, mine] = await Promise.all([
+  const [clients, mine, readOnly] = await Promise.all([
     api.listClients().catch(() => [] as Client[]),
     api.listCreditRequests().catch(() => [] as CreditRequest[]),
+    currentUserReadOnly(),
   ]);
 
   return (
@@ -35,6 +37,11 @@ export default async function RequestCreditsPage({ searchParams }: PageProps) {
         <p className="banner-ok">Request submitted — it&apos;s now in the approval queue.</p>
       )}
 
+      {readOnly && (
+        <p className="muted">You&apos;re viewing as another user (read-only) — exit to submit a request.</p>
+      )}
+
+      {!readOnly && (
       <form action={submitCreditRequestAction} className="card form-narrow">
         <label>Client
           <select name="client_id" required defaultValue="">
@@ -60,6 +67,7 @@ export default async function RequestCreditsPage({ searchParams }: PageProps) {
           <SubmitButton className="btn" pendingLabel="Submitting…">Submit request</SubmitButton>
         </div>
       </form>
+      )}
 
       <div className="card">
         <h3>Your requests</h3>

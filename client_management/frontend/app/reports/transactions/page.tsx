@@ -2,7 +2,7 @@ import Link from 'next/link';
 
 import { apiForRequest, parseId } from '../../../lib/action';
 import { onlyNotFound } from '../../../lib/api';
-import { currentUserIsRestricted } from '../../../lib/auth';
+import { currentUserIsRestricted, currentUserReadOnly } from '../../../lib/auth';
 import {
   contractValue,
   credits as creditsFmt,
@@ -60,7 +60,10 @@ export default async function TransactionsReportPage({ searchParams }: PageProps
   ].map(s => ({ id: s.id, name: s.name }));
 
   const currentYear = new Date().getUTCFullYear();
-  const restricted = await currentUserIsRestricted();
+  const [restricted, readOnly] = await Promise.all([
+    currentUserIsRestricted(),
+    currentUserReadOnly(),
+  ]);
 
   return (
     <>
@@ -107,12 +110,16 @@ export default async function TransactionsReportPage({ searchParams }: PageProps
           </div>
 
           {hasRows ? (
-            <LedgerTree ledger={ledger} clientId={selected.id} canEditMoney={!restricted} />
+            <LedgerTree ledger={ledger} clientId={selected.id} canEditMoney={!restricted && !readOnly} />
           ) : (
             <p className="muted">No contracts or surveys yet for this client.</p>
           )}
 
-          {restricted ? (
+          {readOnly ? (
+            <p className="muted" style={{ marginTop: 16 }}>
+              You&apos;re viewing as another user (read-only) — exit to make changes.
+            </p>
+          ) : restricted ? (
             <p className="muted" style={{ marginTop: 16 }}>
               Need to add credits? <Link href="/credit-requests/new">Request credits</Link> — an approver will apply it to this client&apos;s balance.
             </p>

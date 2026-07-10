@@ -98,6 +98,11 @@ class StudyIn(BaseModel):
     target_n: int | str | None = None
     actual_n_delivered: int | str | None = None
     description: str | None = None
+    # Inline "add a new contact" on study CREATE: when present, the contact is
+    # created in the SAME transaction as the study and attributed to it, so a
+    # failed study never leaves an orphan contact behind.
+    new_contact_name: str | None = None
+    new_contact_email: str | None = None
 
 
 class StudyBulkUpdateIn(BaseModel):

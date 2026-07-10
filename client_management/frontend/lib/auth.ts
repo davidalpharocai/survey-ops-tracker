@@ -112,3 +112,10 @@ export async function currentImpersonatedBy(): Promise<string | null> {
   const h = await headers();
   return h.get('x-impersonated-by');
 }
+
+// Impersonation is strictly read-only (the backend rejects every write while
+// it is active). Write surfaces call this to hide their controls so an admin
+// doing "view as user" never clicks a button that would just 403.
+export async function currentUserReadOnly(): Promise<boolean> {
+  return (await currentImpersonatedBy()) !== null;
+}

@@ -379,6 +379,23 @@ async def create_study(
 
     client = await scoped_client_or_404(session, body.client_id or 0, scope)
     f = read_study_form(body)
+
+    # Inline "add a new contact": create it in THIS transaction (no separate
+    # commit) so if study creation fails below, the contact rolls back too —
+    # no orphaned/duplicate contacts. Its id joins the attribution set before
+    # validation, so a study attributed only to a brand-new contact is valid.
+    new_contact_name = (body.new_contact_name or "").strip()
+    if new_contact_name:
+        contact = ClientUser(
+            client_id=client.id,
+            name=new_contact_name,
+            email=(body.new_contact_email or "").strip() or None,
+            created_by_email=user,
+        )
+        session.add(contact)
+        await session.flush()
+        f.user_ids.append(contact.id)
+
     _check_common(f)
     users = await _validate_users(session, f.user_ids, client.id)
     if users is None:

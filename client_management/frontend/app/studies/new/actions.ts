@@ -65,20 +65,6 @@ export async function createStudyAction(formData: FormData): Promise<void> {
   if (clientId == null) redirectTo('/studies/new');
   const api = await apiForRequest();
 
-  const userIds: FormDataEntryValue[] = formData
-    .getAll('client_user_ids')
-    .filter(Boolean);
-  // Inline "add a new contact": create it on the selected client first, then
-  // attribute the study to it alongside any existing selections.
-  const newContactName = (formData.get('new_contact_name') || '').toString().trim();
-  if (newContactName) {
-    const created = await api.createClientUser(clientId, {
-      name: newContactName,
-      email: (formData.get('new_contact_email') || '').toString().trim() || null,
-    });
-    if (created?.id != null) userIds.push(String(created.id));
-  }
-
   const body = studyBody({
     name: formData.get('name'),
     occurred_on: formData.get('occurred_on'),
@@ -86,14 +72,23 @@ export async function createStudyAction(formData: FormData): Promise<void> {
     cadence: formData.get('cadence'),
     cost: formData.get('cost'),
     setup_cost: formData.get('setup_cost'),
-    client_user_ids: userIds,
+    client_user_ids: formData.getAll('client_user_ids'),
     audience: formData.get('audience'),
     target_n: formData.get('target_n'),
     actual_n_delivered: formData.get('actual_n_delivered'),
     description: formData.get('description'),
   });
   const contractId = parseId(formData.get('contract_id'));
-  await api.createStudy({ client_id: formData.get('client_id'), ...body, contract_id: contractId });
+  // Inline "add a new contact": the backend creates it in the SAME
+  // transaction as the study and attributes it, so a failed study never
+  // leaves an orphaned/duplicate contact behind.
+  await api.createStudy({
+    client_id: formData.get('client_id'),
+    ...body,
+    contract_id: contractId,
+    new_contact_name: formData.get('new_contact_name'),
+    new_contact_email: formData.get('new_contact_email'),
+  });
   revalidatePath('/', 'layout');
   redirectTo(`/studies/new?client_id=${clientId}`);
 }

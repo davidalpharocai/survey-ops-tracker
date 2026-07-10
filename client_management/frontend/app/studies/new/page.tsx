@@ -2,6 +2,7 @@ import Link from 'next/link';
 
 import { apiForRequest, parseId } from '../../../lib/action';
 import { onlyNotFound } from '../../../lib/api';
+import { currentUserReadOnly } from '../../../lib/auth';
 import type { ClientUser, StudyTransaction } from '../../../lib/types';
 import AutoSubmitSelect from '../../_components/AutoSubmitSelect';
 import ExistingStudiesTable from './ExistingStudiesTable';
@@ -23,7 +24,7 @@ export default async function NewStudyPage({ searchParams }: PageProps) {
   // common path from the "+ Add study" quicklinks) that client's studies in
   // one parallel wave — the per-client read only needs `preselect` (a URL
   // int), so waiting for the list first was a gratuitous extra round trip.
-  const [clients, fetchedStudies, fetchedContracts] = await Promise.all([
+  const [clients, fetchedStudies, fetchedContracts, readOnly] = await Promise.all([
     api.listClientsWithUsers(),
     preselect
       ? api.listStudiesByClient(preselect).catch(onlyNotFound([] as StudyTransaction[]))
@@ -31,6 +32,7 @@ export default async function NewStudyPage({ searchParams }: PageProps) {
     preselect
       ? api.listContractsByClient(preselect).catch(() => [])
       : Promise.resolve([]),
+    currentUserReadOnly(),
   ]);
 
   const selectedClient = preselect ? clients.find(c => c.id === preselect) || null : null;
@@ -83,18 +85,25 @@ export default async function NewStudyPage({ searchParams }: PageProps) {
                     studies={existingStudies}
                     clientUsers={selectedClientUsers}
                     clientId={selectedClient.id}
+                    readOnly={readOnly}
                   />
                 </>
               )}
             </>
           )}
 
-          <h2>Record a new study</h2>
-          <NewStudyForm
-            clientId={selectedClient ? selectedClient.id : null}
-            users={selectedClientUsers}
-            contracts={clientContracts}
-          />
+          {readOnly ? (
+            <p className="muted">You&apos;re viewing as another user (read-only) — exit to record or edit studies.</p>
+          ) : (
+            <>
+              <h2>Record a new study</h2>
+              <NewStudyForm
+                clientId={selectedClient ? selectedClient.id : null}
+                users={selectedClientUsers}
+                contracts={clientContracts}
+              />
+            </>
+          )}
         </>
       )}
     </>

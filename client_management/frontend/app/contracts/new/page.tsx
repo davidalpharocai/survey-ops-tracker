@@ -2,6 +2,7 @@ import Link from 'next/link';
 
 import { apiForRequest, parseId } from '../../../lib/action';
 import { onlyNotFound } from '../../../lib/api';
+import { currentUserReadOnly } from '../../../lib/auth';
 import { todayIsoDate } from '../../../lib/dates';
 import { isoDate } from '../../../lib/format';
 import { TIP } from '../../../lib/tooltips';
@@ -32,11 +33,12 @@ export default async function NewContractPage({ searchParams }: PageProps) {
   // (a URL int), so it need not wait for the client list. A stale preselect
   // 404s to an empty list; other errors still surface.
   type ContractRows = Awaited<ReturnType<typeof api.listContractsByClient>>;
-  const [clients, fetchedContracts] = await Promise.all([
+  const [clients, fetchedContracts, readOnly] = await Promise.all([
     api.listClients(),
     preselect
       ? api.listContractsByClient(preselect).catch(onlyNotFound([] as ContractRows))
       : Promise.resolve([] as ContractRows),
+    currentUserReadOnly(),
   ]);
 
   const selectedClient = preselect ? clients.find(c => c.id === preselect) || null : null;
@@ -114,13 +116,17 @@ export default async function NewContractPage({ searchParams }: PageProps) {
                             <input form={fid} name="description" type="text" defaultValue={t.description || ''} placeholder="—" />
                           </td>
                           <td className="row-actions">
-                            <button type="submit" form={fid} className="btn-sm">Save</button>
-                            <form action={deleteContractAction} className="inline-form">
-                              <input type="hidden" name="id" value={t.id} />
-                              <ConfirmButton type="submit" className="btn-sm btn-danger" message={`Delete contract '${t.name}'?`}>
-                                Delete
-                              </ConfirmButton>
-                            </form>
+                            {!readOnly && (
+                              <>
+                                <button type="submit" form={fid} className="btn-sm">Save</button>
+                                <form action={deleteContractAction} className="inline-form">
+                                  <input type="hidden" name="id" value={t.id} />
+                                  <ConfirmButton type="submit" className="btn-sm btn-danger" message={`Delete contract '${t.name}'?`}>
+                                    Delete
+                                  </ConfirmButton>
+                                </form>
+                              </>
+                            )}
                           </td>
                         </tr>
                       );
@@ -133,6 +139,11 @@ export default async function NewContractPage({ searchParams }: PageProps) {
 
           <h2>Record a new contract</h2>
 
+          {readOnly && (
+            <p className="muted">You&apos;re viewing as another user (read-only) — exit to add or edit contracts.</p>
+          )}
+
+          {!readOnly && (
           <form action={createContractAction} className="card form-narrow">
             <input type="hidden" name="client_id" value={selectedClient ? selectedClient.id : ''} />
 
@@ -173,8 +184,9 @@ export default async function NewContractPage({ searchParams }: PageProps) {
               <SubmitButton disabled={!selectedClient} pendingLabel="Saving…">Save Contract</SubmitButton>
             </div>
           </form>
+          )}
 
-          {selectedClient && <RenewalAutofill />}
+          {selectedClient && !readOnly && <RenewalAutofill />}
         </>
       )}
     </>

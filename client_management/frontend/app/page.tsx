@@ -5,6 +5,7 @@ import {
   currentUserEmail,
   currentUserIsApprover,
   currentUserIsRestricted,
+  currentUserReadOnly,
 } from '../lib/auth';
 import ClientPulse from './_components/ClientPulse';
 import LinkPending from './_components/LinkPending';
@@ -12,10 +13,11 @@ import LinkPending from './_components/LinkPending';
 export const metadata = { title: 'AlphaROC Credit Management' };
 
 export default async function HomePage() {
-  const [userEmail, isRestricted, isApprover] = await Promise.all([
+  const [userEmail, isRestricted, isApprover, readOnly] = await Promise.all([
     currentUserEmail(),
     currentUserIsRestricted(),
     currentUserIsApprover(),
+    currentUserReadOnly(),
   ]);
 
   return (
@@ -27,26 +29,28 @@ export default async function HomePage() {
           {/* Tiles use default <Link> prefetch + per-route loading.tsx for an
               instant shell; LinkPending gives immediate click feedback. Do
               not set prefetch={false} (it would kill the instant shell). */}
-          <div className="hub-actions">
-            <Link className="hub-action" href="/studies/new">
-              <span className="hub-link-title">Record a Study</span>
-              <span className="hub-link-sub">Log a survey that draws down a client&apos;s credits or dollars, attributed to one of their contacts.</span>
-              <LinkPending />
-            </Link>
-            {isRestricted ? (
-              <Link className="hub-action" href="/credit-requests/new">
-                <span className="hub-link-title">Request Credits</span>
-                <span className="hub-link-sub">Ask an approver to add credits or dollars to one of your clients.</span>
+          {!readOnly && (
+            <div className="hub-actions">
+              <Link className="hub-action" href="/studies/new">
+                <span className="hub-link-title">Record a Study</span>
+                <span className="hub-link-sub">Log a survey that draws down a client&apos;s credits or dollars, attributed to one of their contacts.</span>
                 <LinkPending />
               </Link>
-            ) : (
-              <Link className="hub-action" href="/contracts/new">
-                <span className="hub-link-title">Add a Contract</span>
-                <span className="hub-link-sub">Top up a client&apos;s available credits and/or dollars — funds their studies.</span>
-                <LinkPending />
-              </Link>
-            )}
-          </div>
+              {isRestricted ? (
+                <Link className="hub-action" href="/credit-requests/new">
+                  <span className="hub-link-title">Request Credits</span>
+                  <span className="hub-link-sub">Ask an approver to add credits or dollars to one of your clients.</span>
+                  <LinkPending />
+                </Link>
+              ) : (
+                <Link className="hub-action" href="/contracts/new">
+                  <span className="hub-link-title">Add a Contract</span>
+                  <span className="hub-link-sub">Top up a client&apos;s available credits and/or dollars — funds their studies.</span>
+                  <LinkPending />
+                </Link>
+              )}
+            </div>
+          )}
 
           {/* Client Pulse dashboard — reuses the existing report endpoints;
               defaults to the signed-in salesperson's clients (no restriction).
