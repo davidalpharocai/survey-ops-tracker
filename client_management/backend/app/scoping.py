@@ -96,6 +96,25 @@ async def require_unrestricted(
     return scope
 
 
+async def require_credit_approver(
+    request: Request, email: str = Depends(require_user)
+) -> str:
+    """Authorize the caller to approve/reject credit requests.
+
+    Admins and configured credit approvers (Vineet / Shanu / David) only.
+    """
+    groups = getattr(request.state, "actor_groups", []) or []
+    if not (
+        settings.is_admin(email, groups)
+        or settings.is_credit_approver(email, groups)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only a credit approver can decide requests.",
+        )
+    return email
+
+
 async def scoped_client_or_404(
     session: AsyncSession, client_id: int, scope: AccessScope
 ) -> Client:

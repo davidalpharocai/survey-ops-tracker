@@ -65,6 +65,43 @@ async def _existing_by_idem_key(
     return result.scalar_one_or_none()
 
 
+async def insert_adjustment(
+    session: AsyncSession,
+    *,
+    client: Client,
+    credits_delta: float,
+    dollars_delta: float,
+    note: str,
+    actor_email: str,
+    idem_key: str | None = None,
+    reverses_transaction_id: int | None = None,
+) -> Transaction:
+    """Build + add + flush an adjustment ledger row (no commit).
+
+    The single insert path for both the direct adjustment endpoint and the
+    credit-request approval flow, so the two can't diverge. The caller
+    commits (and handles any idem-key IntegrityError).
+    """
+    name = "Adjustment"
+    if reverses_transaction_id is not None:
+        name = f"Adjustment of #{reverses_transaction_id}"
+    t = Transaction(
+        client_id=client.id,
+        kind="adjustment",
+        name=name,
+        occurred_on=utc_today(),
+        credits_delta=credits_delta,
+        dollars_delta=dollars_delta,
+        actor_email=actor_email,
+        note=note,
+        reverses_transaction_id=reverses_transaction_id,
+        idem_key=idem_key,
+    )
+    session.add(t)
+    await session.flush()
+    return t
+
+
 @router.post("/adjustments", status_code=status.HTTP_201_CREATED)
 async def create_adjustment(
     body: AdjustmentIn,
@@ -148,21 +185,18 @@ async def create_adjustment(
             )
         name = f"Adjustment of #{reversed_txn.id}"
 
-    t = Transaction(
-        client_id=client.id,
-        kind="adjustment",
-        name=name,
-        occurred_on=utc_today(),
-        credits_delta=credits_delta,
-        dollars_delta=dollars_delta,
-        actor_email=user,
-        note=note,
-        reverses_transaction_id=body.reverses_transaction_id,
-        idem_key=idem,
-    )
     client_name = client.name  # read before commit/rollback expires it
-    session.add(t)
     try:
+        t = await insert_adjustment(
+            session,
+            client=client,
+            credits_delta=credits_delta,
+            dollars_delta=dollars_delta,
+            note=note,
+            actor_email=user,
+            idem_key=idem,
+            reverses_transaction_id=body.reverses_transaction_id,
+        )
         await session.commit()
     except IntegrityError:
         # Race on the idem_key unique index: another request with the same

@@ -142,3 +142,34 @@ ALTER TABLE clients ADD COLUMN IF NOT EXISTS salesperson_name TEXT;
 ALTER TABLE clients ADD COLUMN IF NOT EXISTS salesperson_email TEXT;
 CREATE INDEX IF NOT EXISTS clients_salesperson_email_idx
     ON clients (lower(salesperson_email)) WHERE salesperson_email IS NOT NULL;
+
+-- Credit-request approval queue. A restricted salesperson can't add credits
+-- directly; they submit a request here and an approver (Vineet/Shanu/David)
+-- approves it, which creates the actual adjustment. The row is the durable
+-- approval audit record. transaction_id is optional survey context only
+-- (NOT a funding link). idem_key: the resulting adjustment reuses
+-- transactions.idem_key with the value 'credit_request:{id}'.
+CREATE TABLE IF NOT EXISTS credit_requests (
+    id                     SERIAL PRIMARY KEY,
+    client_id              INTEGER NOT NULL
+                             REFERENCES clients(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    transaction_id         INTEGER
+                             REFERENCES transactions(id) ON DELETE SET NULL ON UPDATE CASCADE,
+    credits_delta          DECIMAL(65,30) NOT NULL DEFAULT 0,
+    dollars_delta          DECIMAL(65,30) NOT NULL DEFAULT 0,
+    note                   TEXT NOT NULL,
+    status                 TEXT NOT NULL DEFAULT 'pending',
+    requested_by_email     TEXT NOT NULL,
+    created_at             TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    decided_by_email       TEXT,
+    decided_at             TIMESTAMP(3),
+    decision_note          TEXT,
+    resulting_transaction_id INTEGER
+                             REFERENCES transactions(id) ON DELETE SET NULL ON UPDATE CASCADE
+);
+CREATE INDEX IF NOT EXISTS credit_requests_status_created_idx
+    ON credit_requests (status, created_at);
+CREATE INDEX IF NOT EXISTS credit_requests_requester_idx
+    ON credit_requests (lower(requested_by_email));
+CREATE INDEX IF NOT EXISTS credit_requests_client_idx
+    ON credit_requests (client_id);

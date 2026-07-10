@@ -16,6 +16,7 @@ from app.routers import (
     archive,
     clients,
     contracts,
+    credit_requests,
     health,
     reports,
     salespeople,
@@ -91,6 +92,7 @@ app.include_router(users.router)
 app.include_router(contracts.router)
 app.include_router(studies.router)
 app.include_router(adjustments.router)
+app.include_router(credit_requests.router)
 app.include_router(transactions.router)
 app.include_router(reports.router)
 app.include_router(salespeople.router)

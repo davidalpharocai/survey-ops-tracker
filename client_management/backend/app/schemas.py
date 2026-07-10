@@ -41,6 +41,22 @@ class SalespersonIn(BaseModel):
     active: bool | None = None
 
 
+class CreditRequestIn(BaseModel):
+    """A salesperson's request to add credits/dollars to a client."""
+
+    client_id: int | None = None
+    transaction_id: int | None = None  # optional survey context
+    credits_delta: float | str | None = None
+    dollars_delta: float | str | None = None
+    note: str = ""
+
+
+class CreditRequestDecision(BaseModel):
+    """An approver's decision note when approving/rejecting a request."""
+
+    decision_note: str | None = None
+
+
 class ContractIn(BaseModel):
     """Create/update payload for a contract transaction."""
 

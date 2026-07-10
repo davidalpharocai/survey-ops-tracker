@@ -13,7 +13,7 @@ them into ``Date`` objects so the existing formatters keep working.
 from datetime import datetime
 from decimal import Decimal
 
-from app.models import Client, ClientUser, Salesperson, Transaction
+from app.models import Client, ClientUser, CreditRequest, Salesperson, Transaction
 
 
 def _iso(dt: datetime | None) -> str | None:
@@ -124,6 +124,41 @@ def client_user_dict(u: ClientUser) -> dict:
         "createdByEmail": u.created_by_email,
         "createdAt": _iso(u.created_at),
     }
+
+
+def credit_request_dict(cr: CreditRequest, client: Client | None = None) -> dict:
+    """Serialise a :class:`~app.models.CreditRequest`.
+
+    Parameters
+    ----------
+    cr : CreditRequest
+        Credit-request row.
+    client : Client or None
+        Owning client to embed (name shown in the approval queue), if loaded.
+
+    Returns
+    -------
+    dict
+        camelCase representation for the approval UI.
+    """
+    out = {
+        "id": cr.id,
+        "clientId": cr.client_id,
+        "transactionId": cr.transaction_id,
+        "creditsDelta": _num(cr.credits_delta),
+        "dollarsDelta": _num(cr.dollars_delta),
+        "note": cr.note,
+        "status": cr.status,
+        "requestedByEmail": cr.requested_by_email,
+        "createdAt": _iso(cr.created_at),
+        "decidedByEmail": cr.decided_by_email,
+        "decidedAt": _iso(cr.decided_at),
+        "decisionNote": cr.decision_note,
+        "resultingTransactionId": cr.resulting_transaction_id,
+    }
+    if client is not None:
+        out["client"] = client_dict(client)
+    return out
 
 
 def transaction_dict(

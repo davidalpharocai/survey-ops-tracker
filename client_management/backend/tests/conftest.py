@@ -51,6 +51,9 @@ import pytest_asyncio  # noqa: E402
 # Auth headers used throughout the suite (dev X-User-Email path).
 ADMIN = {"X-User-Email": "david@alpharoc.ai"}  # in CCM_ADMIN_EMAILS
 ADMIN2 = {"X-User-Email": "tedi@alpharoc.ai"}  # second admin (unrestricted)
+# Credit approver (default CCM_CREDIT_APPROVER_EMAILS) — unrestricted read,
+# can approve/reject credit requests, but not an admin.
+APPROVER = {"X-User-Email": "vineet@alpharoc.ai"}
 # sarah@ is a plain @alpharoc.ai member -> RESTRICTED salesperson under the
 # permissions model (sees only her own clients; can't add credits).
 USER = {"X-User-Email": "sarah@alpharoc.ai"}
@@ -96,8 +99,8 @@ async def _clean_tables(_database):
     conn = await asyncpg.connect(TEST_DSN)
     try:
         await conn.execute(
-            "TRUNCATE transaction_users, transactions, client_users, clients, "
-            "salespeople RESTART IDENTITY CASCADE"
+            "TRUNCATE credit_requests, transaction_users, transactions, "
+            "client_users, clients, salespeople RESTART IDENTITY CASCADE"
         )
     finally:
         await conn.close()

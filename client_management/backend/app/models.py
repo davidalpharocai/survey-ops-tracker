@@ -154,6 +154,39 @@ class ClientUser(Base):
     client: Mapped[Client] = relationship(back_populates="users")
 
 
+class CreditRequest(Base):
+    """A salesperson's request to add credits/dollars, awaiting approval.
+
+    Maps to the ``credit_requests`` table. Restricted salespeople can't add
+    credits directly; they file a request that an approver (Vineet / Shanu /
+    David) approves, which creates the actual adjustment. The row is the
+    durable approval audit trail.
+    """
+
+    __tablename__ = "credit_requests"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    client_id: Mapped[int] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE", onupdate="CASCADE")
+    )
+    # Optional survey context ("these credits are for PR#####") — NOT a link.
+    transaction_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    credits_delta: Mapped[Decimal] = mapped_column(Numeric(65, 30), default=0)
+    dollars_delta: Mapped[Decimal] = mapped_column(Numeric(65, 30), default=0)
+    note: Mapped[str] = mapped_column(String)
+    status: Mapped[str] = mapped_column(String, default="pending")
+    requested_by_email: Mapped[str] = mapped_column(String)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now()
+    )
+    decided_by_email: Mapped[str | None] = mapped_column(String, nullable=True)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    decision_note: Mapped[str | None] = mapped_column(String, nullable=True)
+    resulting_transaction_id: Mapped[int | None] = mapped_column(
+        Integer, nullable=True
+    )
+
+
 class Transaction(Base):
     """A single ledger entry (a contract or a study).
 
