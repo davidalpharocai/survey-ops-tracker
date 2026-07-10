@@ -64,6 +64,21 @@ export async function createStudyAction(formData: FormData): Promise<void> {
   const clientId = parseId(formData.get('client_id'));
   if (clientId == null) redirectTo('/studies/new');
   const api = await apiForRequest();
+
+  const userIds: FormDataEntryValue[] = formData
+    .getAll('client_user_ids')
+    .filter(Boolean);
+  // Inline "add a new contact": create it on the selected client first, then
+  // attribute the study to it alongside any existing selections.
+  const newContactName = (formData.get('new_contact_name') || '').toString().trim();
+  if (newContactName) {
+    const created = await api.createClientUser(clientId, {
+      name: newContactName,
+      email: (formData.get('new_contact_email') || '').toString().trim() || null,
+    });
+    if (created?.id != null) userIds.push(String(created.id));
+  }
+
   const body = studyBody({
     name: formData.get('name'),
     occurred_on: formData.get('occurred_on'),
@@ -71,7 +86,7 @@ export async function createStudyAction(formData: FormData): Promise<void> {
     cadence: formData.get('cadence'),
     cost: formData.get('cost'),
     setup_cost: formData.get('setup_cost'),
-    client_user_ids: formData.getAll('client_user_ids'),
+    client_user_ids: userIds,
     audience: formData.get('audience'),
     target_n: formData.get('target_n'),
     actual_n_delivered: formData.get('actual_n_delivered'),

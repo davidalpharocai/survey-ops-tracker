@@ -19,6 +19,9 @@ interface Props {
 export default function NewStudyForm({ clientId, users, contracts }: Props) {
   const [cadence, setCadence] = useState<Cadence>('single');
   const [cost, setCost] = useState('');
+  const [selCount, setSelCount] = useState(0);
+  const [addingContact, setAddingContact] = useState(false);
+  const [newContactName, setNewContactName] = useState('');
 
   const runs = RUNS_PER_YEAR[cadence] || 1;
   const isTracker = cadence in RUNS_PER_YEAR;
@@ -28,6 +31,9 @@ export default function NewStudyForm({ clientId, users, contracts }: Props) {
   }, [cost, runs]);
 
   const disabled = !clientId;
+  // A study needs at least one contact — satisfied by an existing selection
+  // OR a new contact typed inline (created on submit, then attributed).
+  const hasContact = selCount > 0 || (addingContact && newContactName.trim().length > 0);
 
   return (
     <form action={createStudyAction} className="card form-narrow">
@@ -36,9 +42,15 @@ export default function NewStudyForm({ clientId, users, contracts }: Props) {
       {disabled && <p className="muted small">Pick a client above to enable this form.</p>}
 
       <label>Contacts at this client (pick one or more)<InfoTooltip text={TIP.studyUser} />
-        <select name="client_user_ids" multiple size={4} required disabled={disabled || users.length === 0}>
+        <select
+          name="client_user_ids"
+          multiple
+          size={4}
+          disabled={disabled || users.length === 0}
+          onChange={e => setSelCount(e.target.selectedOptions.length)}
+        >
           {users.length === 0 && disabled ? null : users.length === 0 ? (
-            <option value="" disabled>(no contacts on this client)</option>
+            <option value="" disabled>(no contacts yet — add one below)</option>
           ) : (
             users.map(u => (
               <option key={u.id} value={u.id}>
@@ -51,10 +63,44 @@ export default function NewStudyForm({ clientId, users, contracts }: Props) {
           {disabled
             ? 'Pick a client first.'
             : users.length === 0
-              ? 'Add a contact to this client on Manage Client List, then come back.'
-              : 'Hold Cmd/Ctrl to select more than one.'}
+              ? 'This client has no contacts yet — add one below.'
+              : 'Hold Cmd/Ctrl to select more than one, or add a new contact below.'}
         </span>
       </label>
+
+      {!disabled && (
+        <div className="inline-add">
+          {addingContact ? (
+            <div className="sp-new">
+              <label>New contact name
+                <input
+                  name="new_contact_name"
+                  type="text"
+                  value={newContactName}
+                  onChange={e => setNewContactName(e.target.value)}
+                  placeholder="e.g. Jordan Lee"
+                  autoFocus
+                />
+              </label>
+              <label>Email <span className="muted small">(optional)</span>
+                <input name="new_contact_email" type="email" placeholder="name@company.com" />
+              </label>
+              <button
+                type="button"
+                className="btn-sm"
+                onClick={() => { setAddingContact(false); setNewContactName(''); }}
+              >
+                Cancel
+              </button>
+              <span className="muted small">This contact is created and attributed to the study when you publish.</span>
+            </div>
+          ) : (
+            <button type="button" className="btn-sm" onClick={() => setAddingContact(true)}>
+              ＋ Add a new contact
+            </button>
+          )}
+        </div>
+      )}
 
       <label>Study title
         <input name="name" type="text" required placeholder="e.g. Pilot screening, March cohort" disabled={disabled} />
@@ -144,7 +190,10 @@ export default function NewStudyForm({ clientId, users, contracts }: Props) {
       </label>
 
       <div className="actions">
-        <SubmitButton disabled={disabled} pendingLabel="Publishing…">Publish study</SubmitButton>
+        <SubmitButton disabled={disabled || !hasContact} pendingLabel="Publishing…">Publish study</SubmitButton>
+        {!disabled && !hasContact && (
+          <span className="muted small">Select a contact above or add a new one.</span>
+        )}
       </div>
     </form>
   );
