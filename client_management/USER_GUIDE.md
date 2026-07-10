@@ -53,7 +53,27 @@ Home → **Add a Contract**.
 
 A **navigation ribbon** runs across the top of every page — Home, Record
 Study, Add Contract, Clients, Contacts, Reports (and Admin, for admins). The
-section you're on is highlighted. No need to go back Home to jump around.
+section you're on is highlighted. It stays pinned at the top as you scroll.
+
+## Your home dashboard (Client Pulse)
+
+When you sign in, the home page shows a **Client Pulse** dashboard under the
+two action tiles:
+
+- **Four quick numbers**: clients with a negative balance, clients running low
+  (projected to run out within ~60 days), renewals due in the next 30 days, and
+  this year's total dollar contract value.
+- **Needs attention**: the "who do I call today" list — clients negative or
+  running low, worst first. Click a client to jump to their contracts & surveys.
+- **Renewals due**: the soonest upcoming contract renewals.
+
+Up top is a **My clients / All clients** toggle. "My clients" shows only the
+clients whose **salesperson** is you (matched by your sign-in email); it's just
+a filter — you can always switch to **All clients** and see everyone. Nothing
+is hidden from anyone. Your choice is remembered on your device.
+
+For this to know which clients are yours, each client has a **salesperson**
+(see below), and that salesperson needs an email on the **Salespeople** page.
 
 ## Looking things up
 
@@ -68,8 +88,12 @@ section you're on is highlighted. No need to go back Home to jump around.
   sit under **Unassigned**; corrections sit under **Adjustments**. A search box
   filters that client's contracts and studies instantly.
 - **Manage Client List**: a client's full record — contact details,
-  relationship manager, their contacts, and quick links to add a contract or
-  study.
+  **salesperson**, their contacts, and quick links to add a contract or study.
+  Every client must have a salesperson; pick one from the list or add a new one
+  right there. (This drives the "my clients" dashboard filter — nothing more.)
+- **Salespeople** (Home → Clients & Contacts): the list of salespeople clients
+  can be assigned to. Add a salesperson's **email** here so their "my clients"
+  view works when they sign in.
 
 ## Fixing mistakes
 
