@@ -4,11 +4,11 @@ import { notFound } from 'next/navigation';
 import { apiForRequest } from '../../../lib/action';
 import { currentUserIsAdmin } from '../../../lib/auth';
 import type { Salesperson } from '../../../lib/types';
-import SubmitButton from '../../_components/SubmitButton';
-import { startImpersonationAction } from './actions';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'View as user · AlphaROC' };
+
+const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || '';
 
 interface PageProps {
   searchParams: Promise<{ error?: string }>;
@@ -21,6 +21,8 @@ export default async function ImpersonatePage({ searchParams }: PageProps) {
   const api = await apiForRequest();
   const salespeople = await api.listSalespeople().catch(() => [] as Salesperson[]);
   const withEmail = salespeople.filter(s => s.email);
+  // Native POST → route handler → full-page redirect (see app/api/impersonate).
+  const action = `${BASE_PATH}/api/impersonate`;
 
   return (
     <>
@@ -38,7 +40,8 @@ export default async function ImpersonatePage({ searchParams }: PageProps) {
         <p className="warn">Enter a valid @alpharoc.ai email address.</p>
       )}
 
-      <form action={startImpersonationAction} className="card form-narrow">
+      <form method="post" action={action} className="card form-narrow">
+        <input type="hidden" name="intent" value="start" />
         <label>Email to view as
           <input
             name="email"
@@ -57,7 +60,7 @@ export default async function ImpersonatePage({ searchParams }: PageProps) {
           </span>
         </label>
         <div className="actions">
-          <SubmitButton className="btn" pendingLabel="Starting…">Start viewing</SubmitButton>
+          <button type="submit" className="btn">Start viewing</button>
         </div>
       </form>
 
@@ -67,9 +70,10 @@ export default async function ImpersonatePage({ searchParams }: PageProps) {
           <p className="muted small">One click to view as a rep (restricted to their own clients).</p>
           <div className="impersonate-quick">
             {withEmail.map(s => (
-              <form key={s.id} action={startImpersonationAction} className="inline-form">
+              <form key={s.id} method="post" action={action} className="inline-form">
+                <input type="hidden" name="intent" value="start" />
                 <input type="hidden" name="email" value={s.email as string} />
-                <SubmitButton className="btn-sm" pendingLabel="…">{`View as ${s.name}`}</SubmitButton>
+                <button type="submit" className="btn-sm">{`View as ${s.name}`}</button>
               </form>
             ))}
           </div>
