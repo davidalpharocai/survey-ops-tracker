@@ -18,7 +18,7 @@ from app.db import get_session
 from app.helpers import utc_now
 from app.models import Client, ClientUser, Transaction, TransactionUser
 from app.schemas import StudyBulkUpdateIn, StudyIn
-from app.serializers import transaction_dict
+from app.serializers import client_dict, transaction_dict
 from app.study_logic import StudyForm, decorate_study, read_study_form
 
 router = APIRouter(
@@ -286,6 +286,50 @@ async def list_studies(
                         "email": legacy.email,
                     }
                 ]
+        out.append(decorated)
+    return out
+
+
+@router.get("/studies")
+async def list_all_studies(
+    session: AsyncSession = Depends(get_session),
+) -> list[dict]:
+    """Every active study across all clients, newest first.
+
+    Powers the global "Studies" screen. Each row carries the derived
+    economics (``decorateStudy``) and an embedded ``client`` (which
+    includes the salesperson) so the frontend can filter to "my studies"
+    by the client's salesperson — the same rule the home dashboard uses.
+
+    Parameters
+    ----------
+    session : AsyncSession
+        Injected request-scoped database session.
+
+    Returns
+    -------
+    list of dict
+        Decorated studies, each with a nested ``client``.
+    """
+    result = await session.execute(
+        select(Transaction, Client)
+        .join(Client, Client.id == Transaction.client_id)
+        .where(
+            Transaction.kind == "study",
+            Transaction.deleted_at.is_(None),
+            Client.deleted_at.is_(None),
+        )
+        .order_by(Transaction.occurred_on.desc(), Transaction.id.desc())
+        .options(
+            selectinload(Transaction.users).selectinload(
+                TransactionUser.client_user
+            )
+        )
+    )
+    out = []
+    for t, c in result.all():
+        decorated = decorate_study(transaction_dict(t, with_users=True))
+        decorated["client"] = client_dict(c)
         out.append(decorated)
     return out
 

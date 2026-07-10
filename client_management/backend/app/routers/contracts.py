@@ -16,7 +16,7 @@ from app.db import get_session
 from app.helpers import add_year, parse_date, parse_money, utc_now
 from app.models import Client, Transaction
 from app.schemas import ContractIn
-from app.serializers import transaction_dict
+from app.serializers import client_dict, transaction_dict
 
 router = APIRouter(
     prefix="/api",
@@ -175,6 +175,44 @@ async def list_contracts(
         .order_by(Transaction.occurred_on.desc(), Transaction.id.desc())
     )
     return [_contract_dict(t) for t in result.scalars().all()]
+
+
+@router.get("/contracts")
+async def list_all_contracts(
+    session: AsyncSession = Depends(get_session),
+) -> list[dict]:
+    """Every active contract across all clients, newest first.
+
+    Powers the global "Contracts" screen. Each row is a decorated contract
+    with an embedded ``client`` (including the salesperson) so the frontend
+    can filter to "my contracts" by the client's salesperson.
+
+    Parameters
+    ----------
+    session : AsyncSession
+        Injected request-scoped database session.
+
+    Returns
+    -------
+    list of dict
+        Decorated contracts, each with a nested ``client``.
+    """
+    result = await session.execute(
+        select(Transaction, Client)
+        .join(Client, Client.id == Transaction.client_id)
+        .where(
+            Transaction.kind == "contract",
+            Transaction.deleted_at.is_(None),
+            Client.deleted_at.is_(None),
+        )
+        .order_by(Transaction.occurred_on.desc(), Transaction.id.desc())
+    )
+    out = []
+    for t, c in result.all():
+        d = _contract_dict(t)
+        d["client"] = client_dict(c)
+        out.append(d)
+    return out
 
 
 @router.post("/contracts", status_code=status.HTTP_201_CREATED)

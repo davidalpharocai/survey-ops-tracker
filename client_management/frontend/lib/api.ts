@@ -15,10 +15,12 @@ import type {
   ClientUser,
   ContactStudies,
   ContractTransaction,
+  ContractListRow,
   Ledger,
   RenewalRow,
   Salesperson,
   SearchResults,
+  StudyListRow,
   SoccStatus,
   SoccSyncResult,
   StudyTransaction,
@@ -169,6 +171,8 @@ export interface ApiClient {
 
   getTransaction(id: number): Promise<Transaction | null>;
 
+  listAllStudies(): Promise<StudyListRow[]>;
+  listAllContracts(): Promise<ContractListRow[]>;
   listContractsByClient(clientId: number): Promise<ContractTransaction[]>;
   createContract(d: Record<string, unknown>): Promise<ContractTransaction & { clientName: string }>;
   updateContract(id: number, d: Record<string, unknown>): Promise<ContractTransaction>;
@@ -291,6 +295,8 @@ export function api(userEmail: string): ApiClient {
 
     getTransaction: id => orNull(r('GET', `/api/transactions/${id}`)),
 
+    listAllStudies: () => r('GET', '/api/studies'),
+    listAllContracts: () => r('GET', '/api/contracts'),
     listContractsByClient: clientId => r('GET', `/api/clients/${clientId}/contracts`),
     createContract: d => r('POST', '/api/contracts', d),
     updateContract: (id, d) => r('PATCH', `/api/contracts/${id}`, d),

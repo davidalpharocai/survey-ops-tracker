@@ -16,8 +16,8 @@ interface NavItem {
 
 const LINKS: NavItem[] = [
   { href: '/', label: 'Home', exact: true },
-  { href: '/studies/new', label: 'Record Study' },
-  { href: '/contracts/new', label: 'Add Contract' },
+  { href: '/studies', label: 'Studies' },
+  { href: '/contracts', label: 'Contracts' },
   { href: '/clients', label: 'Clients' },
   { href: '/users', label: 'Contacts' },
   { href: '/reports', label: 'Reports' },

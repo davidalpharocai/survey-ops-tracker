@@ -98,6 +98,11 @@ export interface StudyTransaction extends TransactionBase {
 
 export type Transaction = ContractTransaction | StudyTransaction;
 
+// Global list rows (GET /api/studies, /api/contracts) — the per-row client is
+// embedded (with its salesperson) so the screens can filter to "mine".
+export interface StudyListRow extends StudyTransaction { client: Client; }
+export interface ContractListRow extends ContractTransaction { client: Client; }
+
 // Contract-grouped ledger (GET /api/clients/{id}/ledger).
 export interface LedgerContract extends ContractTransaction {
   remainingCredits: number;
