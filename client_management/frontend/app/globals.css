@@ -694,6 +694,13 @@ h3 { font-size: 1rem; }
 }
 .decision-note-input { width: 11rem; max-width: 40vw; }
 
+/* Totals footer row on report tables */
+.report tfoot .report-totals td {
+  font-weight: 500;
+  border-top: 2px solid var(--card-border);
+  background: var(--surface-2);
+}
+
 label {
   display: flex;
   flex-direction: column;
