@@ -105,26 +105,26 @@ export default function ClientPulseView({
       </div>
 
       <div className="pulse-kpis">
-        <div className="pulse-kpi">
+        <a className="pulse-kpi pulse-kpi-link" href="#pulse-attention">
           <span className="pulse-kpi-label">Clients negative <InfoTooltip text={KPI_TIPS.negative} align="left" /></span>
           <span className="pulse-kpi-value is-neg">{kpis.negative}</span>
-        </div>
-        <div className="pulse-kpi">
+        </a>
+        <a className="pulse-kpi pulse-kpi-link" href="#pulse-attention">
           <span className="pulse-kpi-label">Running low &lt; 60d <InfoTooltip text={KPI_TIPS.low} /></span>
           <span className="pulse-kpi-value is-low">{kpis.low}</span>
-        </div>
-        <div className="pulse-kpi">
+        </a>
+        <a className="pulse-kpi pulse-kpi-link" href="#pulse-renewals">
           <span className="pulse-kpi-label">Renewals in 30d <InfoTooltip text={KPI_TIPS.renewals30} /></span>
           <span className="pulse-kpi-value is-accent">{kpis.renewals30}</span>
-        </div>
-        <div className="pulse-kpi">
+        </a>
+        <Link className="pulse-kpi pulse-kpi-link" href="/reports/balances">
           <span className="pulse-kpi-label">This-year $ <InfoTooltip text={KPI_TIPS.cyDollars} /></span>
           <span className="pulse-kpi-value">{dollars(kpis.cyValue)}</span>
-        </div>
-        <div className="pulse-kpi">
+        </Link>
+        <Link className="pulse-kpi pulse-kpi-link" href="/reports/balances">
           <span className="pulse-kpi-label">This-year credits <InfoTooltip text={KPI_TIPS.cyCredits} align="right" /></span>
           <span className="pulse-kpi-value">{creditsFmt(kpis.cyCredits)} cr</span>
-        </div>
+        </Link>
       </div>
 
       {mode === 'mine' && nothing ? (
@@ -134,7 +134,7 @@ export default function ClientPulseView({
         </p>
       ) : (
         <div className="pulse-cards">
-          <div className="panel pulse-panel">
+          <div className="panel pulse-panel" id="pulse-attention">
             <div className="pulse-panel-head">
               <h3>Needs attention <InfoTooltip text={ATTENTION_TIP} /></h3>
               <Link href="/reports/health" className="pulse-viewall">Balance health →</Link>
@@ -172,7 +172,7 @@ export default function ClientPulseView({
             )}
           </div>
 
-          <div className="panel pulse-panel">
+          <div className="panel pulse-panel" id="pulse-renewals">
             <div className="pulse-panel-head">
               <h3>Renewals due <InfoTooltip text={RENEWALS_TIP} /></h3>
               <Link href="/reports/renewals" className="pulse-viewall">Renewal radar →</Link>

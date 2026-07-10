@@ -566,6 +566,10 @@ h3 { font-size: 1rem; }
   gap: 0.25rem;
   box-shadow: var(--shadow);
 }
+/* KPI tiles are links that jump to their list / the balances report */
+.pulse-kpi-link { text-decoration: none; color: inherit; transition: border-color 0.12s ease; }
+.pulse-kpi-link:hover { border-color: var(--accent); }
+.pulse-kpi-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .pulse-kpi-label { font-size: 0.8rem; color: var(--muted); }
 .pulse-kpi-value { font-size: 1.5rem; font-weight: 600; font-variant-numeric: tabular-nums; }
 .pulse-kpi-value.is-neg { color: var(--neg); }
@@ -577,6 +581,7 @@ h3 { font-size: 1rem; }
   gap: 1rem;
 }
 .pulse-panel { padding: 1rem 1.1rem; }
+.pulse-panel[id] { scroll-margin-top: 84px; }
 .pulse-panel-head {
   display: flex;
   align-items: baseline;
