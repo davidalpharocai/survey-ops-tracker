@@ -159,7 +159,12 @@ async def update_salesperson(
         new name collides with another active salesperson.
     """
     sp = await session.get(Salesperson, salesperson_id)
-    if sp is None or sp.deleted_at is not None:
+    # A PATCH with active=true may reactivate an archived salesperson (the
+    # roster's "Restore" button). Any other PATCH of an archived row is 404.
+    reactivating = (
+        sp is not None and sp.deleted_at is not None and body.active is True
+    )
+    if sp is None or (sp.deleted_at is not None and not reactivating):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Salesperson not found",
@@ -170,7 +175,10 @@ async def update_salesperson(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Salesperson name is required.",
         )
-    if new_name.lower() != sp.name.lower():
+    # Check for a name collision when renaming OR restoring (restoring into a
+    # name an active salesperson now uses would violate the active-name unique
+    # index → a 500). Return a clean 409 instead.
+    if reactivating or new_name.lower() != sp.name.lower():
         clash = await session.execute(
             select(Salesperson).where(
                 func.lower(Salesperson.name) == new_name.lower(),
@@ -191,6 +199,8 @@ async def update_salesperson(
         sp.email = _clean_email(body.email)
     if body.active is not None:
         sp.active = body.active
+        if body.active:
+            sp.deleted_at = None  # restoring clears the archive tombstone
     await _propagate_snapshot(session, sp)
     await session.commit()
     await session.refresh(sp)

@@ -43,7 +43,9 @@ def _clean(v: str | None) -> str | None:
 
 
 async def _resolve_salesperson(
-    session: AsyncSession, salesperson_id: int | None
+    session: AsyncSession,
+    salesperson_id: int | None,
+    allow_current_id: int | None = None,
 ) -> Salesperson | None:
     """Look up an active salesperson by id, or raise ``400``.
 
@@ -53,6 +55,12 @@ async def _resolve_salesperson(
         Active database session.
     salesperson_id : int or None
         Chosen salesperson; ``None`` means "not provided" (import/legacy).
+    allow_current_id : int or None
+        The client's *existing* salesperson id. If the submitted id equals it,
+        an archived salesperson is still accepted — so editing an unrelated
+        field on a client whose salesperson was later archived doesn't force a
+        reassignment. A brand-new assignment to an archived salesperson is
+        still rejected.
 
     Returns
     -------
@@ -62,12 +70,14 @@ async def _resolve_salesperson(
     Raises
     ------
     HTTPException
-        ``400`` if an id was provided but no active salesperson matches.
+        ``400`` if an id was provided but no usable salesperson matches.
     """
     if salesperson_id is None:
         return None
     sp = await session.get(Salesperson, salesperson_id)
-    if sp is None or sp.deleted_at is not None:
+    if sp is None or (
+        sp.deleted_at is not None and sp.id != allow_current_id
+    ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Selected salesperson was not found.",
@@ -324,7 +334,9 @@ async def update_client(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=f"Client code '{socc_code}' is already in use.",
             )
-    sp = await _resolve_salesperson(session, body.salesperson_id)
+    sp = await _resolve_salesperson(
+        session, body.salesperson_id, allow_current_id=client.salesperson_id
+    )
     client.name = new_name
     if socc_code is not None:  # only overwrite when a code was supplied
         client.socc_code = socc_code

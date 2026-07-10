@@ -103,13 +103,18 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   let rows: Transaction[];
   let scopeLabel = 'All contracts & surveys';
   if (scope === 'survey' && targetId != null) {
-    rows = transactions.filter(t => t.id === targetId);
-    scopeLabel = `Survey: ${rows[0]?.name ?? targetId}`;
+    // Respect the selected date range like the "all" scope does; keep a
+    // separate lookup so the label still names the survey even if it falls
+    // outside the range.
+    const survey = transactions.find(t => t.id === targetId);
+    rows = survey && inRange(survey) ? [survey] : [];
+    scopeLabel = `Survey: ${survey?.name ?? targetId}`;
   } else if (scope === 'contract' && targetId != null) {
-    const contractRow = transactions.filter(t => t.id === targetId);
+    const contract = transactions.find(t => t.id === targetId);
+    const contractRow = contract && inRange(contract) ? [contract] : [];
     const linked = transactions.filter(t => t.contractId === targetId && inRange(t));
     rows = [...contractRow, ...linked];
-    scopeLabel = `Contract: ${contractRow[0]?.name ?? targetId}`;
+    scopeLabel = `Contract: ${contract?.name ?? targetId}`;
   } else {
     rows = transactions.filter(inRange);
   }

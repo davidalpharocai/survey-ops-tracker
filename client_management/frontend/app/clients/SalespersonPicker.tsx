@@ -18,10 +18,12 @@ export default function SalespersonPicker({
   salespeople,
   defaultId = null,
   defaultName = null,
+  requiredField = true,
 }: {
   salespeople: Salesperson[];
   defaultId?: number | null;
   defaultName?: string | null;
+  requiredField?: boolean;
 }) {
   const [mode, setMode] = useState<string>(defaultId ? String(defaultId) : '');
   const isNew = mode === '__new__';
@@ -35,7 +37,7 @@ export default function SalespersonPicker({
         Salesperson <InfoTooltip text={TIP} />
         <select
           name="salesperson_id"
-          required
+          required={requiredField}
           value={mode}
           onChange={e => setMode(e.target.value)}
         >

@@ -176,6 +176,62 @@ async def test_patch_salesperson_rename_keeps_email_when_omitted(client):
     assert r.json()["email"] == "jenna@alpharoc.ai"
 
 
+async def test_restore_archived_salesperson(client):
+    sp = await _mk_salesperson(client, "Temp", "temp@alpharoc.ai")
+    await client.delete(f"/api/salespeople/{sp['id']}", headers=ADMIN)
+    # Restore via PATCH active=true (what the roster "Restore" button sends).
+    r = await client.patch(
+        f"/api/salespeople/{sp['id']}",
+        json={"name": "Temp", "active": True},
+        headers=ADMIN,
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["active"] is True
+    active = await client.get("/api/salespeople", headers=ADMIN)
+    assert "Temp" in [s["name"] for s in active.json()]
+
+
+async def test_restore_into_taken_name_conflicts(client):
+    a = await _mk_salesperson(client, "Dup")
+    await client.delete(f"/api/salespeople/{a['id']}", headers=ADMIN)
+    await _mk_salesperson(client, "Dup")  # a new active "Dup"
+    r = await client.patch(
+        f"/api/salespeople/{a['id']}",
+        json={"name": "Dup", "active": True},
+        headers=ADMIN,
+    )
+    assert r.status_code == 409, r.text
+
+
+async def test_edit_client_keeps_archived_salesperson(client):
+    sp = await _mk_salesperson(client, "Jenna", "jenna@alpharoc.ai")
+    c = await make_client(client, name="Sticky", salesperson_id=sp["id"])
+    await client.delete(f"/api/salespeople/{sp['id']}", headers=ADMIN)
+    # Editing an unrelated field must NOT fail just because the assigned
+    # salesperson is now archived (the picker resubmits the same id).
+    r = await client.patch(
+        f"/api/clients/{c['id']}",
+        json={"name": "Sticky Renamed", "became_on": "2024-01-15", "salesperson_id": sp["id"]},
+        headers=ADMIN,
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["salespersonId"] == sp["id"]
+
+
+async def test_new_assignment_to_archived_salesperson_rejected(client):
+    keep = await _mk_salesperson(client, "Keep")
+    gone = await _mk_salesperson(client, "Gone")
+    c = await make_client(client, name="Mover", salesperson_id=keep["id"])
+    await client.delete(f"/api/salespeople/{gone['id']}", headers=ADMIN)
+    # Assigning this client to a DIFFERENT, archived salesperson is still 400.
+    r = await client.patch(
+        f"/api/clients/{c['id']}",
+        json={"name": "Mover", "became_on": "2024-01-15", "salesperson_id": gone["id"]},
+        headers=ADMIN,
+    )
+    assert r.status_code == 400, r.text
+
+
 async def test_reports_balances_include_salesperson(client):
     sp = await _mk_salesperson(client, "Jenna", "jenna@alpharoc.ai")
     await make_client(client, name="Reportable", salesperson_id=sp["id"])

@@ -128,7 +128,7 @@ export default async function ClientsPage({ searchParams }: PageProps) {
                   <label>Primary contact cell <input name="primary_contact_cell" type="tel" defaultValue={selected.primaryContactCell || ''} /></label>
                   <label>Primary contact email <input name="primary_contact_email" type="email" defaultValue={selected.primaryContactEmail || ''} /></label>
                 </div>
-                <SalespersonPicker salespeople={salespeople} defaultId={selected.salespersonId ?? null} defaultName={selected.salespersonName ?? null} />
+                <SalespersonPicker salespeople={salespeople} defaultId={selected.salespersonId ?? null} defaultName={selected.salespersonName ?? null} requiredField={false} />
                 <div className="actions">
                   <button type="submit">Save changes</button>
                 </div>

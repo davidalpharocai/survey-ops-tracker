@@ -11,7 +11,9 @@ import {
 } from '../../../../lib/cognito';
 
 function baseUrl(req: NextRequest): string {
-  return process.env.APP_BASE_URL || req.nextUrl.origin;
+  // Include the basePath (/ccm) so the post-logout redirect lands on the app,
+  // not the bare origin root (which 404s), when APP_BASE_URL is unset.
+  return process.env.APP_BASE_URL || req.nextUrl.origin + req.nextUrl.basePath;
 }
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
