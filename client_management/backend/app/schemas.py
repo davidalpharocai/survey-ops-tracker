@@ -91,6 +91,12 @@ class StudyIn(BaseModel):
     # Optional study→contract link. None = Unassigned (also used to unlink
     # on edit). Validated against the client's active contracts server-side.
     contract_id: int | None = None
+    # Study metadata. Blank/None clears the field on edit (the form always
+    # submits them). Counts accept numeric strings from the form.
+    audience: str | None = None
+    target_n: int | str | None = None
+    actual_n_delivered: int | str | None = None
+    description: str | None = None
 
 
 class StudyBulkUpdateIn(BaseModel):

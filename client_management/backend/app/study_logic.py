@@ -43,6 +43,26 @@ class StudyForm:
     annual_total: float
     setup_cost: float
     user_ids: list[int] = field(default_factory=list)
+    audience: str | None = None
+    target_n: int | None = None
+    actual_n_delivered: int | None = None
+    description: str | None = None
+
+
+def _parse_count(value: object) -> int | None:
+    """Parse a respondent count from a form value.
+
+    Blank/``None`` → ``None``; numeric strings ("750", "750.0") coerce to
+    ``int``; anything unparseable or negative is treated as unset rather
+    than raising (the form uses ``<input type="number" min="0">``).
+    """
+    if value in (None, ""):
+        return None
+    try:
+        n = int(float(str(value).replace(",", "").strip()))
+    except (TypeError, ValueError):
+        return None
+    return n if n >= 0 else None
 
 
 def read_study_form(body: StudyIn) -> StudyForm:
@@ -101,6 +121,10 @@ def read_study_form(body: StudyIn) -> StudyForm:
         annual_total=annual_total,
         setup_cost=setup_cost,
         user_ids=seen,
+        audience=(body.audience or "").strip() or None,
+        target_n=_parse_count(body.target_n),
+        actual_n_delivered=_parse_count(body.actual_n_delivered),
+        description=(body.description or "").strip() or None,
     )
 
 

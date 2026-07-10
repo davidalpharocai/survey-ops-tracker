@@ -404,6 +404,10 @@ async def create_study(
         actor_email=user,
         idem_key=idem,
         contract_id=contract_id,
+        audience=f.audience,
+        target_n=f.target_n,
+        actual_n_delivered=f.actual_n_delivered,
+        description=f.description,
     )
     client_name = client.name  # read before commit/rollback expires it
     session.add(t)
@@ -486,6 +490,10 @@ async def update_study(
     t.setup_cost = f.setup_cost if f.cadence else None
     t.client_user_id = users[0].id
     t.note = note
+    t.audience = f.audience
+    t.target_n = f.target_n
+    t.actual_n_delivered = f.actual_n_delivered
+    t.description = f.description
     if body.socc_project_code is not None:
         t.socc_project_code = (body.socc_project_code or "").strip() or None
     t.updated_by_email = user
@@ -639,6 +647,10 @@ async def bulk_update(
         t.setup_cost = f.setup_cost if f.cadence else None
         t.client_user_id = users[0].id
         t.note = note
+        t.audience = f.audience
+        t.target_n = f.target_n
+        t.actual_n_delivered = f.actual_n_delivered
+        t.description = f.description
         t.updated_by_email = user
         t.updated_at = utc_now()
         updated += 1

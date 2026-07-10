@@ -92,6 +92,7 @@ interface TransactionBase {
   actorEmail: string;
   soccProjectCode?: string | null;
   contractId?: number | null;
+  description?: string | null;
   soccBoardColumn?: string | null;
   soccSyncedAt?: string | null;
   createdAt: Date;
@@ -114,6 +115,9 @@ export interface StudyTransaction extends TransactionBase {
   userIds: number[];
   userObjs: ClientUser[];
   isImported?: boolean;
+  audience?: string | null;
+  targetN?: number | null;
+  actualNDelivered?: number | null;
 }
 
 export type Transaction = ContractTransaction | StudyTransaction;

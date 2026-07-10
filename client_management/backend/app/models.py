@@ -260,6 +260,15 @@ class Transaction(Base):
     # Optional study→contract link (self-referential; NULL = Unassigned).
     # Meaningful only for kind='study'; validated in the application layer.
     contract_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Study metadata (kind='study' only; nullable/additive). `audience` is
+    # free-text; `target_n`/`actual_n_delivered` are respondent counts;
+    # `description` is a free-text note distinct from the CSV-import `note`.
+    audience: Mapped[str | None] = mapped_column(String, nullable=True)
+    target_n: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    actual_n_delivered: Mapped[int | None] = mapped_column(
+        Integer, nullable=True
+    )
+    description: Mapped[str | None] = mapped_column(String, nullable=True)
     # One-way SOCC sync (status only): the survey's SOCC board column and
     # when it was last synced. Never affects money.
     socc_board_column: Mapped[str | None] = mapped_column(String, nullable=True)

@@ -14,6 +14,10 @@ interface StudyInput {
   cost_amount?: FormDataEntryValue | null;
   setup_cost?: FormDataEntryValue | null;
   client_user_ids?: FormDataEntryValue[];
+  audience?: FormDataEntryValue | null;
+  target_n?: FormDataEntryValue | null;
+  actual_n_delivered?: FormDataEntryValue | null;
+  description?: FormDataEntryValue | null;
 }
 
 // Collect the unified study form fields into a backend payload.
@@ -28,6 +32,10 @@ function studyBody(src: StudyInput) {
     cost_amount: src.cost_amount,
     setup_cost: src.setup_cost,
     client_user_ids: (src.client_user_ids || []).filter(Boolean),
+    audience: src.audience,
+    target_n: src.target_n,
+    actual_n_delivered: src.actual_n_delivered,
+    description: src.description,
   };
 }
 
@@ -45,6 +53,10 @@ function bulkStudyFromFormData(formData: FormData, sid: string): StudyInput {
     client_user_ids: formData
       .getAll(`${pfx}[client_user_ids][]`)
       .filter(Boolean),
+    audience: formData.get(`${pfx}[audience]`),
+    target_n: formData.get(`${pfx}[target_n]`),
+    actual_n_delivered: formData.get(`${pfx}[actual_n_delivered]`),
+    description: formData.get(`${pfx}[description]`),
   };
 }
 
@@ -60,6 +72,10 @@ export async function createStudyAction(formData: FormData): Promise<void> {
     cost: formData.get('cost'),
     setup_cost: formData.get('setup_cost'),
     client_user_ids: formData.getAll('client_user_ids'),
+    audience: formData.get('audience'),
+    target_n: formData.get('target_n'),
+    actual_n_delivered: formData.get('actual_n_delivered'),
+    description: formData.get('description'),
   });
   const contractId = parseId(formData.get('contract_id'));
   await api.createStudy({ client_id: formData.get('client_id'), ...body, contract_id: contractId });
@@ -87,6 +103,10 @@ export async function updateStudyAction(formData: FormData): Promise<void> {
       cost: formData.get('cost'),
       setup_cost: formData.get('setup_cost'),
       client_user_ids: formData.getAll('client_user_ids'),
+      audience: formData.get('audience'),
+      target_n: formData.get('target_n'),
+      actual_n_delivered: formData.get('actual_n_delivered'),
+      description: formData.get('description'),
     }),
     contract_id: contractId,
   });

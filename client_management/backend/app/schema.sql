@@ -114,6 +114,14 @@ CREATE INDEX IF NOT EXISTS transactions_contract_id_idx
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS socc_board_column TEXT;
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS socc_synced_at TIMESTAMP(3);
 
+-- Study metadata (studies only; additive + nullable, existing rows
+-- untouched). `audience` is free-text; `target_n` / `actual_n_delivered`
+-- are respondent counts; `description` is a free-text blurb.
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS audience TEXT;
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS target_n INTEGER;
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS actual_n_delivered INTEGER;
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS description TEXT;
+
 -- Structured salesperson (account owner). Each client is assigned one
 -- salesperson, chosen from this list (with add-new on the client form).
 -- This is purely a filter/label dimension — there is NO access restriction

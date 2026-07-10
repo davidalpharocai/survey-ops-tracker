@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 
 import type { Cadence, ClientUser, CostType, StudyTransaction } from '../../../lib/types';
 import ConfirmButton from '../../clients/ConfirmButton';
@@ -48,6 +48,10 @@ interface RowState {
   setup: string;
   userIds: string[];
   userNames: string;
+  audience: string;
+  targetN: string;
+  actualN: string;
+  description: string;
 }
 
 interface Props {
@@ -69,9 +73,22 @@ export default function ExistingStudiesTable({ studies, clientUsers, clientId }:
       setup: String(t.setupCost ?? 0),
       userIds: (t.userIds || []).map(String),
       userNames: (t.userObjs || []).map(u => u.name).join(', '),
+      audience: t.audience || '',
+      targetN: t.targetN != null ? String(t.targetN) : '',
+      actualN: t.actualNDelivered != null ? String(t.actualNDelivered) : '',
+      description: t.description || '',
     })),
   );
   const [sort, setSort] = useState(DEFAULT_SORT);
+  const [expanded, setExpanded] = useState<Set<number>>(new Set());
+
+  function toggleExpanded(id: number) {
+    setExpanded(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
 
   const sorted = useMemo(() => {
     const col = COLUMNS[sort.col];
@@ -143,8 +160,11 @@ export default function ExistingStudiesTable({ studies, clientUsers, clientId }:
             const runs = RUNS_PER_YEAR[r.cadence] || 1;
             const annual = parseFloat(r.cost || '0') * runs;
             const isSingle = r.cadence === 'single';
+            const isExp = expanded.has(r.id);
+            const hasMeta = !!(r.audience || r.targetN || r.actualN || r.description);
             return (
-              <tr key={r.id} id={`s${r.id}`} className={`study-row${r.isImported ? ' is-pending' : ''}`}>
+              <Fragment key={r.id}>
+              <tr id={`s${r.id}`} className={`study-row${r.isImported ? ' is-pending' : ''}`}>
                 <td>
                   <input
                     form="bulk-form"
@@ -234,6 +254,15 @@ export default function ExistingStudiesTable({ studies, clientUsers, clientId }:
                   {Math.round(annual).toLocaleString('en-US')}
                 </td>
                 <td className="row-actions">
+                  <button
+                    type="button"
+                    className={`btn-sm${hasMeta ? ' has-meta' : ''}`}
+                    onClick={() => toggleExpanded(r.id)}
+                    aria-expanded={isExp}
+                    title="Audience, target / actual N, and description"
+                  >
+                    Details {isExp ? '▾' : '▸'}{hasMeta ? ' •' : ''}
+                  </button>
                   {r.isImported && (
                     <button
                       type="submit"
@@ -254,6 +283,60 @@ export default function ExistingStudiesTable({ studies, clientUsers, clientId }:
                   </ConfirmButton>
                 </td>
               </tr>
+              {/* Detail row is always rendered (hidden when collapsed) so its
+                  inputs always submit the current values with the bulk save —
+                  a collapsed row must not blank out its own metadata. */}
+              <tr className="study-detail-row" style={{ display: isExp ? undefined : 'none' }}>
+                <td colSpan={COLUMNS.length + 1}>
+                  <div className="study-detail-grid">
+                    <label>Audience
+                      <input
+                        form="bulk-form"
+                        name={`${pfx}[audience]`}
+                        type="text"
+                        placeholder="e.g. Institutional investors"
+                        value={r.audience}
+                        onChange={e => updateRow(r.id, { audience: e.target.value })}
+                      />
+                    </label>
+                    <label>Target N
+                      <input
+                        form="bulk-form"
+                        name={`${pfx}[target_n]`}
+                        type="number"
+                        min="0"
+                        step="1"
+                        placeholder="e.g. 600"
+                        value={r.targetN}
+                        onChange={e => updateRow(r.id, { targetN: e.target.value })}
+                      />
+                    </label>
+                    <label>Actual N delivered
+                      <input
+                        form="bulk-form"
+                        name={`${pfx}[actual_n_delivered]`}
+                        type="number"
+                        min="0"
+                        step="1"
+                        placeholder="e.g. 542"
+                        value={r.actualN}
+                        onChange={e => updateRow(r.id, { actualN: e.target.value })}
+                      />
+                    </label>
+                    <label className="study-detail-desc">Description
+                      <textarea
+                        form="bulk-form"
+                        name={`${pfx}[description]`}
+                        rows={2}
+                        placeholder="Short description of this study"
+                        value={r.description}
+                        onChange={e => updateRow(r.id, { description: e.target.value })}
+                      />
+                    </label>
+                  </div>
+                </td>
+              </tr>
+              </Fragment>
             );
           })}
         </tbody>

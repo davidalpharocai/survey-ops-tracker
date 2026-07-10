@@ -505,6 +505,86 @@ async def test_study_idempotency_key_replay_returns_same_row(client, db):
     assert bal["credits"] == -100.0
 
 
+# --- New study fields: audience / target N / actual N / description ---------
+
+
+async def test_study_new_fields_round_trip(client):
+    made, user = await _client_with_user(client)
+    payload = _study_payload(
+        made["id"],
+        [user["id"]],
+        audience="Institutional investors",
+        target_n=600,
+        actual_n_delivered=542,
+        description="Q1 buy-side sentiment wave",
+    )
+    r = await client.post("/api/studies", json=payload, headers=ADMIN)
+    assert r.status_code == 201, r.text
+    body = r.json()
+    assert body["audience"] == "Institutional investors"
+    assert body["targetN"] == 600
+    assert body["actualNDelivered"] == 542
+    assert body["description"] == "Q1 buy-side sentiment wave"
+
+
+async def test_study_new_fields_default_none(client):
+    made, user = await _client_with_user(client)
+    body = await make_study(client, made["id"], [user["id"]], cost=100)
+    assert body["audience"] is None
+    assert body["targetN"] is None
+    assert body["actualNDelivered"] is None
+    assert body["description"] is None
+
+
+async def test_study_new_fields_update_and_clear(client):
+    made, user = await _client_with_user(client)
+    body = await make_study(
+        client,
+        made["id"],
+        [user["id"]],
+        cost=100,
+        audience="Retail",
+        target_n=1000,
+        actual_n_delivered=900,
+        description="v1",
+    )
+    # Update some, clear others (the form always submits every field, so an
+    # omitted/blank value means "clear", mirroring the contract link).
+    r = await client.patch(
+        f"/api/studies/{body['id']}",
+        json=_study_payload(
+            made["id"],
+            [user["id"]],
+            audience="",
+            target_n=1200,
+            actual_n_delivered="",
+            description="v2",
+        ),
+        headers=ADMIN,
+    )
+    assert r.status_code == 200, r.text
+    upd = r.json()
+    assert upd["audience"] is None
+    assert upd["targetN"] == 1200
+    assert upd["actualNDelivered"] is None
+    assert upd["description"] == "v2"
+
+
+async def test_study_counts_accept_numeric_strings(client):
+    made, user = await _client_with_user(client)
+    payload = _study_payload(
+        made["id"],
+        [user["id"]],
+        target_n="750",
+        actual_n_delivered="",
+    )
+    r = await client.post("/api/studies", json=payload, headers=ADMIN)
+    assert r.status_code == 201, r.text
+    body = r.json()
+    assert body["targetN"] == 750
+    assert body["actualNDelivered"] is None
+
+
 async def test_study_different_idempotency_keys_create_two_rows(client, db):
     made, user = await _client_with_user(client)
     payload = _study_payload(made["id"], [user["id"]])

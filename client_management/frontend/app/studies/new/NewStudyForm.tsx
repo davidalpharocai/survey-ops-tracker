@@ -122,6 +122,27 @@ export default function NewStudyForm({ clientId, users, contracts }: Props) {
         </span>
       </label>
 
+      <label>Audience (optional)
+        <InfoTooltip text="Who this study surveys — e.g. 'Institutional investors', 'US registered voters'. Free text, for your reference." />
+        <input name="audience" type="text" placeholder="e.g. Institutional investors" disabled={disabled} />
+      </label>
+
+      <div className="amounts-row">
+        <label>Target N (optional)
+          <InfoTooltip text="The number of completed responses you're aiming for on this study." />
+          <input name="target_n" type="number" min="0" step="1" placeholder="e.g. 600" disabled={disabled} />
+        </label>
+        <label>Actual N delivered (optional)
+          <InfoTooltip text="The number of completes actually delivered. Can be filled in later once fielding wraps." />
+          <input name="actual_n_delivered" type="number" min="0" step="1" placeholder="e.g. 542" disabled={disabled} />
+        </label>
+      </div>
+
+      <label>Description (optional)
+        <InfoTooltip text="A short note about this study — methodology, goal, or anything worth remembering." />
+        <textarea name="description" rows={2} placeholder="Short description of this study" disabled={disabled} />
+      </label>
+
       <div className="actions">
         <SubmitButton disabled={disabled} pendingLabel="Publishing…">Publish study</SubmitButton>
       </div>
