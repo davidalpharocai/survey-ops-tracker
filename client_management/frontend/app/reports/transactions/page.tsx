@@ -10,7 +10,7 @@ import {
   isoDate,
 } from '../../../lib/format';
 import { TIP } from '../../../lib/tooltips';
-import type { Balance, Ledger } from '../../../lib/types';
+import type { Balance, Family, Ledger } from '../../../lib/types';
 import AutoSubmitSelect from '../../_components/AutoSubmitSelect';
 import InfoTooltip from '../../_components/InfoTooltip';
 import SubmitButton from '../../_components/SubmitButton';
@@ -24,7 +24,7 @@ export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Contracts & Studies · AlphaROC' };
 
 interface PageProps {
-  searchParams: Promise<{ client_id?: string }>;
+  searchParams: Promise<{ client_id?: string; view?: string }>;
 }
 
 export default async function TransactionsReportPage({ searchParams }: PageProps) {
@@ -38,8 +38,9 @@ export default async function TransactionsReportPage({ searchParams }: PageProps
   // `selected` object, so there is no reason to wait for getClient first.
   // Transient errors are NOT swallowed — only a 404 (archived/stale id)
   // degrades to the empty state; a 5xx surfaces rather than showing a fake
-  // $0 balance for a real client.
-  const [clients, selected, ledgerResult, balResult] = await Promise.all([
+  // $0 balance for a real client. The family read is best-effort — a null
+  // just hides the parent toggle rather than blocking the ledger.
+  const [clients, selected, ledgerResult, balResult, family] = await Promise.all([
     api.listClients(),
     clientId ? api.getClient(clientId) : Promise.resolve(null),
     clientId
@@ -48,9 +49,17 @@ export default async function TransactionsReportPage({ searchParams }: PageProps
     clientId
       ? api.clientBalances(clientId).catch(onlyNotFound(defaultBal))
       : Promise.resolve(defaultBal),
+    clientId
+      ? api.clientFamily(clientId).catch(() => null as Family | null)
+      : Promise.resolve(null as Family | null),
   ]);
   const ledger: Ledger = selected ? ledgerResult : EMPTY_LEDGER;
   const bal: Balance = selected ? balResult : defaultBal;
+  // A parent (has sub-accounts) can flip the ledger between just this account
+  // and the whole family. The rollup view sums balances only — it never
+  // merges transactions, so the per-account ledger stays authoritative.
+  const isParent = !!selected && (family?.children.length ?? 0) > 0;
+  const familyView = isParent && sp?.view === 'family';
   const hasRows =
     ledger.contracts.length + ledger.unassigned.length + ledger.adjustments.length > 0;
   const exportContracts = ledger.contracts.map(c => ({ id: c.id, name: c.name }));
@@ -90,32 +99,112 @@ export default async function TransactionsReportPage({ searchParams }: PageProps
 
       {selected ? (
         <>
-          <div className="detail-balances">
-            <div className="bal">
-              <span className="bal-label">Credits <InfoTooltip text={TIP.creditsRemaining} /></span>
-              <span className={`bal-value${bal.credits < 0 ? ' neg' : ''}`}>{creditsFmt(bal.credits)}</span>
+          {isParent && (
+            <div className="view-toggle" role="group" aria-label="Balance scope">
+              <Link
+                className={familyView ? '' : 'is-active'}
+                href={`/reports/transactions?client_id=${selected.id}`}
+              >
+                This account
+              </Link>
+              <Link
+                className={familyView ? 'is-active' : ''}
+                href={`/reports/transactions?client_id=${selected.id}&view=family`}
+              >
+                Include sub-accounts
+              </Link>
+              <InfoTooltip text="This account shows only this client's ledger. Include sub-accounts rolls up balances across the whole family — it sums totals, it doesn't merge transactions." />
             </div>
-            <div className="bal">
-              <span className="bal-label">Dollars <InfoTooltip text={TIP.dollarsRemaining} /></span>
-              <span className={`bal-value${bal.dollars < 0 ? ' neg' : ''}`}>{dollars(bal.dollars)}</span>
-            </div>
-            <div className="bal">
-              <span className="bal-label">{currentYear} contract value <InfoTooltip text={TIP.cyValue} /></span>
-              <span className="bal-value">{contractValue(bal.cyCredits, bal.cyValue)}</span>
-            </div>
-            <div className="bal">
-              <span className="bal-label">Next renewal <InfoTooltip text={TIP.cyRenewal} /></span>
-              <span className="bal-value">{bal.cyRenewal ? isoDate(bal.cyRenewal) : '—'}</span>
-            </div>
-          </div>
+          )}
 
-          {hasRows ? (
+          {familyView && family ? (
+            <div className="detail-balances">
+              <div className="bal">
+                <span className="bal-label">Family credits <InfoTooltip text={TIP.creditsRemaining} /></span>
+                <span className={`bal-value${family.rollup.credits < 0 ? ' neg' : ''}`}>{creditsFmt(family.rollup.credits)}</span>
+              </div>
+              <div className="bal">
+                <span className="bal-label">Family dollars <InfoTooltip text={TIP.dollarsRemaining} /></span>
+                <span className={`bal-value${family.rollup.dollars < 0 ? ' neg' : ''}`}>{dollars(family.rollup.dollars)}</span>
+              </div>
+              <div className="bal">
+                <span className="bal-label">{currentYear} contract value <InfoTooltip text={TIP.cyValue} /></span>
+                <span className="bal-value">{contractValue(family.rollup.cyCredits, family.rollup.cyValue)}</span>
+              </div>
+              <div className="bal">
+                <span className="bal-label">Next renewal <InfoTooltip text={TIP.cyRenewal} /></span>
+                <span className="bal-value">{family.rollup.nextRenewal ? isoDate(family.rollup.nextRenewal) : '—'}</span>
+              </div>
+            </div>
+          ) : (
+            <div className="detail-balances">
+              <div className="bal">
+                <span className="bal-label">Credits <InfoTooltip text={TIP.creditsRemaining} /></span>
+                <span className={`bal-value${bal.credits < 0 ? ' neg' : ''}`}>{creditsFmt(bal.credits)}</span>
+              </div>
+              <div className="bal">
+                <span className="bal-label">Dollars <InfoTooltip text={TIP.dollarsRemaining} /></span>
+                <span className={`bal-value${bal.dollars < 0 ? ' neg' : ''}`}>{dollars(bal.dollars)}</span>
+              </div>
+              <div className="bal">
+                <span className="bal-label">{currentYear} contract value <InfoTooltip text={TIP.cyValue} /></span>
+                <span className="bal-value">{contractValue(bal.cyCredits, bal.cyValue)}</span>
+              </div>
+              <div className="bal">
+                <span className="bal-label">Next renewal <InfoTooltip text={TIP.cyRenewal} /></span>
+                <span className="bal-value">{bal.cyRenewal ? isoDate(bal.cyRenewal) : '—'}</span>
+              </div>
+            </div>
+          )}
+
+          {familyView && family ? (
+            <div className="table-scroll">
+              <table className="report compact">
+                <thead>
+                  <tr>
+                    <th>Account</th>
+                    <th className="num">Credits</th>
+                    <th className="num">Dollars</th>
+                    <th>Next renewal</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><strong>{selected.name}</strong> <span className="muted small">(this account)</span></td>
+                    <td className={`num${bal.credits < 0 ? ' neg' : ''}`}>{creditsFmt(bal.credits)}</td>
+                    <td className={`num${bal.dollars < 0 ? ' neg' : ''}`}>{dollars(bal.dollars)}</td>
+                    <td>{bal.cyRenewal ? isoDate(bal.cyRenewal) : '—'}</td>
+                  </tr>
+                  {family.children.map(ch => (
+                    <tr key={ch.id}>
+                      <td><Link href={`/reports/transactions?client_id=${ch.id}`}>{ch.name}</Link></td>
+                      <td className={`num${ch.credits < 0 ? ' neg' : ''}`}>{creditsFmt(ch.credits)}</td>
+                      <td className={`num${ch.dollars < 0 ? ' neg' : ''}`}>{dollars(ch.dollars)}</td>
+                      <td>{ch.cyRenewal ? isoDate(ch.cyRenewal) : '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="report-totals">
+                    <td>Family total</td>
+                    <td className={`num${family.rollup.credits < 0 ? ' neg' : ''}`}>{creditsFmt(family.rollup.credits)}</td>
+                    <td className={`num${family.rollup.dollars < 0 ? ' neg' : ''}`}>{dollars(family.rollup.dollars)}</td>
+                    <td>{family.rollup.nextRenewal ? isoDate(family.rollup.nextRenewal) : '—'}</td>
+                  </tr>
+                </tfoot>
+              </table>
+              {family.partial && <p className="muted small">Showing only your clients in this family.</p>}
+              <p className="muted small" style={{ marginTop: 8 }}>
+                Open a sub-account to see its own contracts &amp; studies. Balances roll up here; transactions stay on each account.
+              </p>
+            </div>
+          ) : hasRows ? (
             <LedgerTree ledger={ledger} clientId={selected.id} canEditMoney={!restricted && !readOnly} />
           ) : (
             <p className="muted">No contracts or studies yet for this client.</p>
           )}
 
-          {readOnly ? (
+          {familyView ? null : readOnly ? (
             <p className="muted" style={{ marginTop: 16 }}>
               You&apos;re viewing as another user (read-only) — exit to make changes.
             </p>
