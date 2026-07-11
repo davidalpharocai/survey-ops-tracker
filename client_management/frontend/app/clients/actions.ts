@@ -47,14 +47,20 @@ export async function updateClientAction(formData: FormData): Promise<void> {
   if (id == null) redirectTo('/clients');
   const api = await apiForRequest();
   const salespersonId = await resolveSalespersonId(api, formData);
-  await api.updateClient(id, {
+  const body: Record<string, unknown> = {
     name: formData.get('name'),
     became_on: formData.get('became_on'),
     primary_contact_name: formData.get('primary_contact_name'),
     primary_contact_cell: formData.get('primary_contact_cell'),
     primary_contact_email: formData.get('primary_contact_email'),
     salesperson_id: salespersonId,
-  });
+  };
+  // Only send parent_id when the picker was on the form (admins editing a
+  // non-parent client); omitting it leaves the link unchanged server-side.
+  if (formData.has('parent_id')) {
+    body.parent_id = parseId(formData.get('parent_id'));
+  }
+  await api.updateClient(id, body);
   revalidatePath('/', 'layout');
   redirectTo(`/clients?id=${id}`);
 }

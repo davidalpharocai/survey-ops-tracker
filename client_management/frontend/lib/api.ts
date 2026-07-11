@@ -17,6 +17,7 @@ import type {
   ContractTransaction,
   ContractListRow,
   CreditRequest,
+  Family,
   Ledger,
   RenewalRow,
   Salesperson,
@@ -52,6 +53,7 @@ const DATE_KEYS = new Set([
   'occurredOn',
   'renewalOn',
   'cyRenewal',
+  'nextRenewal',
   'decidedAt',
 ]);
 
@@ -193,6 +195,7 @@ export interface ApiClient {
   bulkUpdateStudies(d: Record<string, unknown>): Promise<BulkUpdateStudiesResult>;
 
   clientBalances(clientId: number): Promise<Balance>;
+  clientFamily(clientId: number): Promise<Family>;
   allBalances(): Promise<BalanceRow[]>;
   listRenewals(): Promise<RenewalRow[]>;
   balanceHealth(): Promise<BalanceHealthRow[]>;
@@ -323,6 +326,7 @@ export function api(userEmail: string): ApiClient {
     bulkUpdateStudies: d => r('POST', '/api/studies/bulk-update', d),
 
     clientBalances: clientId => r('GET', `/api/clients/${clientId}/balances`),
+    clientFamily: clientId => r('GET', `/api/clients/${clientId}/family`),
     allBalances: () => r('GET', '/api/reports/balances'),
     listRenewals: () => r('GET', '/api/reports/renewals'),
     balanceHealth: () => r('GET', '/api/reports/balance-health'),

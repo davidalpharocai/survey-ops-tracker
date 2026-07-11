@@ -17,7 +17,31 @@ export interface Client {
   salespersonId?: number | null;
   salespersonName?: string | null;
   salespersonEmail?: string | null;
+  parentId?: number | null;
   users?: ClientUser[];
+}
+
+// GET /api/clients/{id}/family — flat macro/micro rollup for one client.
+export interface FamilyChild {
+  id: number;
+  name: string;
+  credits: number;
+  dollars: number;
+  cyValue: number;
+  cyRenewal: Date | null;
+}
+export interface Family {
+  client: { id: number; name: string };
+  parent: { id: number; name: string } | null;
+  children: FamilyChild[];
+  rollup: {
+    credits: number;
+    dollars: number;
+    cyCredits: number;
+    cyValue: number;
+    nextRenewal: Date | null;
+  };
+  partial: boolean;
 }
 
 export interface Salesperson {

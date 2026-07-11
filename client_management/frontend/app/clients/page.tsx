@@ -2,10 +2,11 @@ import Link from 'next/link';
 
 import { apiForRequest, parseId } from '../../lib/action';
 import { onlyNotFound } from '../../lib/api';
+import { currentUserIsRestricted } from '../../lib/auth';
 import { todayIsoDate } from '../../lib/dates';
 import { contractValue, credits as creditsFmt, dollars, isoDate } from '../../lib/format';
 import { TIP } from '../../lib/tooltips';
-import type { Balance, ClientUser, Salesperson } from '../../lib/types';
+import type { Balance, ClientUser, Family, Salesperson } from '../../lib/types';
 import InfoTooltip from '../_components/InfoTooltip';
 import ConfirmButton from './ConfirmButton';
 import NewClientDialog from './NewClientDialog';
@@ -36,7 +37,7 @@ export default async function ClientsPage({ searchParams }: PageProps) {
   // stale ?id= URL falls back to the empty state, but a transient backend
   // error still surfaces rather than rendering a fake $0 balance for a
   // real client.
-  const [clients, salespeople, selected, selectedUsers, bal] = await Promise.all([
+  const [clients, salespeople, selected, selectedUsers, bal, family, restricted] = await Promise.all([
     api.listClients(),
     api.listSalespeople(),
     selectedId ? api.getClient(selectedId) : Promise.resolve(null),
@@ -46,10 +47,21 @@ export default async function ClientsPage({ searchParams }: PageProps) {
     selectedId
       ? api.clientBalances(selectedId).catch(onlyNotFound(defaultBal))
       : Promise.resolve(defaultBal),
+    selectedId
+      ? api.clientFamily(selectedId).catch(() => null as Family | null)
+      : Promise.resolve(null as Family | null),
+    currentUserIsRestricted(),
   ]);
 
   const currentYear = new Date().getUTCFullYear();
   const today = todayIsoDate();
+  // A client with sub-accounts is a parent (can't also be a child); a child
+  // or standalone can be assigned a parent. Only admins/approvers set structure.
+  const isParent = (family?.children.length ?? 0) > 0;
+  const eligibleParents = selected
+    ? clients.filter(c => c.parentId == null && c.id !== selected.id)
+    : [];
+  const showParentPicker = !!selected && !restricted && !isParent;
 
   return (
     <>
@@ -91,6 +103,11 @@ export default async function ClientsPage({ searchParams }: PageProps) {
                     Client since {isoDate(selected.becameClientOn)}
                     {selected.soccCode ? ` · ${selected.soccCode}` : ''}
                   </p>
+                  {family?.parent && (
+                    <p className="muted small">
+                      Part of <Link href={`/clients?id=${family.parent.id}`}>{family.parent.name} ↑</Link>
+                    </p>
+                  )}
                 </div>
                 <div className="detail-balances">
                   <div className="bal">
@@ -129,10 +146,52 @@ export default async function ClientsPage({ searchParams }: PageProps) {
                   <label>Primary contact email <input name="primary_contact_email" type="email" defaultValue={selected.primaryContactEmail || ''} /></label>
                 </div>
                 <SalespersonPicker salespeople={salespeople} defaultId={selected.salespersonId ?? null} defaultName={selected.salespersonName ?? null} requiredField={false} />
+                {showParentPicker && (
+                  <label className="parent-picker">Parent account (optional)
+                    <InfoTooltip text="Roll this client up under a parent account. Balances still live on each client — the parent just shows a family total. Only top-level clients can be parents." />
+                    <select name="parent_id" defaultValue={selected.parentId ?? ''}>
+                      <option value="">— none (top-level) —</option>
+                      {eligibleParents.map(c => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
+                  </label>
+                )}
                 <div className="actions">
                   <button type="submit">Save changes</button>
                 </div>
               </form>
+
+              {isParent && family && (
+                <div className="card">
+                  <h3>Sub-accounts <span className="muted small">({family.children.length})</span></h3>
+                  <p className="muted small">Each sub-account keeps its own balance; the total below rolls them up with this account.</p>
+                  <div className="table-scroll">
+                    <table className="report compact">
+                      <thead><tr><th>Client</th><th className="num">Credits</th><th className="num">Dollars</th><th>Next renewal</th></tr></thead>
+                      <tbody>
+                        {family.children.map(ch => (
+                          <tr key={ch.id}>
+                            <td><Link href={`/clients?id=${ch.id}`}>{ch.name}</Link></td>
+                            <td className={`num${ch.credits < 0 ? ' neg' : ''}`}>{creditsFmt(ch.credits)}</td>
+                            <td className={`num${ch.dollars < 0 ? ' neg' : ''}`}>{dollars(ch.dollars)}</td>
+                            <td>{ch.cyRenewal ? isoDate(ch.cyRenewal) : '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr className="report-totals">
+                          <td>Family total (incl. this account)</td>
+                          <td className={`num${family.rollup.credits < 0 ? ' neg' : ''}`}>{creditsFmt(family.rollup.credits)}</td>
+                          <td className={`num${family.rollup.dollars < 0 ? ' neg' : ''}`}>{dollars(family.rollup.dollars)}</td>
+                          <td>{family.rollup.nextRenewal ? isoDate(family.rollup.nextRenewal) : '—'}</td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                  {family.partial && <p className="muted small">Showing only your clients in this family.</p>}
+                </div>
+              )}
 
               <div className="card">
                 <h3>Contacts at {selected.name}</h3>

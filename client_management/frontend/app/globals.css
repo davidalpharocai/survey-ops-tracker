@@ -657,6 +657,7 @@ h3 { font-size: 1rem; }
 .sp-new label { display: flex; flex-direction: column; gap: 0.25rem; margin: 0; }
 @media (max-width: 620px) { .sp-new { grid-template-columns: 1fr; } }
 .inline-add { margin: -0.2rem 0 0.2rem; }
+.parent-picker { display: flex; flex-direction: column; gap: 0.25rem; max-width: 24rem; margin: 0.6rem 0 0.2rem; }
 
 /* Impersonation ("view as user") */
 .imp-banner {
