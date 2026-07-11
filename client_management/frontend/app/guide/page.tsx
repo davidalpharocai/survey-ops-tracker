@@ -88,6 +88,14 @@ export default function GuidePage() {
         <li><strong>Salespeople</strong> (Home → Clients &amp; Contacts): the salesperson roster. Add a salesperson&apos;s <strong>email</strong> so their &ldquo;my clients&rdquo; view works when they sign in.</li>
       </ul>
 
+      <h2>Parent &amp; sub-accounts (macro / micro view)</h2>
+      <p>Some clients are one family — a parent and its sub-accounts (e.g. Millennium and Black Kite Capital). Link them so balances add up at the family level, while each account keeps its own ledger.</p>
+      <ul>
+        <li><strong>Linking</strong>: on <strong>Manage Client List</strong>, admins get a <em>Parent account</em> picker on a client&apos;s edit form. It&apos;s one level deep — a parent can&apos;t itself be a sub-account, and a client that already has sub-accounts can&apos;t become one. Contacts can live on either level.</li>
+        <li><strong>On the parent&apos;s record</strong>, a <strong>Sub-accounts</strong> card lists each sub-account with its balance and a <strong>family total</strong> (parent + all sub-accounts). A sub-account shows a <strong>&ldquo;Part of [Parent] ↑&rdquo;</strong> link back up.</li>
+        <li><strong>On Contracts &amp; Studies</strong>, a parent gets a <strong>This account / Include sub-accounts</strong> toggle. <em>Include sub-accounts</em> swaps the tiles for the family rollup and a breakdown of each account (click to open its ledger). It <strong>adds up balances only — it never merges transactions</strong>, so each account&apos;s ledger stays the source of truth.</li>
+      </ul>
+
       <h2>Fixing mistakes</h2>
       <ul>
         <li><strong>Edits</strong>: contracts and studies can be edited from the client&apos;s pages; every edit records who made it. The ledger&apos;s <em>Edit</em> jumps you to the exact row.</li>

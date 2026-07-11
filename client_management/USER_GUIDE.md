@@ -129,6 +129,30 @@ Salespeople always see just their own clients.
   client's record, or in the Contacts list — to see every survey they
   requested.
 
+## Parent & sub-accounts (macro / micro view)
+
+Some clients are really one family — a parent and its sub-accounts (for
+example Millennium and Black Kite Capital). You can link them so balances add
+up at the family level, while each account still keeps its own ledger.
+
+- **Linking**: on **Manage Client List**, admins get a *Parent account*
+  picker on a client's edit form. Pick the parent to make that client a
+  sub-account. It's one level deep — a parent can't itself be a sub-account,
+  and a client that already has sub-accounts can't become one. Contacts can
+  live on either the parent or a sub-account.
+- **On the parent's record**, a **Sub-accounts** card lists each sub-account
+  with its balance and a **family total** that rolls up the parent plus every
+  sub-account. A sub-account's record shows a **"Part of [Parent] ↑"** link
+  back up.
+- **On Contracts & Studies**, a parent gets a **This account / Include
+  sub-accounts** toggle. *This account* is the normal per-client ledger.
+  *Include sub-accounts* swaps the tiles for the family rollup and shows a
+  breakdown of the parent and each sub-account (click any to open its own
+  ledger). The rollup **adds up balances only — it never merges
+  transactions**, so each account's ledger stays the source of truth.
+- If some sub-accounts belong to other salespeople, you'll see only yours, and
+  the total is labelled accordingly.
+
 ## Fixing mistakes
 
 - **Edits**: contracts and studies can be edited from the client's pages;
