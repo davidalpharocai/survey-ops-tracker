@@ -1011,6 +1011,7 @@ button:hover, .btn:hover { background: var(--accent-hover); }
 .tag-contract { background: var(--tag-contract-bg); color: var(--tag-contract-fg); }
 .tag-study { background: var(--tag-study-bg); color: var(--tag-study-fg); }
 .tag-adjustment { background: var(--tag-adj-bg); color: var(--tag-adj-fg); }
+.tag-overdrawn { background: var(--err-bg); color: var(--neg); margin-left: 0.4rem; }
 
 /* ---------- Audit log ---------- */
 

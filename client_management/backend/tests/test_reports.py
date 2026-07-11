@@ -307,6 +307,87 @@ async def test_renewals_exclude_past_deleted_and_archived(client):
     assert [row["contractName"] for row in rows] == ["Upcoming"]
 
 
+async def test_renewals_expose_remaining_and_overdrawn(client):
+    # Each renewing contract carries its own remaining balance (funding minus
+    # the studies rolled up to it) and an over-drawn flag, so an approaching
+    # renewal on a depleted contract is visible without opening the ledger.
+    made = await make_client(client, name="Remainder Co")
+    user = await make_user(client, made["id"], name="Ann")
+    # Healthy: 1000 funded, 300 drawn -> 700 remaining, not over-drawn.
+    healthy = await make_contract(
+        client, made["id"], name="Healthy",
+        occurred_on=_d(TODAY - timedelta(days=10)),
+        renewal_on=_d(TODAY + timedelta(days=45)),
+        credits_amount=1000, dollars_amount=0,
+    )
+    await make_study(
+        client, made["id"], [user["id"]], name="Draw 300",
+        occurred_on=_d(TODAY - timedelta(days=5)),
+        cost_type="credits", cost=300, contract_id=healthy["id"],
+    )
+    # Over-drawn: 200 funded, 500 drawn -> -300 remaining, over-drawn.
+    over = await make_contract(
+        client, made["id"], name="Overdrawn",
+        occurred_on=_d(TODAY - timedelta(days=10)),
+        renewal_on=_d(TODAY + timedelta(days=20)),
+        credits_amount=200, dollars_amount=0,
+    )
+    await make_study(
+        client, made["id"], [user["id"]], name="Draw 500",
+        occurred_on=_d(TODAY - timedelta(days=5)),
+        cost_type="credits", cost=500, contract_id=over["id"],
+    )
+    # A contract with no linked studies keeps its full funding as remaining.
+    await make_contract(
+        client, made["id"], name="Untouched",
+        occurred_on=_d(TODAY - timedelta(days=10)),
+        renewal_on=_d(TODAY + timedelta(days=60)),
+        credits_amount=400, dollars_amount=250,
+    )
+
+    rows = (await client.get("/api/reports/renewals", headers=ADMIN)).json()
+    by_name = {r["contractName"]: r for r in rows}
+    assert by_name["Healthy"]["remainingCredits"] == 700.0
+    assert by_name["Healthy"]["remainingDollars"] == 0.0
+    assert by_name["Healthy"]["overDrawn"] is False
+    assert by_name["Overdrawn"]["remainingCredits"] == -300.0
+    assert by_name["Overdrawn"]["overDrawn"] is True
+    assert by_name["Untouched"]["remainingCredits"] == 400.0
+    assert by_name["Untouched"]["remainingDollars"] == 250.0
+    assert by_name["Untouched"]["overDrawn"] is False
+
+
+async def test_renewals_remaining_ignores_deleted_and_unlinked_studies(client):
+    # Remaining reflects only ACTIVE studies linked to that contract: a
+    # soft-deleted linked study and an unlinked study both leave it untouched.
+    made = await make_client(client, name="Cleanroom Co")
+    user = await make_user(client, made["id"], name="Bo")
+    con = await make_contract(
+        client, made["id"], name="Solo",
+        occurred_on=_d(TODAY - timedelta(days=10)),
+        renewal_on=_d(TODAY + timedelta(days=30)),
+        credits_amount=1000, dollars_amount=0,
+    )
+    # Linked but soft-deleted: must not count.
+    zombie = await make_study(
+        client, made["id"], [user["id"]], name="Zombie draw",
+        occurred_on=_d(TODAY - timedelta(days=5)),
+        cost_type="credits", cost=250, contract_id=con["id"],
+    )
+    await client.delete(f"/api/studies/{zombie['id']}", headers=ADMIN)
+    # Active but unlinked (Unassigned): must not count toward this contract.
+    await make_study(
+        client, made["id"], [user["id"]], name="Unlinked draw",
+        occurred_on=_d(TODAY - timedelta(days=5)),
+        cost_type="credits", cost=400,
+    )
+
+    rows = (await client.get("/api/reports/renewals", headers=ADMIN)).json()
+    solo = next(r for r in rows if r["contractName"] == "Solo")
+    assert solo["remainingCredits"] == 1000.0
+    assert solo["overDrawn"] is False
+
+
 # --- Balance health ---------------------------------------------------------
 
 

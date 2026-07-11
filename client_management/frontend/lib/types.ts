@@ -242,6 +242,9 @@ export interface RenewalRow {
   daysUntil: number;
   creditsAmount: number;
   dollarsAmount: number;
+  remainingCredits: number;
+  remainingDollars: number;
+  overDrawn: boolean;
   bucket: RenewalBucket;
 }
 

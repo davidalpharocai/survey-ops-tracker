@@ -69,8 +69,8 @@ describe('computeKpis', () => {
       healthRow(4, null, 'ok'),
     ];
     const renewals: RenewalRow[] = [
-      { client: client(1, null), contractId: 1, contractName: 'x', renewalOn: new Date(), daysUntil: 10, creditsAmount: 0, dollarsAmount: 0, bucket: '30' },
-      { client: client(2, null), contractId: 2, contractName: 'y', renewalOn: new Date(), daysUntil: 45, creditsAmount: 0, dollarsAmount: 0, bucket: '60' },
+      { client: client(1, null), contractId: 1, contractName: 'x', renewalOn: new Date(), daysUntil: 10, creditsAmount: 0, dollarsAmount: 0, remainingCredits: 0, remainingDollars: 0, overDrawn: false, bucket: '30' },
+      { client: client(2, null), contractId: 2, contractName: 'y', renewalOn: new Date(), daysUntil: 45, creditsAmount: 0, dollarsAmount: 0, remainingCredits: 0, remainingDollars: 0, overDrawn: false, bucket: '60' },
     ];
     const balances: BalanceRow[] = [
       { client: client(1, null), credits: 0, dollars: 0, cyCredits: 0, cyValue: 1000, cyRenewal: null },

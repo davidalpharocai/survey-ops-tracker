@@ -491,8 +491,11 @@ async def renewal_radar(
     list of dict
         One row per contract: ``{"client", "contractId", "contractName",
         "renewalOn", "daysUntil", "creditsAmount", "dollarsAmount",
-        "bucket"}`` where ``bucket`` is ``"30"``/``"60"``/``"90"``/
-        ``"later"`` by days until renewal.
+        "remainingCredits", "remainingDollars", "overDrawn", "bucket"}``
+        where ``bucket`` is ``"30"``/``"60"``/``"90"``/``"later"`` by days
+        until renewal. ``remaining*`` is the contract's funding minus the
+        active studies rolled up to it (matching the ledger); ``overDrawn``
+        is true when either remaining balance is negative.
     """
     today = utc_today()
     result = await session.execute(
@@ -508,9 +511,34 @@ async def renewal_radar(
         )
         .order_by(Transaction.renewal_on.asc(), Transaction.id.asc())
     )
+    rows = result.all()
+
+    # Roll up each renewing contract's active linked studies in one grouped
+    # query (studies carry negative deltas), then remaining = funding + drawn.
+    contract_ids = [t.id for t, _ in rows]
+    drawn: dict[int, tuple[float, float]] = {}
+    if contract_ids:
+        for r in await session.execute(
+            select(
+                Transaction.contract_id.label("contract_id"),
+                func.coalesce(func.sum(Transaction.credits_delta), 0).label("credits"),
+                func.coalesce(func.sum(Transaction.dollars_delta), 0).label("dollars"),
+            )
+            .where(
+                Transaction.kind == "study",
+                Transaction.deleted_at.is_(None),
+                Transaction.contract_id.in_(contract_ids),
+            )
+            .group_by(Transaction.contract_id)
+        ):
+            drawn[r.contract_id] = (float(r.credits), float(r.dollars))
+
     out = []
-    for t, c in result.all():
+    for t, c in rows:
         days_until = (t.renewal_on - today).days
+        d_credits, d_dollars = drawn.get(t.id, (0.0, 0.0))
+        remaining_credits = float(t.credits_delta or 0) + d_credits
+        remaining_dollars = float(t.dollars_delta or 0) + d_dollars
         out.append(
             {
                 "client": client_dict(c),
@@ -520,6 +548,9 @@ async def renewal_radar(
                 "daysUntil": days_until,
                 "creditsAmount": float(t.credits_delta or 0),
                 "dollarsAmount": float(t.dollars_delta or 0),
+                "remainingCredits": remaining_credits,
+                "remainingDollars": remaining_dollars,
+                "overDrawn": remaining_credits < 0 or remaining_dollars < 0,
                 "bucket": _bucket(days_until),
             }
         )

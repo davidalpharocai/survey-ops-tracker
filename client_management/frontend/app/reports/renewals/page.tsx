@@ -19,30 +19,39 @@ const SECTIONS: { bucket: RenewalBucket; title: string }[] = [
 function RenewalTable({ rows }: { rows: RenewalRow[] }) {
   if (rows.length === 0) return <p className="muted">None</p>;
   return (
-    <table className="report">
-      <thead>
-        <tr>
-          <th>Client</th>
-          <th>Contract</th>
-          <th>Renewal date<InfoTooltip text={TIP.renewalDate} /></th>
-          <th className="num">Days<InfoTooltip text={TIP.daysUntilRenewal} /></th>
-          <th className="num">Contract credits<InfoTooltip text={TIP.contractCredits} /></th>
-          <th className="num">Contract dollars<InfoTooltip text={TIP.contractDollars} /></th>
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map(r => (
-          <tr key={r.contractId}>
-            <td><Link href={`/clients?id=${r.client.id}`}>{r.client.name}</Link></td>
-            <td>{r.contractName}</td>
-            <td>{isoDate(r.renewalOn)}</td>
-            <td className="num">{r.daysUntil}</td>
-            <td className="num">{creditsFmt(r.creditsAmount)}</td>
-            <td className="num">{dollars(r.dollarsAmount)}</td>
+    <div className="table-scroll">
+      <table className="report">
+        <thead>
+          <tr>
+            <th>Client</th>
+            <th>Contract</th>
+            <th>Renewal date<InfoTooltip text={TIP.renewalDate} /></th>
+            <th className="num">Days<InfoTooltip text={TIP.daysUntilRenewal} /></th>
+            <th className="num">Contract credits<InfoTooltip text={TIP.contractCredits} /></th>
+            <th className="num">Contract dollars<InfoTooltip text={TIP.contractDollars} /></th>
+            <th className="num">Remaining credits<InfoTooltip text={TIP.remainingOnContract} /></th>
+            <th className="num">Remaining dollars<InfoTooltip text={TIP.remainingOnContract} /></th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {rows.map(r => (
+            <tr key={r.contractId}>
+              <td><Link href={`/clients?id=${r.client.id}`}>{r.client.name}</Link></td>
+              <td>
+                <Link href={`/reports/transactions?client_id=${r.client.id}`}>{r.contractName}</Link>
+                {r.overDrawn && <span className="tag tag-overdrawn" title="Linked studies have used more than this contract funded.">Over-drawn</span>}
+              </td>
+              <td>{isoDate(r.renewalOn)}</td>
+              <td className="num">{r.daysUntil}</td>
+              <td className="num">{creditsFmt(r.creditsAmount)}</td>
+              <td className="num">{dollars(r.dollarsAmount)}</td>
+              <td className={`num${r.remainingCredits < 0 ? ' neg' : ''}`}>{creditsFmt(r.remainingCredits)}</td>
+              <td className={`num${r.remainingDollars < 0 ? ' neg' : ''}`}>{dollars(r.remainingDollars)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -54,7 +63,7 @@ export default async function RenewalsPage() {
     <>
       <Link className="back" href="/reports">← Reports</Link>
       <h1>Renewal Radar</h1>
-      <p className="muted">Every upcoming contract renewal across active clients, soonest first, grouped by how close it is. Renewals already past are not shown.</p>
+      <p className="muted">Every upcoming contract renewal across active clients, soonest first, grouped by how close it is. Each row shows what&apos;s left on the contract — an <strong>Over-drawn</strong> tag flags one whose linked studies have already used more than it funded. Renewals already past are not shown.</p>
 
       {SECTIONS.map(s => (
         <section key={s.bucket}>

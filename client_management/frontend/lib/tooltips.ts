@@ -64,6 +64,8 @@ export const TIP = {
     'The credits this contract added when it was signed — the size of the deal that is coming up for renewal.',
   contractDollars:
     'The dollars this contract added when it was signed — the size of the deal that is coming up for renewal.',
+  remainingOnContract:
+    'What is left on this contract right now — its funding minus the studies rolled up to it. Red/over-drawn means the linked studies have used more than the contract funded, so it likely needs a renewal or top-up.',
 
   // Balance health
   monthlyBurn:
