@@ -24,7 +24,7 @@ export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Contracts & Studies · AlphaROC' };
 
 interface PageProps {
-  searchParams: Promise<{ client_id?: string; view?: string }>;
+  searchParams: Promise<{ client_id?: string; view?: string; att_error?: string; att_ok?: string }>;
 }
 
 export default async function TransactionsReportPage({ searchParams }: PageProps) {
@@ -96,6 +96,12 @@ export default async function TransactionsReportPage({ searchParams }: PageProps
           />
         )}
       </form>
+
+      {sp?.att_error ? (
+        <p className="banner-error" role="alert">{sp.att_error}</p>
+      ) : sp?.att_ok ? (
+        <p className="banner-ok" role="status">Document uploaded.</p>
+      ) : null}
 
       {selected ? (
         <>

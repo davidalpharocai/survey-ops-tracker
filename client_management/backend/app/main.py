@@ -14,6 +14,7 @@ from app.routers import (
     adjustments,
     admin,
     archive,
+    attachments,
     clients,
     contracts,
     credit_requests,
@@ -122,6 +123,7 @@ app.include_router(me.router)
 app.include_router(clients.router)
 app.include_router(users.router)
 app.include_router(contracts.router)
+app.include_router(attachments.router)
 app.include_router(studies.router)
 app.include_router(adjustments.router)
 app.include_router(credit_requests.router)

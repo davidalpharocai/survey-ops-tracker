@@ -123,6 +123,12 @@ Salespeople always see just their own clients.
   Collapse/expand any contract, or all at once. Studies not tied to a contract
   sit under **Unassigned**; corrections sit under **Adjustments**. A search box
   filters that client's contracts and studies instantly.
+- **Attach documents to a contract**: expand a contract in the ledger to see
+  its **📎 Documents** — signed PDFs, SOWs, invoices, etc. Contract managers
+  can upload (PDF, Office, image, CSV or text, up to 8 MB) and remove files;
+  anyone who can see the client can download them. Files always download (they
+  never open in-page) for safety, and removing one archives it rather than
+  destroying it.
 - **Manage Client List**: a client's full record — contact details,
   salesperson, their contacts, and quick links to add a contract or study.
 - **A contact's surveys**: click any contact — in the search box, on their

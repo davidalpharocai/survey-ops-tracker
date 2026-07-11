@@ -13,7 +13,14 @@ them into ``Date`` objects so the existing formatters keep working.
 from datetime import datetime
 from decimal import Decimal
 
-from app.models import Client, ClientUser, CreditRequest, Salesperson, Transaction
+from app.models import (
+    Client,
+    ClientUser,
+    ContractAttachment,
+    CreditRequest,
+    Salesperson,
+    Transaction,
+)
 
 
 def _iso(dt: datetime | None) -> str | None:
@@ -79,6 +86,23 @@ def client_dict(c: Client) -> dict:
         "parentId": c.parent_id,
         "createdByEmail": c.created_by_email,
         "createdAt": _iso(c.created_at),
+    }
+
+
+def attachment_dict(a: ContractAttachment) -> dict:
+    """Serialise a :class:`~app.models.ContractAttachment` (metadata only).
+
+    Never includes bytes or the internal ``storage_key``/``storage_backend``
+    — the frontend addresses the file by ``id`` through the download proxy.
+    """
+    return {
+        "id": a.id,
+        "transactionId": a.transaction_id,
+        "filename": a.filename,
+        "contentType": a.content_type,
+        "byteSize": a.byte_size,
+        "uploadedByEmail": a.uploaded_by_email,
+        "createdAt": _iso(a.created_at),
     }
 
 

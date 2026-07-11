@@ -3,6 +3,8 @@
 import { revalidatePath } from 'next/cache';
 
 import { apiForRequest, parseId, redirectTo } from '../../../lib/action';
+import { authHeaders, BACKEND_BASE } from '../../../lib/api';
+import { currentUserEmail } from '../../../lib/auth';
 
 export async function createAdjustmentAction(formData: FormData): Promise<void> {
   const clientId = parseId(formData.get('client_id'));
@@ -38,6 +40,58 @@ export async function deleteLedgerContractAction(formData: FormData): Promise<vo
   if (id == null || clientId == null) redirectTo('/reports/transactions');
   const api = await apiForRequest();
   await api.deleteContract(id);
+  revalidatePath('/', 'layout');
+  redirectTo(`/reports/transactions?client_id=${clientId}`);
+}
+
+// Upload a document to a contract. Forwards the multipart body straight to
+// the backend with the same auth headers the JSON client uses; on rejection
+// (bad type / too large) it redirects back with a readable message rather
+// than throwing an error page. Kept out of the JSON api client because the
+// body is multipart, not JSON.
+export async function uploadContractAttachmentAction(formData: FormData): Promise<void> {
+  const contractId = parseId(formData.get('contract_id'));
+  const clientId = parseId(formData.get('client_id'));
+  if (contractId == null || clientId == null) redirectTo('/reports/transactions');
+  const back = `/reports/transactions?client_id=${clientId}`;
+  const file = formData.get('file');
+  if (!(file instanceof File) || file.size === 0) {
+    redirectTo(`${back}&att_error=${encodeURIComponent('Choose a file to upload.')}`);
+  }
+  const fwd = new FormData();
+  fwd.append('file', file, file.name);
+  let res: Response;
+  try {
+    res = await fetch(`${BACKEND_BASE}/api/contracts/${contractId}/attachments`, {
+      method: 'POST',
+      headers: await authHeaders(await currentUserEmail()),
+      body: fwd,
+      cache: 'no-store',
+    });
+  } catch {
+    redirectTo(`${back}&att_error=${encodeURIComponent('Upload failed — please try again.')}`);
+  }
+  if (!res.ok) {
+    let detail = `Upload failed (${res.status}).`;
+    try {
+      const j = (await res.json()) as { detail?: unknown };
+      if (typeof j?.detail === 'string') detail = j.detail;
+    } catch {
+      /* non-JSON error body — keep the generic message */
+    }
+    redirectTo(`${back}&att_error=${encodeURIComponent(detail)}`);
+  }
+  revalidatePath('/', 'layout');
+  redirectTo(`${back}&att_ok=1`);
+}
+
+// Soft-delete a contract attachment (recoverable; bytes retained).
+export async function deleteContractAttachmentAction(formData: FormData): Promise<void> {
+  const id = parseId(formData.get('id'));
+  const clientId = parseId(formData.get('client_id'));
+  if (id == null || clientId == null) redirectTo('/reports/transactions');
+  const api = await apiForRequest();
+  await api.deleteAttachment(id);
   revalidatePath('/', 'layout');
   redirectTo(`/reports/transactions?client_id=${clientId}`);
 }

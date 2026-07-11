@@ -151,11 +151,23 @@ export type Transaction = ContractTransaction | StudyTransaction;
 export interface StudyListRow extends StudyTransaction { client: Client; }
 export interface ContractListRow extends ContractTransaction { client: Client; }
 
+// A file attached to a contract (metadata only; bytes fetched via download).
+export interface AttachmentMeta {
+  id: number;
+  transactionId: number;
+  filename: string;
+  contentType: string;
+  byteSize: number;
+  uploadedByEmail: string;
+  createdAt: Date;
+}
+
 // Contract-grouped ledger (GET /api/clients/{id}/ledger).
 export interface LedgerContract extends ContractTransaction {
   remainingCredits: number;
   remainingDollars: number;
   studies: StudyTransaction[];
+  attachments: AttachmentMeta[];
 }
 export interface LedgerAdjustment extends TransactionBase {
   kind: 'adjustment';

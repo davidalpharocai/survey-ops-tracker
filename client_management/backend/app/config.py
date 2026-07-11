@@ -85,6 +85,16 @@ class Settings(BaseSettings):
     audit_s3_output: str = Field(default="", alias="AUDIT_S3_OUTPUT")
     aws_region: str = Field(default="us-east-1", alias="AWS_REGION")
 
+    # Contract-attachment storage. Default 'postgres' keeps file bytes in the
+    # DB (free, no extra infra, travels with the DB dump into AWS). Flip to
+    # 's3' once a bucket exists — set ATTACHMENT_S3_BUCKET too; no code change.
+    attachment_storage: str = Field(default="postgres", alias="ATTACHMENT_STORAGE")
+    attachment_s3_bucket: str = Field(default="", alias="ATTACHMENT_S3_BUCKET")
+    attachment_s3_prefix: str = Field(default="contract-attachments", alias="ATTACHMENT_S3_PREFIX")
+    # Hard cap on a single upload (bytes). Kept under the frontend server
+    # action body limit (10 MB) so the proxy never truncates a valid file.
+    attachment_max_bytes: int = Field(default=8 * 1024 * 1024, alias="ATTACHMENT_MAX_BYTES")
+
     @model_validator(mode="after")
     def _resolve_database_url_from_secret(self) -> "Settings":
         """Fetch DATABASE_URL from Secrets Manager when not set directly.

@@ -20,9 +20,27 @@ import {
 import type { Ledger, LedgerAdjustment, LedgerContract, StudyTransaction } from '../../../lib/types';
 import DeleteConfirm from '../../_components/DeleteConfirm';
 import InfoTooltip from '../../_components/InfoTooltip';
-import { deleteLedgerContractAction, deleteLedgerStudyAction } from './actions';
+import {
+  deleteContractAttachmentAction,
+  deleteLedgerContractAction,
+  deleteLedgerStudyAction,
+  uploadContractAttachmentAction,
+} from './actions';
 
 const LS_KEY = 'ccm-ledger-col-order';
+
+// NEXT_PUBLIC_ is inlined at build; needed because attachment downloads hit a
+// route handler (not a page), so <a href> must carry the basePath itself.
+const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || '';
+
+const ATTACH_TIP =
+  'Upload documents for this contract (signed PDF, SOW, invoice…). Files download rather than open in-page for safety. Max 8 MB; PDF/Office/image/CSV/text.';
+
+function fmtBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 const REMAINING_TIP =
   'What is left on this contract: its funding minus every study that rolls up to it. Red means the contract is over-drawn.';
@@ -136,6 +154,72 @@ function StudyRow({
   );
 }
 
+// Documents attached to a contract, shown as a sub-row when the contract is
+// expanded. Editors can upload/delete; everyone who can see the client can
+// download. Rendered only when there is something to show (files, or the
+// upload affordance for an editor).
+function ContractAttachments({
+  c,
+  clientId,
+  canEditMoney,
+  colCount,
+}: {
+  c: LedgerContract;
+  clientId: number;
+  canEditMoney: boolean;
+  colCount: number;
+}) {
+  const atts = c.attachments ?? [];
+  if (atts.length === 0 && !canEditMoney) return null;
+  return (
+    <tr className="ledger-attachments">
+      <td colSpan={colCount}>
+        <div className="att-panel">
+          <span className="att-label">
+            📎 Documents <InfoTooltip text={ATTACH_TIP} />
+          </span>
+          {atts.length > 0 ? (
+            <ul className="att-list">
+              {atts.map((a) => (
+                <li key={a.id}>
+                  <a className="att-link" href={`${BASE_PATH}/attachments/${a.id}/download`}>
+                    {a.filename}
+                  </a>
+                  <span className="muted small"> · {fmtBytes(a.byteSize)} · {isoDate(a.createdAt)}</span>
+                  {canEditMoney && (
+                    <DeleteConfirm
+                      action={deleteContractAttachmentAction}
+                      id={a.id}
+                      clientId={clientId}
+                      name={a.filename}
+                    />
+                  )}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <span className="muted small">No documents yet.</span>
+          )}
+          {canEditMoney && (
+            <form action={uploadContractAttachmentAction} className="att-upload">
+              <input type="hidden" name="contract_id" value={c.id} />
+              <input type="hidden" name="client_id" value={clientId} />
+              <input
+                type="file"
+                name="file"
+                required
+                accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.csv,.txt,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
+                aria-label={`Attach a document to ${c.name}`}
+              />
+              <button type="submit" className="btn-sm">Attach</button>
+            </form>
+          )}
+        </div>
+      </td>
+    </tr>
+  );
+}
+
 export default function LedgerTree({ ledger, clientId, canEditMoney = true }: { ledger: Ledger; clientId: number; canEditMoney?: boolean }) {
   const [q, setQ] = useState('');
   const [collapsed, setCollapsed] = useState<Set<number>>(new Set());
@@ -183,6 +267,8 @@ export default function LedgerTree({ ledger, clientId, canEditMoney = true }: { 
 
   const view = useMemo(() => filterLedger(ledger, q), [ledger, q]);
   const allIds = ledger.contracts.map((c) => c.id);
+  // name column + reorderable data columns + actions column.
+  const colCount = order.length + 2;
   // Original (unfiltered) linked-study counts — a contract can only be
   // archived when nothing rolls up to it (the backend enforces this too).
   const studyCounts = useMemo(
@@ -270,6 +356,9 @@ export default function LedgerTree({ ledger, clientId, canEditMoney = true }: { 
                       <span className="ledger-contract-name">{c.name}</span>
                       {c.soccProjectCode ? <span className="muted small"> · {c.soccProjectCode}</span> : null}
                       {c.studies.length ? <span className="muted small"> ({c.studies.length})</span> : null}
+                      {(c.attachments?.length ?? 0) > 0 ? (
+                        <span className="att-count" title={`${c.attachments.length} document(s) attached`}>📎 {c.attachments.length}</span>
+                      ) : null}
                     </button>
                   </td>
                   {dataCells(order, 'contract', c)}
@@ -286,6 +375,9 @@ export default function LedgerTree({ ledger, clientId, canEditMoney = true }: { 
                     ) : null}
                   </td>
                 </tr>
+                {!isCollapsed && (
+                  <ContractAttachments c={c} clientId={clientId} canEditMoney={canEditMoney} colCount={colCount} />
+                )}
                 {!isCollapsed && c.studies.map((s) => <StudyRow key={s.id} s={s} clientId={clientId} order={order} />)}
               </Fragment>
             );

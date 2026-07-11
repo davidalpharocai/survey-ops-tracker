@@ -15,9 +15,9 @@ from sqlalchemy.orm import selectinload
 from app.auth import require_user
 from app.db import get_session
 from app.helpers import current_year_window, utc_today
-from app.models import Client, Transaction
+from app.models import Client, ContractAttachment, Transaction
 from app.scoping import AccessScope, require_scope, scoped_client_or_404
-from app.serializers import client_dict, transaction_dict
+from app.serializers import attachment_dict, client_dict, transaction_dict
 
 # Balance-health tuning: burn is averaged over the trailing 90 days, a
 # month is 30.44 days (365.25 / 12), and a projected run-out within 60
@@ -418,6 +418,26 @@ async def client_ledger(
         else:
             unassigned.append(s)
 
+    # Active attachments for these contracts, grouped by contract, in one
+    # query (metadata only — never the bytes).
+    attachments_by_contract: dict[int, list] = {}
+    if contract_ids:
+        att_rows = (
+            await session.execute(
+                select(ContractAttachment)
+                .where(
+                    ContractAttachment.transaction_id.in_(contract_ids),
+                    ContractAttachment.deleted_at.is_(None),
+                )
+                .order_by(
+                    ContractAttachment.created_at.asc(),
+                    ContractAttachment.id.asc(),
+                )
+            )
+        ).scalars().all()
+        for a in att_rows:
+            attachments_by_contract.setdefault(a.transaction_id, []).append(a)
+
     contract_rows = []
     for c in (t for t in txns if t.kind == "contract"):
         linked = studies_by_contract.get(c.id, [])
@@ -430,6 +450,9 @@ async def client_ledger(
         )
         row["studies"] = [
             transaction_dict(s, with_client_user=True) for s in linked
+        ]
+        row["attachments"] = [
+            attachment_dict(a) for a in attachments_by_contract.get(c.id, [])
         ]
         contract_rows.append(row)
 

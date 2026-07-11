@@ -14,8 +14,10 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Integer,
+    LargeBinary,
     Numeric,
     String,
+    Text,
     UniqueConstraint,
     func,
 )
@@ -289,6 +291,50 @@ class Transaction(Base):
     users: Mapped[list["TransactionUser"]] = relationship(
         back_populates="transaction", cascade="all, delete-orphan"
     )
+
+
+class ContractAttachment(Base):
+    """An uploaded document tied to a contract transaction.
+
+    Maps to the ``contract_attachments`` table. Metadata only — the bytes
+    live in :class:`AttachmentBlob` (the ``postgres`` backend) or in S3 (the
+    ``s3`` backend), selected by ``storage_backend``. The original
+    ``filename`` is display-only; the object is addressed solely by the
+    generated ``storage_key`` so a crafted filename can never traverse a
+    path. Soft-deleted via ``deleted_at`` to keep an audit trail.
+    """
+
+    __tablename__ = "contract_attachments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    transaction_id: Mapped[int] = mapped_column(
+        ForeignKey("transactions.id", ondelete="CASCADE", onupdate="CASCADE")
+    )
+    filename: Mapped[str] = mapped_column(Text)
+    content_type: Mapped[str] = mapped_column(Text)
+    byte_size: Mapped[int] = mapped_column(Integer)
+    storage_backend: Mapped[str] = mapped_column(Text)
+    storage_key: Mapped[str] = mapped_column(Text)
+    uploaded_by_email: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now()
+    )
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class AttachmentBlob(Base):
+    """Raw file bytes for the ``postgres`` attachment backend.
+
+    Maps to the ``attachment_blobs`` table, keyed by the same
+    ``storage_key`` held on :class:`ContractAttachment`. The ``s3`` backend
+    leaves this table empty. Kept separate from the metadata table so
+    listing attachments never loads file bytes.
+    """
+
+    __tablename__ = "attachment_blobs"
+
+    storage_key: Mapped[str] = mapped_column(Text, primary_key=True)
+    data: Mapped[bytes] = mapped_column(LargeBinary)
 
 
 class TransactionUser(Base):

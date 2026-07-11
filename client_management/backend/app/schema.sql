@@ -188,3 +188,33 @@ CREATE INDEX IF NOT EXISTS credit_requests_requester_idx
     ON credit_requests (lower(requested_by_email));
 CREATE INDEX IF NOT EXISTS credit_requests_client_idx
     ON credit_requests (client_id);
+
+-- Contract attachments: uploaded documents (signed PDFs, SOWs, etc.) tied to
+-- a contract transaction. Metadata lives here; the bytes live either in
+-- attachment_blobs (the free/temporary 'postgres' backend) or in S3 (the
+-- 's3' backend, once AWS is provisioned) — storage_backend records which, so
+-- a mixed migration is safe. The original filename is display-only; the
+-- object is addressed solely by the generated storage_key (no path traversal).
+CREATE TABLE IF NOT EXISTS contract_attachments (
+    id                SERIAL PRIMARY KEY,
+    transaction_id    INTEGER NOT NULL
+                        REFERENCES transactions(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    filename          TEXT NOT NULL,
+    content_type      TEXT NOT NULL,
+    byte_size         INTEGER NOT NULL,
+    storage_backend   TEXT NOT NULL,
+    storage_key       TEXT NOT NULL,
+    uploaded_by_email TEXT NOT NULL,
+    created_at        TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_at        TIMESTAMP(3)
+);
+CREATE INDEX IF NOT EXISTS contract_attachments_txn_idx
+    ON contract_attachments (transaction_id) WHERE deleted_at IS NULL;
+
+-- Blob store for the 'postgres' attachment backend. Addressed by the same
+-- storage_key held in contract_attachments; the 's3' backend leaves this
+-- table empty. Kept separate so listing attachments never loads file bytes.
+CREATE TABLE IF NOT EXISTS attachment_blobs (
+    storage_key TEXT PRIMARY KEY,
+    data        BYTEA NOT NULL
+);

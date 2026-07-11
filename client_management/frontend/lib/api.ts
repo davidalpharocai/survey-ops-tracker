@@ -40,10 +40,35 @@ const BASE = (process.env.BACKEND_URL || 'http://127.0.0.1:8000').replace(
   '',
 );
 
+/** Base URL of the FastAPI backend (no trailing slash). Server-only. */
+export const BACKEND_BASE = BASE;
+
 // Service secret proving requests come from this trusted frontend; the
 // backend accepts X-User-Email in production only when this matches its
 // INTERNAL_API_SECRET. Server-only (this module imports next/headers).
 const SHARED_SECRET = process.env.BACKEND_SHARED_SECRET || '';
+
+/**
+ * Build the auth/identity headers every backend call needs: the verified
+ * user email, the frontend↔backend service secret, the Cognito ID token, and
+ * the impersonation marker (present only for an admin in an active "view as
+ * user" session — the backend then rejects writes). Content-Type is NOT set
+ * here so binary/multipart callers can let fetch pick the boundary.
+ *
+ * Exported so the attachment upload action and download proxy authenticate to
+ * the backend exactly the way {@link request} does — one source of truth.
+ */
+export async function authHeaders(
+  userEmail: string,
+): Promise<Record<string, string>> {
+  const idToken = (await cookies()).get(COOKIE_ID_TOKEN)?.value || '';
+  const headers: Record<string, string> = { 'X-User-Email': userEmail || '' };
+  if (SHARED_SECRET) headers['X-Internal-Auth'] = SHARED_SECRET;
+  if (idToken) headers.Authorization = `Bearer ${idToken}`;
+  const impersonatedBy = (await nextHeaders()).get('x-impersonated-by') || '';
+  if (impersonatedBy) headers['X-Impersonated-By'] = impersonatedBy;
+  return headers;
+}
 
 // Keys that hold timestamps in the API payloads. Revived to `Date` so
 // templates calling isoDate()/fmtDateTime() behave as before.
@@ -89,21 +114,12 @@ async function request<T>(
   path: string,
   body?: unknown,
 ): Promise<T> {
-  // Forward the user's Cognito ID token; the backend verifies it
-  // independently (signature, issuer, audience, group). X-User-Email is
-  // kept for the local-dev path where Cognito is not configured.
-  const idToken = (await cookies()).get(COOKIE_ID_TOKEN)?.value || '';
+  // Identity/service headers (Cognito token, X-User-Email, service secret,
+  // impersonation marker) come from the shared builder; JSON adds its type.
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    'X-User-Email': userEmail || '',
+    ...(await authHeaders(userEmail)),
   };
-  if (SHARED_SECRET) headers['X-Internal-Auth'] = SHARED_SECRET;
-  if (idToken) headers.Authorization = `Bearer ${idToken}`;
-  // Propagate the impersonation marker (set by middleware only for an admin
-  // with an active "view as user" session). The backend rejects writes while
-  // it is present, so an admin can never mutate data as someone else.
-  const impersonatedBy = (await nextHeaders()).get('x-impersonated-by') || '';
-  if (impersonatedBy) headers['X-Impersonated-By'] = impersonatedBy;
   const res = await fetch(BASE + path, {
     method,
     headers,
@@ -186,6 +202,7 @@ export interface ApiClient {
   createContract(d: Record<string, unknown>): Promise<ContractTransaction & { clientName: string }>;
   updateContract(id: number, d: Record<string, unknown>): Promise<ContractTransaction>;
   deleteContract(id: number): Promise<{ name: string; clientId: number }>;
+  deleteAttachment(id: number): Promise<{ transactionId: number; id: number }>;
 
   listStudiesByClient(clientId: number): Promise<StudyTransaction[]>;
   createStudy(d: Record<string, unknown>): Promise<StudyTransaction & { clientName: string }>;
@@ -317,6 +334,7 @@ export function api(userEmail: string): ApiClient {
     createContract: d => r('POST', '/api/contracts', d),
     updateContract: (id, d) => r('PATCH', `/api/contracts/${id}`, d),
     deleteContract: id => r('DELETE', `/api/contracts/${id}`),
+    deleteAttachment: id => r('DELETE', `/api/attachments/${id}`),
 
     listStudiesByClient: clientId => r('GET', `/api/clients/${clientId}/studies`),
     createStudy: d => r('POST', '/api/studies', d),
