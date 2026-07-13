@@ -9,7 +9,16 @@ from datetime import datetime, timedelta
 
 from app.helpers import utc_today
 
-from conftest import ADMIN, get_balances, make_client, make_contract, make_study, make_user
+from conftest import (
+    ADMIN,
+    APPROVER,
+    USER,
+    get_balances,
+    make_client,
+    make_contract,
+    make_study,
+    make_user,
+)
 
 TODAY = utc_today()
 CY = TODAY.year
@@ -538,6 +547,58 @@ async def test_balance_health_expired_tracker_excluded_from_burn(client):
     assert row["monthlyCreditBurn"] == 0  # expired tracker adds nothing
     assert row["creditsRunOutOn"] is None
     assert row["credits"] == 5000.0 - 3600.0  # balance still reflects it
+
+
+# --- Client activity feed ---------------------------------------------------
+
+
+async def test_client_activity_feed(client):
+    sp = (await client.post(
+        "/api/salespeople", json={"name": "Sarah", "email": "sarah@alpharoc.ai"}, headers=ADMIN
+    )).json()
+    made = await make_client(client, name="Activity Co", salesperson_id=sp["id"])
+    user = await make_user(client, made["id"], name="Ann")
+    await make_contract(
+        client, made["id"], name="MSA",
+        occurred_on=_d(TODAY - timedelta(days=10)),
+        renewal_on=_d(TODAY + timedelta(days=355)),
+    )
+    await make_study(
+        client, made["id"], [user["id"]], name="Pilot",
+        occurred_on=_d(TODAY - timedelta(days=2)),
+    )
+    # Sarah (owns the client) requests credits; an approver approves it.
+    req = (await client.post(
+        "/api/credit-requests",
+        json={"client_id": made["id"], "credits_delta": 100, "note": "top up"},
+        headers=USER,
+    )).json()
+    approved = await client.post(f"/api/credit-requests/{req['id']}/approve", headers=APPROVER)
+    assert approved.status_code == 200
+
+    r = await client.get(f"/api/clients/{made['id']}/activity", headers=ADMIN)
+    assert r.status_code == 200
+    events = r.json()
+    types = {e["type"] for e in events}
+    assert {"contract", "study", "credit_request", "credit_decision"} <= types
+    # Newest-first ordering.
+    dates = [e["date"] for e in events]
+    assert dates == sorted(dates, reverse=True)
+    # Every event is labelled and attributed.
+    assert all(e["title"] and e["actor"] is not None for e in events)
+    # The requested-credits event carries its delta.
+    cr = next(e for e in events if e["type"] == "credit_request")
+    assert cr["creditsDelta"] == 100.0 and cr["detail"] == "top up"
+
+
+async def test_client_activity_scoped_404(client):
+    # A restricted user can't read another rep's client's activity feed.
+    await client.post(
+        "/api/salespeople", json={"name": "Sarah", "email": "sarah@alpharoc.ai"}, headers=ADMIN
+    )
+    theirs = await make_client(client, name="Not Sarah's Co")  # unowned by sarah
+    assert (await client.get(f"/api/clients/{theirs['id']}/activity", headers=USER)).status_code == 404
+    assert (await client.get("/api/clients/999999/activity", headers=ADMIN)).status_code == 404
 
 
 async def test_balance_health_flags_idle_funded_but_dormant(client):

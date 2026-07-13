@@ -523,6 +523,23 @@ h3 { font-size: 1rem; }
   font-size: 0.9rem;
 }
 
+/* Auto-derived client activity timeline (client detail pane) */
+.timeline { list-style: none; margin: 0.3rem 0 0; padding: 0; }
+.tl-item {
+  display: flex;
+  gap: 0.6rem;
+  padding: 0.4rem 0;
+  border-top: 1px solid var(--border);
+  font-size: 0.88rem;
+  align-items: baseline;
+}
+.tl-item:first-child { border-top: 0; }
+.tl-date { flex: 0 0 6.5rem; color: var(--muted); font-size: 0.8rem; font-variant-numeric: tabular-nums; }
+.tl-body { flex: 1; min-width: 0; }
+.tl-amt { margin-left: 0.4rem; font-variant-numeric: tabular-nums; }
+.tl-amt.pos { color: var(--pos); }
+.tl-amt.neg { color: var(--neg); }
+
 /* "Possible existing matches" duplicate-client hint in the New client dialog */
 .dup-warn {
   background: var(--warn-bg);

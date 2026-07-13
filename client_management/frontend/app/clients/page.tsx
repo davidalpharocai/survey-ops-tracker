@@ -6,7 +6,7 @@ import { currentUserEmail, currentUserIsRestricted } from '../../lib/auth';
 import { todayIsoDate } from '../../lib/dates';
 import { contractValue, credits as creditsFmt, dollars, isoDate } from '../../lib/format';
 import { TIP } from '../../lib/tooltips';
-import type { Balance, ClientUser, Family, Salesperson } from '../../lib/types';
+import type { ActivityEvent, Balance, ClientUser, Family, Salesperson } from '../../lib/types';
 import InfoTooltip from '../_components/InfoTooltip';
 import ConfirmButton from './ConfirmButton';
 import ClientListRail from './ClientListRail';
@@ -38,7 +38,7 @@ export default async function ClientsPage({ searchParams }: PageProps) {
   // stale ?id= URL falls back to the empty state, but a transient backend
   // error still surfaces rather than rendering a fake $0 balance for a
   // real client.
-  const [clients, salespeople, selected, selectedUsers, bal, family, restricted, myEmail] = await Promise.all([
+  const [clients, salespeople, selected, selectedUsers, bal, family, restricted, myEmail, activity] = await Promise.all([
     api.listClients(),
     api.listSalespeople(),
     selectedId ? api.getClient(selectedId) : Promise.resolve(null),
@@ -53,6 +53,9 @@ export default async function ClientsPage({ searchParams }: PageProps) {
       : Promise.resolve(null as Family | null),
     currentUserIsRestricted(),
     currentUserEmail(),
+    selectedId
+      ? api.clientActivity(selectedId).catch(() => [] as ActivityEvent[])
+      : Promise.resolve([] as ActivityEvent[]),
   ]);
 
   const currentYear = new Date().getUTCFullYear();
@@ -89,6 +92,7 @@ export default async function ClientsPage({ searchParams }: PageProps) {
                   <p className="muted">
                     Client since {isoDate(selected.becameClientOn)}
                     {selected.soccCode ? ` · ${selected.soccCode}` : ''}
+                    {activity.length > 0 ? ` · Last activity ${isoDate(new Date(activity[0].date))}` : ''}
                   </p>
                   {family?.parent && (
                     <p className="muted small">
@@ -177,6 +181,35 @@ export default async function ClientsPage({ searchParams }: PageProps) {
                     </table>
                   </div>
                   {family.partial && <p className="muted small">Showing only your clients in this family.</p>}
+                </div>
+              )}
+
+              {activity.length > 0 && (
+                <div className="card">
+                  <h3>Activity <span className="muted small">({activity.length})</span>
+                    <InfoTooltip text="Recent activity on this client — contracts, studies, adjustments, and credit requests — newest first. Built automatically from the record; nothing to maintain." />
+                  </h3>
+                  <ul className="timeline">
+                    {activity.slice(0, 15).map((e, i) => (
+                      <li key={`${e.type}-${e.date}-${i}`} className={`tl-item tl-${e.type}`}>
+                        <span className="tl-date">{isoDate(new Date(e.date))}</span>
+                        <span className="tl-body">
+                          <strong>{e.title}</strong>
+                          {e.detail ? <span className="muted"> — {e.detail}</span> : null}
+                          {e.creditsDelta !== 0 && (
+                            <span className={`tl-amt${e.creditsDelta < 0 ? ' neg' : ' pos'}`}>{creditsFmt(e.creditsDelta)} cr</span>
+                          )}
+                          {e.dollarsDelta !== 0 && (
+                            <span className={`tl-amt${e.dollarsDelta < 0 ? ' neg' : ' pos'}`}>{dollars(e.dollarsDelta)}</span>
+                          )}
+                          {e.actor ? <span className="muted small"> · {e.actor}</span> : null}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                  {activity.length > 15 && (
+                    <p className="muted small">Showing the 15 most recent of {activity.length}.</p>
+                  )}
                 </div>
               )}
 

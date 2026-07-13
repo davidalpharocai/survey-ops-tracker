@@ -44,6 +44,24 @@ export interface Family {
   partial: boolean;
 }
 
+// GET /api/clients/{id}/activity — reverse-chron feed derived from existing rows.
+export type ActivityType =
+  | 'contract'
+  | 'study'
+  | 'adjustment'
+  | 'credit_request'
+  | 'credit_decision';
+
+export interface ActivityEvent {
+  type: ActivityType;
+  date: string; // ISO-8601 (kept as string; formatted in the component)
+  title: string;
+  detail: string;
+  actor: string;
+  creditsDelta: number;
+  dollarsDelta: number;
+}
+
 export interface Salesperson {
   id: number;
   name: string;

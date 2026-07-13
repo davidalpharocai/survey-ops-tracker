@@ -15,7 +15,7 @@ from sqlalchemy.orm import selectinload
 from app.auth import require_user
 from app.db import get_session
 from app.helpers import current_year_window, utc_today
-from app.models import Client, ContractAttachment, Transaction
+from app.models import Client, ContractAttachment, CreditRequest, Transaction
 from app.scoping import AccessScope, require_scope, scoped_client_or_404
 from app.serializers import attachment_dict, client_dict, transaction_dict
 
@@ -363,6 +363,86 @@ async def client_transactions(
         transaction_dict(t, with_client_user=True)
         for t in result.scalars().all()
     ]
+
+
+@router.get("/clients/{client_id}/activity")
+async def client_activity(
+    client_id: int,
+    session: AsyncSession = Depends(get_session),
+    scope: AccessScope = Depends(require_scope),
+) -> list[dict]:
+    """Reverse-chronological activity feed for one client.
+
+    Derived entirely from rows CCM already owns — active transactions
+    (contracts, studies, adjustments) plus the client's credit requests and
+    their decisions — so it needs no new writable model and can never drift.
+    Each event is ``{"type", "date", "title", "detail", "actor",
+    "creditsDelta", "dollarsDelta"}``, newest first.
+
+    Raises
+    ------
+    HTTPException
+        ``404`` if the client is absent, archived, or not visible to the
+        caller.
+    """
+    await scoped_client_or_404(session, client_id, scope)
+    events: list[dict] = []
+
+    txns = (
+        await session.execute(
+            select(Transaction).where(
+                Transaction.client_id == client_id,
+                Transaction.deleted_at.is_(None),
+            )
+        )
+    ).scalars().all()
+    titles = {"contract": "Contract added", "study": "Study recorded"}
+    for t in txns:
+        events.append(
+            {
+                "type": t.kind,
+                "date": _iso(t.occurred_on),
+                "title": titles.get(t.kind, "Adjustment"),
+                "detail": t.name or t.note or "",
+                "actor": t.actor_email,
+                "creditsDelta": float(t.credits_delta or 0),
+                "dollarsDelta": float(t.dollars_delta or 0),
+            }
+        )
+
+    reqs = (
+        await session.execute(
+            select(CreditRequest).where(CreditRequest.client_id == client_id)
+        )
+    ).scalars().all()
+    for r in reqs:
+        events.append(
+            {
+                "type": "credit_request",
+                "date": _iso(r.created_at),
+                "title": "Credit requested",
+                "detail": r.note or "",
+                "actor": r.requested_by_email,
+                "creditsDelta": float(r.credits_delta or 0),
+                "dollarsDelta": float(r.dollars_delta or 0),
+            }
+        )
+        if r.status in ("approved", "rejected") and r.decided_at is not None:
+            events.append(
+                {
+                    "type": "credit_decision",
+                    "date": _iso(r.decided_at),
+                    "title": f"Credit request {r.status}",
+                    "detail": r.decision_note or r.note or "",
+                    "actor": r.decided_by_email or "",
+                    "creditsDelta": 0.0,
+                    "dollarsDelta": 0.0,
+                }
+            )
+
+    # ISO-8601 strings sort lexicographically in time order; newest first.
+    events.sort(key=lambda e: e["date"] or "", reverse=True)
+    return events
 
 
 @router.get("/clients/{client_id}/ledger")

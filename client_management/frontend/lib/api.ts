@@ -8,6 +8,7 @@
 import { cookies, headers as nextHeaders } from 'next/headers';
 
 import type {
+  ActivityEvent,
   Balance,
   BalanceHealthRow,
   BalanceRow,
@@ -213,6 +214,7 @@ export interface ApiClient {
 
   clientBalances(clientId: number): Promise<Balance>;
   clientFamily(clientId: number): Promise<Family>;
+  clientActivity(clientId: number): Promise<ActivityEvent[]>;
   allBalances(): Promise<BalanceRow[]>;
   listRenewals(): Promise<RenewalRow[]>;
   balanceHealth(): Promise<BalanceHealthRow[]>;
@@ -345,6 +347,7 @@ export function api(userEmail: string): ApiClient {
 
     clientBalances: clientId => r('GET', `/api/clients/${clientId}/balances`),
     clientFamily: clientId => r('GET', `/api/clients/${clientId}/family`),
+    clientActivity: clientId => r('GET', `/api/clients/${clientId}/activity`),
     allBalances: () => r('GET', '/api/reports/balances'),
     listRenewals: () => r('GET', '/api/reports/renewals'),
     balanceHealth: () => r('GET', '/api/reports/balance-health'),
