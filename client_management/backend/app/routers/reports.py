@@ -25,6 +25,10 @@ from app.serializers import attachment_dict, client_dict, transaction_dict
 BURN_WINDOW_DAYS = 90
 DAYS_PER_MONTH = 30.44
 LOW_RUNWAY_DAYS = 60
+# A recurring tracker books its whole year as one lump; it is treated as an
+# ongoing monthly commitment (annual/12) while still inside that booked year.
+TRACKER_YEAR_DAYS = 365
+MONTHS_PER_YEAR = 12
 
 router = APIRouter(
     prefix="/api",
@@ -619,11 +623,18 @@ async def balance_health(
     """Burn rate and projected run-out for every client with activity.
 
     One row per ACTIVE client that has at least one ACTIVE transaction.
-    Monthly burn is the credits/dollars consumed by SINGLE (non-tracker)
-    studies over the trailing :data:`BURN_WINDOW_DAYS` days divided by 3;
-    the run-out date projects the current balance forward at that pace.
-    Recurring trackers book their full year as one lump at creation, so
-    they are excluded from burn (they still reduce the balance).
+    Monthly burn blends two sources so run-out dates are credible for both
+    ad-hoc and recurring clients:
+    - SINGLE (non-tracker) studies over the trailing :data:`BURN_WINDOW_DAYS`
+      days, divided by 3 (a monthly average of recent one-off spend); plus
+    - each ACTIVE recurring tracker's annualized rate (the full year it books
+      at creation, divided by 12), for trackers still inside their booked year
+      (:data:`TRACKER_YEAR_DAYS`).
+    The tracker lump itself is never counted as trailing-window burn (that
+    would massively overstate it); its steady monthly commitment is added
+    instead, so a tracker-only client — previously showing zero burn and no
+    run-out — now gets a realistic projection. The run-out date projects the
+    current balance forward at the blended pace.
 
     Parameters
     ----------
@@ -651,6 +662,13 @@ async def balance_health(
         & (Transaction.cadence.is_(None))
         & (Transaction.occurred_on >= today - timedelta(days=BURN_WINDOW_DAYS))
     )
+    # A recurring tracker still inside its booked year is an ongoing monthly
+    # commitment: annual_total (= the negative delta it booked) / 12.
+    is_active_tracker = (
+        (Transaction.kind == "study")
+        & (Transaction.cadence.is_not(None))
+        & (Transaction.occurred_on >= today - timedelta(days=TRACKER_YEAR_DAYS))
+    )
     agg = {
         row.client_id: row
         for row in await session.execute(
@@ -660,6 +678,11 @@ async def balance_health(
                 func.coalesce(func.sum(Transaction.dollars_delta), 0).label("dollars"),
                 func.coalesce(func.sum(case((is_recent_study, -Transaction.credits_delta), else_=0)), 0).label("credit_burn"),
                 func.coalesce(func.sum(case((is_recent_study, -Transaction.dollars_delta), else_=0)), 0).label("dollar_burn"),
+                # Recurring annual only: a tracker's delta bundles a one-time
+                # setup_cost (always booked in credits), which must NOT be
+                # annualized — subtract it so only the repeating year counts.
+                func.coalesce(func.sum(case((is_active_tracker, -Transaction.credits_delta - func.coalesce(Transaction.setup_cost, 0)), else_=0)), 0).label("tracker_credit_annual"),
+                func.coalesce(func.sum(case((is_active_tracker, -Transaction.dollars_delta), else_=0)), 0).label("tracker_dollar_annual"),
                 func.coalesce(func.sum(case((Transaction.occurred_on >= today - timedelta(days=BURN_WINDOW_DAYS), 1), else_=0)), 0).label("recent_any"),
             )
             .where(Transaction.deleted_at.is_(None))
@@ -683,8 +706,13 @@ async def balance_health(
         row = agg[c.id]
         credits = float(row.credits)
         dollars = float(row.dollars)
-        credit_burn = float(row.credit_burn) / 3
-        dollar_burn = float(row.dollar_burn) / 3
+        # Blended monthly burn: recent one-off study spend (trailing 90d / 3)
+        # plus each active tracker's annualized commitment (/ 12).
+        tracker_credit = float(row.tracker_credit_annual)
+        tracker_dollar = float(row.tracker_dollar_annual)
+        credit_burn = float(row.credit_burn) / 3 + tracker_credit / MONTHS_PER_YEAR
+        dollar_burn = float(row.dollar_burn) / 3 + tracker_dollar / MONTHS_PER_YEAR
+        has_active_tracker = tracker_credit > 0 or tracker_dollar > 0
         credits_out = _run_out(today, credits, credit_burn)
         dollars_out = _run_out(today, dollars, dollar_burn)
         if credits < 0 or dollars < 0:
@@ -695,12 +723,14 @@ async def balance_health(
             health = "low"
         elif (
             int(row.recent_any) == 0
+            and not has_active_tracker
             and (credits > 0 or dollars > 0)
             and c.became_client_on < today - timedelta(days=BURN_WINDOW_DAYS)
         ):
-            # Established client with money on the books but no transaction of
-            # any kind in the trailing window — funded but dormant, a
-            # re-engagement/churn signal rather than a healthy "ok".
+            # Established client with money on the books but no recent activity
+            # AND no active recurring tracker — funded but dormant, a
+            # re-engagement/churn signal rather than a healthy "ok". A client
+            # with an active tracker is NOT idle: it's steadily drawing down.
             health = "idle"
         else:
             health = "ok"

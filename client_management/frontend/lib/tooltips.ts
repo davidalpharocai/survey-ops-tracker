@@ -69,9 +69,9 @@ export const TIP = {
 
   // Balance health
   monthlyBurn:
-    'Average credits consumed per month, measured over the trailing 90 days: all study spend in that window divided by 3. Zero means no recent activity.',
+    'Estimated credits consumed per month: recent one-off study spend (trailing 90 days ÷ 3) plus each active recurring tracker’s yearly cost ÷ 12 (setup fees excluded). Zero means no recent one-off spend and no active tracker.',
   runOutDate:
-    'The projected date the balance hits zero if the client keeps spending at their trailing-90-day pace. Blank when there is no recent burn or no positive balance to deplete.',
+    'The projected date the balance hits zero if the client keeps spending at their current monthly pace (recent one-off spend plus active recurring trackers). Blank when there is no burn or no positive balance to deplete.',
   healthStatus:
-    'NEGATIVE: a balance is already below zero. LOW: projected to run out within 60 days. OK: neither — balance covers 60+ days at the current pace.',
+    'NEGATIVE: a balance is already below zero. LOW: projected to run out within 60 days. IDLE: funded but no recent spend and no active tracker (re-engagement signal). OK: balance covers 60+ days at the current pace.',
 } as const;

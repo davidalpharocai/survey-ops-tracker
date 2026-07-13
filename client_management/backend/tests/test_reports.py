@@ -433,11 +433,11 @@ async def test_balance_health_burn_window_and_projection(client):
     assert row["status"] == "ok"
 
 
-async def test_balance_health_excludes_trackers_from_burn(client):
-    # A recurring tracker books its FULL ANNUAL cost as one transaction, so it
-    # must NOT count toward the trailing-window burn rate (it's a pre-paid year,
-    # not ongoing spend). Only single studies drive burn; the tracker still
-    # reduces the balance.
+async def test_balance_health_tracker_contributes_annualized_burn(client):
+    # A recurring tracker books its FULL ANNUAL cost as one transaction. That
+    # lump must NOT be counted as trailing-window burn (it would 4x the rate),
+    # but the tracker IS an ongoing commitment, so its annual/12 is added to
+    # the monthly burn alongside recent single-study spend.
     made = await make_client(client, name="Tracker Co")
     user = await make_user(client, made["id"])
     await make_contract(
@@ -447,12 +447,12 @@ async def test_balance_health_excludes_trackers_from_burn(client):
         renewal_on=_d(TODAY + timedelta(days=355)),
         credits_amount=20000,
     )
-    # Recent MONTHLY tracker: 300/run × 12 = 3600 booked now.
+    # Recent MONTHLY tracker: 300/run × 12 = 3600/yr booked now.
     await make_study(
         client, made["id"], [user["id"]], name="Tracker",
         occurred_on=_d(TODAY), cost=300, cadence="monthly",
     )
-    # Recent single study: DOES drive burn.
+    # Recent single study: drives trailing burn (450 / 3).
     await make_study(
         client, made["id"], [user["id"]], name="OneShot",
         occurred_on=_d(TODAY), cost=450,
@@ -461,10 +461,83 @@ async def test_balance_health_excludes_trackers_from_burn(client):
     r = await client.get("/api/reports/balance-health", headers=ADMIN)
     assert r.status_code == 200
     row = next(x for x in r.json() if x["client"]["id"] == made["id"])
-    # Burn = single study only (the tracker's 3600 lump is excluded).
-    assert row["monthlyCreditBurn"] == 450.0 / 3
+    # Burn = single (450/3=150) + tracker annualized (3600/12=300) = 450.
+    assert row["monthlyCreditBurn"] == 450.0 / 3 + 3600.0 / 12
     # Balance still reflects the tracker's full-year deduction.
     assert row["credits"] == 20000.0 - 3600.0 - 450.0
+
+
+async def test_balance_health_tracker_only_client_gets_runout(client):
+    # A client whose only spend is a recurring tracker used to show zero burn
+    # and NO run-out (trackers were excluded entirely) — invisible despite
+    # steadily draining. Now the tracker's annual/12 drives a real projection.
+    made = await make_client(client, name="Tracker Only Co")
+    user = await make_user(client, made["id"])
+    # Fund 4000 credits; a monthly tracker of 3600/yr leaves 400 remaining.
+    await make_contract(
+        client, made["id"],
+        occurred_on=_d(TODAY - timedelta(days=40)),
+        renewal_on=_d(TODAY + timedelta(days=325)),
+        credits_amount=4000,
+    )
+    await make_study(
+        client, made["id"], [user["id"]], name="Monthly tracker",
+        occurred_on=_d(TODAY - timedelta(days=30)), cost=300, cadence="monthly",
+    )
+    r = await client.get("/api/reports/balance-health", headers=ADMIN)
+    row = next(x for x in r.json() if x["client"]["id"] == made["id"])
+    assert row["monthlyCreditBurn"] == 3600.0 / 12  # 300/mo from the tracker
+    assert row["credits"] == 400.0
+    # 400 / 300 ≈ 1.3 months ≈ 40 days < 60 → flagged low, with a run-out date.
+    assert row["creditsRunOutOn"] is not None
+    assert row["status"] == "low"
+
+
+async def test_balance_health_tracker_setup_excluded_from_burn(client):
+    # A tracker's one-time setup cost is bundled into its credits_delta but is
+    # NOT recurring, so it must not be annualized into monthly burn.
+    made = await make_client(client, name="Setup Tracker Co")
+    user = await make_user(client, made["id"])
+    await make_contract(
+        client, made["id"],
+        occurred_on=_d(TODAY - timedelta(days=10)),
+        renewal_on=_d(TODAY + timedelta(days=355)),
+        credits_amount=10000,
+    )
+    # Monthly tracker: 300/run × 12 = 3600/yr recurring, plus a 600 one-time setup.
+    await make_study(
+        client, made["id"], [user["id"]], name="Tracker w/ setup",
+        occurred_on=_d(TODAY - timedelta(days=5)), cost=300, cadence="monthly",
+        setup_cost=600,
+    )
+    r = await client.get("/api/reports/balance-health", headers=ADMIN)
+    row = next(x for x in r.json() if x["client"]["id"] == made["id"])
+    # Burn = recurring only (3600/12=300); the 600 setup is excluded.
+    assert row["monthlyCreditBurn"] == 3600.0 / 12
+    # Balance reflects BOTH the recurring year and the one-time setup.
+    assert row["credits"] == 10000.0 - 3600.0 - 600.0
+
+
+async def test_balance_health_expired_tracker_excluded_from_burn(client):
+    # A tracker booked more than a year ago is past its booked year — no longer
+    # an ongoing commitment, so it drops out of burn (balance still reflects it).
+    made = await make_client(client, name="Lapsed Tracker Co")
+    user = await make_user(client, made["id"])
+    await make_contract(
+        client, made["id"],
+        occurred_on=_d(TODAY - timedelta(days=400)),
+        renewal_on=_d(TODAY - timedelta(days=35)),
+        credits_amount=5000,
+    )
+    await make_study(
+        client, made["id"], [user["id"]], name="Old tracker",
+        occurred_on=_d(TODAY - timedelta(days=400)), cost=300, cadence="monthly",
+    )
+    r = await client.get("/api/reports/balance-health", headers=ADMIN)
+    row = next(x for x in r.json() if x["client"]["id"] == made["id"])
+    assert row["monthlyCreditBurn"] == 0  # expired tracker adds nothing
+    assert row["creditsRunOutOn"] is None
+    assert row["credits"] == 5000.0 - 3600.0  # balance still reflects it
 
 
 async def test_balance_health_flags_idle_funded_but_dormant(client):
