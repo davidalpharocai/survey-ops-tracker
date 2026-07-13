@@ -670,6 +670,21 @@ h3 { font-size: 1rem; }
 .form-narrow { max-width: 560px; }
 .amounts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
 
+/* Compact 2-column layout for tall record forms (e.g. Record a new study):
+   short fields pair up, wide ones span both columns — cuts the vertical
+   length ~in half and uses the horizontal space instead of one skinny column.
+   Collapses to a single column on narrow screens. */
+.record-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.7rem 1.25rem;
+  align-items: start;
+  max-width: 880px;
+}
+.record-form-grid > label { margin: 0; }
+.record-form-grid .span-2 { grid-column: 1 / -1; }
+@media (max-width: 640px) { .record-form-grid { grid-template-columns: 1fr; } }
+
 /* Deep-linked row highlight: the ledger "Edit" links jump to a specific
    contract/study (#c<id> / #s<id>) on its editor page. Offset the scroll so
    the sticky top bar doesn't cover the row. */

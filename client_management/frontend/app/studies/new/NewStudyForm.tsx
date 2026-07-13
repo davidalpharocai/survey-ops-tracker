@@ -36,12 +36,12 @@ export default function NewStudyForm({ clientId, users, contracts }: Props) {
   const hasContact = selCount > 0 || (addingContact && newContactName.trim().length > 0);
 
   return (
-    <form action={createStudyAction} className="card form-narrow">
+    <form action={createStudyAction} className="card record-form-grid">
       <input type="hidden" name="client_id" value={clientId || ''} />
 
-      {disabled && <p className="muted small">Pick a client above to enable this form.</p>}
+      {disabled && <p className="muted small span-2">Pick a client above to enable this form.</p>}
 
-      <label>Contacts at this client (pick one or more)<InfoTooltip text={TIP.studyUser} />
+      <label className="span-2">Contacts at this client (pick one or more)<InfoTooltip text={TIP.studyUser} />
         <select
           name="client_user_ids"
           multiple
@@ -69,7 +69,7 @@ export default function NewStudyForm({ clientId, users, contracts }: Props) {
       </label>
 
       {!disabled && (
-        <div className="inline-add">
+        <div className="inline-add span-2">
           {addingContact ? (
             <div className="sp-new">
               <label>New contact name
@@ -110,7 +110,7 @@ export default function NewStudyForm({ clientId, users, contracts }: Props) {
         <input name="occurred_on" type="date" defaultValue={todayIso()} required disabled={disabled} />
       </label>
 
-      <div className="amounts-row">
+      <div className="amounts-row span-2">
         <label>Cadence<InfoTooltip text={TIP.cadence} />
           <select
             name="cadence"
@@ -132,7 +132,7 @@ export default function NewStudyForm({ clientId, users, contracts }: Props) {
         </label>
       </div>
 
-      <div className="amounts-row">
+      <div className="amounts-row span-2">
         <label>
           {isTracker ? 'Cost per run' : 'Cost'}<InfoTooltip text={TIP.studyCost} />
           <input
@@ -173,7 +173,7 @@ export default function NewStudyForm({ clientId, users, contracts }: Props) {
         <input name="audience" type="text" placeholder="e.g. Institutional investors" disabled={disabled} />
       </label>
 
-      <div className="amounts-row">
+      <div className="amounts-row span-2">
         <label>Target N (optional)
           <InfoTooltip text="The number of completed responses you're aiming for on this study." />
           <input name="target_n" type="number" min="0" step="1" placeholder="e.g. 600" disabled={disabled} />
@@ -184,12 +184,12 @@ export default function NewStudyForm({ clientId, users, contracts }: Props) {
         </label>
       </div>
 
-      <label>Description (optional)
+      <label className="span-2">Description (optional)
         <InfoTooltip text="A short note about this study — methodology, goal, or anything worth remembering." />
         <textarea name="description" rows={2} placeholder="Short description of this study" disabled={disabled} />
       </label>
 
-      <div className="actions">
+      <div className="actions span-2">
         <SubmitButton disabled={disabled || !hasContact} pendingLabel="Recording…">Record study</SubmitButton>
         {!disabled && !hasContact && (
           <span className="muted small">Select a contact above or add a new one.</span>
