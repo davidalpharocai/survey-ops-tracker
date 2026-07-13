@@ -54,6 +54,19 @@ export async function GET(req: NextRequest) {
       p.due_date <= soon
   )
 
+  // Reruns (the /reruns radar mirror): overdue + due-this-week, so slipped
+  // recurring studies surface in the digest instead of only on the page.
+  // Best-effort — a rerun-mirror hiccup never blocks the project digest.
+  const week = new Date(Date.now() + 7 * 86400_000).toISOString().split('T')[0]
+  const { data: reruns } = await supabase
+    .from('rerun_snapshot')
+    .select('client, cadence, status_raw, next_run_date, status_class')
+  const rerunActive = (reruns ?? []).filter(r => r.status_class !== 'done' && r.status_class !== 'closed')
+  const rerunOverdue = rerunActive.filter(r => r.next_run_date && r.next_run_date < today)
+  const rerunSoon = rerunActive.filter(r => r.next_run_date && r.next_run_date >= today && r.next_run_date <= week)
+  const rerunLine = (r: (typeof rerunActive)[number]) =>
+    `• *${r.client || r.cadence || 'Rerun'}*${r.client && r.cadence ? ` — ${r.cadence}` : ''} (${r.status_raw || 'pending'}, due ${fmt(r.next_run_date)})`
+
   // System-health line: surface any backend job that failed in the last ~26h
   // (a window slightly over a day so a once-daily run never slips through a gap)
   // right in the digest the team already reads.
@@ -74,6 +87,8 @@ export async function GET(req: NextRequest) {
   if (overdue.length) sections.push(`🔴 *Due today or overdue (${overdue.length})*\n${overdue.map(line).join('\n')}`)
   if (dueSoon.length) sections.push(`🟠 *Due in the next 3 days (${dueSoon.length})*\n${dueSoon.map(line).join('\n')}`)
   if (behind.length) sections.push(`📉 *Fielding behind target with deadline near (${behind.length})*\n${behind.map(line).join('\n')}`)
+  if (rerunOverdue.length) sections.push(`🔁 *Reruns overdue (${rerunOverdue.length})*\n${rerunOverdue.map(rerunLine).join('\n')}`)
+  if (rerunSoon.length) sections.push(`🔁 *Reruns due in the next 7 days (${rerunSoon.length})*\n${rerunSoon.map(rerunLine).join('\n')}`)
   if (sections.length === 1) sections.push('✅ Nothing overdue, nothing due in the next 3 days. Clear skies.')
   sections.push(`<https://survey-ops-tracker.vercel.app|Open the Command Center>`)
 
