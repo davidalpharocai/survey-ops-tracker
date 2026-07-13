@@ -13,13 +13,15 @@ exact money, bytea, sequences, and FK integrity all verified).
   verify counts. `--dry-run` loads then rolls back.
 
 ## What I need from you (Supabase)
-Create the project, then copy **both** connection strings from
-Settings → Database:
-1. **Direct** (host `db.<ref>.supabase.co`, port **5432**) — used for the
-   one-time migration load (DDL + big transaction need a real session).
-2. **Transaction pooler** (host `...pooler.supabase.com`, port **6543**) — used
-   as the app's runtime `DATABASE_URL` (Vercel is serverless). Safe because
-   `db.py` already sets asyncpg `statement_cache_size=0`.
+Create the project, then copy **both pooler** strings (Connect dialog). Skip
+the "Direct connection" — it's IPv6-only now and can fail from IPv4 hosts.
+1. **Session pooler** (host `...pooler.supabase.com`, port **5432**, user
+   `postgres.<ref>`) → `SUPABASE_SESSION_URL`. Used for the one-time migration
+   load — session mode behaves like a direct connection (DDL + multi-statement
+   transaction) but is IPv4-safe.
+2. **Transaction pooler** (same host, port **6543**) → `SUPABASE_POOLER_URL`.
+   Used as the app's runtime `DATABASE_URL` (Vercel is serverless). Safe
+   because `db.py` already sets asyncpg `statement_cache_size=0`.
 
 ## Cutover (I run this once you paste the two strings)
 ```bash
@@ -29,10 +31,10 @@ set -a; . ./.env.preview-secrets; set +a          # source DATABASE_URL (Neon)
 # 1. Fresh backup of the live Neon DB (minimizes staleness at cutover).
 backend/.venv/Scripts/python.exe .devstack/backup-neon.py .backups/ccm-db-backup-CUTOVER.json
 
-# 2. Load into Supabase via the DIRECT (5432) string. Dry-run first.
-TARGET_DATABASE_URL="<supabase-direct-5432>" \
+# 2. Load into Supabase via the SESSION pooler (5432). Dry-run first.
+TARGET_DATABASE_URL="$SUPABASE_SESSION_URL" \
   backend/.venv/Scripts/python.exe .devstack/migrate-db.py .backups/ccm-db-backup-CUTOVER.json --dry-run
-TARGET_DATABASE_URL="<supabase-direct-5432>" \
+TARGET_DATABASE_URL="$SUPABASE_SESSION_URL" \
   backend/.venv/Scripts/python.exe .devstack/migrate-db.py .backups/ccm-db-backup-CUTOVER.json
 
 # 3. Point ccm-api at the Supabase POOLER (6543) and redeploy.
