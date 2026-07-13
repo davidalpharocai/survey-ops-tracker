@@ -89,10 +89,11 @@ function processInbox() {
 }
 
 /**
- * True only for messages that actually arrived via deliverables@alpharoc.ai (forward/cc to it, or bcc/
- * Group delivery), so thread siblings from the original conversation (teammates, client) are never
- * ingested or replied to. The Group stamps List-*/Mailing-list/X-Original-To headers that ordinary
- * person-to-person messages in the thread do not carry — the same signal the `list:` Gmail filter uses.
+ * True only for messages that actually arrived via deliverables@alpharoc.ai -- either addressed to it
+ * (To or Cc), or delivered through the Google Group (bcc / group posts). Thread siblings from the
+ * original conversation (teammates, and possibly the client) are never ingested or replied to. Google
+ * Groups stamps List-ID, List-Post, Mailing-list and X-Original-To headers that ordinary person-to-
+ * person messages in the thread do not carry -- the same signal the Gmail "list:" filter matches on.
  */
 function cameViaDeliverables(msg) {
   if ((msg.getTo() + ' ' + msg.getCc()).toLowerCase().indexOf('deliverables@alpharoc.ai') >= 0) return true;
