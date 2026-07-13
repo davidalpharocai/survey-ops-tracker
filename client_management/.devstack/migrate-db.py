@@ -134,23 +134,31 @@ async def main(json_path: str, dry_run: bool) -> None:
                     f"COALESCE((SELECT MAX(id) FROM \"{name}\"), 1))"
                 )
 
+        # Verify counts WHILE the transaction is still open (the rows are
+        # visible within it), so this works for both dry-run and real runs and
+        # can abort a real load on any mismatch before it commits.
+        print("verify (in-transaction counts):")
+        all_ok = True
+        for name in ORDER:
+            n = await conn.fetchval(f'SELECT COUNT(*) FROM "{name}"')
+            src = len(tables.get(name, []))
+            ok = n == src
+            all_ok = all_ok and ok
+            print(f"  {name}: {n} " + ("OK" if ok else f"MISMATCH src={src}"))
+        if not all_ok:
+            raise RuntimeError("row-count mismatch vs backup — aborting, nothing committed")
+
         if dry_run:
             print("DRY RUN — rolling back (nothing persisted).")
             await tx.rollback()
         else:
             await tx.commit()
             print("COMMITTED.")
-
-        # Verify counts against the source (fresh connection after commit).
-        print("verify (target counts):")
-        for name in ORDER:
-            n = await conn.fetchval(f'SELECT COUNT(*) FROM "{name}"')
-            src = len(tables.get(name, []))
-            flag = "OK" if (dry_run or n == src) else f"MISMATCH src={src}"
-            print(f"  {name}: {n} {flag}")
     except Exception:
-        if not tx._managed:  # best-effort rollback if still open
+        try:
             await tx.rollback()
+        except Exception:
+            pass  # already rolled back / connection gone
         raise
     finally:
         await conn.close()
