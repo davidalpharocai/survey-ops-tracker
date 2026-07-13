@@ -523,6 +523,19 @@ h3 { font-size: 1rem; }
   font-size: 0.9rem;
 }
 
+/* "Possible existing matches" duplicate-client hint in the New client dialog */
+.dup-warn {
+  background: var(--warn-bg);
+  color: var(--warn-fg);
+  border: 1px solid var(--warn-fg);
+  border-radius: 8px;
+  padding: 0.5rem 0.75rem;
+  margin: 0.5rem 0 0.2rem;
+  font-size: 0.85rem;
+}
+.dup-warn ul { margin: 0.3rem 0 0; padding-left: 1.15rem; }
+.dup-warn a { color: var(--warn-fg); font-weight: 500; }
+
 /* ---------- Contract attachments (ledger sub-row) ---------- */
 .ledger-attachments > td { background: var(--surface-2); }
 .att-panel {
