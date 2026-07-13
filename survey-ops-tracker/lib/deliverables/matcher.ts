@@ -1,11 +1,31 @@
 // lib/deliverables/matcher.ts
 import type { Candidate, MatchInput, MatchResult } from './types'
 import { SHARED_DOMAINS } from './shared-domains'
+import { ALPHAROC_DOMAIN } from './email'
 
 const CODE_RE = /\b(PR\d{5}|Cl\d{5})\b/i
 
+// Our own org, derived from the internal mail domain (e.g. "alpharoc"). A deliverable is always FOR a
+// client, never for us, so the fuzzy name tier must never resolve to our own company — otherwise it
+// matches the forwarder's own signature/domain on essentially every internal forward.
+const SELF_ORG = ALPHAROC_DOMAIN.split('.')[0]
+
+// Generic survey/report jargon: too common to identify a project on its own, so these are excluded
+// when falling back to single-token project-name matching (which needs a distinctive word).
+const NAME_STOPWORDS = new Set([
+  'survey', 'tracker', 'poll', 'study', 'consumer', 'wave', 'final', 'topline', 'report', 'data',
+  'results', 'deck', 'analysis', 'project', 'phase', 'round', 'update', 'draft', 'deliverable',
+])
+
 export function normalizeName(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+}
+
+/** Distinctive words of a name: long enough, not generic jargon, not a bare number/year/quarter. */
+function distinctiveTokens(name: string): string[] {
+  return normalizeName(name)
+    .split(' ')
+    .filter((t) => t.length >= 4 && !NAME_STOPWORDS.has(t) && !/^\d+$/.test(t))
 }
 
 function domainOf(email: string): string {
@@ -34,7 +54,7 @@ export function matchDeliverable(input: MatchInput): MatchResult {
 
   // Tier 3 — sender domain (skip shared)
   const dom = domainOf(from)
-  if (dom && !SHARED_DOMAINS.has(dom) && input.domainMap[dom]) {
+  if (dom && dom !== ALPHAROC_DOMAIN && !SHARED_DOMAINS.has(dom) && input.domainMap[dom]) {
     candidates.push({ clientId: input.domainMap[dom], projectId: null, confidence: 0.8, reason: `domain:${dom}`, method: 'domain' })
   }
 
@@ -42,11 +62,26 @@ export function matchDeliverable(input: MatchInput): MatchResult {
   for (const p of input.projects) {
     const pn = normalizeName(p.project_name)
     if (pn.length >= 4 && nhay.includes(` ${pn} `)) {
+      // Full project name present verbatim — strongest name signal.
       candidates.push({ clientId: p.client_id, projectId: p.id, confidence: 0.75, reason: `pname:${p.project_code}`, method: 'name' })
+      continue
+    }
+    // Fallback: distinctive words of the project name (e.g. "Korea" from "Korea Consumer Survey"), so a
+    // forward whose subject drops the boilerplate still guesses the right project. Kept below
+    // AUTO_FILE_THRESHOLD — a fuzzy token match improves the review-queue guess, it never auto-files.
+    const hits = distinctiveTokens(p.project_name).filter((t) => nhay.includes(` ${t} `))
+    if (hits.length) {
+      candidates.push({
+        clientId: p.client_id, projectId: p.id,
+        confidence: hits.length >= 2 ? 0.7 : 0.62,
+        reason: `ptoken:${p.project_code}:${hits.join('+')}`, method: 'name',
+      })
     }
   }
   for (const c of input.clients) {
     const cn = normalizeName(c.name)
+    // Never resolve to our own company from fuzzy text (a forwarder's signature/domain) — see SELF_ORG.
+    if (cn.split(' ').includes(SELF_ORG)) continue
     if (cn.length >= 3 && nhay.includes(` ${cn} `)) {
       candidates.push({ clientId: c.id, projectId: null, confidence: 0.6, reason: 'cname', method: 'name' })
     }

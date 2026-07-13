@@ -93,4 +93,35 @@ describe('matchDeliverable', () => {
     expect(r.confidence).toBe(0.75)
     expect(r.method).toBe('name')
   })
+
+  // (d) Distinctive-token fallback: a forward whose subject drops the boilerplate still guesses the project
+  it('tier 4 (token): a distinctive project-name word matches when the full name is not present', () => {
+    const projects = [{ id: 'p-k', client_id: 'c-bam', project_code: 'PR00227', project_name: 'Korea Consumer Survey' }]
+    const r = matchDeliverable({ ...base, projects, subject: 'Fwd: Korea Survey', body: 'see attached', fromEmail: 'x@gmail.com' })
+    expect(r.projectId).toBe('p-k')
+    expect(r.method).toBe('name')
+    expect(r.confidence).toBeGreaterThanOrEqual(0.6)
+    expect(r.confidence).toBeLessThan(0.85) // stays in review — a fuzzy token never auto-files
+  })
+
+  // (e) Never resolve to our own company from fuzzy text (a forwarder's signature/domain)
+  it('does not match our own company (AlphaROC) from body/signature text', () => {
+    const clients = [
+      { id: 'c-self', name: 'AlphaROC', code: 'Cl00003' },
+      { id: 'c-bam', name: 'Balyasny', code: 'Cl00012' },
+    ]
+    const r = matchDeliverable({
+      ...base, clients, projects: [], contacts: [], domainMap: {},
+      subject: 'Korea deck', body: 'Thanks,\nJane\nAlphaROC', fromEmail: 'jane@alpharoc.ai',
+    })
+    expect(r.method).toBe('none')
+    expect(r.clientId).toBeNull()
+  })
+
+  // (f) Generic survey words alone must not token-match a project
+  it('does not token-match on generic survey jargon alone', () => {
+    const projects = [{ id: 'p-1', client_id: 'c-bam', project_code: 'PR00112', project_name: 'Q2 Consumer Tracker' }]
+    const r = matchDeliverable({ ...base, projects, subject: 'quarterly consumer report', body: 'the tracker data', fromEmail: 'x@gmail.com' })
+    expect(r.method).toBe('none') // "consumer"/"tracker" are stopwords; "q2" is too short → no distinctive token
+  })
 })
