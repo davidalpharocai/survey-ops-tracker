@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from 'react';
 
-import type { ClientUser, Cadence } from '../../../lib/types';
+import { credits as creditsFmt, dollars } from '../../../lib/format';
+import type { Balance, ClientUser, Cadence, CostType } from '../../../lib/types';
 import { TIP } from '../../../lib/tooltips';
 import InfoTooltip from '../../_components/InfoTooltip';
 import SubmitButton from '../../_components/SubmitButton';
@@ -12,13 +13,17 @@ const RUNS_PER_YEAR: Record<string, number> = { weekly: 52, monthly: 12, quarter
 
 interface Props {
   clientId: number | null;
+  clientName?: string | null;
   users: ClientUser[];
   contracts: { id: number; name: string }[];
+  balance?: Balance | null;
 }
 
-export default function NewStudyForm({ clientId, users, contracts }: Props) {
+export default function NewStudyForm({ clientId, clientName, users, contracts, balance }: Props) {
   const [cadence, setCadence] = useState<Cadence>('single');
   const [cost, setCost] = useState('');
+  const [costType, setCostType] = useState<CostType>('credits');
+  const [setup, setSetup] = useState('0');
   const [selCount, setSelCount] = useState(0);
   const [addingContact, setAddingContact] = useState(false);
   const [newContactName, setNewContactName] = useState('');
@@ -30,6 +35,19 @@ export default function NewStudyForm({ clientId, users, contracts }: Props) {
     return Number.isFinite(n) ? n * runs : 0;
   }, [cost, runs]);
 
+  // What this study would draw from the balance (its currency, plus setup —
+  // always in credits — for trackers) and whether that pushes a balance
+  // negative. A soft, non-blocking heads-up: sales sometimes pre-book.
+  const setupNum = isTracker ? Math.max(parseFloat(setup || '0') || 0, 0) : 0;
+  const drawCredits = (costType === 'credits' ? annual : 0) + setupNum;
+  const drawDollars = costType === 'dollars' ? annual : 0;
+  const projCredits = balance ? balance.credits - drawCredits : null;
+  const projDollars = balance ? balance.dollars - drawDollars : null;
+  const overParts: string[] = [];
+  if (projCredits !== null && drawCredits > 0 && projCredits < 0) overParts.push(`${creditsFmt(projCredits)} credits`);
+  if (projDollars !== null && drawDollars > 0 && projDollars < 0) overParts.push(dollars(projDollars));
+  const wouldOverdraw = overParts.length > 0 && cost.trim() !== '';
+
   const disabled = !clientId;
   // A study needs at least one contact — satisfied by an existing selection
   // OR a new contact typed inline (created on submit, then attributed).
@@ -40,6 +58,15 @@ export default function NewStudyForm({ clientId, users, contracts }: Props) {
       <input type="hidden" name="client_id" value={clientId || ''} />
 
       {disabled && <p className="muted small span-2">Pick a client above to enable this form.</p>}
+
+      {balance && (
+        <p className="span-2 muted small study-balance">
+          {clientName ? `${clientName} balance` : 'Current balance'}:{' '}
+          <strong className={balance.credits < 0 ? 'neg' : ''}>{creditsFmt(balance.credits)} cr</strong>
+          {' · '}
+          <strong className={balance.dollars < 0 ? 'neg' : ''}>{dollars(balance.dollars)}</strong>
+        </p>
+      )}
 
       <label className="span-2">Contacts at this client (pick one or more)<InfoTooltip text={TIP.studyUser} />
         <select
@@ -125,7 +152,13 @@ export default function NewStudyForm({ clientId, users, contracts }: Props) {
           </select>
         </label>
         <label>Cost type<InfoTooltip text={TIP.costType} />
-          <select name="cost_type" required disabled={disabled} defaultValue="credits">
+          <select
+            name="cost_type"
+            required
+            disabled={disabled}
+            value={costType}
+            onChange={e => setCostType(e.target.value as CostType)}
+          >
             <option value="credits">Credits</option>
             <option value="dollars">Dollars</option>
           </select>
@@ -149,7 +182,15 @@ export default function NewStudyForm({ clientId, users, contracts }: Props) {
         </label>
         {isTracker && (
           <label>Setup (credits, one-time)<InfoTooltip text={TIP.setupCost} />
-            <input name="setup_cost" type="number" step="0.01" min="0" defaultValue={0} disabled={disabled} />
+            <input
+              name="setup_cost"
+              type="number"
+              step="0.01"
+              min="0"
+              value={setup}
+              onChange={e => setSetup(e.target.value)}
+              disabled={disabled}
+            />
           </label>
         )}
       </div>
@@ -188,6 +229,12 @@ export default function NewStudyForm({ clientId, users, contracts }: Props) {
         <InfoTooltip text="A short note about this study — methodology, goal, or anything worth remembering." />
         <textarea name="description" rows={2} placeholder="Short description of this study" disabled={disabled} />
       </label>
+
+      {wouldOverdraw && (
+        <p className="span-2 warn small" role="status">
+          Heads up: this study would over-draw {clientName || 'this client'} — balance goes to {overParts.join(' and ')}. You can still record it (e.g. a pre-booked commitment).
+        </p>
+      )}
 
       <div className="actions span-2">
         <SubmitButton disabled={disabled || !hasContact} pendingLabel="Recording…">Record study</SubmitButton>

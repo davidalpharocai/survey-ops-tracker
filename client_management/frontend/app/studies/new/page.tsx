@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { apiForRequest, parseId } from '../../../lib/action';
 import { onlyNotFound } from '../../../lib/api';
 import { currentUserReadOnly } from '../../../lib/auth';
-import type { ClientUser, StudyTransaction } from '../../../lib/types';
+import type { Balance, ClientUser, StudyTransaction } from '../../../lib/types';
 import AutoSubmitSelect from '../../_components/AutoSubmitSelect';
 import ExistingStudiesTable from './ExistingStudiesTable';
 import NewStudyForm from './NewStudyForm';
@@ -20,11 +20,13 @@ export default async function NewStudyPage({ searchParams }: PageProps) {
   const preselect = parseId(sp?.client_id);
 
   const api = await apiForRequest();
+  const defaultBal: Balance = { credits: 0, dollars: 0, cyCredits: 0, cyValue: 0, cyRenewal: null };
   // Fetch the client list and (when arriving with a preselected client, the
-  // common path from the "+ Add study" quicklinks) that client's studies in
-  // one parallel wave — the per-client read only needs `preselect` (a URL
-  // int), so waiting for the list first was a gratuitous extra round trip.
-  const [clients, fetchedStudies, fetchedContracts, readOnly] = await Promise.all([
+  // common path from the "+ Add study" quicklinks) that client's studies,
+  // contracts, and current balance in one parallel wave — the per-client
+  // reads only need `preselect` (a URL int), so waiting for the list first
+  // was a gratuitous extra round trip.
+  const [clients, fetchedStudies, fetchedContracts, fetchedBalance, readOnly] = await Promise.all([
     api.listClientsWithUsers(),
     preselect
       ? api.listStudiesByClient(preselect).catch(onlyNotFound([] as StudyTransaction[]))
@@ -32,6 +34,9 @@ export default async function NewStudyPage({ searchParams }: PageProps) {
     preselect
       ? api.listContractsByClient(preselect).catch(() => [])
       : Promise.resolve([]),
+    preselect
+      ? api.clientBalances(preselect).catch(onlyNotFound(defaultBal))
+      : Promise.resolve(defaultBal),
     currentUserReadOnly(),
   ]);
 
@@ -41,6 +46,7 @@ export default async function NewStudyPage({ searchParams }: PageProps) {
   const clientContracts = selectedClient
     ? fetchedContracts.map(c => ({ id: c.id, name: c.name }))
     : [];
+  const clientBalance: Balance | null = selectedClient ? fetchedBalance : null;
 
   const pending = existingStudies.filter(t => t.isImported).length;
 
@@ -72,8 +78,10 @@ export default async function NewStudyPage({ searchParams }: PageProps) {
               <h2>Record a new study</h2>
               <NewStudyForm
                 clientId={selectedClient ? selectedClient.id : null}
+                clientName={selectedClient ? selectedClient.name : null}
                 users={selectedClientUsers}
                 contracts={clientContracts}
+                balance={clientBalance}
               />
             </>
           )}
