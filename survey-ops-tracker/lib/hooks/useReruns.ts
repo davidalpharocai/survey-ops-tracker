@@ -1,5 +1,5 @@
 'use client'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import type { Database } from '@/lib/supabase/types'
 
@@ -27,5 +27,22 @@ export function useReruns() {
       return data as RerunSnapshot[]
     },
     staleTime: 60_000,
+  })
+}
+
+// Analyst-triggered refresh of the mirror from the sheet → POST /api/reruns/sync.
+export function useSyncReruns() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async () => {
+      const res = await fetch('/api/reruns/sync', { method: 'POST' })
+      const body = (await res.json().catch(() => ({}))) as { count?: number; error?: string }
+      if (!res.ok) throw new Error(body.error ?? 'Sync failed')
+      return body
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['rerun-snapshot'] })
+      qc.invalidateQueries({ queryKey: ['rerun-overdue-count'] })
+    },
   })
 }

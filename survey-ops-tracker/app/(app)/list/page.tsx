@@ -39,6 +39,10 @@ export default function ListView() {
   const { mode, setMode } = useViewMode()
   const [search, setSearch] = useState('')
   const [exporting, setExporting] = useState(false)
+  // Transient Full-view override from a ?view=full deep-link — shows this visit
+  // without persisting over the user's saved Operations/Full preference.
+  const [forceFull, setForceFull] = useState(false)
+  const effectiveMode = forceFull ? 'full' : mode
 
   // Same filters as the board
   const [captainFilter, setCaptainFilter] = useState<string | null>(null)
@@ -96,10 +100,15 @@ export default function ListView() {
   }
 
   // Seed the search from a ?search= param so deep-links (e.g. from the Rerun
-  // Radar) land pre-filtered. Read once on mount; no Suspense boundary needed.
+  // Radar) land pre-filtered. ?view=full also flips to Full View so Closed /
+  // between-wave projects show (a rerun's project is usually Closed). Read once
+  // on mount; no Suspense boundary needed.
   useEffect(() => {
-    const s = new URLSearchParams(window.location.search).get('search')
+    const params = new URLSearchParams(window.location.search)
+    const s = params.get('search')
     if (s) setSearch(s)
+    if (params.get('view') === 'full') setForceFull(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   function applyView(c: ListViewConfig) {
@@ -132,7 +141,7 @@ export default function ListView() {
 
   const q = search.trim().toLowerCase()
   const visibleProjects = projects.filter(p => {
-    if (!(mode === 'full' ? true : p.phase === 'Active' && p.status === 'Open')) return false
+    if (!(effectiveMode === 'full' ? true : p.phase === 'Active' && p.status === 'Open')) return false
     if (
       captainFilter &&
       p.captain?.id !== captainFilter &&
@@ -192,7 +201,7 @@ export default function ListView() {
             List
           </span>
         </div>
-        <ViewToggle mode={mode} onChange={setMode} />
+        <ViewToggle mode={effectiveMode} onChange={(m) => { setForceFull(false); setMode(m) }} />
         <button
           onClick={handleExport}
           disabled={isLoading || exporting || visibleProjects.length === 0}

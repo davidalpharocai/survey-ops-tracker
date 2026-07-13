@@ -1,12 +1,14 @@
 'use client'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { useReruns, type RerunSnapshot } from '@/lib/hooks/useReruns'
+import { useReruns, useSyncReruns, type RerunSnapshot } from '@/lib/hooks/useReruns'
+import { useProjects } from '@/lib/hooks/useProjects'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
 import { Skeleton } from '@/components/shared/Skeleton'
 import { formatDate, daysOverdue } from '@/lib/utils/date'
 import { isTypingTarget } from '@/lib/utils/keyboard'
 import { toast } from '@/lib/utils/toast'
+import { monthIdx, quarterEndM } from '@/lib/reruns/parse'
 
 // Read-only "Rerun Radar": a mirror of Sree's manual rerun tab, read as
 // overdue / needs-a-date / upcoming / done. Buckets computed at read time so
@@ -65,10 +67,70 @@ const selectCls =
   'bg-muted border border-border text-foreground/80 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-ring'
 
 const firmOf = (r: RerunSnapshot) => (r.client ?? '').split(' - ')[0].trim()
+
+// Sheet client names don't equal app client names (e.g. sheet "Newark Alliance"
+// vs app "Newark"), and reruns are often between-wave/Closed. So only deep-link
+// a title when a real project actually matches — return the project's client to
+// search by (guaranteed to hit), else null → the title renders as plain text.
+function matchedClient(firm: string, projectClients: string[]): string | null {
+  const norm = (s: string) => s.trim().toLowerCase().replace(/\s*-\s*/g, ' ').replace(/\s+/g, ' ')
+  const f = norm(firm)
+  if (f.length < 3) return null
+  for (const pc of projectClients) {
+    const p = norm(pc)
+    if (!p) continue
+    // Exact, or one is a WORD-BOUNDED leading phrase of the other
+    // ("newark" ⊂ "newark alliance", "us chamber" ⊂ "us chamber james kenny").
+    // Word-bounded (trailing space) avoids "bam"⊂"bambora" / "united x"⊂"united y".
+    if (f === p || f.startsWith(`${p} `) || p.startsWith(`${f} `)) return pc
+  }
+  return null
+}
 const waveIds = (ids: string | null) => (ids ?? '').split(/[\n,]/).map((s) => s.trim()).filter(Boolean)
 const parseN = (r: RerunSnapshot) => {
   const m = (r.n ?? '').match(/\d[\d,]*/)
   return m ? parseInt(m[0].replace(/,/g, ''), 10) : -1
+}
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+const SHEET_URL = 'https://docs.google.com/spreadsheets/d/1ZTTJ0PQZ7vj13tmZmsMvKAcEEf0Nc0s8dVbfaYJju7Q/edit'
+
+// How precise the inferred date is + where it came from, so the UI can say
+// "Due in May" (fuzzy month) vs "Due Jul 13" (explicit) and explain on hover.
+// Reports the WIDEST granularity present in the raw cells = the honest confidence.
+// Precedence MUST match deriveNextRunDate (today → month → quarter) so `gran`
+// agrees with what produced next_run_date. The displayed month comes from
+// next_run_date itself (in cardStatus), so the label can never contradict the
+// bucket; gran here only picks the wording ("in" vs "by" vs exact) + the tip.
+function dateInfo(r: RerunSnapshot): { gran: 'day' | 'month' | 'quarter' | 'none'; explain: string } {
+  if ((r.next_cadence ?? '').trim().toLowerCase() === 'today') {
+    return { gran: 'day', explain: 'from “Today” in the next-collection cell' }
+  }
+  const ms = monthIdx(r.status_raw)
+  const mn = monthIdx(r.next_cadence)
+  if (ms >= 0 || mn >= 0) {
+    const src = ms >= 0 ? r.status_raw : r.next_cadence
+    return { gran: 'month', explain: `inferred from “${src}” — month-level precision` }
+  }
+  const qs = quarterEndM(r.status_raw)
+  const qn = quarterEndM(r.next_cadence)
+  if (qs >= 0 || qn >= 0) {
+    const src = qs >= 0 ? r.status_raw : r.next_cadence
+    return { gran: 'quarter', explain: `inferred from “${src}” — quarter-level (≈ end of quarter)` }
+  }
+  return { gran: 'none', explain: '' }
+}
+
+// Surface obviously-contradictory sheet cells rather than silently resolving them.
+function conflictOf(r: RerunSnapshot): string | null {
+  const s = (r.status_raw ?? '').toLowerCase()
+  const nc = (r.next_cadence ?? '').toLowerCase()
+  if (/pending/.test(s) && nc === 'today') return 'Status is a pending month, but next-collection says “Today”.'
+  if (/closed|cancel/.test(nc) && /pending/.test(s)) return 'One cell says closed/cancelled, another says pending.'
+  const sm = monthIdx(r.status_raw)
+  const nm = monthIdx(r.next_cadence)
+  if (sm >= 0 && nm >= 0 && sm !== nm) return `Status month (${MONTHS[sm]}) ≠ next-collection month (${MONTHS[nm]}).`
+  return null
 }
 
 function relAge(iso: string): string {
@@ -85,17 +147,29 @@ function copy(text: string) {
   )
 }
 
-function cardStatus(r: RerunSnapshot, bucket: Bucket): { icon: string; label: string } {
+function cardStatus(
+  r: RerunSnapshot,
+  bucket: Bucket,
+  di: ReturnType<typeof dateInfo>
+): { icon: string; label: string } {
   if (bucket === 'overdue') {
     const d = daysOverdue(r.next_run_date)
     return { icon: '⚠', label: d > 1 ? `${d}d overdue` : 'Overdue' }
   }
-  if (bucket === 'upcoming') return { icon: '', label: `Due ${formatDate(r.next_run_date)}` }
+  if (bucket === 'upcoming') {
+    // Month always taken from the actual next_run_date, so the label can't
+    // disagree with the bucket/sort; gran only picks the wording.
+    if ((di.gran === 'month' || di.gran === 'quarter') && r.next_run_date) {
+      const mn = MONTHS[new Date(`${r.next_run_date}T00:00:00Z`).getUTCMonth()]
+      if (mn) return { icon: '', label: di.gran === 'quarter' ? `Due by ${mn}` : `Due in ${mn}` }
+    }
+    return { icon: '', label: `Due ${formatDate(r.next_run_date)}` }
+  }
   if (bucket === 'done') return { icon: '✓', label: r.status_raw || 'Done' }
   return { icon: '', label: 'Needs a date' }
 }
 
-function RerunCard({ r, bucket }: { r: RerunSnapshot; bucket: Bucket }) {
+function RerunCard({ r, bucket, hrefFor }: { r: RerunSnapshot; bucket: Bucket; hrefFor: (r: RerunSnapshot) => string | null }) {
   const cfg = BUCKETS[bucket]
   const [showWaves, setShowWaves] = useState(false)
   const title = r.client || r.cadence || '(unlabeled)'
@@ -104,26 +178,35 @@ function RerunCard({ r, bucket }: { r: RerunSnapshot; bucket: Bucket }) {
   const waves = bucket !== 'done' ? waveIds(r.survey_ids) : []
   const showNext =
     bucket !== 'done' && r.next_cadence && !/closed|cancel|^today$/i.test(r.next_cadence) ? r.next_cadence : null
-  const { icon, label } = cardStatus(r, bucket)
-  // Deep-link to the List, pre-filtered to this firm (the List reads ?search).
-  const findHref = `/list?search=${encodeURIComponent(firmOf(r) || r.cadence || '')}`
+  const di = dateInfo(r)
+  const conflict = conflictOf(r)
+  const { icon, label } = cardStatus(r, bucket, di)
+  const chipTitle = `${icon} ${label}`.trim() + (bucket !== 'done' && di.explain ? ` — ${di.explain}` : '')
+  // Only a link when a real matching project exists (Full view so Closed ones show).
+  const href = hrefFor(r)
 
   return (
     <li className={`bg-background border border-border border-l-4 ${cfg.stripe} rounded-lg p-3`}>
       <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:gap-2">
         <div className="min-w-0 flex items-baseline gap-2 flex-wrap">
-          <Link
-            href={findHref}
-            title={`Find ${firmOf(r) || title} in the project list`}
-            className="font-medium text-foreground hover:text-primary hover:underline truncate min-w-0"
-          >
-            {title}
-          </Link>
+          {href ? (
+            <Link
+              href={href}
+              title={`Find ${title} in the project list`}
+              className="font-medium text-foreground hover:text-primary hover:underline truncate min-w-0"
+            >
+              {title}
+            </Link>
+          ) : (
+            <span className="font-medium text-foreground truncate min-w-0" title={title}>
+              {title}
+            </span>
+          )}
           {study && <span className="text-sm text-muted-foreground truncate min-w-0">· {study}</span>}
         </div>
         <span
           className={`shrink-0 self-start inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium max-w-full sm:ml-auto sm:max-w-[55%] ${cfg.chip}`}
-          title={`${icon} ${label}`.trim()}
+          title={chipTitle}
         >
           {icon && <span aria-hidden="true">{icon}</span>}
           <span className="truncate min-w-0">{label}</span>
@@ -177,6 +260,12 @@ function RerunCard({ r, bucket }: { r: RerunSnapshot; bucket: Bucket }) {
         </ul>
       )}
 
+      {conflict && (
+        <div className="mt-1 flex items-center gap-1 text-[11px] text-amber-600 dark:text-amber-400">
+          <span aria-hidden="true">⚠</span> conflicting cells
+          <InfoTooltip text={conflict} />
+        </div>
+      )}
       {bucket !== 'done' && r.note && <div className="text-xs text-muted-foreground italic mt-1 break-words">{r.note}</div>}
     </li>
   )
@@ -194,32 +283,56 @@ function HeadInner({ bucket, count }: { bucket: Bucket; count: number }) {
   )
 }
 
-function CardList({ items, bucket }: { items: RerunSnapshot[]; bucket: Bucket }) {
+function CardList({
+  items,
+  bucket,
+  hrefFor,
+}: {
+  items: RerunSnapshot[]
+  bucket: Bucket
+  hrefFor: (r: RerunSnapshot) => string | null
+}) {
   if (items.length === 0) return <p className="text-sm text-muted-foreground mt-2">None right now.</p>
   return (
     <ul className="space-y-2.5 mt-3">
       {items.map((r) => (
-        <RerunCard key={r.id} r={r} bucket={bucket} />
+        <RerunCard key={r.id} r={r} bucket={bucket} hrefFor={hrefFor} />
       ))}
     </ul>
   )
 }
 
-function Section({ bucket, items }: { bucket: Bucket; items: RerunSnapshot[] }) {
+function Section({
+  bucket,
+  items,
+  hrefFor,
+}: {
+  bucket: Bucket
+  items: RerunSnapshot[]
+  hrefFor: (r: RerunSnapshot) => string | null
+}) {
   return (
     <section id={`sec-${bucket}`} className={panel}>
       <h3 className={headCls}>
         <HeadInner bucket={bucket} count={items.length} />
         {TIPS[bucket] && <InfoTooltip text={TIPS[bucket]!} />}
       </h3>
-      <CardList items={items} bucket={bucket} />
+      <CardList items={items} bucket={bucket} hrefFor={hrefFor} />
     </section>
   )
 }
 
 // A real <h3> + toggle button (not native <details>) so the header stays a
 // heading and the InfoTooltip button isn't nested in a <summary>.
-function CollapsibleSection({ bucket, items }: { bucket: Bucket; items: RerunSnapshot[] }) {
+function CollapsibleSection({
+  bucket,
+  items,
+  hrefFor,
+}: {
+  bucket: Bucket
+  items: RerunSnapshot[]
+  hrefFor: (r: RerunSnapshot) => string | null
+}) {
   const [open, setOpen] = useState(false)
   return (
     <section id={`sec-${bucket}`} className={panel}>
@@ -235,7 +348,7 @@ function CollapsibleSection({ bucket, items }: { bucket: Bucket; items: RerunSna
         </button>
         {TIPS[bucket] && <InfoTooltip text={TIPS[bucket]!} />}
       </h3>
-      {open && <CardList items={items} bucket={bucket} />}
+      {open && <CardList items={items} bucket={bucket} hrefFor={hrefFor} />}
     </section>
   )
 }
@@ -275,6 +388,16 @@ export default function RerunsPage() {
   const [client, setClient] = useState<string>('all')
   const [sort, setSort] = useState<SortKey>('smart')
   const searchRef = useRef<HTMLInputElement>(null)
+  const sync = useSyncReruns()
+  const { data: projects = [] } = useProjects()
+  const projectClients = useMemo(() => projects.map((p) => p.client), [projects])
+  const hrefFor = useCallback(
+    (r: RerunSnapshot) => {
+      const m = matchedClient(firmOf(r) || r.cadence || '', projectClients)
+      return m ? `/list?search=${encodeURIComponent(m)}&view=full` : null
+    },
+    [projectClients]
+  )
 
   useEffect(() => {
     try {
@@ -349,6 +472,8 @@ export default function RerunsPage() {
     return groups
   }, [filtered, today, sort])
 
+  const conflicts = useMemo(() => filtered.filter((r) => conflictOf(r)).length, [filtered])
+
   const syncedAt = rows.length ? rows.reduce((m, r) => (r.synced_at > m ? r.synced_at : m), rows[0].synced_at) : null
   const stale = syncedAt ? Date.now() - new Date(syncedAt).getTime() > 36 * 3_600_000 : false
   const filterActive = work !== 'all' || platform !== 'all' || client !== 'all' || q.trim() !== ''
@@ -414,6 +539,12 @@ export default function RerunsPage() {
               {g.unsorted.length} need a date
               {' · '}
               {shown} of {total} studies
+              {conflicts > 0 && (
+                <>
+                  {' · '}
+                  <span className="text-amber-600 dark:text-amber-400">{conflicts} flagged</span>
+                </>
+              )}
             </>
           )}
         </p>
@@ -427,8 +558,8 @@ export default function RerunsPage() {
         </div>
       ) : (
         <>
-          {/* Search + sync freshness */}
-          <div className="flex items-center gap-3 flex-wrap">
+          {/* Search + sync controls */}
+          <div className="flex items-center gap-2 flex-wrap">
             <input
               ref={searchRef}
               value={q}
@@ -437,15 +568,40 @@ export default function RerunsPage() {
               aria-label="Search reruns by client, study, status, survey ID or note"
               className="flex-1 min-w-[12rem] max-w-sm bg-muted border border-border text-foreground text-sm rounded-lg px-3 py-1.5 focus:outline-none focus:border-ring"
             />
-            {syncedAt && (
-              <span
-                className={`text-xs ${stale ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'}`}
-                title={`Last synced from the sheet: ${new Date(syncedAt).toLocaleString()}`}
+            <div className="flex items-center gap-2 text-xs sm:ml-auto">
+              {syncedAt && (
+                <span
+                  className={stale ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'}
+                  title={`Last synced from the sheet: ${new Date(syncedAt).toLocaleString()}`}
+                >
+                  Synced {relAge(syncedAt)}
+                  {stale ? ' · may be stale' : ''}
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={() =>
+                  sync.mutate(undefined, {
+                    onSuccess: (d) => toast(`Synced ${d.count ?? ''} reruns ✓`, 'success'),
+                    onError: (e) => toast(String((e as Error).message)),
+                  })
+                }
+                disabled={sync.isPending}
+                title="Pull the latest from Sree's sheet now"
+                className="border border-border text-muted-foreground hover:text-foreground hover:border-ring rounded-lg px-2.5 py-1.5 transition-colors disabled:opacity-40"
               >
-                Synced {relAge(syncedAt)}
-                {stale ? ' · may be stale' : ''}
-              </span>
-            )}
+                {sync.isPending ? 'Syncing…' : '↻ Sync now'}
+              </button>
+              <a
+                href={SHEET_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Open the Manual Rerun sheet"
+                className="text-muted-foreground hover:text-foreground border border-border rounded-lg px-2.5 py-1.5 transition-colors"
+              >
+                Sheet ↗
+              </a>
+            </div>
           </div>
 
           {/* Filters + sort */}
@@ -557,7 +713,7 @@ export default function RerunsPage() {
             <>
               <h2 className={groupLabel}>Needs attention</h2>
               {g.overdue.length > 0 ? (
-                <Section bucket="overdue" items={g.overdue} />
+                <Section bucket="overdue" items={g.overdue} hrefFor={hrefFor} />
               ) : (
                 <div
                   id="sec-overdue"
@@ -566,11 +722,11 @@ export default function RerunsPage() {
                   <span aria-hidden="true">✓</span> Nothing overdue.
                 </div>
               )}
-              {g.unsorted.length > 0 && <Section bucket="unsorted" items={g.unsorted} />}
+              {g.unsorted.length > 0 && <Section bucket="unsorted" items={g.unsorted} hrefFor={hrefFor} />}
 
               <h2 className={groupLabel}>On track</h2>
-              <Section bucket="upcoming" items={g.upcoming} />
-              <CollapsibleSection bucket="done" items={g.done} />
+              <Section bucket="upcoming" items={g.upcoming} hrefFor={hrefFor} />
+              <CollapsibleSection bucket="done" items={g.done} hrefFor={hrefFor} />
 
               <p className="text-xs text-muted-foreground">
                 Read-only mirror of the “Manual Rerun” tab. Dates are inferred from the sheet’s free text, so timing is
