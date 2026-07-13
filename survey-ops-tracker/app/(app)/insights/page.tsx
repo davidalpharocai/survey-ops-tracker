@@ -189,7 +189,7 @@ export default function InsightsPage() {
             <div key={s.label} className="flex items-center gap-3 text-sm">
               <span className="w-40 shrink-0 text-muted-foreground">{s.label}</span>
               <div className="flex-1 bg-muted rounded-full h-4 overflow-hidden">
-                <div className="h-full bg-blue-500/60 rounded-full" style={{ width: `${(s.count / maxStage) * 100}%` }} />
+                <div className="h-full bg-primary/70 rounded-full" style={{ width: `${(s.count / maxStage) * 100}%` }} />
               </div>
               <span className="w-8 text-right text-foreground tabular-nums">{s.count}</span>
             </div>
@@ -213,7 +213,7 @@ export default function InsightsPage() {
               <div key={w.name} className="flex items-center gap-3 text-sm">
                 <span className="w-40 shrink-0 text-muted-foreground truncate">{w.name}</span>
                 <div className="flex-1 bg-muted rounded-full h-4 overflow-hidden">
-                  <div className="h-full bg-emerald-500/50 rounded-full" style={{ width: `${(w.open / maxCap) * 100}%` }} />
+                  <div className="h-full bg-primary/45 rounded-full" style={{ width: `${(w.open / maxCap) * 100}%` }} />
                 </div>
                 <span className="w-20 text-right text-foreground tabular-nums">
                   {w.open}{w.overdue > 0 && <span className="text-red-600 dark:text-red-400"> · {w.overdue} od</span>}

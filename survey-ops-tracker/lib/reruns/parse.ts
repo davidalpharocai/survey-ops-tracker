@@ -71,12 +71,29 @@ export function statusClass(status: string | null, next: string | null): string 
  * (NO roll-forward: a past "May Pending" must read as overdue, not next year's
  * May). Month-END is deliberate: a rerun only flips to overdue once its month has
  * actually finished — "May Pending" reads as due through May, overdue from June.
+ *
+ * Priority: a PAST "<Month/Qn> Pending" wins over everything — a stale "Today"
+ * left in the Next-Collection cell must not hide a wave that's actually overdue.
+ * Otherwise an explicit "Today" is the signal, then any month named in status/next.
  * null when nothing parseable → the row lands in the "needs a date" bucket. UTC
  * to match formatDate()'s UTC rendering.
  */
 export function deriveNextRunDate(status: string | null, next: string | null, now: Date): string | null {
-  const n = (next ?? '').trim().toLowerCase()
-  if (n === 'today') return now.toISOString().slice(0, 10)
+  const monthEnd = (mm: number) => new Date(Date.UTC(now.getUTCFullYear(), mm + 1, 0)).toISOString().slice(0, 10)
+  const today = now.toISOString().slice(0, 10)
+
+  // A past "<Month/Qn> Pending" outranks a stale "Today" cell.
+  if (/pending/i.test(status ?? '')) {
+    let pm = monthIdx(status)
+    if (pm < 0) pm = quarterEndM(status)
+    if (pm >= 0) {
+      const end = monthEnd(pm)
+      if (end < today) return end
+    }
+  }
+
+  if ((next ?? '').trim().toLowerCase() === 'today') return today
+
   let m = monthIdx(status)
   if (m < 0) m = monthIdx(next)
   if (m < 0) {
@@ -84,8 +101,7 @@ export function deriveNextRunDate(status: string | null, next: string | null, no
     if (m < 0) m = quarterEndM(next)
   }
   if (m < 0) return null
-  // Last day of month m: day 0 of month m+1.
-  return new Date(Date.UTC(now.getUTCFullYear(), m + 1, 0)).toISOString().slice(0, 10)
+  return monthEnd(m)
 }
 
 /**

@@ -50,8 +50,18 @@ function statusClass(status, next) {
   return 'active'
 }
 function deriveNextRunDate(status, next, now) {
-  const n = (next ?? '').trim().toLowerCase()
-  if (n === 'today') return now.toISOString().slice(0, 10)
+  const monthEnd = (mm) => new Date(Date.UTC(now.getUTCFullYear(), mm + 1, 0)).toISOString().slice(0, 10)
+  const today = now.toISOString().slice(0, 10)
+  // A past "<Month/Qn> Pending" outranks a stale "Today" cell.
+  if (/pending/i.test(status ?? '')) {
+    let pm = monthIdx(status)
+    if (pm < 0) pm = quarterEndM(status)
+    if (pm >= 0) {
+      const end = monthEnd(pm)
+      if (end < today) return end
+    }
+  }
+  if ((next ?? '').trim().toLowerCase() === 'today') return today
   let m = monthIdx(status)
   if (m < 0) m = monthIdx(next)
   if (m < 0) {
@@ -59,7 +69,7 @@ function deriveNextRunDate(status, next, now) {
     if (m < 0) m = quarterEndM(next)
   }
   if (m < 0) return null
-  return new Date(Date.UTC(now.getUTCFullYear(), m + 1, 0)).toISOString().slice(0, 10)
+  return monthEnd(m)
 }
 const headerLooksValid = (header) => {
   const at = (i) => (header?.[i] == null ? '' : String(header[i]).toLowerCase())
