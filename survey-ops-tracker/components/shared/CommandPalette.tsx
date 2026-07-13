@@ -11,6 +11,7 @@ const ACTIONS: { id: string; label: string; href: string }[] = [
   { id: 'new-project', label: 'New project', href: '/?new=1' },
   { id: 'go-board', label: 'Go to board', href: '/' },
   { id: 'go-list', label: 'Go to list', href: '/list' },
+  { id: 'go-reruns', label: 'Go to reruns', href: '/reruns' },
 ]
 
 const MAX_RESULTS = 8

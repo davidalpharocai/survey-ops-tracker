@@ -1230,6 +1230,63 @@ export type Database = {
           }
         ]
       }
+      rerun_snapshot: {
+        Row: {
+          id: string
+          sheet_row: number | null
+          client: string | null
+          next_cadence: string | null
+          work: string | null
+          freq: string | null
+          platform: string | null
+          cadence: string | null
+          n: string | null
+          template: string | null
+          note: string | null
+          status_raw: string | null
+          survey_ids: string | null
+          next_run_date: string | null
+          status_class: string | null
+          synced_at: string
+        }
+        Insert: {
+          id?: string
+          sheet_row?: number | null
+          client?: string | null
+          next_cadence?: string | null
+          work?: string | null
+          freq?: string | null
+          platform?: string | null
+          cadence?: string | null
+          n?: string | null
+          template?: string | null
+          note?: string | null
+          status_raw?: string | null
+          survey_ids?: string | null
+          next_run_date?: string | null
+          status_class?: string | null
+          synced_at?: string
+        }
+        Update: {
+          id?: string
+          sheet_row?: number | null
+          client?: string | null
+          next_cadence?: string | null
+          work?: string | null
+          freq?: string | null
+          platform?: string | null
+          cadence?: string | null
+          n?: string | null
+          template?: string | null
+          note?: string | null
+          status_raw?: string | null
+          survey_ids?: string | null
+          next_run_date?: string | null
+          status_class?: string | null
+          synced_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       portal_projects: {
@@ -1246,6 +1303,10 @@ export type Database = {
       }
     }
     Functions: {
+      replace_rerun_snapshot: {
+        Args: { rows: Json }
+        Returns: number
+      }
       merge_projects: {
         Args: { p_survivor: string; p_loser: string }
         Returns: undefined

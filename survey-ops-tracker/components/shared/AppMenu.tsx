@@ -109,6 +109,13 @@ export function AppMenu() {
               </span>
             )}
           </Link>
+          <Link
+            href="/reruns"
+            className={itemClass}
+            title="Rerun Radar — recurring & one-off survey reruns from Sree's tracker, bucketed overdue / upcoming / done"
+          >
+            <span>🔁</span> Reruns
+          </Link>
           <div className="border-t border-border my-1.5" />
           <Link
             href="/connect"
