@@ -52,12 +52,14 @@ returns integer
 language plpgsql
 security definer
 set search_path = public
-set sql_safe_updates = 'off'   -- allow the intentional full-table delete below
 as $$
 declare inserted integer;
 begin
   perform pg_advisory_xact_lock(hashtext('rerun_snapshot_sync'));
-  delete from public.rerun_snapshot;
+  -- TRUNCATE, not an unqualified DELETE: Supabase loads pg_safeupdate, which
+  -- rejects "DELETE ... " with no WHERE. TRUNCATE isn't guarded, is atomic
+  -- within this transaction, and is the correct "replace everything" op.
+  truncate table public.rerun_snapshot;
   insert into public.rerun_snapshot (
     sheet_row, client, next_cadence, work, freq, platform, cadence, n,
     template, note, status_raw, survey_ids, next_run_date, status_class
