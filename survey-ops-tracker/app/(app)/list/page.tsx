@@ -95,6 +95,13 @@ export default function ListView() {
     localStorage.setItem(SORT_KEY, JSON.stringify({ field, dir }))
   }
 
+  // Seed the search from a ?search= param so deep-links (e.g. from the Rerun
+  // Radar) land pre-filtered. Read once on mount; no Suspense boundary needed.
+  useEffect(() => {
+    const s = new URLSearchParams(window.location.search).get('search')
+    if (s) setSearch(s)
+  }, [])
+
   function applyView(c: ListViewConfig) {
     setMode(c.mode)
     setCaptainFilter(c.captain)

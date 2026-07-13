@@ -32,6 +32,23 @@ export function AppMenu() {
     staleTime: 60_000,
   })
 
+  // Overdue-rerun count → a red badge on Reruns, mirroring the /reruns radar's
+  // overdue bucket (next collection past + not done/closed). Fails soft to 0.
+  const { data: rerunOverdue = 0 } = useQuery({
+    queryKey: ['rerun-overdue-count'],
+    queryFn: async () => {
+      const n = new Date()
+      const today = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`
+      const { count } = await createClient()
+        .from('rerun_snapshot')
+        .select('id', { count: 'exact', head: true })
+        .lt('next_run_date', today)
+        .not('status_class', 'in', '(done,closed)')
+      return count ?? 0
+    },
+    staleTime: 60_000,
+  })
+
   // Close when navigating, clicking outside, or pressing Escape
   useEffect(() => setOpen(false), [pathname])
   useEffect(() => {
@@ -115,6 +132,11 @@ export function AppMenu() {
             title="Rerun Radar — recurring & one-off survey reruns from Sree's tracker, bucketed overdue / upcoming / done"
           >
             <span>🔁</span> Reruns
+            {rerunOverdue > 0 && (
+              <span className="ml-auto text-xs font-medium px-1.5 py-0.5 rounded-full bg-red-500/15 text-red-600 dark:text-red-400">
+                {rerunOverdue}
+              </span>
+            )}
           </Link>
           <div className="border-t border-border my-1.5" />
           <Link
