@@ -57,72 +57,76 @@
 }
 
 :root {
-  --background: oklch(0.985 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.96 0 0);
-  --muted-foreground: oklch(0.36 0 0);
-  --accent: oklch(0.96 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.78 0 0);
-  --input: oklch(0.84 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
+  /* AlphaROC brand: navy #010B40 + teal #0076AF on a navy-tinted ink scale.
+     Mirrors the CCM app's palette (client_management/frontend/app/globals.css)
+     so the AlphaROC tools read as one product family. */
+  --background: #f4f6fa;          /* ink-50 */
+  --foreground: #010b40;          /* navy */
+  --card: #ffffff;
+  --card-foreground: #010b40;
+  --popover: #ffffff;
+  --popover-foreground: #010b40;
+  --primary: #0076af;             /* teal — buttons, links, emphasis */
+  --primary-foreground: #ffffff;
+  --secondary: #e7ebf1;           /* ink-100 */
+  --secondary-foreground: #010b40;
+  --muted: #e7ebf1;               /* ink-100 — subtle surfaces / skeletons */
+  --muted-foreground: #5b6472;    /* ink-600 — secondary text */
+  --accent: #eaf6f6;              /* teal tint — hover surfaces */
+  --accent-foreground: #0076af;
+  --destructive: #b42318;
+  --border: #c2cad8;              /* ink-300 — defined card/edge */
+  --input: #c2cad8;
+  --ring: #0076af;                /* teal focus ring */
+  --chart-1: #0076af;
+  --chart-2: #0097a7;
+  --chart-3: #2a3550;
+  --chart-4: #5b6472;
+  --chart-5: #8a93a3;
   --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --sidebar: #f4f6fa;
+  --sidebar-foreground: #010b40;
+  --sidebar-primary: #0076af;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #eaf6f6;
+  --sidebar-accent-foreground: #0076af;
+  --sidebar-border: #c2cad8;
+  --sidebar-ring: #0076af;
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.85 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 22%);
-  --input: oklch(1 0 0 / 25%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  /* AlphaROC dark: deep navy ground, lighter teal accent (matches CCM dark). */
+  --background: #060c22;
+  --foreground: #e6e9f2;
+  --card: #0f1836;
+  --card-foreground: #e6e9f2;
+  --popover: #0f1836;
+  --popover-foreground: #e6e9f2;
+  --primary: #3fa7d6;             /* lighter teal for legibility on dark */
+  --primary-foreground: #04122a;
+  --secondary: #1b2540;
+  --secondary-foreground: #e6e9f2;
+  --muted: #1c2748;
+  --muted-foreground: #98a1b5;
+  --accent: #10273a;              /* teal-tinted hover surface */
+  --accent-foreground: #7fc4ec;
+  --destructive: #e4695c;
+  --border: #33405f;              /* card-border strength so cards read */
+  --input: #3c4a6e;
+  --ring: #3fa7d6;
+  --chart-1: #3fa7d6;
+  --chart-2: #0097a7;
+  --chart-3: #8fd2ef;
+  --chart-4: #98a1b5;
+  --chart-5: #c2cad8;
+  --sidebar: #0f1836;
+  --sidebar-foreground: #e6e9f2;
+  --sidebar-primary: #3fa7d6;
+  --sidebar-primary-foreground: #04122a;
+  --sidebar-accent: #10273a;
+  --sidebar-accent-foreground: #7fc4ec;
+  --sidebar-border: #33405f;
+  --sidebar-ring: #3fa7d6;
 }
 
 @layer base {
