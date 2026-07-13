@@ -121,6 +121,9 @@ ALTER TABLE transactions ADD COLUMN IF NOT EXISTS audience TEXT;
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS target_n INTEGER;
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS actual_n_delivered INTEGER;
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS description TEXT;
+-- SOCC project type for a study (PS/B2B/Rerun); set on the study form and sent
+-- to SOCC when the CCM->SOCC auto-create relay is enabled. Nullable/additive.
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS project_type TEXT;
 
 -- Structured salesperson (account owner). Each client is assigned one
 -- salesperson, chosen from this list (with add-new on the client form).

@@ -230,6 +230,7 @@ def transaction_dict(
         "audience": t.audience,
         "targetN": t.target_n,
         "actualNDelivered": t.actual_n_delivered,
+        "projectType": t.project_type,
         "description": t.description,
         "soccBoardColumn": t.socc_board_column,
         "soccSyncedAt": _iso(t.socc_synced_at),

@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.auth import require_user
+from app.config import get_settings
 from app.db import get_session
 from app.helpers import utc_now
 from app.models import Client, ClientUser, Transaction, TransactionUser
@@ -424,9 +425,11 @@ async def create_study(
         audience=f.audience,
         target_n=f.target_n,
         actual_n_delivered=f.actual_n_delivered,
+        project_type=f.project_type,
         description=f.description,
     )
     client_name = client.name  # read before commit/rollback expires it
+    client_salesperson = client.salesperson_name
     session.add(t)
     try:
         await session.flush()
@@ -443,6 +446,20 @@ async def create_study(
         out["clientName"] = client_name
         return out
     await session.refresh(t)
+    # CCM->SOCC auto-create relay (dormant unless SOCC_API_URL/TOKEN set): create
+    # the matching SOCC project and stamp the returned PR#####. Best-effort and
+    # OUTSIDE the study's transaction — the study is already committed, so a SOCC
+    # failure never rolls it back; it just stays unlinked for a later retry.
+    if get_settings().socc_relay_enabled and not t.socc_project_code:
+        from app.socc_relay import create_socc_project
+
+        pr_code = await create_socc_project(
+            t, client_name=client_name, salesperson=client_salesperson
+        )
+        if pr_code:
+            t.socc_project_code = pr_code
+            await session.commit()
+            await session.refresh(t)
     out = transaction_dict(t)
     out["clientName"] = client_name
     return out
@@ -510,6 +527,8 @@ async def update_study(
     t.audience = f.audience
     t.target_n = f.target_n
     t.actual_n_delivered = f.actual_n_delivered
+    # project_type is set on CREATE only (the edit forms have no picker yet);
+    # leave it untouched here so an edit can't wipe it.
     t.description = f.description
     if body.socc_project_code is not None:
         t.socc_project_code = (body.socc_project_code or "").strip() or None
@@ -667,6 +686,7 @@ async def bulk_update(
         t.audience = f.audience
         t.target_n = f.target_n
         t.actual_n_delivered = f.actual_n_delivered
+        # project_type is create-only (no picker in the bulk grid) — don't wipe.
         t.description = f.description
         t.updated_by_email = user
         t.updated_at = utc_now()

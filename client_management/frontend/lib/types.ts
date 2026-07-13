@@ -160,6 +160,7 @@ export interface StudyTransaction extends TransactionBase {
   audience?: string | null;
   targetN?: number | null;
   actualNDelivered?: number | null;
+  projectType?: string | null;
 }
 
 export type Transaction = ContractTransaction | StudyTransaction;

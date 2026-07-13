@@ -46,7 +46,21 @@ class StudyForm:
     audience: str | None = None
     target_n: int | None = None
     actual_n_delivered: int | None = None
+    project_type: str | None = None
     description: str | None = None
+
+
+# Canonical SOCC project types; the study form / API value is normalised to
+# one of these (case-insensitively) or None. Kept in sync with the SOCC
+# create_project schema's project_type enum.
+_PROJECT_TYPES = {"ps": "PS", "b2b": "B2B", "rerun": "Rerun"}
+
+
+def _parse_project_type(value: object) -> str | None:
+    """Normalise a project-type value to PS/B2B/Rerun, or None if unset/invalid."""
+    if value in (None, ""):
+        return None
+    return _PROJECT_TYPES.get(str(value).strip().lower())
 
 
 def _parse_count(value: object) -> int | None:
@@ -124,6 +138,7 @@ def read_study_form(body: StudyIn) -> StudyForm:
         audience=(body.audience or "").strip() or None,
         target_n=_parse_count(body.target_n),
         actual_n_delivered=_parse_count(body.actual_n_delivered),
+        project_type=_parse_project_type(body.project_type),
         description=(body.description or "").strip() or None,
     )
 

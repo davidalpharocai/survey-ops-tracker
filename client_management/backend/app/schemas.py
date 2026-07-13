@@ -101,6 +101,8 @@ class StudyIn(BaseModel):
     audience: str | None = None
     target_n: int | str | None = None
     actual_n_delivered: int | str | None = None
+    # SOCC project type (PS/B2B/Rerun) — used by the CCM->SOCC auto-create relay.
+    project_type: str | None = None
     description: str | None = None
     # Inline "add a new contact" on study CREATE: when present, the contact is
     # created in the SAME transaction as the study and attributed to it, so a

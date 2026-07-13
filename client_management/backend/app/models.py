@@ -274,6 +274,8 @@ class Transaction(Base):
         Integer, nullable=True
     )
     description: Mapped[str | None] = mapped_column(String, nullable=True)
+    # SOCC project type for a study (PS/B2B/Rerun); drives the CCM->SOCC relay.
+    project_type: Mapped[str | None] = mapped_column(String, nullable=True)
     # One-way SOCC sync (status only): the survey's SOCC board column and
     # when it was last synced. Never affects money.
     socc_board_column: Mapped[str | None] = mapped_column(String, nullable=True)

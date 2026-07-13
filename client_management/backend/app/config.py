@@ -95,6 +95,13 @@ class Settings(BaseSettings):
     # action body limit (10 MB) so the proxy never truncates a valid file.
     attachment_max_bytes: int = Field(default=8 * 1024 * 1024, alias="ATTACHMENT_MAX_BYTES")
 
+    # CCM->SOCC auto-create relay. When both are set, recording a study calls
+    # the SOCC tracker's create-project endpoint and stamps the returned
+    # PR#####. Unset (default) → the relay is DORMANT: studies save normally,
+    # no call, no flag. See docs/specs/2026-07-13-ccm-socc-autocreate-design.md.
+    socc_api_url: str = Field(default="", alias="SOCC_API_URL")
+    socc_api_token: str = Field(default="", alias="SOCC_API_TOKEN")
+
     @model_validator(mode="after")
     def _resolve_database_url_from_secret(self) -> "Settings":
         """Fetch DATABASE_URL from Secrets Manager when not set directly.
@@ -308,6 +315,11 @@ class Settings(BaseSettings):
         if url.startswith("postgres://"):
             url = url.replace("postgres://", "postgresql://", 1)
         return url.replace("postgresql://", "postgresql+asyncpg://", 1)
+
+    @property
+    def socc_relay_enabled(self) -> bool:
+        """Whether the CCM->SOCC auto-create relay is configured (both URL+token)."""
+        return bool(self.socc_api_url and self.socc_api_token)
 
     @property
     def is_production(self) -> bool:

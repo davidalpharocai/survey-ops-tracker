@@ -195,7 +195,7 @@ export default function NewStudyForm({ clientId, clientName, users, contracts, b
         )}
       </div>
 
-      <label>Rolls up to contract (optional)<InfoTooltip text={TIP.studyContract} />
+      <label className="span-2">Rolls up to contract (optional)<InfoTooltip text={TIP.studyContract} />
         <select name="contract_id" disabled={disabled}>
           <option value="">— none (Unassigned) —</option>
           {contracts.map(c => (
@@ -207,6 +207,16 @@ export default function NewStudyForm({ clientId, clientName, users, contracts, b
             ? 'This client has no contracts yet — the study will be Unassigned.'
             : 'Pick the contract this study draws its credits from.'}
         </span>
+      </label>
+
+      <label>Survey type (optional)
+        <InfoTooltip text="What kind of survey this is (PS / B2B / Rerun). Recorded on the study, and used to create the matching SOCC project when the SOCC link is turned on." />
+        <select name="project_type" defaultValue="" disabled={disabled}>
+          <option value="">— set later / in SOCC —</option>
+          <option value="PS">PS</option>
+          <option value="B2B">B2B</option>
+          <option value="Rerun">Rerun</option>
+        </select>
       </label>
 
       <label>Audience (optional)
