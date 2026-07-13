@@ -2,13 +2,14 @@ import Link from 'next/link';
 
 import { apiForRequest, parseId } from '../../lib/action';
 import { onlyNotFound } from '../../lib/api';
-import { currentUserIsRestricted } from '../../lib/auth';
+import { currentUserEmail, currentUserIsRestricted } from '../../lib/auth';
 import { todayIsoDate } from '../../lib/dates';
 import { contractValue, credits as creditsFmt, dollars, isoDate } from '../../lib/format';
 import { TIP } from '../../lib/tooltips';
 import type { Balance, ClientUser, Family, Salesperson } from '../../lib/types';
 import InfoTooltip from '../_components/InfoTooltip';
 import ConfirmButton from './ConfirmButton';
+import ClientListRail from './ClientListRail';
 import NewClientDialog from './NewClientDialog';
 import SalespersonPicker from './SalespersonPicker';
 import {
@@ -37,7 +38,7 @@ export default async function ClientsPage({ searchParams }: PageProps) {
   // stale ?id= URL falls back to the empty state, but a transient backend
   // error still surfaces rather than rendering a fake $0 balance for a
   // real client.
-  const [clients, salespeople, selected, selectedUsers, bal, family, restricted] = await Promise.all([
+  const [clients, salespeople, selected, selectedUsers, bal, family, restricted, myEmail] = await Promise.all([
     api.listClients(),
     api.listSalespeople(),
     selectedId ? api.getClient(selectedId) : Promise.resolve(null),
@@ -51,6 +52,7 @@ export default async function ClientsPage({ searchParams }: PageProps) {
       ? api.clientFamily(selectedId).catch(() => null as Family | null)
       : Promise.resolve(null as Family | null),
     currentUserIsRestricted(),
+    currentUserEmail(),
   ]);
 
   const currentYear = new Date().getUTCFullYear();
@@ -75,22 +77,7 @@ export default async function ClientsPage({ searchParams }: PageProps) {
             <strong>Clients</strong>
             <NewClientDialog today={today} salespeople={salespeople} />
           </div>
-          <ul className="client-list">
-            {clients.length === 0 ? (
-              <li className="empty muted">No clients yet — click + New.</li>
-            ) : (
-              clients.map(c => (
-                <li key={c.id} className={selected && c.id === selected.id ? 'is-selected' : ''}>
-                  <Link href={`/clients?id=${c.id}`}>
-                    <span className="cl-name">{c.name}</span>
-                    {(c.salespersonName || c.relationshipManager) && (
-                      <span className="cl-meta">Sales · {c.salespersonName || c.relationshipManager}</span>
-                    )}
-                  </Link>
-                </li>
-              ))
-            )}
-          </ul>
+          <ClientListRail clients={clients} selectedId={selected?.id ?? null} myEmail={myEmail} />
         </aside>
 
         <section className="pane-detail">

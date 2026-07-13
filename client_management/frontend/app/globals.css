@@ -860,6 +860,31 @@ button:hover, .btn:hover { background: var(--accent-hover); }
   padding: 0.75rem 1rem;
   border-bottom: 1px solid var(--border);
 }
+/* Left-rail client filter + My/All scope toggle */
+.rail-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.6rem;
+  border-bottom: 1px solid var(--border);
+}
+.rail-filter { flex: 1; min-width: 0; }
+.rail-toggle {
+  display: inline-flex;
+  border: 1px solid var(--card-border);
+  border-radius: 7px;
+  overflow: hidden;
+}
+.rail-toggle > button {
+  border: 0;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.25rem 0.5rem;
+  cursor: pointer;
+}
+.rail-toggle > button.is-active { background: var(--accent); color: #fff; }
 .client-list {
   list-style: none;
   margin: 0;
