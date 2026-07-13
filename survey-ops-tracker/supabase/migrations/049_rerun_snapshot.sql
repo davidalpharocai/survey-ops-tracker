@@ -52,6 +52,7 @@ returns integer
 language plpgsql
 security definer
 set search_path = public
+set sql_safe_updates = 'off'   -- allow the intentional full-table delete below
 as $$
 declare inserted integer;
 begin
