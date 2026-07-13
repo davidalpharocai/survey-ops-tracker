@@ -13,15 +13,20 @@ exact money, bytea, sequences, and FK integrity all verified).
   verify counts. `--dry-run` loads then rolls back.
 
 ## What I need from you (Supabase)
-Create the project, then copy **both pooler** strings (Connect dialog). Skip
-the "Direct connection" — it's IPv6-only now and can fail from IPv4 hosts.
+Create the project, then copy the pooler string (Connect dialog). Skip the
+"Direct connection" — it's IPv6-only now and can fail from IPv4 hosts.
 1. **Session pooler** (host `...pooler.supabase.com`, port **5432**, user
-   `postgres.<ref>`) → `SUPABASE_SESSION_URL`. Used for the one-time migration
-   load — session mode behaves like a direct connection (DDL + multi-statement
-   transaction) but is IPv4-safe.
-2. **Transaction pooler** (same host, port **6543**) → `SUPABASE_POOLER_URL`.
-   Used as the app's runtime `DATABASE_URL` (Vercel is serverless). Safe
-   because `db.py` already sets asyncpg `statement_cache_size=0`.
+   `postgres.<ref>`) → `SUPABASE_SESSION_URL`. Used BOTH for the migration load
+   AND as the app's runtime `DATABASE_URL`. Session mode pins one backend per
+   connection (DDL, multi-statement transactions, and prepared statements all
+   work) and is IPv4-safe.
+
+**Do NOT use the 6543 TRANSACTION pooler for this app.** It caused intermittent
+500s: asyncpg+SQLAlchemy use server-side prepared statements and Supavisor
+txn-mode routes a follow-up query (e.g. a `selectinload`) to a different backend
+where the statement doesn't exist. `statement_cache_size=0` doesn't fix it. The
+5432 session pooler avoids it entirely (fine at this tool's low concurrency with
+NullPool). (`SUPABASE_POOLER_URL` at 6543 is kept in secrets only for reference.)
 
 ## Cutover (I run this once you paste the two strings)
 ```bash
@@ -37,11 +42,12 @@ TARGET_DATABASE_URL="$SUPABASE_SESSION_URL" \
 TARGET_DATABASE_URL="$SUPABASE_SESSION_URL" \
   backend/.venv/Scripts/python.exe .devstack/migrate-db.py .backups/ccm-db-backup-CUTOVER.json
 
-# 3. Point ccm-api at the Supabase POOLER (6543) and redeploy.
-#    (Vercel env: DATABASE_URL = <supabase-pooler-6543>)
+# 3. Point ccm-api at the Supabase SESSION pooler (5432) and redeploy.
+#    (Vercel env: DATABASE_URL = $SUPABASE_SESSION_URL — NOT the 6543 txn pooler)
 cd backend && npx vercel deploy --prod --yes --scope alpha-roc
 
-# 4. Smoke test: counts + a ledger read against the new DB.
+# 4. Smoke test: hit each read/report endpoint a few times (all 200, no
+#    intermittent 500s) + a ledger read against the new DB.
 # 5. Post-cutover backup from Supabase for safety.
 ```
 
