@@ -19,7 +19,7 @@ const LINKS: { label: string; href: string; desc: string }[] = [
   {
     label: 'Supabase — Users',
     href: `https://supabase.com/dashboard/project/${SUPABASE_PROJECT}/auth/users`,
-    desc: 'Add teammates and send password resets. New accounts must be @alpharoc.ai.',
+    desc: 'Add teammates (they sign in with a passwordless magic link). New accounts must be @alpharoc.ai.',
   },
   {
     label: 'Supabase — Database & SQL Editor',

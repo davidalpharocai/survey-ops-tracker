@@ -103,7 +103,7 @@ export function AppMenu() {
           <Link
             href="/admin"
             className={itemClass}
-            title="Admin — system links (incl. password resets), client ids, roster, recently deleted, and data health"
+            title="Admin — system links (add teammates, etc.), client ids, roster, recently deleted, and data health"
           >
             <span>⚙️</span> Admin
           </Link>

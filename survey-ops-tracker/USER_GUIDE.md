@@ -5,7 +5,7 @@
 **Finding this guide later:** the ☰ menu in the app's top-left corner links straight here, along with the Systems & Handover doc.
 
 **App:** https://survey-ops-tracker.vercel.app
-**Sign in:** your @alpharoc.ai email + password (only company accounts can get in). First time signing in, or forgot your password? Click **"First time here or forgot your password?"** on the login page and email yourself a set-password link — no admin needed.
+**Sign in:** passwordless. Enter your **@alpharoc.ai** username on the login page (the domain is fixed, so only company accounts can get in) and click **"Email me a sign-in link"** — you'll get a one-tap magic link. Open it **on the same device** you requested it from to finish signing in. No password to set or remember.
 
 ---
 
@@ -121,7 +121,7 @@ Some clients (the financial ones) require their compliance team to sign off befo
 - Light/dark/system theme: the toggle at the top right
 - Works on phones at the same address with the same login
 - Made a mess? Nothing here is truly lost: closed projects reopen, deleted bids have ↺ Undo, checked steps uncheck, and the data change log keeps the paper trail
-- Signing in for the first time (or forgot your password)? Click "First time here or forgot your password?" on the login page to email yourself a set-password link
+- Signing in? Enter your @alpharoc.ai username and click "Email me a sign-in link" — open the emailed link on the same device. No password needed. (If you're brand new and it says "no account yet," ask an admin to add you in Supabase → Auth → Users.)
 
 ## 9. Deliverables
 
