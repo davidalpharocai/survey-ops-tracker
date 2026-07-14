@@ -133,6 +133,19 @@ function conflictOf(r: RerunSnapshot): string | null {
   return null
 }
 
+// "Needs a date" triage: rows that look active (pending/active status) are the
+// highest-value one-edit fixes → sort them first; blank/unknown rows last.
+const fixRank = (r: RerunSnapshot) => (r.status_class === 'pending' || r.status_class === 'active' ? 0 : 1)
+
+// Why a row couldn't be dated + the nudge to fix it — makes the bucket a queue.
+function needsDateReason(r: RerunSnapshot): string {
+  const nc = (r.next_cadence ?? '').trim()
+  const s = (r.status_raw ?? '').trim()
+  if (nc && !/^today$/i.test(nc) && !/closed|cancel/i.test(nc)) return `next-collection “${nc}” — no month or quarter to read`
+  if (s) return `status “${s}” — no month or quarter to read`
+  return 'blank status + next-collection in the sheet'
+}
+
 function relAge(iso: string): string {
   const h = Math.floor((Date.now() - new Date(iso).getTime()) / 3_600_000)
   if (h < 1) return 'just now'
@@ -265,6 +278,9 @@ function RerunCard({ r, bucket, hrefFor }: { r: RerunSnapshot; bucket: Bucket; h
           <span aria-hidden="true">⚠</span> conflicting cells
           <InfoTooltip text={conflict} />
         </div>
+      )}
+      {bucket === 'unsorted' && (
+        <div className="mt-1 text-[11px] text-amber-600 dark:text-amber-400 break-words">→ {needsDateReason(r)}</div>
       )}
       {bucket !== 'done' && r.note && <div className="text-xs text-muted-foreground italic mt-1 break-words">{r.note}</div>}
     </li>
@@ -463,11 +479,12 @@ export default function RerunsPage() {
     const byClient = (a: RerunSnapshot, b: RerunSnapshot) =>
       (a.client ?? a.cadence ?? '').localeCompare(b.client ?? b.cadence ?? '')
     const byN = (a: RerunSnapshot, b: RerunSnapshot) => parseN(b) - parseN(a)
-    const cmp =
-      sort === 'client' ? byClient : sort === 'n' ? byN : null
+    const cmp = sort === 'client' ? byClient : sort === 'n' ? byN : null
     for (const b of Object.keys(groups) as Bucket[]) {
       if (cmp) groups[b].sort(cmp)
-      else groups[b].sort(b === 'overdue' || b === 'upcoming' ? byDate : byClient) // smart
+      else if (b === 'overdue' || b === 'upcoming') groups[b].sort(byDate)
+      else if (b === 'unsorted') groups[b].sort((x, y) => fixRank(x) - fixRank(y) || byClient(x, y)) // fixable first
+      else groups[b].sort(byClient)
     }
     return groups
   }, [filtered, today, sort])
@@ -514,6 +531,7 @@ export default function RerunsPage() {
 
   const total = rows.length
   const shown = filtered.length
+  const withDate = filtered.filter((r) => r.next_run_date).length
   const kpiOrder: Bucket[] = ['overdue', 'unsorted', 'upcoming', 'done']
   const segOrder: Bucket[] = ['overdue', 'upcoming', 'done', 'unsorted']
   const jumpTo = (b: Bucket) => {
@@ -703,6 +721,12 @@ export default function RerunsPage() {
                 ) : null
               )}
             </div>
+          )}
+          {shown > 0 && (
+            <p className="text-[11px] text-muted-foreground flex items-center flex-wrap">
+              {withDate} of {shown} studies have a real collection date
+              <InfoTooltip text="Write a real date (or e.g. “May 2026”) in the sheet's Next-Collection cell and a study sorts itself instead of landing in “Needs a date”." />
+            </p>
           )}
 
           {shown === 0 ? (
