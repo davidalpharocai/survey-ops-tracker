@@ -70,6 +70,7 @@ export async function ingestEmail(payload: IngestPayload, deps: IngestDeps): Pro
     subject: payload.subject ?? '',
     body: payload.body ?? '',
     fromEmail: signalEmail,
+    filenames: files.map((f) => f.filename.replace(/\.[^.]+$/, '')), // the deliverable filenames name the client/study
     clients: deps.matchData.clients,
     projects: deps.matchData.projects,
     contacts: deps.matchData.contacts,

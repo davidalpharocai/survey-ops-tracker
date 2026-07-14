@@ -13,8 +13,14 @@ const SELF_ORG = ALPHAROC_DOMAIN.split('.')[0]
 // Generic survey/report jargon: too common to identify a project on its own, so these are excluded
 // when falling back to single-token project-name matching (which needs a distinctive word).
 const NAME_STOPWORDS = new Set([
+  // report / survey jargon
   'survey', 'tracker', 'poll', 'study', 'consumer', 'wave', 'final', 'topline', 'report', 'data',
   'results', 'deck', 'analysis', 'project', 'phase', 'round', 'update', 'draft', 'deliverable',
+  'graph', 'graphs', 'chart', 'charts', 'tagline', 'mock', 'test', 'campaign',
+  // email / forwarding filler
+  'follow', 'available', 'attached', 'please', 'thanks', 'regards', 'hello', 'team', 'here', 'fwd',
+  // file extensions
+  'xlsx', 'docx', 'pptx', 'pdf', 'csv', 'zip', 'png', 'jpg', 'jpeg',
 ])
 
 export function normalizeName(s: string): string {
@@ -33,12 +39,18 @@ function domainOf(email: string): string {
 }
 
 export function matchDeliverable(input: MatchInput): MatchResult {
-  const hay = `${input.subject}\n${input.body}`
-  const nhay = ` ${normalizeName(hay)} `
+  const names = input.filenames ?? []
+  // Deliberate signals — subject + attachment file names. Low-noise, so fuzzy token / client-name
+  // matching reads only these; a long forwarded body would otherwise swamp them with false hits.
+  const focused = ` ${normalizeName([input.subject, ...names].join(' '))} `
+  // Everything, incl. the email body — for explicit codes and full project-name phrase hits, which are
+  // specific enough to tolerate a quoted thread.
+  const full = ` ${normalizeName([input.subject, input.body, ...names].join(' '))} `
+  const codeText = [input.subject, input.body, ...names].join('\n')
   const candidates: Candidate[] = []
 
-  // Tier 1 — explicit code
-  const code = hay.match(CODE_RE)?.[1]?.toUpperCase()
+  // Tier 1 — explicit code (anywhere: subject, body, or file name)
+  const code = codeText.match(CODE_RE)?.[1]?.toUpperCase()
   if (code?.startsWith('PR')) {
     const p = input.projects.find((p) => p.project_code.toUpperCase() === code)
     if (p) candidates.push({ clientId: p.client_id, projectId: p.id, confidence: 0.99, reason: `code:${code}`, method: 'code' })
@@ -58,18 +70,19 @@ export function matchDeliverable(input: MatchInput): MatchResult {
     candidates.push({ clientId: input.domainMap[dom], projectId: null, confidence: 0.8, reason: `domain:${dom}`, method: 'domain' })
   }
 
-  // Tier 4 — name / project-name text
+  // Tier 4 — name / project-name text (see focused vs full above)
   for (const p of input.projects) {
     const pn = normalizeName(p.project_name)
-    if (pn.length >= 4 && nhay.includes(` ${pn} `)) {
+    if (pn.length >= 4 && full.includes(` ${pn} `)) {
       // Full project name present verbatim — strongest name signal.
       candidates.push({ clientId: p.client_id, projectId: p.id, confidence: 0.75, reason: `pname:${p.project_code}`, method: 'name' })
       continue
     }
-    // Fallback: distinctive words of the project name (e.g. "Korea" from "Korea Consumer Survey"), so a
-    // forward whose subject drops the boilerplate still guesses the right project. Kept below
-    // AUTO_FILE_THRESHOLD — a fuzzy token match improves the review-queue guess, it never auto-files.
-    const hits = distinctiveTokens(p.project_name).filter((t) => nhay.includes(` ${t} `))
+    // Fallback: distinctive words of the project name (e.g. "Korea" from "Korea Consumer Survey", or the
+    // client/study named right in the attachment filename), so a forward that drops the boilerplate still
+    // guesses the right project. Read from the focused signals only, and kept below AUTO_FILE_THRESHOLD —
+    // a fuzzy token match improves the review-queue guess, it never auto-files.
+    const hits = distinctiveTokens(p.project_name).filter((t) => focused.includes(` ${t} `))
     if (hits.length) {
       candidates.push({
         clientId: p.client_id, projectId: p.id,
@@ -82,7 +95,7 @@ export function matchDeliverable(input: MatchInput): MatchResult {
     const cn = normalizeName(c.name)
     // Never resolve to our own company from fuzzy text (a forwarder's signature/domain) — see SELF_ORG.
     if (cn.split(' ').includes(SELF_ORG)) continue
-    if (cn.length >= 3 && nhay.includes(` ${cn} `)) {
+    if (cn.length >= 3 && focused.includes(` ${cn} `)) {
       candidates.push({ clientId: c.id, projectId: null, confidence: 0.6, reason: 'cname', method: 'name' })
     }
   }
