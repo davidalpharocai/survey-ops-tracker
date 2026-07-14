@@ -6,13 +6,41 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { isAllowedEmail, ALLOWED_EMAIL_DOMAIN } from '@/lib/utils/allowedDomain'
 
+// The account is always @alpharoc.ai — the field takes just the username and the
+// domain is fixed + shown, so only company accounts can even be entered. (The
+// server still re-checks the domain on every page load; see (app)/layout.tsx.)
+const localPart = (v: string) => v.trim().split('@')[0]
+const toEmail = (username: string) => `${localPart(username)}@${ALLOWED_EMAIL_DOMAIN}`
+
+function EmailField({ id, value, onChange }: { id: string; value: string; onChange: (v: string) => void }) {
+  return (
+    <div className="flex items-stretch rounded-md border border-border bg-muted overflow-hidden focus-within:border-ring">
+      <input
+        id={id}
+        type="text"
+        inputMode="email"
+        autoComplete="username"
+        aria-label={`Your @${ALLOWED_EMAIL_DOMAIN} username`}
+        placeholder="you"
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        required
+        className="flex-1 min-w-0 bg-transparent px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
+      />
+      <span className="flex items-center px-3 text-sm text-muted-foreground border-l border-border select-none whitespace-nowrap">
+        @{ALLOWED_EMAIL_DOMAIN}
+      </span>
+    </div>
+  )
+}
+
 export default function LoginForm() {
-  const [email, setEmail] = useState('')
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [mode, setMode] = useState<'signin' | 'reset' | 'reset-sent'>('signin')
-  const [resetEmail, setResetEmail] = useState('')
+  const [resetUsername, setResetUsername] = useState('')
   const [resetError, setResetError] = useState('')
   const [resetLoading, setResetLoading] = useState(false)
   const router = useRouter()
@@ -37,10 +65,11 @@ export default function LoginForm() {
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
     setError('')
-    if (!isAllowedEmail(email)) {
-      setError(`Only @${ALLOWED_EMAIL_DOMAIN} accounts can access this app.`)
+    if (!localPart(username)) {
+      setError(`Enter your @${ALLOWED_EMAIL_DOMAIN} username.`)
       return
     }
+    const email = toEmail(username)
     setLoading(true)
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) {
@@ -55,12 +84,12 @@ export default function LoginForm() {
   async function handleReset(e: React.FormEvent) {
     e.preventDefault()
     setResetError('')
-    if (!isAllowedEmail(resetEmail)) {
-      setResetError(`Only @${ALLOWED_EMAIL_DOMAIN} accounts can access this app.`)
+    if (!localPart(resetUsername)) {
+      setResetError(`Enter your @${ALLOWED_EMAIL_DOMAIN} username.`)
       return
     }
     setResetLoading(true)
-    const { error } = await supabase.auth.resetPasswordForEmail(resetEmail)
+    const { error } = await supabase.auth.resetPasswordForEmail(toEmail(resetUsername))
     setResetLoading(false)
     if (error) {
       setResetError(
@@ -95,14 +124,7 @@ export default function LoginForm() {
           </p>
         </div>
         <form onSubmit={handleReset} className="flex flex-col gap-4">
-          <Input
-            type="email"
-            placeholder="Email"
-            value={resetEmail}
-            onChange={e => setResetEmail(e.target.value)}
-            required
-            className="bg-muted border-border text-foreground placeholder:text-muted-foreground"
-          />
+          <EmailField id="reset-username" value={resetUsername} onChange={setResetUsername} />
           {resetError && (
             <p className="text-red-600 dark:text-red-400 text-sm bg-red-400/10 px-3 py-2 rounded-lg">{resetError}</p>
           )}
@@ -125,7 +147,7 @@ export default function LoginForm() {
     <div className="w-full max-w-sm p-8 bg-card rounded-xl border border-border">
       <div className="mb-6">
         <h1 className="text-xl font-bold text-foreground">Survey Ops Command Center</h1>
-        <p className="text-sm text-muted-foreground mt-1">Sign in to your workspace</p>
+        <p className="text-sm text-muted-foreground mt-1">Sign in with your @{ALLOWED_EMAIL_DOMAIN} account</p>
       </div>
       {linkExpired && (
         <p className="text-amber-600 dark:text-amber-400 text-sm bg-amber-400/10 px-3 py-2 rounded-lg mb-4">
@@ -135,14 +157,7 @@ export default function LoginForm() {
         </p>
       )}
       <form onSubmit={handleLogin} className="flex flex-col gap-4">
-        <Input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={e => setEmail(e.target.value)}
-          required
-          className="bg-muted border-border text-foreground placeholder:text-muted-foreground"
-        />
+        <EmailField id="username" value={username} onChange={setUsername} />
         <Input
           type="password"
           placeholder="Password"
@@ -160,7 +175,7 @@ export default function LoginForm() {
         <button
           type="button"
           onClick={() => {
-            setResetEmail(email)
+            setResetUsername(username)
             setMode('reset')
           }}
           className="text-sm text-muted-foreground hover:text-foreground text-center"
