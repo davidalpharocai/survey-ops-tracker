@@ -1,13 +1,14 @@
 import 'server-only'
-import { google } from 'googleapis'
 import * as XLSX from 'xlsx'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database, Json } from '@/lib/supabase/types'
+import { getDriveClient } from '@/lib/drive/google'
 import { parseRerunRows, headerLooksValid } from './parse'
 
 // Server-side sync: mirror Sree's "Manual Rerun(sree)" tab into public.rerun_snapshot.
-// Reuses the deliverables Drive OAuth creds (Drive scope includes files.export) —
-// see scripts/export-survey-sheet.mjs. Same workbook as the rest of the app.
+// Uses the app's shared Drive client (OAuth locally, service account in prod —
+// see lib/drive/google.ts), so it works wherever the deliverables Drive features
+// do. Drive scope includes files.export. Same workbook as the rest of the app.
 const SHEET_ID = '1ZTTJ0PQZ7vj13tmZmsMvKAcEEf0Nc0s8dVbfaYJju7Q'
 
 type Admin = SupabaseClient<Database>
@@ -22,16 +23,7 @@ type Admin = SupabaseClient<Database>
  * sheet parses to zero rows.
  */
 export async function syncReruns(admin: Admin): Promise<{ count: number }> {
-  const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID
-  const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET
-  const refreshToken = process.env.GOOGLE_OAUTH_REFRESH_TOKEN
-  if (!clientId || !clientSecret || !refreshToken) {
-    throw new Error('Missing GOOGLE_OAUTH_CLIENT_ID / _SECRET / _REFRESH_TOKEN for rerun sync')
-  }
-
-  const oauth = new google.auth.OAuth2(clientId, clientSecret)
-  oauth.setCredentials({ refresh_token: refreshToken })
-  const drive = google.drive({ version: 'v3', auth: oauth })
+  const drive = getDriveClient()
   const res = await drive.files.export(
     { fileId: SHEET_ID, mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
     { responseType: 'arraybuffer' },

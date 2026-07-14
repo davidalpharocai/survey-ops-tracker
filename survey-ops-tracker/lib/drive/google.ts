@@ -43,6 +43,15 @@ function getDrive() {
   return _drive
 }
 
+/**
+ * Raw Drive v3 client using the app's configured auth (OAuth locally, service
+ * account in prod — whichever env vars are present). For Drive calls not on the
+ * DriveClient interface, e.g. files.export for the rerun-sheet sync.
+ */
+export function getDriveClient() {
+  return getDrive()
+}
+
 export class GoogleDrive implements DriveClient {
   private get drive() { return getDrive() }
 
