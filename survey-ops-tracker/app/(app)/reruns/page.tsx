@@ -1,14 +1,18 @@
 'use client'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { useReruns, useSyncReruns, type RerunSnapshot } from '@/lib/hooks/useReruns'
+import { useReruns, useSyncReruns, type RerunRow } from '@/lib/hooks/useReruns'
 import { useProjects } from '@/lib/hooks/useProjects'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
 import { Skeleton } from '@/components/shared/Skeleton'
+import { RerunMetaEditor } from '@/components/reruns/RerunMetaEditor'
 import { formatDate, daysOverdue } from '@/lib/utils/date'
 import { isTypingTarget } from '@/lib/utils/keyboard'
 import { toast } from '@/lib/utils/toast'
 import { monthIdx, quarterEndM } from '@/lib/reruns/parse'
+
+const cadenceLabel = (m: number | null): string | null =>
+  m == null ? null : ({ 1: 'Monthly', 3: 'Quarterly', 6: 'Every 6 mo', 12: 'Yearly' } as Record<number, string>)[m] ?? `Every ${m} mo`
 
 // Read-only "Rerun Radar": a mirror of Sree's manual rerun tab, read as
 // overdue / needs-a-date / upcoming / done. Buckets computed at read time so
@@ -20,10 +24,15 @@ type Bucket = 'overdue' | 'upcoming' | 'done' | 'unsorted'
 type SortKey = 'smart' | 'client' | 'n'
 const SORT_KEY = 'sot.rerunsSort'
 
-function bucketOf(r: RerunSnapshot, today: string): Bucket {
-  if (r.status_class === 'done' || r.status_class === 'closed') return 'done'
-  if (!r.next_run_date) return 'unsorted'
-  return r.next_run_date < today ? 'overdue' : 'upcoming'
+// Buckets read the view's computed flags (the "nothing-missed" logic lives in
+// SQL, shared with the badge + digest). is_overdue already ignores a completed
+// wave's done-ness when a cadence is defined, and excludes paused; paused rows
+// have a null effective_due so they fall through to the quiet Done bucket.
+function bucketOf(r: RerunRow, today: string): Bucket {
+  if (r.is_overdue) return 'overdue'
+  if (r.needs_definition) return 'unsorted'
+  if (r.effective_due && r.effective_due >= today) return 'upcoming'
+  return 'done'
 }
 
 const BUCKETS: Record<
@@ -66,7 +75,7 @@ const headCls = 'flex items-center gap-2 text-xs uppercase tracking-widest font-
 const selectCls =
   'bg-muted border border-border text-foreground/80 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-ring'
 
-const firmOf = (r: RerunSnapshot) => (r.client ?? '').split(' - ')[0].trim()
+const firmOf = (r: RerunRow) => (r.client ?? '').split(' - ')[0].trim()
 
 // Sheet client names don't equal app client names (e.g. sheet "Newark Alliance"
 // vs app "Newark"), and reruns are often between-wave/Closed. So only deep-link
@@ -87,7 +96,7 @@ function matchedClient(firm: string, projectClients: string[]): string | null {
   return null
 }
 const waveIds = (ids: string | null) => (ids ?? '').split(/[\n,]/).map((s) => s.trim()).filter(Boolean)
-const parseN = (r: RerunSnapshot) => {
+const parseN = (r: RerunRow) => {
   const m = (r.n ?? '').match(/\d[\d,]*/)
   return m ? parseInt(m[0].replace(/,/g, ''), 10) : -1
 }
@@ -102,7 +111,7 @@ const SHEET_URL = 'https://docs.google.com/spreadsheets/d/1ZTTJ0PQZ7vj13tmZmsMvK
 // agrees with what produced next_run_date. The displayed month comes from
 // next_run_date itself (in cardStatus), so the label can never contradict the
 // bucket; gran here only picks the wording ("in" vs "by" vs exact) + the tip.
-function dateInfo(r: RerunSnapshot): { gran: 'day' | 'month' | 'quarter' | 'none'; explain: string } {
+function dateInfo(r: RerunRow): { gran: 'day' | 'month' | 'quarter' | 'none'; explain: string } {
   if ((r.next_cadence ?? '').trim().toLowerCase() === 'today') {
     return { gran: 'day', explain: 'from “Today” in the next-collection cell' }
   }
@@ -122,7 +131,7 @@ function dateInfo(r: RerunSnapshot): { gran: 'day' | 'month' | 'quarter' | 'none
 }
 
 // Surface obviously-contradictory sheet cells rather than silently resolving them.
-function conflictOf(r: RerunSnapshot): string | null {
+function conflictOf(r: RerunRow): string | null {
   const s = (r.status_raw ?? '').toLowerCase()
   const nc = (r.next_cadence ?? '').toLowerCase()
   if (/pending/.test(s) && nc === 'today') return 'Status is a pending month, but next-collection says “Today”.'
@@ -135,10 +144,10 @@ function conflictOf(r: RerunSnapshot): string | null {
 
 // "Needs a date" triage: rows that look active (pending/active status) are the
 // highest-value one-edit fixes → sort them first; blank/unknown rows last.
-const fixRank = (r: RerunSnapshot) => (r.status_class === 'pending' || r.status_class === 'active' ? 0 : 1)
+const fixRank = (r: RerunRow) => (r.status_class === 'pending' || r.status_class === 'active' ? 0 : 1)
 
 // Why a row couldn't be dated + the nudge to fix it — makes the bucket a queue.
-function needsDateReason(r: RerunSnapshot): string {
+function needsDateReason(r: RerunRow): string {
   const nc = (r.next_cadence ?? '').trim()
   const s = (r.status_raw ?? '').trim()
   if (nc && !/^today$/i.test(nc) && !/closed|cancel/i.test(nc)) return `next-collection “${nc}” — no month or quarter to read`
@@ -161,28 +170,33 @@ function copy(text: string) {
 }
 
 function cardStatus(
-  r: RerunSnapshot,
+  r: RerunRow,
   bucket: Bucket,
   di: ReturnType<typeof dateInfo>
 ): { icon: string; label: string } {
+  const due = r.effective_due
   if (bucket === 'overdue') {
-    const d = daysOverdue(r.next_run_date)
+    const d = daysOverdue(due)
     return { icon: '⚠', label: d > 1 ? `${d}d overdue` : 'Overdue' }
   }
   if (bucket === 'upcoming') {
-    // Month always taken from the actual next_run_date, so the label can't
-    // disagree with the bucket/sort; gran only picks the wording.
-    if ((di.gran === 'month' || di.gran === 'quarter') && r.next_run_date) {
-      const mn = MONTHS[new Date(`${r.next_run_date}T00:00:00Z`).getUTCMonth()]
+    // A defined cadence / explicit date is exact ("Due Aug 15"). Only the
+    // free-text-inferred fallback uses the fuzzy confidence wording.
+    if (r.has_cadence_due || r.expected_next_on) return { icon: '', label: `Due ${formatDate(due)}` }
+    if ((di.gran === 'month' || di.gran === 'quarter') && due) {
+      const mn = MONTHS[new Date(`${due}T00:00:00Z`).getUTCMonth()]
       if (mn) return { icon: '', label: di.gran === 'quarter' ? `Due by ${mn}` : `Due in ${mn}` }
     }
-    return { icon: '', label: `Due ${formatDate(r.next_run_date)}` }
+    return { icon: '', label: `Due ${formatDate(due)}` }
   }
-  if (bucket === 'done') return { icon: '✓', label: r.status_raw || 'Done' }
+  if (bucket === 'done') {
+    if (r.is_paused) return { icon: '⏸', label: 'Paused' }
+    return { icon: '✓', label: r.status_raw || 'Done' }
+  }
   return { icon: '', label: 'Needs a date' }
 }
 
-function RerunCard({ r, bucket, hrefFor }: { r: RerunSnapshot; bucket: Bucket; hrefFor: (r: RerunSnapshot) => string | null }) {
+function RerunCard({ r, bucket, hrefFor }: { r: RerunRow; bucket: Bucket; hrefFor: (r: RerunRow) => string | null }) {
   const cfg = BUCKETS[bucket]
   const [showWaves, setShowWaves] = useState(false)
   const title = r.client || r.cadence || '(unlabeled)'
@@ -234,6 +248,14 @@ function RerunCard({ r, bucket, hrefFor }: { r: RerunSnapshot; bucket: Bucket; h
         </div>
       )}
 
+      {(r.cadence_months != null || r.owner_email || r.last_wave_on) && (
+        <div className="text-[11px] text-muted-foreground/90 mt-1 flex flex-wrap gap-x-2 gap-y-0.5">
+          {cadenceLabel(r.cadence_months) && <span>🔁 {cadenceLabel(r.cadence_months)}</span>}
+          {r.owner_email && <span>👤 {r.owner_email}</span>}
+          {r.last_wave_on && <span>last {formatDate(r.last_wave_on)}</span>}
+        </div>
+      )}
+
       {waves.length > 0 && (
         <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px]">
           <button
@@ -280,9 +302,17 @@ function RerunCard({ r, bucket, hrefFor }: { r: RerunSnapshot; bucket: Bucket; h
         </div>
       )}
       {bucket === 'unsorted' && (
-        <div className="mt-1 text-[11px] text-amber-600 dark:text-amber-400 break-words">→ {needsDateReason(r)}</div>
+        <div className="mt-1 text-[11px] text-amber-600 dark:text-amber-400 break-words">
+          → {needsDateReason(r)} — define a cadence below to start tracking it.
+        </div>
       )}
       {bucket !== 'done' && r.note && <div className="text-xs text-muted-foreground italic mt-1 break-words">{r.note}</div>}
+      {/* key includes the meta fields so the editor re-seeds its form state after
+          a save/log-wave refetch (Server ids are stable → no auto-remount). */}
+      <RerunMetaEditor
+        key={`${r.rerun_key}:${r.cadence_months}:${r.last_wave_on}:${r.expected_next_on}:${r.owner_email}:${r.is_paused}`}
+        r={r}
+      />
     </li>
   )
 }
@@ -304,9 +334,9 @@ function CardList({
   bucket,
   hrefFor,
 }: {
-  items: RerunSnapshot[]
+  items: RerunRow[]
   bucket: Bucket
-  hrefFor: (r: RerunSnapshot) => string | null
+  hrefFor: (r: RerunRow) => string | null
 }) {
   if (items.length === 0) return <p className="text-sm text-muted-foreground mt-2">None right now.</p>
   return (
@@ -324,8 +354,8 @@ function Section({
   hrefFor,
 }: {
   bucket: Bucket
-  items: RerunSnapshot[]
-  hrefFor: (r: RerunSnapshot) => string | null
+  items: RerunRow[]
+  hrefFor: (r: RerunRow) => string | null
 }) {
   return (
     <section id={`sec-${bucket}`} className={panel}>
@@ -346,8 +376,8 @@ function CollapsibleSection({
   hrefFor,
 }: {
   bucket: Bucket
-  items: RerunSnapshot[]
-  hrefFor: (r: RerunSnapshot) => string | null
+  items: RerunRow[]
+  hrefFor: (r: RerunRow) => string | null
 }) {
   const [open, setOpen] = useState(false)
   return (
@@ -408,7 +438,7 @@ export default function RerunsPage() {
   const { data: projects = [] } = useProjects()
   const projectClients = useMemo(() => projects.map((p) => p.client), [projects])
   const hrefFor = useCallback(
-    (r: RerunSnapshot) => {
+    (r: RerunRow) => {
       const m = matchedClient(firmOf(r) || r.cadence || '', projectClients)
       return m ? `/list?search=${encodeURIComponent(m)}&view=full` : null
     },
@@ -473,12 +503,12 @@ export default function RerunsPage() {
   }, [rows, q, work, platform, client])
 
   const g = useMemo(() => {
-    const groups: Record<Bucket, RerunSnapshot[]> = { overdue: [], upcoming: [], done: [], unsorted: [] }
+    const groups: Record<Bucket, RerunRow[]> = { overdue: [], upcoming: [], done: [], unsorted: [] }
     for (const r of filtered) groups[bucketOf(r, today)].push(r)
-    const byDate = (a: RerunSnapshot, b: RerunSnapshot) => (a.next_run_date ?? '').localeCompare(b.next_run_date ?? '')
-    const byClient = (a: RerunSnapshot, b: RerunSnapshot) =>
+    const byDate = (a: RerunRow, b: RerunRow) => (a.effective_due ?? '').localeCompare(b.effective_due ?? '')
+    const byClient = (a: RerunRow, b: RerunRow) =>
       (a.client ?? a.cadence ?? '').localeCompare(b.client ?? b.cadence ?? '')
-    const byN = (a: RerunSnapshot, b: RerunSnapshot) => parseN(b) - parseN(a)
+    const byN = (a: RerunRow, b: RerunRow) => parseN(b) - parseN(a)
     const cmp = sort === 'client' ? byClient : sort === 'n' ? byN : null
     for (const b of Object.keys(groups) as Bucket[]) {
       if (cmp) groups[b].sort(cmp)
@@ -531,7 +561,7 @@ export default function RerunsPage() {
 
   const total = rows.length
   const shown = filtered.length
-  const withDate = filtered.filter((r) => r.next_run_date).length
+  const withDate = filtered.filter((r) => r.effective_due).length
   const kpiOrder: Bucket[] = ['overdue', 'unsorted', 'upcoming', 'done']
   const segOrder: Bucket[] = ['overdue', 'upcoming', 'done', 'unsorted']
   const jumpTo = (b: Bucket) => {

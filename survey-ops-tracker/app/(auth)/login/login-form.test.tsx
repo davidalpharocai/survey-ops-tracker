@@ -60,6 +60,6 @@ describe('LoginForm (passwordless magic link)', () => {
   it('shows the expired-link notice when error=link is present', () => {
     searchParamsValue = new URLSearchParams('error=link')
     render(<LoginForm />)
-    expect(screen.getByText(/That sign-in link expired or was already used/i)).toBeInTheDocument()
+    expect(screen.getByText(/That sign-in link didn.t work/i)).toBeInTheDocument()
   })
 })

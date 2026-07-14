@@ -3,30 +3,61 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import type { Database } from '@/lib/supabase/types'
 
-export type RerunSnapshot = Database['public']['Tables']['rerun_snapshot']['Row']
+// The read model is the rerun_status VIEW (mirror + durable meta + the computed
+// effective_due / is_overdue / needs_definition), so the "nothing-missed" logic
+// lives in one place the page, badge, and digest all share.
+export type RerunRow = Database['public']['Views']['rerun_status']['Row']
 
-// Reads the sheet-mirror table directly via the browser client (RLS: analysts
-// only). The overdue/upcoming/done bucketing is a read-time decision in the page
-// against next_run_date, so the radar ages correctly between syncs.
 export function useReruns() {
   const supabase = createClient()
   return useQuery({
     queryKey: ['rerun-snapshot'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('rerun_snapshot')
+        .from('rerun_status')
         .select('*')
-        .order('next_run_date', { ascending: true, nullsFirst: false })
+        .order('effective_due', { ascending: true, nullsFirst: false })
       if (error) {
-        // Before migration 049 is applied the table doesn't exist yet — treat
-        // that as "no data yet" (friendly empty state) rather than a hard error.
-        // Any other failure still surfaces.
+        // Before migrations 049/050 are applied the view doesn't exist yet —
+        // treat that as "no data yet" (friendly empty state), not a hard error.
         if (error.code === '42P01' || /does not exist/i.test(error.message)) return []
         throw error
       }
-      return data as RerunSnapshot[]
+      return data as RerunRow[]
     },
     staleTime: 60_000,
+  })
+}
+
+export interface RerunMetaPatch {
+  rerun_key: string
+  cadence_months?: number | null
+  last_wave_on?: string | null
+  expected_next_on?: string | null
+  owner_email?: string | null
+  paused?: boolean
+  display_name?: string | null
+  note?: string | null
+}
+
+// Define a rerun's cadence/owner or log its latest wave → POST /api/reruns/meta.
+export function useSetRerunMeta() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (patch: RerunMetaPatch) => {
+      const res = await fetch('/api/reruns/meta', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      })
+      const body = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string }
+      if (!res.ok) throw new Error(body.error ?? 'Save failed')
+      return body
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['rerun-snapshot'] })
+      qc.invalidateQueries({ queryKey: ['rerun-overdue-count'] })
+    },
   })
 }
 

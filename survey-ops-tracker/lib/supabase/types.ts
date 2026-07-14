@@ -1247,6 +1247,7 @@ export type Database = {
           survey_ids: string | null
           next_run_date: string | null
           status_class: string | null
+          rerun_key: string | null
           synced_at: string
         }
         Insert: {
@@ -1265,6 +1266,7 @@ export type Database = {
           survey_ids?: string | null
           next_run_date?: string | null
           status_class?: string | null
+          rerun_key?: string | null
           synced_at?: string
         }
         Update: {
@@ -1283,12 +1285,85 @@ export type Database = {
           survey_ids?: string | null
           next_run_date?: string | null
           status_class?: string | null
+          rerun_key?: string | null
           synced_at?: string
+        }
+        Relationships: []
+      }
+      rerun_meta: {
+        Row: {
+          rerun_key: string
+          display_name: string | null
+          cadence_months: number | null
+          last_wave_on: string | null
+          expected_next_on: string | null
+          owner_email: string | null
+          paused: boolean
+          note: string | null
+          updated_by: string | null
+          updated_at: string
+        }
+        Insert: {
+          rerun_key: string
+          display_name?: string | null
+          cadence_months?: number | null
+          last_wave_on?: string | null
+          expected_next_on?: string | null
+          owner_email?: string | null
+          paused?: boolean
+          note?: string | null
+          updated_by?: string | null
+          updated_at?: string
+        }
+        Update: {
+          rerun_key?: string
+          display_name?: string | null
+          cadence_months?: number | null
+          last_wave_on?: string | null
+          expected_next_on?: string | null
+          owner_email?: string | null
+          paused?: boolean
+          note?: string | null
+          updated_by?: string | null
+          updated_at?: string
         }
         Relationships: []
       }
     }
     Views: {
+      rerun_status: {
+        Row: {
+          id: string
+          sheet_row: number | null
+          client: string | null
+          next_cadence: string | null
+          work: string | null
+          freq: string | null
+          platform: string | null
+          cadence: string | null
+          n: string | null
+          template: string | null
+          note: string | null
+          status_raw: string | null
+          survey_ids: string | null
+          next_run_date: string | null
+          status_class: string | null
+          rerun_key: string | null
+          synced_at: string
+          display_name: string | null
+          cadence_months: number | null
+          last_wave_on: string | null
+          expected_next_on: string | null
+          owner_email: string | null
+          is_paused: boolean | null
+          is_defined: boolean | null
+          has_cadence_due: boolean | null
+          effective_due: string | null
+          is_overdue: boolean | null
+          needs_definition: boolean | null
+        }
+        Relationships: []
+      }
       portal_projects: {
         Row: {
           id: string

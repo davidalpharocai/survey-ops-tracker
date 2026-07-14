@@ -37,13 +37,10 @@ export function AppMenu() {
   const { data: rerunOverdue = 0 } = useQuery({
     queryKey: ['rerun-overdue-count'],
     queryFn: async () => {
-      const n = new Date()
-      const today = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`
       const { count } = await createClient()
-        .from('rerun_snapshot')
+        .from('rerun_status')
         .select('id', { count: 'exact', head: true })
-        .lt('next_run_date', today)
-        .not('status_class', 'in', '(done,closed)')
+        .eq('is_overdue', true)
       return count ?? 0
     },
     staleTime: 60_000,

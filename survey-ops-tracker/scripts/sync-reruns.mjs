@@ -75,6 +75,10 @@ const headerLooksValid = (header) => {
   const at = (i) => (header?.[i] == null ? '' : String(header[i]).toLowerCase())
   return /client/.test(at(0)) && /next|collection/.test(at(1)) && /cadence/.test(at(5)) && /status/.test(at(9))
 }
+const rerunKey = (client, cadence) => {
+  const norm = (s) => (s ?? '').trim().toLowerCase().replace(/\s*-\s*/g, ' ').replace(/\s+/g, ' ')
+  return `${norm(client)}|${norm(cadence)}`
+}
 
 // ---- fetch live sheet ----
 const oauth = new google.auth.OAuth2(clientId, clientSecret)
@@ -114,6 +118,7 @@ for (let i = 1; i < rows.length; i++) {
     survey_ids: str(r[10]),
     next_run_date: deriveNextRunDate(status_raw, next_cadence, now),
     status_class: statusClass(status_raw, next_cadence),
+    rerun_key: rerunKey(client, cadence),
   })
 }
 if (parsed.length === 0) throw new Error('Parsed 0 rerun rows — aborting rather than wiping the mirror')

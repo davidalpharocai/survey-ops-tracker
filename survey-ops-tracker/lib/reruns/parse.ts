@@ -23,6 +23,15 @@ export interface ParsedRerun {
   survey_ids: string | null
   next_run_date: string | null
   status_class: string
+  rerun_key: string
+}
+
+// Stable join key to the durable rerun_meta table: normalized client|cadence
+// (same normalization as matchedClient in the page). Lets cadence/owner/last-wave
+// survive the TRUNCATE-replace sync — the mirror is disposable, meta is not.
+export function rerunKey(client: string | null, cadence: string | null): string {
+  const norm = (s: string | null) => (s ?? '').trim().toLowerCase().replace(/\s*-\s*/g, ' ').replace(/\s+/g, ' ')
+  return `${norm(client)}|${norm(cadence)}`
 }
 
 const MONS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
@@ -141,6 +150,7 @@ export function parseRerunRows(rows: unknown[][], now: Date): ParsedRerun[] {
       survey_ids: str(r[10]),
       next_run_date: deriveNextRunDate(status_raw, next_cadence, now),
       status_class: statusClass(status_raw, next_cadence),
+      rerun_key: rerunKey(client, cadence),
     })
   }
   return out

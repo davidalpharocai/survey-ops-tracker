@@ -54,18 +54,23 @@ export async function GET(req: NextRequest) {
       p.due_date <= soon
   )
 
-  // Reruns (the /reruns radar mirror): overdue + due-this-week, so slipped
-  // recurring studies surface in the digest instead of only on the page.
-  // Best-effort — a rerun-mirror hiccup never blocks the project digest.
+  // Reruns (the rerun_status view: mirror + cadence layer → computed due date),
+  // so slipped recurring studies surface in the digest — including ones the sheet
+  // marks "Done" but a cadence says are due again. Best-effort — a hiccup never
+  // blocks the project digest.
   const week = new Date(Date.now() + 7 * 86400_000).toISOString().split('T')[0]
   const { data: reruns } = await supabase
-    .from('rerun_snapshot')
-    .select('client, cadence, status_raw, next_run_date, status_class')
-  const rerunActive = (reruns ?? []).filter(r => r.status_class !== 'done' && r.status_class !== 'closed')
-  const rerunOverdue = rerunActive.filter(r => r.next_run_date && r.next_run_date < today)
-  const rerunSoon = rerunActive.filter(r => r.next_run_date && r.next_run_date >= today && r.next_run_date <= week)
-  const rerunLine = (r: (typeof rerunActive)[number]) =>
-    `• *${r.client || r.cadence || 'Rerun'}*${r.client && r.cadence ? ` — ${r.cadence}` : ''} (${r.status_raw || 'pending'}, due ${fmt(r.next_run_date)})`
+    .from('rerun_status')
+    .select('client, cadence, effective_due, is_overdue, needs_definition, owner_email, synced_at')
+  const list = reruns ?? []
+  const rerunOverdue = list.filter(r => r.is_overdue)
+  const rerunSoon = list.filter(r => !r.is_overdue && r.effective_due && r.effective_due >= today && r.effective_due <= week)
+  const rerunUndefined = list.filter(r => r.needs_definition)
+  const rerunLine = (r: (typeof list)[number]) =>
+    `• *${r.client || r.cadence || 'Rerun'}*${r.client && r.cadence ? ` — ${r.cadence}` : ''} (due ${fmt(r.effective_due)}${r.owner_email ? ` · ${r.owner_email}` : ''})`
+  // Mirror-staleness: if the sync froze, the whole radar is quietly out of date.
+  const lastSync = list.reduce((m, r) => (r.synced_at && r.synced_at > m ? r.synced_at : m), '')
+  const rerunStale = lastSync !== '' && Date.now() - new Date(lastSync).getTime() > 36 * 3600_000
 
   // System-health line: surface any backend job that failed in the last ~26h
   // (a window slightly over a day so a once-daily run never slips through a gap)
@@ -89,6 +94,8 @@ export async function GET(req: NextRequest) {
   if (behind.length) sections.push(`📉 *Fielding behind target with deadline near (${behind.length})*\n${behind.map(line).join('\n')}`)
   if (rerunOverdue.length) sections.push(`🔁 *Reruns overdue (${rerunOverdue.length})*\n${rerunOverdue.map(rerunLine).join('\n')}`)
   if (rerunSoon.length) sections.push(`🔁 *Reruns due in the next 7 days (${rerunSoon.length})*\n${rerunSoon.map(rerunLine).join('\n')}`)
+  if (rerunUndefined.length) sections.push(`🔧 *Reruns needing a cadence/date (${rerunUndefined.length})* — define them on /reruns so they can be tracked.`)
+  if (rerunStale) sections.push(`⚠️ *Rerun mirror looks stale* — last synced ${fmt(lastSync.slice(0, 10))}. Run a sync from /reruns.`)
   if (sections.length === 1) sections.push('✅ Nothing overdue, nothing due in the next 3 days. Clear skies.')
   sections.push(`<https://survey-ops-tracker.vercel.app|Open the Command Center>`)
 
