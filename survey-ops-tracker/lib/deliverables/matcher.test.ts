@@ -124,4 +124,30 @@ describe('matchDeliverable', () => {
     const r = matchDeliverable({ ...base, projects, subject: 'quarterly consumer report', body: 'the tracker data', fromEmail: 'x@gmail.com' })
     expect(r.method).toBe('none') // "consumer"/"tracker" are stopwords; "q2" is too short → no distinctive token
   })
+
+  // (g) The attachment filename drives the match when subject/body are generic (the common forward case)
+  it('tier 4 (filename): a distinctive word in the attachment filename resolves the project', () => {
+    const clients = [{ id: 'c-aarp', name: 'AARP', code: 'Cl00050' }, ...base.clients]
+    const projects = [{ id: 'p-aarp', client_id: 'c-aarp', project_code: 'PR00185', project_name: 'AARP Membership (2 questions)' }]
+    const r = matchDeliverable({
+      ...base, clients, projects, contacts: [], domainMap: {},
+      subject: 'Data now available', body: 'See attached, thanks.', fromEmail: 'x@gmail.com',
+      filenames: ['AARP - July Study - Deliverable'],
+    })
+    expect(r.projectId).toBe('p-aarp')
+    expect(r.method).toBe('name')
+    expect(r.confidence).toBeLessThan(0.85) // fuzzy signal — stays in review, never auto-files
+  })
+
+  // (h) A distinctive word that appears ONLY in the quoted body must not drive matching (that was the
+  // "Wellington/Harvey → wrong project" noise: a long forwarded thread hitting random project tokens).
+  it('ignores distinctive words that appear only in the email body', () => {
+    const projects = [{ id: 'p-k', client_id: 'c-bam', project_code: 'PR00227', project_name: 'Korea Consumer Survey' }]
+    const r = matchDeliverable({
+      ...base, projects,
+      subject: 'Fwd: quick follow up', body: 'earlier we discussed the Korea numbers at length', fromEmail: 'x@gmail.com',
+      filenames: ['Q3 deck'],
+    })
+    expect(r.method).toBe('none') // "Korea" is only in the body → not a match signal
+  })
 })

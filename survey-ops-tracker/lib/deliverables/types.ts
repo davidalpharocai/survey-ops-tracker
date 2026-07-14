@@ -9,6 +9,7 @@ export type MatchInput = {
   subject: string
   body: string
   fromEmail: string
+  filenames?: string[]              // attachment file names (extension stripped) — a deliberate, low-noise signal
   clients: ClientRec[]
   projects: ProjectRec[]            // non-deleted only
   contacts: ContactRec[]            // project_recipients + known client contacts
