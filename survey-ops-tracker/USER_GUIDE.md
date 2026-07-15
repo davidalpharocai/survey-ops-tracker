@@ -70,7 +70,7 @@ Four big tiles: **N collected** (click to edit), **Timing** — Due (internal: w
 - **✦ Edit by description** — type changes in plain English ("collected is 180, due pushed to July 20"), review the before→after preview, approve
 
 ### Right sidebar
-Titled groups: **People** (client, the **Requested by** contact, captain + optional co-captains, salesperson from a dropdown), **Dates**, **Sample N & Audience** (N target, internal target, collected, actual, audience size), **Flags** (click a chip to toggle), **Money** (Total budget, computed Actual $ + cost/N + budget-used, the **Bid Budget** $/bid allowance with its change log, and a per-blast cost table: # delivered · $/bid · blast $ · total). Most projects have one captain; "+ add" under Co-Captains shares a project, and shared projects show "+1" on their board card.
+Titled groups: **People** (client, the **Requested by** contact, captain + optional co-captains, salesperson from a dropdown), **Dates**, **Sample N & Audience** (N target, internal target, collected, actual, audience size), **Flags** (click a chip to toggle), **Money** (Total budget + computed Actual $ / cost-per-complete / budget-used; then, by project type: **PS** shows **Suppliers** — the PureSpectrum sample suppliers, each with a CPI (cost per interview) and a completes cap, plus an estimated cost = Σ cap×CPI; **B2B** shows **Blast Configuration** — create a blast with its $/bid + per-respondent reward + optional schedule, then mark it sent, at which point its cost (incl. incentive) counts toward spend). Most projects have one captain; "+ add" under Co-Captains shares a project, and shared projects show "+1" on their board card.
 
 **Requested by** is the client contact who asked for the survey. Click it to pick from that client's people or add a new one inline (first + last name required; email/title/phone optional), and click a chosen name to view or edit their details. Manage the full roster — and archive/delete contacts — on the client page.
 
@@ -272,7 +272,7 @@ for me?"* · *"How did last quarter's wave compare?"* If you ask what questions 
 time, Claude hands the linked questionnaire doc over to your Drive connector rather than guess
 at the content.
 
-**Corrections:** if a logged blast or bid needs fixing, do that in the app — Claude can log new
+**Corrections:** if a logged blast needs fixing, do that in the app — Claude can log new
 ones but won't edit or delete an existing entry.
 
 **Revoking access:** the Connect page lists every Claude currently connected (device/client name,

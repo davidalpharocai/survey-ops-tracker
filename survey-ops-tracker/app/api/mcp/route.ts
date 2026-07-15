@@ -14,7 +14,7 @@ import type { Database, Json } from '@/lib/supabase/types'
 import * as data from '@/lib/mcp/data'
 import {
   resolveProjectWritable, resolveStep, resolveContact, loadGateInput,
-  runAddStep, runCompleteStep, runEditStep, runProjectWrite, runSetBidBudget, runLogBlast,
+  runAddStep, runCompleteStep, runEditStep, runProjectWrite, runLogBlast,
   runRenameClient, runCreateProject,
   pickProjectPatch, diffSummary, stageColumnsFor,
 } from '@/lib/mcp/writes'
@@ -185,7 +185,7 @@ Duplicates: create_project checks for likely duplicate projects and returns them
 Creating a project — run an intake checklist. When asked to create/add a survey or project, make sure these are covered, asking for any the user hasn't given: client + project name (required); **captain (required)** — create_project refuses without a valid team member; project type (PS/B2B/Rerun); salesperson; requested-by (which client contact); due date; N target; audience size; budget; whether it's longitudinal (+ cadence); and **whether it's approved for the open pipeline or still in scoping**. For every item EXCEPT client/name/captain, always offer the user "Not sure / will fill it in later" — if they choose it, leave that field blank and move on; never nag or block on it.
 - Captain not on the roster? Tell the user and OFFER to add them: with their approval, get the person's name + @alpharoc email and call add_team_member (preview → confirm), then create the project with that captain. Never invent a captain or leave one unassigned.
 - Pipeline status: if the user hasn't said, ASK whether it's approved to move into the open pipeline (→ pass skip_scoping:true, starts Active/Submitted) or still in scoping / pre-sale (→ leave skip_scoping off; it defaults to Scoping / New Inquiry).
-create_project itself takes client/project_name/project_type/captain/salesperson/due_date/n_target/skip_scoping; set the rest AFTER creating — audience size / budget / longitudinal via update_project, requested-by via set_requested_by, a bid budget via set_bid_budget. If the client has compliance requirements (visible via get_client), mention them. Read the assembled details back to the user, then create.
+create_project itself takes client/project_name/project_type/captain/salesperson/due_date/n_target/skip_scoping; set the rest AFTER creating — audience size / budget / longitudinal via update_project, requested-by via set_requested_by. If the client has compliance requirements (visible via get_client), mention them. Read the assembled details back to the user, then create.
 
 History & "what did we do last time": for "what did we do last time for <client>" or when planning a new project for a client you've served before, call get_client_history first — it returns past projects, derived patterns (typical N, common project type, typical fielding duration, cadence, recurring contacts), and any explicitly stated preferences. Use those patterns to offer sensible defaults when creating a new project for that client. get_project_history returns a project's sibling waves when it's part of a longitudinal/rerun series.
 
@@ -197,7 +197,7 @@ Recording interactions: to log that something happened outside the app (e.g. "we
 
 Corrections: logged blasts and bids can't be edited or deleted via the connector. If a user needs to correct one, tell them to do it in the app.
 
-Money idempotency: log_blast and set_bid_budget affect spend, so a retried confirm must not double-count. Pass a stable idem_key for each blast/bid you intend to log (e.g. derived from the conversation turn) and reuse that same idem_key if you retry the same confirm call — don't generate a new one on retry. Only use a different idem_key when the user genuinely means a new, separate blast or bid.
+Money idempotency: log_blast affects spend, so a retried confirm must not double-count. Pass a stable idem_key for each blast you intend to log (e.g. derived from the conversation turn) and reuse that same idem_key if you retry the same confirm call — don't generate a new one on retry. Only use a different idem_key when the user genuinely means a new, separate blast.
 
 Segmented N: if update_project refuses because a project's N is segmented, don't try to work around it — tell the user to edit the segment breakdown in the app.
 
@@ -693,46 +693,6 @@ const handler = createMcpHandler(
               if ('error' in result) return result
               meta.detail = { requested_by: { contact_id: contact.id, name } }
               return { ok: true, project_code: result.project_code, requested_by_name: result.requested_by_name }
-            }
-          )
-        }, meta))
-      }
-    )
-
-    server.tool(
-      'set_bid_budget',
-      'Log a new allowed $/bid for a project — the most recent entry is the current bid budget (preview first; confirm to apply).',
-      {
-        project: z.string(),
-        amount: z.number().positive(),
-        note: z.string().max(1000).optional(),
-        confirm: z.boolean().optional(),
-        idem_key: z.string().optional(),
-      },
-      async (args, extra) => {
-        const meta: LoggedMeta = {}
-        return json(await logged(extra, 'set_bid_budget', async () => {
-          const { userEmail } = authIdentity(extra)
-          const p = await resolveProjectWritable(args.project)
-          if (!p) return { error: 'Project not found.' }
-          if ('error' in p) return p
-          if ('ambiguous' in p) return p
-          meta.project_id = p.id as string
-
-          return confirmable(
-            args,
-            async () => ({
-              summary: `New bid budget: $${args.amount}${args.note ? ` (${args.note})` : ''}`,
-              amount: args.amount, note: args.note ?? null,
-            }),
-            async () => {
-              const row = await runSetBidBudget({
-                projectId: p.id as string, amount: args.amount, note: args.note ?? null,
-                createdBy: userEmail.split('@')[0], idemKey: args.idem_key ?? randomUUID(),
-                actor: `${userEmail} via Claude`,
-              })
-              meta.detail = { created: { id: row.id, amount: row.amount, note: row.note } }
-              return { ok: true, bid: { id: row.id, amount: row.amount, note: row.note } }
             }
           )
         }, meta))

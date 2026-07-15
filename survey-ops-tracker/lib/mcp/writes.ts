@@ -184,7 +184,6 @@ export async function resolveContact(
 
 type SurveyProjectRow = Database['public']['Tables']['survey_projects']['Row']
 type ProjectStepRow = Database['public']['Tables']['project_steps']['Row']
-type ProjectBidRow = Database['public']['Tables']['project_bids']['Row']
 type ProjectBlastRow = Database['public']['Tables']['project_blasts']['Row']
 
 /** A clean "someone else changed this first" result — never a throw, so the tool can surface it as-is. */
@@ -250,22 +249,6 @@ export async function runEditStep(stepId: string, text: string, actor: string): 
   })
   if (error) throw new Error(error.message)
   return data as ProjectStepRow
-}
-
-export async function runSetBidBudget(opts: {
-  projectId: string; amount: number; note: string | null; createdBy: string; idemKey: string; actor: string
-}): Promise<ProjectBidRow> {
-  const supabase = createAdminClient()
-  const { data, error } = await supabase.rpc('mcp_set_bid_budget', {
-    p_project: opts.projectId,
-    p_amount: opts.amount,
-    p_note: opts.note ?? '',
-    p_created_by: opts.createdBy,
-    p_idem: opts.idemKey,
-    p_actor: opts.actor,
-  })
-  if (error) throw new Error(error.message)
-  return data as ProjectBidRow
 }
 
 export async function runLogBlast(opts: {

@@ -743,6 +743,9 @@ export type Database = {
           delivered: number
           bid: number
           blast_cost: number
+          reward: number
+          scheduled_at: string | null
+          status: string
           note: string | null
           created_by: string | null
           idem_key: string | null
@@ -754,6 +757,9 @@ export type Database = {
           delivered?: number
           bid?: number
           blast_cost?: number
+          reward?: number
+          scheduled_at?: string | null
+          status?: string
           note?: string | null
           created_by?: string | null
           idem_key?: string | null
@@ -765,9 +771,48 @@ export type Database = {
           delivered?: number
           bid?: number
           blast_cost?: number
+          reward?: number
+          scheduled_at?: string | null
+          status?: string
           note?: string | null
           created_by?: string | null
           idem_key?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      suppliers: {
+        Row: { id: string; name: string; active: boolean; created_by: string | null; created_at: string }
+        Insert: { id?: string; name: string; active?: boolean; created_by?: string | null; created_at?: string }
+        Update: { id?: string; name?: string; active?: boolean; created_by?: string | null; created_at?: string }
+        Relationships: []
+      }
+      project_suppliers: {
+        Row: {
+          id: string
+          project_id: string
+          supplier_id: string
+          cpi: number
+          completes_cap: number
+          created_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          project_id: string
+          supplier_id: string
+          cpi?: number
+          completes_cap?: number
+          created_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          project_id?: string
+          supplier_id?: string
+          cpi?: number
+          completes_cap?: number
+          created_by?: string | null
           created_at?: string
         }
         Relationships: []

@@ -23,8 +23,8 @@ import { formatDate, getDueUrgency } from '@/lib/utils/date'
 import { differenceInCalendarDays, parseISO, startOfDay } from 'date-fns'
 import { deriveWaitingOn } from '@/lib/utils/waitingOn'
 import { BudgetWidget } from '@/components/project/BudgetWidget'
-import { BidBudgetWidget } from '@/components/project/BidBudgetWidget'
-import { BlastsWidget } from '@/components/project/BlastsWidget'
+import { SuppliersWidget } from '@/components/project/SuppliersWidget'
+import { BlastConfigWidget } from '@/components/project/BlastConfigWidget'
 import { CompliancePanel } from '@/components/compliance/CompliancePanel'
 import { ComplianceBanner } from '@/components/project/ComplianceBanner'
 import { SegmentedNTile } from '@/components/project/SegmentedNTile'
@@ -658,8 +658,18 @@ export default function ProjectDetailPage() {
                 budget={project.budget ?? null}
                 nCollected={project.n_collected}
               />
-              <BidBudgetWidget projectId={project.id} />
-              <BlastsWidget projectId={project.id} />
+              {/* PS → Suppliers (PureSpectrum), B2B → Blast Configuration.
+                  Rerun/untyped show both (they don't map cleanly to one). */}
+              {project.project_type === 'PS' && (
+                <SuppliersWidget projectId={project.id} nTarget={project.n_target} />
+              )}
+              {project.project_type === 'B2B' && <BlastConfigWidget projectId={project.id} />}
+              {(project.project_type === 'Rerun' || project.project_type == null) && (
+                <>
+                  <SuppliersWidget projectId={project.id} nTarget={project.n_target} />
+                  <BlastConfigWidget projectId={project.id} />
+                </>
+              )}
               <div className="border-t border-border pt-3 mt-1 flex items-center gap-1.5 text-xs text-muted-foreground/50">
                 <span aria-hidden="true">＋</span> Add cost line — other costs &amp; unit economics (coming soon)
               </div>

@@ -64,6 +64,28 @@ export function useUpdateBlast(projectId: string) {
   })
 }
 
+// Mark a queued/scheduled blast as sent, filling the now-known delivered + fee.
+// Only then does it count toward actual_spend (the DB trigger sums sent blasts).
+export function useMarkBlastSent(projectId: string) {
+  const supabase = createClient()
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, delivered, blast_cost }: { id: string; delivered: number; blast_cost: number }) => {
+      const { error } = await supabase
+        .from('project_blasts')
+        .update({ status: 'sent', delivered, blast_cost })
+        .eq('id', id)
+      if (error) throw error
+    },
+    onError: () => toast("Couldn't mark the blast sent — please try again."),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ['blasts', projectId] })
+      qc.invalidateQueries({ queryKey: ['project', projectId] })
+      qc.invalidateQueries({ queryKey: ['projects'] })
+    },
+  })
+}
+
 export function useDeleteBlast(projectId: string) {
   const supabase = createClient()
   const qc = useQueryClient()
