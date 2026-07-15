@@ -5,8 +5,9 @@ import { matchDeliverable } from './matcher'
 import { fileDeliverable, type FolderResolver } from './ingest'
 import { projectFolderName, originalSendDate } from './naming'
 import { routeMatch, describeCandidates, type LabeledCandidate } from './confidence'
-import { clientSignalEmail, emailDateISO, itemizeAttachments, isInternalSender, type IngestPayload } from './email'
+import { clientSignalEmail, emailDateISO, itemizeAttachments, isInternalSender, emailDomain, type IngestPayload } from './email'
 import { replySubject, renderReplyHtml, type ReplyItem } from './reply'
+import { serverCorroborates, AI_AUTO_FILE_THRESHOLD, type AiMatchInput, type AiMatchResult, type FilingHistoryRec } from './ai-matcher'
 
 export type MatchData = { clients: ClientRec[]; projects: ProjectRec[]; contacts: ContactRec[]; domainMap: Record<string, string> }
 
@@ -51,6 +52,9 @@ export type IngestDeps = {
   findDup: (opts: { fileHash?: string | null; sourceUrl?: string | null }) => Promise<string | null>
   persist: (row: EmailDeliverableRow) => Promise<void>
   reply: (to: string, subject: string, html: string) => Promise<void>
+  // AI matcher tier (optional). When absent, matching is deterministic-only (unchanged behavior).
+  aiMatch?: (input: AiMatchInput) => Promise<AiMatchResult>
+  filingHistory?: FilingHistoryRec[]
 }
 
 export type IngestOutcome =
@@ -66,7 +70,13 @@ export async function ingestEmail(payload: IngestPayload, deps: IngestDeps): Pro
   if (files.length === 0) return { action: 'ignored', reason: 'no_items' }
 
   const signalEmail = clientSignalEmail({ to: payload.to, cc: payload.cc, body: payload.body }) ?? ''
-  const match = matchDeliverable({
+
+  // Global content-dedup, checked up front (per attachment) so an already-filed re-forward is skipped
+  // WITHOUT spending an AI matcher call.
+  const dupIds = await Promise.all(files.map((f) => deps.findDup({ fileHash: f.hash })))
+  const anyNew = dupIds.some((d) => !d)
+
+  let match = matchDeliverable({
     subject: payload.subject ?? '',
     body: payload.body ?? '',
     fromEmail: signalEmail,
@@ -76,7 +86,52 @@ export async function ingestEmail(payload: IngestPayload, deps: IngestDeps): Pro
     contacts: deps.matchData.contacts,
     domainMap: deps.matchData.domainMap,
   })
-  const routing = routeMatch(match)
+  let routing = routeMatch(match)
+
+  // AI matcher tier — only when the deterministic match is sub-threshold AND there is a new attachment to file.
+  if (!routing.confident && anyNew && deps.aiMatch) {
+    const candidates = deps.matchData.projects.map((p) => ({
+      projectCode: p.project_code,
+      projectName: p.project_name,
+      clientName: deps.matchData.clients.find((c) => c.id === p.client_id)?.name ?? 'Unknown',
+    }))
+    const ai = await deps.aiMatch({
+      from: payload.from,
+      subject: payload.subject ?? '',
+      filename: files.map((f) => f.filename).join(', '),
+      bodySnippet: (payload.body ?? '').slice(0, 1500),
+      candidates,
+      history: deps.filingHistory ?? [],
+    })
+    const chosen = ai.projectCode ? deps.matchData.projects.find((p) => p.project_code === ai.projectCode) ?? null : null
+    if (chosen) {
+      const chosenClientName = deps.matchData.clients.find((c) => c.id === chosen.client_id)?.name ?? ''
+      const dom = emailDomain(signalEmail)
+      // Corroboration is re-verified server-side — the AI's own claim is never trusted alone.
+      const corroborated =
+        ai.confidence >= AI_AUTO_FILE_THRESHOLD &&
+        serverCorroborates({
+          clientName: chosenClientName,
+          projectName: chosen.project_name,
+          haystack: `${payload.subject ?? ''} ${files.map((f) => f.filename).join(' ')}`,
+          senderDomainMatchesClient: !!dom && deps.matchData.domainMap[dom] === chosen.client_id,
+          clientHasHistory: (deps.filingHistory ?? []).some((h) => h.clientId === chosen.client_id),
+        })
+      match = {
+        clientId: chosen.client_id,
+        projectId: chosen.id,
+        // Corroborated → auto-file band; otherwise keep in the review band but surface the pick as the best guess.
+        confidence: corroborated ? Math.max(ai.confidence, 0.85) : 0.6,
+        method: 'ai',
+        candidates: [
+          { clientId: chosen.client_id, projectId: chosen.id, confidence: ai.confidence, reason: `ai:${ai.reasoning}`, method: 'ai' as const },
+          ...match.candidates,
+        ].slice(0, 3),
+      }
+      routing = routeMatch(match)
+    }
+  }
+
   const labeled = describeCandidates(match.candidates, deps.matchData)
 
   const emailDate = emailDateISO(payload.date, deps.now)
@@ -105,10 +160,11 @@ export async function ingestEmail(payload: IngestPayload, deps: IngestDeps): Pro
     kind: 'file' | 'link'
     name: string
     dedup: { fileHash?: string | null; sourceUrl?: string | null }
+    dupId: string | null
     file?: { mimeType: string; bytes: Buffer }
     sourceUrl?: string | null
   }) {
-    if (await deps.findDup(opts.dedup)) {
+    if (opts.dupId) {
       duplicates++
       replyItems.push({ name: opts.name, status: 'duplicate' })
       return
@@ -138,8 +194,9 @@ export async function ingestEmail(payload: IngestPayload, deps: IngestDeps): Pro
     })
   }
 
-  for (const f of files) {
-    await handle({ kind: 'file', name: f.filename, dedup: { fileHash: f.hash }, file: { mimeType: f.mimeType, bytes: f.bytes } })
+  for (let i = 0; i < files.length; i++) {
+    const f = files[i]
+    await handle({ kind: 'file', name: f.filename, dedup: { fileHash: f.hash }, dupId: dupIds[i], file: { mimeType: f.mimeType, bytes: f.bytes } })
   }
 
   if (replyItems.length > 0) {

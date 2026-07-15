@@ -16,7 +16,7 @@ export type MatchInput = {
   domainMap: Record<string, string> // emailDomain -> clientId
 }
 
-export type MatchMethod = 'code' | 'contact_email' | 'domain' | 'name' | 'none'
+export type MatchMethod = 'code' | 'contact_email' | 'domain' | 'name' | 'ai' | 'none'
 export type MatchResult = {
   clientId: string | null
   projectId: string | null
