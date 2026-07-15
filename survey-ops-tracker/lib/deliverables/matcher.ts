@@ -10,9 +10,14 @@ const CODE_RE = /\b(PR\d{5}|Cl\d{5})\b/i
 // matches the forwarder's own signature/domain on essentially every internal forward.
 const SELF_ORG = ALPHAROC_DOMAIN.split('.')[0]
 
+// When a client is explicitly named in the signals (filename/subject), a project-name match to a
+// DIFFERENT client is capped here — low enough never to win or auto-file, but kept as a visible
+// low-rank candidate so the review queue still surfaces it.
+const CROSS_CLIENT_CAP = 0.35
+
 // Generic survey/report jargon: too common to identify a project on its own, so these are excluded
 // when falling back to single-token project-name matching (which needs a distinctive word).
-const NAME_STOPWORDS = new Set([
+export const NAME_STOPWORDS = new Set([
   // report / survey jargon
   'survey', 'tracker', 'poll', 'study', 'consumer', 'wave', 'final', 'topline', 'report', 'data',
   'results', 'deck', 'analysis', 'project', 'phase', 'round', 'update', 'draft', 'deliverable',
@@ -49,6 +54,18 @@ export function matchDeliverable(input: MatchInput): MatchResult {
   const codeText = [input.subject, input.body, ...names].join('\n')
   const candidates: Candidate[] = []
 
+  // Clients whose distinctive name is present in the focused signals. When a client is named, the
+  // deliverable is almost certainly theirs, so a project-name match to a DIFFERENT client must not win
+  // (e.g. Bain's "AI tracker" appearing verbatim inside "holocene ai tracker survey").
+  const namedClientIds = new Set<string>()
+  for (const c of input.clients) {
+    const cn = normalizeName(c.name)
+    if (cn.split(' ').includes(SELF_ORG)) continue // never our own org
+    if (cn.length >= 3 && focused.includes(` ${cn} `)) namedClientIds.add(c.id)
+  }
+  const crossClientCapped = (clientId: string | null, conf: number): number =>
+    namedClientIds.size > 0 && clientId && !namedClientIds.has(clientId) ? Math.min(conf, CROSS_CLIENT_CAP) : conf
+
   // Tier 1 — explicit code (anywhere: subject, body, or file name)
   const code = codeText.match(CODE_RE)?.[1]?.toUpperCase()
   if (code?.startsWith('PR')) {
@@ -75,7 +92,7 @@ export function matchDeliverable(input: MatchInput): MatchResult {
     const pn = normalizeName(p.project_name)
     if (pn.length >= 4 && full.includes(` ${pn} `)) {
       // Full project name present verbatim — strongest name signal.
-      candidates.push({ clientId: p.client_id, projectId: p.id, confidence: 0.75, reason: `pname:${p.project_code}`, method: 'name' })
+      candidates.push({ clientId: p.client_id, projectId: p.id, confidence: crossClientCapped(p.client_id, 0.75), reason: `pname:${p.project_code}`, method: 'name' })
       continue
     }
     // Fallback: distinctive words of the project name (e.g. "Korea" from "Korea Consumer Survey", or the
@@ -86,18 +103,15 @@ export function matchDeliverable(input: MatchInput): MatchResult {
     if (hits.length) {
       candidates.push({
         clientId: p.client_id, projectId: p.id,
-        confidence: hits.length >= 2 ? 0.7 : 0.62,
+        confidence: crossClientCapped(p.client_id, hits.length >= 2 ? 0.7 : 0.62),
         reason: `ptoken:${p.project_code}:${hits.join('+')}`, method: 'name',
       })
     }
   }
-  for (const c of input.clients) {
-    const cn = normalizeName(c.name)
-    // Never resolve to our own company from fuzzy text (a forwarder's signature/domain) — see SELF_ORG.
-    if (cn.split(' ').includes(SELF_ORG)) continue
-    if (cn.length >= 3 && focused.includes(` ${cn} `)) {
-      candidates.push({ clientId: c.id, projectId: null, confidence: 0.6, reason: 'cname', method: 'name' })
-    }
+  // Client-name candidates: the clients named in the focused signals (namedClientIds, computed above,
+  // already excludes our own org and too-short names).
+  for (const cid of namedClientIds) {
+    candidates.push({ clientId: cid, projectId: null, confidence: 0.6, reason: 'cname', method: 'name' })
   }
 
   candidates.sort((a, b) => b.confidence - a.confidence)

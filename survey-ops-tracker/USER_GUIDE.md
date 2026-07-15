@@ -142,10 +142,13 @@ If you attach something that was already filed for the same project, the app say
 Files go into the Shared Drive under:
 
 ```
-Client name (ClXXXXX) / ProjectName_PR#####_YYYY.MM.DD
+Client name (ClXXXXX) / ProjectName_PR#####_YYYY.MM.DD   ← one-shot project (date-stamped folder)
+Client name (ClXXXXX) / ProjectName_PR#####              ← rerun (one parent folder for all waves)
 ```
 
-The date is the project's delivery date (or today if none is set). Low-confidence items (not yet tied to a project) are staged in `00_Needs Review` at the drive root until resolved.
+For a one-shot project the folder is date-stamped (the project's delivery date, or today). For a **rerun** (a project flagged *longitudinal*), every wave shares **one undated parent folder** and each wave lands inside it as its own dated file (`YYYY.MM.DD — filename`) — so a weekly or monthly tracker doesn't spawn a new folder every time. Low-confidence items (not yet tied to a project) are staged in `00_Needs Review` at the drive root until resolved.
+
+> **Tip:** name the deliverable file with the client and study (e.g. `holocene_ai_tracker_survey_0715.xlsx`). The auto-filer treats the **client name in the filename** as the strongest signal, so a clearly-named file lands in the right client's folder even when another client happens to have a similarly-named project.
 
 ### Emailing deliverables (bcc / cc / forward)
 

@@ -150,4 +150,29 @@ describe('matchDeliverable', () => {
     })
     expect(r.method).toBe('none') // "Korea" is only in the body → not a match signal
   })
+
+  // (i) Client-first: a distinctive CLIENT name in the filename beats another client's verbatim project name.
+  // Real bug: "holocene_ai_tracker_survey" contains Bain's whole project name "AI tracker" (→ 0.75 verbatim),
+  // but the file is Holocene's. The client named in the file must win; the cross-client match is demoted.
+  it('client-first: the client named in the file wins over another client\'s verbatim project-name match', () => {
+    const clients = [
+      { id: 'c-bain', name: 'Bain', code: 'Cl00030' },
+      { id: 'c-holo', name: 'Holocene', code: 'Cl00031' },
+    ]
+    const projects = [
+      { id: 'p-bain', client_id: 'c-bain', project_code: 'PR00039', project_name: 'AI tracker' },
+      { id: 'p-holo', client_id: 'c-holo', project_code: 'PR00149', project_name: 'Holocene Tracker' },
+    ]
+    const r = matchDeliverable({
+      ...base, clients, projects, contacts: [], domainMap: {},
+      subject: 'Fwd: New Occam data', body: 'see attached', fromEmail: 'x@gmail.com',
+      filenames: ['holocene_ai_tracker_survey_0715'],
+    })
+    expect(r.clientId).toBe('c-holo')
+    expect(r.projectId).toBe('p-holo')
+    expect(r.method).toBe('name')
+    // the cross-client Bain candidate is demoted below the Holocene match
+    const bain = r.candidates.find((c) => c.projectId === 'p-bain')
+    if (bain) expect(bain.confidence).toBeLessThanOrEqual(0.35)
+  })
 })

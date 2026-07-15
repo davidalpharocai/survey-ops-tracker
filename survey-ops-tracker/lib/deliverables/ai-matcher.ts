@@ -1,6 +1,6 @@
 // lib/deliverables/ai-matcher.ts
 import Anthropic from '@anthropic-ai/sdk'
-import { normalizeName } from './matcher'
+import { normalizeName, NAME_STOPWORDS } from './matcher'
 
 export const AI_AUTO_FILE_THRESHOLD = 0.9
 
@@ -29,6 +29,7 @@ You are given the email (sender, subject, attachment filename, a body snippet), 
 Pick the ONE survey project the deliverable belongs to, using every signal — the attachment filename and subject are the strongest (they usually name the client and study); the body may contain a forwarded thread.
 Rules:
 - Choose projectCode ONLY from the provided candidate list. If none clearly fits, return projectCode=null.
+- If the filename or subject clearly contains a CLIENT name, the deliverable belongs to THAT client — pick a project from that client. NEVER pick a different client's project just because its project name matches other words in the filename (a file named "holocene ai tracker" is Holocene's, not Bain's "AI tracker").
 - confidence 0..1 reflects how sure you are. Reserve >=0.9 for cases a human would call obvious.
 - corroboratingSignal names the single strongest hard signal for your pick (filename, subject, sender_domain, or history), or null.
 - Never guess to be helpful. "Unsure" (null) is the correct answer when the signals are weak or conflicting.`
@@ -115,7 +116,7 @@ export function serverCorroborates(args: {
   const hay = ` ${normalizeName(args.haystack)} `
   const cn = normalizeName(args.clientName)
   if (cn.length >= 3 && hay.includes(` ${cn} `)) return true
-  const tokens = normalizeName(args.projectName).split(' ').filter((t) => t.length >= 4)
+  const tokens = normalizeName(args.projectName).split(' ').filter((t) => t.length >= 4 && !NAME_STOPWORDS.has(t))
   if (tokens.some((t) => hay.includes(` ${t} `))) return true
   if (args.senderDomainMatchesClient) return true
   if (args.clientHasHistory) return true

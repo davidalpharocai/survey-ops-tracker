@@ -144,7 +144,7 @@ export async function ingestEmail(payload: IngestPayload, deps: IngestDeps): Pro
     clientFolderId: () => deps.clientFolderId(match.clientId!),
     projectFolderName: () => {
       if (!project) throw new Error('projectFolderName called without a resolved project')
-      return projectFolderName(project.project_name, project.project_code, dateISO)
+      return projectFolderName(project.project_name, project.project_code, dateISO, project.longitudinal ?? false)
     },
     needsReviewFolderName: '00_Needs Review',
     unsortedFolderName: '_Unsorted',

@@ -1,6 +1,6 @@
 // lib/deliverables/resolve.ts
 export type DeliverableForResolve = { id: string; file_name: string | null; drive_file_id: string | null; status: string; deleted_at: string | null }
-export type ProjectForResolve = { id: string; client_id: string | null; project_code: string | null; project_name: string; deliver_date: string | null }
+export type ProjectForResolve = { id: string; client_id: string | null; project_code: string | null; project_name: string; deliver_date: string | null; longitudinal: boolean | null }
 
 export type ResolveDeps = {
   getDeliverable: (id: string) => Promise<DeliverableForResolve | null>

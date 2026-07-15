@@ -1,6 +1,6 @@
 // lib/deliverables/types.ts
 export type ClientRec = { id: string; name: string; code: string | null }
-export type ProjectRec = { id: string; client_id: string | null; project_code: string; project_name: string }
+export type ProjectRec = { id: string; client_id: string | null; project_code: string; project_name: string; longitudinal?: boolean }
 export type ContactRec = { email: string; client_id: string | null; project_id: string | null }
 
 export type Candidate = { clientId: string | null; projectId: string | null; confidence: number; reason: string; method: MatchMethod }
