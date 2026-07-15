@@ -7,10 +7,10 @@ import { assertHttpUrl } from './url'
 
 const FOLDER = 'application/vnd.google-apps.folder'
 
-function driveClient() {
-  // Two supported auth modes (pick whichever env vars are present):
-  // (A) No-admin: OAuth as a user who is a Shared Drive member (GOOGLE_OAUTH_*).
-  // (B) Service account, optionally impersonating via domain-wide delegation.
+// Two supported auth modes (pick whichever env vars are present):
+// (A) No-admin: OAuth as a user who is a Shared Drive member (GOOGLE_OAUTH_*).
+// (B) Service account, optionally impersonating via domain-wide delegation.
+function buildGoogleAuth() {
   const refreshToken = process.env.GOOGLE_OAUTH_REFRESH_TOKEN
   if (refreshToken) {
     const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID
@@ -18,18 +18,28 @@ function driveClient() {
     if (!clientId || !clientSecret) throw new Error('Missing GOOGLE_OAUTH_CLIENT_ID / GOOGLE_OAUTH_CLIENT_SECRET')
     const oauth = new google.auth.OAuth2(clientId, clientSecret)
     oauth.setCredentials({ refresh_token: refreshToken })
-    return google.drive({ version: 'v3', auth: oauth })
+    return oauth
   }
   const email = process.env.GOOGLE_CLIENT_EMAIL
   const key = process.env.GOOGLE_PRIVATE_KEY
   if (!email || !key) throw new Error('Missing GOOGLE_OAUTH_REFRESH_TOKEN or GOOGLE_CLIENT_EMAIL/GOOGLE_PRIVATE_KEY')
-  const auth = new google.auth.JWT({
+  return new google.auth.JWT({
     email,
     key: key.replace(/\\n/g, '\n'), // tolerate \n stored literally in env vars
-    scopes: ['https://www.googleapis.com/auth/drive'],
+    scopes: ['https://www.googleapis.com/auth/drive'], // full Drive scope also authorizes Sheets writes
     subject: process.env.GOOGLE_IMPERSONATE_SUBJECT || undefined, // domain-wide delegation: act as an internal Drive member
   })
-  return google.drive({ version: 'v3', auth })
+}
+
+let _auth: ReturnType<typeof buildGoogleAuth> | undefined
+/** Shared, lazily-built Google auth (OAuth locally / service account in prod). Reused by the Sheets client. */
+export function getGoogleAuth() {
+  if (!_auth) _auth = buildGoogleAuth()
+  return _auth
+}
+
+function driveClient() {
+  return google.drive({ version: 'v3', auth: getGoogleAuth() })
 }
 
 const COMMON = { supportsAllDrives: true, includeItemsFromAllDrives: true } as const

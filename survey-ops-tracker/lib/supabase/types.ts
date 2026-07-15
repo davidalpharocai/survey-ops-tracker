@@ -242,6 +242,8 @@ export type Database = {
           n_internal_target: number | null
           created_at: string
           updated_at: string
+          sheet_synced_at: string | null
+          sheet_synced_hash: string | null
         }
         Insert: {
           id?: string
@@ -310,6 +312,8 @@ export type Database = {
           n_internal_target?: number | null
           created_at?: string
           updated_at?: string
+          sheet_synced_at?: string | null
+          sheet_synced_hash?: string | null
         }
         Update: {
           id?: string
@@ -378,6 +382,8 @@ export type Database = {
           n_internal_target?: number | null
           created_at?: string
           updated_at?: string
+          sheet_synced_at?: string | null
+          sheet_synced_hash?: string | null
         }
         Relationships: [
           {

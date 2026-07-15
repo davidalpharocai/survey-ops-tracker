@@ -95,6 +95,7 @@ The **✦ Assistant** button (bottom-right) answers questions from live project 
 - **Survey IDs** sync nightly (~6:45pm ET) from each project's Edwin link; conflicts show an amber review banner on the project
 - **Voter QA + Citation flags** auto-set when the salesperson is Jenna or the project/client mentions "vote"
 - **Morning digest** posts to Slack at 8am ET: overdue, due-soon, and behind-pace projects
+- **Legacy sheet sync** (migration period): new PS/B2B projects and their changes are mirrored into the old "Surveys" Google Sheet automatically, so the team keeps seeing current data there while everyone moves onto SOCC
 - **Live updates**: teammates' changes appear on your screen within a second — no refreshing
 - **If a save ever fails**, a message pops up bottom-left and the change safely reverts — nothing is ever half-saved
 

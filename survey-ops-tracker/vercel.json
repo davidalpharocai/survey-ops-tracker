@@ -21,6 +21,10 @@
       "schedule": "15 12 * * *"
     },
     {
+      "path": "/api/cron/sheet-writeback",
+      "schedule": "0 */4 * * *"
+    },
+    {
       "path": "/api/cron/email-retention",
       "schedule": "0 8 * * *"
     }
