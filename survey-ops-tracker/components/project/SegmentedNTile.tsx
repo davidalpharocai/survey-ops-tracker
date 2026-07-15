@@ -14,7 +14,21 @@ import {
 } from '@/lib/hooks/useProjectSegments'
 import type { SurveyProject } from '@/lib/hooks/useProjects'
 
-const tile = 'bg-card border border-border shadow-sm rounded-xl p-3 flex flex-col gap-1'
+const tile = 'relative bg-card border border-border shadow-sm rounded-xl p-3 flex flex-col gap-1'
+
+// Once delivered, surface the final N Actual in the tile corner (the number that
+// matters post-delivery). Shown when delivered_at is set and N Actual is known.
+function DeliveredActualBadge({ project }: { project: SurveyProject }) {
+  if (!project.delivered_at || project.n_actual == null) return null
+  return (
+    <span
+      className="absolute top-2 right-2 inline-flex items-center gap-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 text-[10px] font-medium px-1.5 py-0.5"
+      title="Final N Actual (project delivered)"
+    >
+      ✓ Actual {fmtNum(project.n_actual)}
+    </span>
+  )
+}
 const numOrNull = (s: string) => {
   const n = parseInt(s, 10)
   return isNaN(n) ? null : n
@@ -54,6 +68,7 @@ export function SegmentedNTile({
   if (segmented) {
     return (
       <div className={tile}>
+        <DeliveredActualBadge project={project} />
         <div className="flex items-center justify-between">
           <span className="text-xs text-muted-foreground flex items-center">
             N collected · total
@@ -92,6 +107,7 @@ export function SegmentedNTile({
 
   return (
     <div className={tile}>
+      <DeliveredActualBadge project={project} />
       <span className="text-xs text-muted-foreground flex items-center">
         N collected
         <InfoTooltip text={tooltip} />

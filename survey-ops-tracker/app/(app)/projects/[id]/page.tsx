@@ -586,10 +586,11 @@ export default function ProjectDetailPage() {
                 tooltip={TOOLTIPS['N Internal Target']}
                 onSave={v => updateProject.mutate({ id, updates: { n_internal_target: v } })}
               />
-              <DetailRow
+              <EditableNumberRow
                 label="N Collected"
-                value={fmtNum(project.n_collected ?? 0)}
+                value={project.n_collected ?? 0}
                 tooltip={TOOLTIPS['N Collected']}
+                onSave={v => updateProject.mutate({ id, updates: { n_collected: v ?? 0 } })}
               />
               <EditableNumberRow
                 label="N Actual"
