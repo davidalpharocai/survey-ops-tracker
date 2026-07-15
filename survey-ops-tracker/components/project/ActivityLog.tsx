@@ -1,8 +1,9 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
+import { toast } from '@/lib/utils/toast'
 import type { Database } from '@/lib/supabase/types'
 
 type Activity = Database['public']['Tables']['project_activity']['Row']
@@ -31,7 +32,9 @@ function gmailUrl(externalId: string | null): string | null {
 
 export function ActivityLog({ projectId }: { projectId: string }) {
   const supabase = createClient()
+  const qc = useQueryClient()
   const [expanded, setExpanded] = useState<string | null>(null)
+  const [removing, setRemoving] = useState<string | null>(null)
   const [showAll, setShowAll] = useState(false)
   const [q, setQ] = useState('')
   // Debounce the search term. An empty term shows the recent view; a term runs a
@@ -64,6 +67,25 @@ export function ActivityLog({ projectId }: { projectId: string }) {
   })
 
   const visible = showAll || searching ? activity : activity.slice(0, 5)
+
+  async function remove(id: string) {
+    if (!window.confirm('Remove this entry from the activity log?')) return
+    setRemoving(id)
+    try {
+      const res = await fetch('/api/activity/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      })
+      if (!res.ok) throw new Error('remove failed')
+      if (expanded === id) setExpanded(null)
+      qc.invalidateQueries({ queryKey: ['activity', projectId] })
+    } catch {
+      toast("Couldn't remove that entry — please try again.")
+    } finally {
+      setRemoving(null)
+    }
+  }
 
   return (
     <div className="bg-card border border-border shadow-sm rounded-xl p-4">
@@ -99,32 +121,43 @@ export function ActivityLog({ projectId }: { projectId: string }) {
           const isOpen = expanded === a.id
           return (
             <div key={a.id} className="rounded-lg bg-muted/60 overflow-hidden">
-              <button
-                onClick={() => setExpanded(isOpen ? null : a.id)}
-                className="w-full text-left px-3 py-2 hover:bg-accent/60 transition-colors"
-              >
-                <div className="flex items-center gap-2 text-sm">
-                  <span>{TYPE_ICON[a.type] ?? '•'}</span>
-                  <span className="text-muted-foreground shrink-0">
-                    {formatWhen(a.occurred_at)}
-                  </span>
-                  {a.direction && (
-                    <span className="text-muted-foreground/70 shrink-0">
-                      {a.direction === 'inbound' ? '←' : '→'}
+              <div className="flex items-start">
+                <button
+                  onClick={() => setExpanded(isOpen ? null : a.id)}
+                  className="flex-1 min-w-0 text-left px-3 py-2 hover:bg-accent/60 transition-colors"
+                >
+                  <div className="flex items-center gap-2 text-sm">
+                    <span>{TYPE_ICON[a.type] ?? '•'}</span>
+                    <span className="text-muted-foreground shrink-0">
+                      {formatWhen(a.occurred_at)}
                     </span>
+                    {a.direction && (
+                      <span className="text-muted-foreground/70 shrink-0">
+                        {a.direction === 'inbound' ? '←' : '→'}
+                      </span>
+                    )}
+                    <span className="text-foreground font-medium truncate">
+                      {a.subject ?? a.snippet ?? '(no subject)'}
+                    </span>
+                  </div>
+                  {!isOpen && a.snippet && a.subject && (
+                    <p className="text-xs text-muted-foreground truncate mt-0.5 pl-6">
+                      {a.snippet}
+                    </p>
                   )}
-                  <span className="text-foreground font-medium truncate">
-                    {a.subject ?? a.snippet ?? '(no subject)'}
-                  </span>
-                </div>
-                {!isOpen && a.snippet && a.subject && (
-                  <p className="text-xs text-muted-foreground truncate mt-0.5 pl-6">
-                    {a.snippet}
-                  </p>
-                )}
-              </button>
+                </button>
+                <button
+                  onClick={() => remove(a.id)}
+                  disabled={removing === a.id}
+                  title="Remove from activity"
+                  aria-label="Remove from activity"
+                  className="shrink-0 px-2.5 py-2 text-muted-foreground/40 hover:text-red-600 dark:hover:text-red-400 disabled:opacity-40 transition-colors"
+                >
+                  ✕
+                </button>
+              </div>
               {isOpen && (
-                <div className="px-3 pb-3 pl-9 flex flex-col gap-1">
+                <div className="px-3 pb-3 pl-9 flex flex-col gap-1 min-w-0">
                   {(a.sender || a.recipients) && (
                     <p className="text-xs text-muted-foreground">
                       {a.sender && <>From: {a.sender}</>}
@@ -142,7 +175,7 @@ export function ActivityLog({ projectId }: { projectId: string }) {
                       open in Gmail ↗
                     </a>
                   )}
-                  <pre className="text-sm text-foreground/90 whitespace-pre-wrap font-sans leading-relaxed max-h-80 overflow-y-auto">
+                  <pre className="text-sm text-foreground/90 whitespace-pre-wrap break-words font-sans leading-relaxed max-h-80 overflow-y-auto">
                     {a.body ?? a.snippet ?? ''}
                   </pre>
                 </div>
