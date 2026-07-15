@@ -85,9 +85,9 @@ export function SuppliersWidget({ projectId, nTarget }: { projectId: string; nTa
         {list.length > 0 && (
           <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-2 text-[11px] text-muted-foreground">
             <span>Supplier</span>
-            <span className="text-right">CPI $</span>
-            <span className="text-right">cap</span>
-            <span></span>
+            <span className="w-20 text-right" title="Cost per interview — what this supplier charges per completed response.">CPI ($)</span>
+            <span className="w-20 text-right" title="The most completes to buy from this supplier (default 1,000). The estimate assumes every supplier fills its cap.">Completes cap</span>
+            <span className="w-5"></span>
           </div>
         )}
         {list.map((r) => (
@@ -102,7 +102,7 @@ export function SuppliersWidget({ projectId, nTarget }: { projectId: string; nTa
                 const v = parseFloat(e.target.value)
                 if (!isNaN(v) && v !== r.cpi) updateRow.mutate({ id: r.id, updates: { cpi: v } })
               }}
-              className={`${inputCls} w-16 text-right`}
+              className={`${inputCls} w-20 text-right`}
             />
             <input
               key={`cap-${r.id}-${r.completes_cap}`}
@@ -112,12 +112,12 @@ export function SuppliersWidget({ projectId, nTarget }: { projectId: string; nTa
                 const v = parseInt(e.target.value, 10)
                 if (!isNaN(v) && v !== r.completes_cap) updateRow.mutate({ id: r.id, updates: { completes_cap: v } })
               }}
-              className={`${inputCls} w-16 text-right`}
+              className={`${inputCls} w-20 text-right`}
             />
             <button
               onClick={() => removeRow.mutate(r.id)}
               title="Remove supplier"
-              className="text-muted-foreground/50 hover:text-red-600 dark:hover:text-red-400 px-0.5"
+              className="w-5 text-center text-muted-foreground/50 hover:text-red-600 dark:hover:text-red-400"
             >
               ✕
             </button>
@@ -155,8 +155,8 @@ export function SuppliersWidget({ projectId, nTarget }: { projectId: string; nTa
             onChange={(e) => setApplyCpi(e.target.value)}
             type="number"
             step="0.01"
-            placeholder="CPI $"
-            className={`${inputCls} w-16`}
+            placeholder="CPI ($)"
+            className={`${inputCls} w-20`}
           />
           <button
             onClick={applyToAll}
@@ -185,7 +185,7 @@ export function SuppliersWidget({ projectId, nTarget }: { projectId: string; nTa
           </button>
         </div>
         <p className="text-[10px] text-muted-foreground/50 mt-0.5">
-          New in the “CPI $” box applies to newly-added suppliers; “Apply to all” retro-sets every row.
+          A CPI in the box above applies to newly-added suppliers; “Apply to all” retro-sets it on every existing row.
         </p>
       </div>
     </div>
