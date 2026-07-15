@@ -290,8 +290,9 @@ export default function ProjectDetailPage() {
         />
       )}
 
-      {/* Tabs */}
-      <div className="flex bg-muted border border-border rounded-lg p-1 gap-1 w-fit mb-4">
+      {/* Tabs + Survey IDs surfaced top-right (was buried in Links & Setup) */}
+      <div className="flex items-start justify-between gap-3 mb-4 flex-wrap">
+      <div className="flex bg-muted border border-border rounded-lg p-1 gap-1 w-fit">
         <button
           onClick={() => setActiveTab('overview')}
           title='The full project view — stats, pipeline, next steps, documents, and details'
@@ -316,7 +317,7 @@ export default function ProjectDetailPage() {
         </button>
         <button
           onClick={() => setActiveTab('links')}
-          title="Survey IDs, Slack channel link, and notification settings"
+          title="Slack channel link and notification settings"
           className={`text-sm px-3 py-1.5 rounded font-medium transition-colors ${
             activeTab === 'links'
               ? 'bg-background text-foreground'
@@ -337,6 +338,41 @@ export default function ProjectDetailPage() {
           Audit Log
         </button>
       </div>
+      <div className="bg-card border border-border shadow-sm rounded-xl px-3 py-2 w-full sm:w-auto sm:min-w-[260px] sm:max-w-sm flex flex-col gap-2">
+        <EditableRow
+          label="Survey IDs"
+          value={project.survey_tool_id ?? ''}
+          placeholder="e.g. SV-1042, SV-1043"
+          tooltip={TOOLTIPS['Survey IDs']}
+          onSave={v => updateProject.mutate({ id, updates: { survey_tool_id: v || null } })}
+        />
+        {project.survey_id_discrepancy && (
+          <div className="bg-amber-500/10 border border-amber-500/40 rounded-lg p-2 flex flex-col gap-1.5">
+            <p className="text-sm text-amber-700 dark:text-amber-400">⚠ {project.survey_id_discrepancy}</p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  const m = project.survey_id_discrepancy?.match(/"([^"]+)"/)
+                  updateProject.mutate({
+                    id,
+                    updates: { survey_tool_id: m?.[1] ?? project.survey_tool_id, survey_id_discrepancy: null },
+                  })
+                }}
+                className="text-[11px] bg-amber-500/20 hover:bg-amber-500/30 text-amber-700 dark:text-amber-300 px-2 py-1 rounded transition-colors"
+              >
+                Use Edwin ID
+              </button>
+              <button
+                onClick={() => updateProject.mutate({ id, updates: { survey_id_discrepancy: null } })}
+                className="text-[11px] text-muted-foreground hover:text-foreground px-2 py-1 transition-colors"
+              >
+                Keep current — dismiss
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+      </div>
 
       {activeTab === 'datalog' && (
         <div className="max-w-3xl">
@@ -352,50 +388,6 @@ export default function ProjectDetailPage() {
 
       {activeTab === 'links' && (
         <div className="max-w-3xl flex flex-col gap-4">
-          <div className="bg-card border border-border shadow-sm rounded-xl p-4">
-            <div className="flex flex-col gap-3">
-              <EditableRow
-                label="Survey IDs"
-                value={project.survey_tool_id ?? ''}
-                placeholder="e.g. SV-1042, SV-1043"
-                tooltip={TOOLTIPS['Survey IDs']}
-                onSave={v => updateProject.mutate({ id, updates: { survey_tool_id: v || null } })}
-              />
-              {project.survey_id_discrepancy && (
-                <div className="bg-amber-500/10 border border-amber-500/40 rounded-lg p-2 flex flex-col gap-1.5">
-                  <p className="text-sm text-amber-700 dark:text-amber-400">
-                    ⚠ {project.survey_id_discrepancy}
-                  </p>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => {
-                        const m = project.survey_id_discrepancy?.match(/"([^"]+)"/)
-                        updateProject.mutate({
-                          id,
-                          updates: {
-                            survey_tool_id: m?.[1] ?? project.survey_tool_id,
-                            survey_id_discrepancy: null,
-                          },
-                        })
-                      }}
-                      className="text-[11px] bg-amber-500/20 hover:bg-amber-500/30 text-amber-700 dark:text-amber-300 px-2 py-1 rounded transition-colors"
-                    >
-                      Use Edwin ID
-                    </button>
-                    <button
-                      onClick={() =>
-                        updateProject.mutate({ id, updates: { survey_id_discrepancy: null } })
-                      }
-                      className="text-[11px] text-muted-foreground hover:text-foreground px-2 py-1 transition-colors"
-                    >
-                      Keep current — dismiss
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
           <SlackChannel projectId={project.id} url={project.slack_channel_url ?? null} />
 
           <div className="bg-card border border-border shadow-sm rounded-xl p-4 text-sm text-muted-foreground leading-relaxed">
