@@ -209,4 +209,22 @@ describe('ingestEmail', () => {
     expect(out).toEqual({ action: 'processed', filed: 0, queued: 1, duplicates: 0 })
     expect(rows[0].status).toBe('review')
   })
+
+  it('AI tier: constrains candidates to the client named in the filename (no cross-client look-alikes)', async () => {
+    const drive = new FakeDrive('root')
+    const twoClient: MatchData = {
+      clients: [{ id: 'c1', name: 'Coatue', code: 'CL001' }, { id: 'c2', name: 'Wellington', code: 'CL002' }],
+      projects: [
+        { id: 'p1', client_id: 'c1', project_code: 'PR00003', project_name: 'B2B Tracker' },
+        { id: 'p2', client_id: 'c2', project_code: 'PR00009', project_name: 'B2B Tracker' }, // same-name look-alike, other client
+      ],
+      contacts: [], domainMap: {},
+    }
+    const aiMatch = vi.fn().mockResolvedValue({ projectCode: null, confidence: 0, reasoning: 'x', corroboratingSignal: null })
+    const { deps } = makeDeps(drive, { matchData: twoClient, aiMatch })
+    await ingestEmail({ ...pdfPayload, to: 'unknown@x.com', subject: 'data', body: 'no hints', messageId: 'con-1', attachments: [{ filename: 'Wellington deck.pdf', mimeType: 'application/pdf', base64: Buffer.from('w').toString('base64') }] }, deps)
+    expect(aiMatch).toHaveBeenCalledOnce()
+    const passed = aiMatch.mock.calls[0][0].candidates as { projectCode: string }[]
+    expect(passed.map((c) => c.projectCode)).toEqual(['PR00009']) // only Wellington's project — Coatue's look-alike excluded
+  })
 })

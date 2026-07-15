@@ -43,6 +43,22 @@ function domainOf(email: string): string {
   return (email.split('@')[1] ?? '').toLowerCase().trim()
 }
 
+/**
+ * Client ids whose distinctive name appears in the deliberate signals (subject + attachment filenames).
+ * When non-empty, the deliverable is almost certainly one of these clients' — used to gate matching
+ * (cap other clients' name matches) and to constrain the AI candidate pool.
+ */
+export function namedClients(input: MatchInput): Set<string> {
+  const focused = ` ${normalizeName([input.subject, ...(input.filenames ?? [])].join(' '))} `
+  const ids = new Set<string>()
+  for (const c of input.clients) {
+    const cn = normalizeName(c.name)
+    if (cn.split(' ').includes(SELF_ORG)) continue // never our own org
+    if (cn.length >= 3 && focused.includes(` ${cn} `)) ids.add(c.id)
+  }
+  return ids
+}
+
 export function matchDeliverable(input: MatchInput): MatchResult {
   const names = input.filenames ?? []
   // Deliberate signals — subject + attachment file names. Low-noise, so fuzzy token / client-name
@@ -57,12 +73,7 @@ export function matchDeliverable(input: MatchInput): MatchResult {
   // Clients whose distinctive name is present in the focused signals. When a client is named, the
   // deliverable is almost certainly theirs, so a project-name match to a DIFFERENT client must not win
   // (e.g. Bain's "AI tracker" appearing verbatim inside "holocene ai tracker survey").
-  const namedClientIds = new Set<string>()
-  for (const c of input.clients) {
-    const cn = normalizeName(c.name)
-    if (cn.split(' ').includes(SELF_ORG)) continue // never our own org
-    if (cn.length >= 3 && focused.includes(` ${cn} `)) namedClientIds.add(c.id)
-  }
+  const namedClientIds = namedClients(input)
   const crossClientCapped = (clientId: string | null, conf: number): number =>
     namedClientIds.size > 0 && clientId && !namedClientIds.has(clientId) ? Math.min(conf, CROSS_CLIENT_CAP) : conf
 
