@@ -154,4 +154,42 @@ describe('ingestEmail', () => {
     expect(rows).toHaveLength(1)
     expect(rows[0].original_file_name).toBe('New.pdf')
   })
+
+  it('AI tier: auto-files a sub-threshold email when the AI is confident and corroborated', async () => {
+    const drive = new FakeDrive('root')
+    const aiMatch = vi.fn().mockResolvedValue({ projectCode: 'PR00003', confidence: 0.95, reasoning: 'subject names the client', corroboratingSignal: 'subject' })
+    const { deps, rows } = makeDeps(drive, { aiMatch })
+    const out = await ingestEmail({ ...pdfPayload, to: 'unknown@randomco.com', subject: 'Coatue deck', body: 'no hints', messageId: 'ai-corr' }, deps)
+    expect(aiMatch).toHaveBeenCalledOnce()
+    expect(out).toEqual({ action: 'processed', filed: 1, queued: 0, duplicates: 0 })
+    expect(rows[0]).toMatchObject({ client_id: 'c1', project_id: 'p1', status: 'filed', match_method: 'ai' })
+  })
+
+  it('AI tier: stages in review with the AI pick as the best guess when not corroborated', async () => {
+    const drive = new FakeDrive('root')
+    const aiMatch = vi.fn().mockResolvedValue({ projectCode: 'PR00003', confidence: 0.95, reasoning: 'hunch', corroboratingSignal: null })
+    const { deps, rows, replies } = makeDeps(drive, { aiMatch })
+    const out = await ingestEmail({ ...pdfPayload, to: 'unknown@randomco.com', subject: 'monthly deck', body: 'no hints', messageId: 'ai-uncorr' }, deps)
+    expect(out).toEqual({ action: 'processed', filed: 0, queued: 1, duplicates: 0 })
+    expect(rows[0]).toMatchObject({ status: 'review', match_method: 'ai', project_id: null })
+    expect(replies[0].subject).toContain('Needs a quick review')
+  })
+
+  it('AI tier: does not call the AI when the deterministic match is confident', async () => {
+    const drive = new FakeDrive('root')
+    const aiMatch = vi.fn()
+    const { deps } = makeDeps(drive, { aiMatch })
+    await ingestEmail({ ...pdfPayload, subject: 'Final deck PR00003', messageId: 'ai-skip' }, deps)
+    expect(aiMatch).not.toHaveBeenCalled()
+  })
+
+  it('AI tier: leaves the email in review when the AI is unsure', async () => {
+    const drive = new FakeDrive('root')
+    const aiMatch = vi.fn().mockResolvedValue({ projectCode: null, confidence: 0, reasoning: 'unclear', corroboratingSignal: null })
+    const { deps, rows } = makeDeps(drive, { aiMatch })
+    const out = await ingestEmail({ ...pdfPayload, to: 'unknown@randomco.com', subject: 'stuff', body: 'no hints', messageId: 'ai-unsure' }, deps)
+    expect(aiMatch).toHaveBeenCalledOnce()
+    expect(out).toEqual({ action: 'processed', filed: 0, queued: 1, duplicates: 0 })
+    expect(rows[0].status).toBe('review')
+  })
 })

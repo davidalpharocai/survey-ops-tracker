@@ -3,7 +3,9 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { GoogleDrive } from '@/lib/drive/google'
 import { safeEqual } from '@/lib/utils/secureCompare'
 import { ingestEmail, type IngestDeps, type EmailDeliverableRow } from '@/lib/deliverables/email-ingest'
-import { loadMatchData } from '@/lib/deliverables/load'
+import Anthropic from '@anthropic-ai/sdk'
+import { loadMatchData, loadFilingHistory } from '@/lib/deliverables/load'
+import { aiMatch } from '@/lib/deliverables/ai-matcher'
 import { findDuplicateAnywhere } from '@/lib/deliverables/persist'
 import { ensureClientFolder } from '@/lib/deliverables/folders'
 import { sendAndLog } from '@/lib/email/send'
@@ -28,7 +30,9 @@ export async function POST(req: Request) {
 
   const admin = createAdminClient()
   const drive = new GoogleDrive()
+  const anthropic = new Anthropic()
   const matchData = await loadMatchData(admin)
+  const filingHistory = await loadFilingHistory(admin, matchData.clients, matchData.projects)
 
   const deps: IngestDeps = {
     drive,
@@ -42,6 +46,8 @@ export async function POST(req: Request) {
     },
     clientFolderId: (clientId) => ensureClientFolder(admin, drive, sharedDriveId, clientId),
     findDup: (opts) => findDuplicateAnywhere(admin, opts),
+    aiMatch: (input) => aiMatch(input, anthropic),
+    filingHistory,
     persist: async (row: EmailDeliverableRow) => {
       // Boundary cast: row is structurally the deliverables Insert; only match_candidates (LabeledCandidate[]) needs widening to Json.
       const { data: inserted, error } = await admin
