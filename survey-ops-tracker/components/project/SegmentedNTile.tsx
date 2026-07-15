@@ -14,7 +14,11 @@ import {
 } from '@/lib/hooks/useProjectSegments'
 import type { SurveyProject } from '@/lib/hooks/useProjects'
 
-const tile = 'relative bg-card border border-border shadow-sm rounded-xl p-3 flex flex-col gap-1'
+const tile = 'relative border shadow-sm rounded-xl p-3 flex flex-col gap-1'
+// Default card styling vs. an accented "lead tile" treatment (used as the first
+// hero stat — the number that matters most).
+const tilePlain = `${tile} bg-card border-border`
+const tileAccent = `${tile} bg-primary/[0.04] border-primary/30`
 
 // Once delivered, surface the final N Actual in the tile corner (the number that
 // matters post-delivery). Shown when delivered_at is set and N Actual is known.
@@ -40,10 +44,12 @@ export function SegmentedNTile({
   project,
   tooltip,
   onSaveCollected,
+  accent = false,
 }: {
   project: SurveyProject
   tooltip: string
   onSaveCollected: (next: number | null) => void
+  accent?: boolean
 }) {
   const { data: segments = [] } = useProjectSegments(project.id)
   const split = useSplitProject(project.id)
@@ -52,6 +58,7 @@ export function SegmentedNTile({
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
 
+  const cls = accent ? tileAccent : tilePlain
   const segmented = (project.segment_count ?? 0) > 0 || segments.length > 0
 
   const TotalNumber = (
@@ -67,7 +74,7 @@ export function SegmentedNTile({
 
   if (segmented) {
     return (
-      <div className={tile}>
+      <div className={cls}>
         <DeliveredActualBadge project={project} />
         <div className="flex items-center justify-between">
           <span className="text-xs text-muted-foreground flex items-center">
@@ -106,7 +113,7 @@ export function SegmentedNTile({
   }
 
   return (
-    <div className={tile}>
+    <div className={cls}>
       <DeliveredActualBadge project={project} />
       <span className="text-xs text-muted-foreground flex items-center">
         N collected

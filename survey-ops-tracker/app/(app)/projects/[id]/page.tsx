@@ -27,6 +27,8 @@ import { SuppliersWidget } from '@/components/project/SuppliersWidget'
 import { BlastConfigWidget } from '@/components/project/BlastConfigWidget'
 import { CompliancePanel } from '@/components/compliance/CompliancePanel'
 import { ComplianceBanner } from '@/components/project/ComplianceBanner'
+import { useComplianceState } from '@/lib/hooks/useComplianceState'
+import { beforeFieldingRequired, afterFieldingRequired } from '@/lib/utils/compliance'
 import { SegmentedNTile } from '@/components/project/SegmentedNTile'
 import { RequestedByRow } from '@/components/project/RequestedByRow'
 import { ordinal } from '@/lib/utils/rerun'
@@ -74,7 +76,7 @@ export default function ProjectDetailPage() {
   const updateProject = useUpdateProject()
   const deleteProject = useDeleteProject()
   const [confirmingDelete, setConfirmingDelete] = useState(false)
-  const [activeTab, setActiveTab] = useState<'overview' | 'datalog' | 'audit' | 'links'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'activity' | 'deliverables' | 'links' | 'logs'>('overview')
   // Where to return on "← Back": the board or list, whichever the user came from
   const [backTo, setBackTo] = useState<{ href: string; label: string }>({ href: '/', label: 'Board' })
   useEffect(() => {
@@ -84,6 +86,21 @@ export default function ProjectDetailPage() {
   }, [])
   const queryClient = useQueryClient()
   const projectLoaded = !!project
+
+  // Compliance card is conditional: show it only when the client actually
+  // requires a review (before/after fielding) or a submission already exists —
+  // otherwise it's just clutter on the majority of projects. In-flight or
+  // historical reviews keep it visible even if the client flag is later toggled.
+  const compliance = useComplianceState(
+    project?.id ?? '',
+    project?.client ?? '',
+    project?.compliance_override ?? null,
+  )
+  const showCompliance =
+    !!compliance.data &&
+    (beforeFieldingRequired(compliance.data.client, compliance.data.override) ||
+      afterFieldingRequired(compliance.data.client, compliance.data.override) ||
+      compliance.data.submissions.length > 0)
 
   // Mark the project as seen by the current user on every visit — this is
   // what dismisses the green NEW! badge on the board. Errors are swallowed
@@ -293,7 +310,7 @@ export default function ProjectDetailPage() {
 
       {/* Tabs + Survey IDs surfaced top-right (was buried in Links & Setup) */}
       <div className="flex items-start justify-between gap-3 mb-4 flex-wrap">
-      <div className="flex bg-muted border border-border rounded-lg p-1 gap-1 w-fit">
+      <div className="flex flex-wrap bg-muted border border-border rounded-lg p-1 gap-1 w-fit">
         <button
           onClick={() => setActiveTab('overview')}
           title='The full project view — stats, pipeline, next steps, documents, and details'
@@ -306,15 +323,26 @@ export default function ProjectDetailPage() {
           Overview
         </button>
         <button
-          onClick={() => setActiveTab('datalog')}
-          title="Engineer log of manual data changes for this project"
+          onClick={() => setActiveTab('activity')}
+          title="Logged emails and events for this project"
           className={`text-sm px-3 py-1.5 rounded font-medium transition-colors ${
-            activeTab === 'datalog'
+            activeTab === 'activity'
               ? 'bg-background text-foreground'
               : 'text-muted-foreground hover:text-foreground'
           }`}
         >
-          Data Change Log
+          Activity
+        </button>
+        <button
+          onClick={() => setActiveTab('deliverables')}
+          title="Files delivered to the client for this project"
+          className={`text-sm px-3 py-1.5 rounded font-medium transition-colors ${
+            activeTab === 'deliverables'
+              ? 'bg-background text-foreground'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          Deliverables
         </button>
         <button
           onClick={() => setActiveTab('links')}
@@ -325,18 +353,18 @@ export default function ProjectDetailPage() {
               : 'text-muted-foreground hover:text-foreground'
           }`}
         >
-          Links &amp; Setup
+          Links
         </button>
         <button
-          onClick={() => setActiveTab('audit')}
-          title="Automatic history of every field change on this project"
+          onClick={() => setActiveTab('logs')}
+          title="Manual data-change log and the automatic field-change audit trail"
           className={`text-sm px-3 py-1.5 rounded font-medium transition-colors ${
-            activeTab === 'audit'
+            activeTab === 'logs'
               ? 'bg-background text-foreground'
               : 'text-muted-foreground hover:text-foreground'
           }`}
         >
-          Audit Log
+          Logs
         </button>
       </div>
       <div className="bg-card border border-border shadow-sm rounded-xl px-3 py-2 w-full sm:w-auto sm:min-w-[260px] sm:max-w-sm flex flex-col gap-2">
@@ -375,14 +403,21 @@ export default function ProjectDetailPage() {
       </div>
       </div>
 
-      {activeTab === 'datalog' && (
+      {activeTab === 'activity' && (
         <div className="max-w-3xl">
-          <DataChangeLog projectId={project.id} />
+          <ActivityLog projectId={project.id} />
         </div>
       )}
 
-      {activeTab === 'audit' && (
-        <div className="max-w-3xl">
+      {activeTab === 'deliverables' && (
+        <div className="max-w-4xl">
+          <DeliverablesPanel projectId={project.id} />
+        </div>
+      )}
+
+      {activeTab === 'logs' && (
+        <div className="max-w-3xl flex flex-col gap-4">
+          <DataChangeLog projectId={project.id} />
           <ProjectAuditLog projectId={project.id} />
         </div>
       )}
@@ -410,6 +445,7 @@ export default function ProjectDetailPage() {
             project={project}
             tooltip={TOOLTIPS['N Collected']}
             onSaveCollected={v => updateProject.mutate({ id, updates: { n_collected: v ?? 0 } })}
+            accent
           />
           <HeroTiming
             due={project.due_date}
@@ -465,14 +501,14 @@ export default function ProjectDetailPage() {
                 <PipelineProgress project={project} />
               )}
             </div>
-            <LatestNextSteps projectId={project.id} notes={project.latest_next_steps} />
-            <LinkedDocuments
-              projectId={project.id}
-              documents={project.linked_documents ?? []}
-            />
-            <CompliancePanel projectId={project.id} project={project} />
-            <DeliverablesPanel projectId={project.id} />
-            <ActivityLog projectId={project.id} />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+              <LatestNextSteps projectId={project.id} notes={project.latest_next_steps} />
+              <LinkedDocuments
+                projectId={project.id}
+                documents={project.linked_documents ?? []}
+              />
+            </div>
+            {showCompliance && <CompliancePanel projectId={project.id} project={project} />}
           </div>
 
           {/* Right sidebar — packs into 2 columns on wide screens to cut scrolling;
