@@ -431,7 +431,7 @@ export default function ProjectDetailPage() {
         </div>
 
         {/* Two-column layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_440px] gap-6">
           {/* Left column */}
           <div className="flex flex-col gap-4">
             <QuickEdit project={project} />
@@ -475,8 +475,9 @@ export default function ProjectDetailPage() {
             <ActivityLog projectId={project.id} />
           </div>
 
-          {/* Right sidebar */}
-          <div className="flex flex-col gap-4">
+          {/* Right sidebar — packs into 2 columns on wide screens to cut scrolling;
+              single column on narrower ones. Money spans both (it's the tallest). */}
+          <div className="flex flex-col gap-4 xl:grid xl:grid-cols-2 xl:items-start xl:gap-4">
             <SidebarCard title="People">
               {project.client_id ? (
                 <div className="flex justify-between items-center text-sm gap-2">
@@ -653,7 +654,7 @@ export default function ProjectDetailPage() {
               </div>
             </SidebarCard>
 
-            <SidebarCard title="Money">
+            <SidebarCard title="Money" className="xl:col-span-2">
               <BudgetWidget
                 projectId={project.id}
                 budget={project.budget ?? null}
@@ -682,9 +683,9 @@ export default function ProjectDetailPage() {
   )
 }
 
-function SidebarCard({ title, children }: { title: string; children: React.ReactNode }) {
+function SidebarCard({ title, children, className = '' }: { title: string; children: React.ReactNode; className?: string }) {
   return (
-    <div className="bg-card border border-border shadow-sm rounded-xl p-4">
+    <div className={`bg-card border border-border shadow-sm rounded-xl p-4 ${className}`}>
       <h3 className="text-xs text-muted-foreground uppercase tracking-widest mb-4 font-medium">
         {title}
       </h3>
