@@ -477,7 +477,7 @@ export default function ProjectDetailPage() {
 
           {/* Right sidebar — packs into 2 columns on wide screens to cut scrolling;
               single column on narrower ones. Money spans both (it's the tallest). */}
-          <div className="flex flex-col gap-4 xl:grid xl:grid-cols-2 xl:items-start xl:gap-4">
+          <div className="flex flex-col gap-4 self-start xl:grid xl:grid-cols-2 xl:items-start xl:content-start xl:gap-4">
             <SidebarCard title="People">
               {project.client_id ? (
                 <div className="flex justify-between items-center text-sm gap-2">
