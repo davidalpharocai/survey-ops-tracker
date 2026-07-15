@@ -79,6 +79,23 @@ describe('classifyLinkedDocs', () => {
   })
 })
 
+describe('formula-injection escaping', () => {
+  it('apostrophe-prefixes free-text cells starting with a formula char', () => {
+    const c = mappedCells({ ...base, latest_next_steps: '=IMPORTRANGE("k","A1")', client: '+Acme', project_name: '-lead', salesperson: '@who' }, 'CT')
+    expect(c[0]).toBe('\'=IMPORTRANGE("k","A1")')
+    expect(c[1]).toBe("'+Acme")
+    expect(c[2]).toBe("'-lead")
+    expect(c[37]).toBe("'@who")
+  })
+  it('leaves ordinary text and typed (date/number/bool) cells untouched', () => {
+    const c = mappedCells(base, 'CT')
+    expect(c[0]).toBe('ping client')
+    expect(c[6]).toBe('2026-07-01') // date not quoted
+    expect(c[13]).toBe('400') // number not quoted
+    expect(c[10]).toBe('TRUE') // bool not quoted
+  })
+})
+
 describe('fullRow', () => {
   it('is full-width with blanks in unmapped columns', () => {
     const row = fullRow(mappedCells(base, 'CT'))

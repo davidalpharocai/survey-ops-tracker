@@ -29,6 +29,14 @@ const fmtBool = (b: boolean | null) => (b == null ? '' : b ? 'TRUE' : 'FALSE') /
 const fmtNum = (n: number | null) => (n == null ? '' : String(n))
 const statusFor = (p: SurveyProject) => (p.delivered_at ? 'Done' : 'In Progress')
 
+// Neutralize Sheets formula injection: under USER_ENTERED a free-text cell that
+// begins with = + - @ is evaluated as a FORMULA (e.g. a note "=> follow up" becomes
+// #ERROR!; "=IMPORTRANGE(...)" runs). Prefix an apostrophe so Sheets stores it as
+// literal text — the apostrophe is a display directive, not part of the exported
+// value, so the read-back parser sees the clean string. Applied only to free-text
+// columns (date/number/bool cells never start with these and must not be quoted).
+export const escapeText = (s: string) => (/^[=+\-@]/.test(s) ? `'${s}` : s)
+
 export function classifyLinkedDocs(links: string[] | null): { doc: string; sheet: string } {
   const arr = links ?? []
   return {
@@ -45,9 +53,9 @@ export function classifyLinkedDocs(links: string[] | null): { doc: string; sheet
 export function mappedCells(p: SurveyProject, captainInitials: string): Record<number, string> {
   const { doc, sheet } = classifyLinkedDocs(p.linked_documents)
   return {
-    0: p.latest_next_steps ?? '',
-    1: p.client ?? '',
-    2: p.project_name ?? '',
+    0: escapeText(p.latest_next_steps ?? ''),
+    1: escapeText(p.client ?? ''),
+    2: escapeText(p.project_name ?? ''),
     3: fmtBool(p.longitudinal),
     4: p.project_type ?? '',
     5: statusFor(p),
@@ -71,9 +79,9 @@ export function mappedCells(p: SurveyProject, captainInitials: string): Record<n
     26: fmtBool(p.stage_fielding),
     27: fmtBool(p.stage_data_qa),
     28: fmtBool(p.stage_delivery),
-    32: doc,
-    34: sheet,
-    37: p.salesperson ?? '',
+    32: escapeText(doc),
+    34: escapeText(sheet),
+    37: escapeText(p.salesperson ?? ''),
     38: p.project_code ?? '',
   }
 }
