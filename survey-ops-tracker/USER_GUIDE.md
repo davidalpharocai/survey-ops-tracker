@@ -58,15 +58,15 @@ Four big tiles: **N collected** (click to edit), **Timing** — Due (internal: w
 
 ### Tabs
 - **Overview** — everything below
-- **Data Change Log** — engineers log manual data edits here ("removed 4 speeders from SV-2201"); date + author stamped, edit/delete with confirmation
-- **Links & setup** — Survey IDs (auto-synced nightly from the Edwin link; mismatches get flagged for review), Slack channel link, notification info
-- **Audit Log** (last tab) — automatic history of every field change on this project: who changed what, when, and the old → new value. You don't write to it — the system records it for you ("system" means an automated update like the nightly Edwin sync).
+- **Activity** — logged emails and events for the project (click one to expand and read; the search box finds a specific email by subject, body, or person). See §9b.
+- **Deliverables** — the final client deliverables filed for this project. See §9.
+- **Links** — Survey IDs (auto-synced nightly from the Edwin link; mismatches get flagged for review), Slack channel link, notification info. (Survey IDs also stay pinned to the top-right of the tab row so they're always in view.)
+- **Logs** — two histories in one place: the **Data Change Log**, where engineers log manual data edits ("removed 4 speeders from SV-2201"; date + author stamped, edit/delete with confirmation), and the automatic **Audit Log** — every field change on the project (who changed what, when, and the old → new value; "system" means an automated update like the nightly Edwin sync). You don't write to the Audit Log — the system records it for you.
 
 ### Left column
 - **Pipeline progress** — check off stages (this moves the card on the board)
-- **Latest / Next Steps** — add to-dos (Ctrl+Enter saves); check one off and it moves to the "Latest" log with date + who. Old imported notes live under "History."
-- **Linked Documents** — paste any URL (its document title fills in automatically); rename via the ✎ or remove via the ✕ (this only unlinks it — the file stays in Drive); questionnaire/Edwin/data sheet links live here
-- **Activity** — logged emails and events (expand to read)
+- **Latest / Next Steps** and **Linked Documents** sit side by side on wide screens. Next Steps: add to-dos (Ctrl+Enter saves); check one off and it moves to the "Latest" log with date + who (old imported notes live under "History"). Linked Documents: paste any URL (its document title fills in automatically), rename via the ✎ or remove via the ✕ (this only unlinks it — the file stays in Drive); questionnaire/Edwin/data sheet links live here
+- **Compliance Review** — appears only when the client requires a review (before and/or after fielding) or a review has already been submitted (see §6)
 - **✦ Edit by description** — type changes in plain English ("collected is 180, due pushed to July 20"), review the before→after preview, approve
 
 ### Right sidebar
@@ -130,7 +130,7 @@ The **deliverables depository** is a central store for final client deliverables
 
 ### Attaching a file or link
 
-On any project page, scroll to the **Deliverables** panel in the left column:
+On any project page, open the **Deliverables** tab:
 
 - **File:** click **+ Attach deliverable** and pick a file — it uploads and files immediately.
 - **Link:** paste a URL (Occam, Edwin, Google Sheet, anything) into the link box and click **Add link**. Google-native links (Docs, Sheets, Drive) are stored as Drive shortcuts; other links are saved as bookmark files.
@@ -179,7 +179,7 @@ Client emails are logged automatically to each project's **Activity** panel, so 
 - **Auto-logged** when it's confident: the email mentions a project code (PR#####) or a survey ID, or it's from a known client contact and clearly about one project (its name is in the email, or the client has just one active project).
 - **Sent to Email Review** (☰ menu → **Email Review**) when it's unsure — e.g. a client with several active projects and nothing in the email says which one. Open the queue and file each email to the right project with one click, or **Ignore** it. Confident emails skip review entirely.
 
-**On the project page:** the **Activity** panel lists emails newest-first — click one to expand the full message, use **open in Gmail** to jump to the original, and use the **search box** to find a specific email by subject, body, or person.
+**On the project page:** the **Activity** tab lists emails newest-first — click one to expand the full message, use **open in Gmail** to jump to the original, and use the **search box** to find a specific email by subject, body, or person.
 
 **Ask Claude:** with the connector you can ask things like *"find the email where Coatue approved the budget"* — it searches the activity log and can pull up the full message.
 
