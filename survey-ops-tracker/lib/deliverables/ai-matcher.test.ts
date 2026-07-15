@@ -77,4 +77,9 @@ describe('serverCorroborates', () => {
   it('false when nothing supports the pick', () => {
     expect(serverCorroborates({ ...d, haystack: 'q3 report.pdf' })).toBe(false)
   })
+  it('false when the only project-name overlap is a stopword like "tracker" (cross-client jargon)', () => {
+    // The Bain mis-file: "AI tracker" shares only "tracker" with "holocene ai tracker survey" — that
+    // generic word must NOT corroborate the pick (the real client, Holocene, isn't Bain).
+    expect(serverCorroborates({ clientName: 'Bain', projectName: 'AI tracker', haystack: 'holocene ai tracker survey', senderDomainMatchesClient: false, clientHasHistory: false })).toBe(false)
+  })
 })

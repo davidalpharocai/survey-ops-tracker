@@ -53,13 +53,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     getDeliverable: async (rid) =>
       (await admin.from('deliverables').select('id, file_name, drive_file_id, status, deleted_at').eq('id', rid).single()).data,
     getProject: async (pid) =>
-      (await admin.from('survey_projects').select('id, client_id, project_code, project_name, deliver_date').eq('id', pid).is('deleted_at', null).single()).data,
+      (await admin.from('survey_projects').select('id, client_id, project_code, project_name, deliver_date, longitudinal').eq('id', pid).is('deleted_at', null).single()).data,
     projectFolderId: async (p) => {
       const dateISO = p.deliver_date ?? new Date().toISOString().slice(0, 10)
       const resolver: FolderResolver = {
         sharedDriveId,
         clientFolderId: () => ensureClientFolder(admin, drive, sharedDriveId, p.client_id!),
-        projectFolderName: () => projectFolderName(p.project_name, p.project_code!, dateISO),
+        projectFolderName: () => projectFolderName(p.project_name, p.project_code!, dateISO, p.longitudinal ?? false),
         needsReviewFolderName: '00_Needs Review',
         unsortedFolderName: '_Unsorted',
       }

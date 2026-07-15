@@ -56,6 +56,23 @@ describe('ingestEmail', () => {
     expect(await drive.findChild(proj!, '2026.06.15 — Topline.pdf')).toBeTruthy()
   })
 
+  it('files a rerun (longitudinal) deliverable into an UNDATED parent folder, wave dated inside', async () => {
+    const drive = new FakeDrive('root')
+    const rerunData = { ...matchData, projects: [{ ...matchData.projects[0], longitudinal: true }] }
+    const { deps, rows } = makeDeps(drive, { matchData: rerunData })
+    const out = await ingestEmail({ ...pdfPayload, messageId: 'rerun-1' }, deps)
+
+    expect(out).toEqual({ action: 'processed', filed: 1, queued: 0, duplicates: 0 })
+    expect(rows[0]).toMatchObject({ project_id: 'p1', status: 'filed' })
+    const client = await drive.findChildFolder('root', 'Coatue')
+    // one undated parent folder (no _YYYY.MM.DD suffix) so every wave stacks in it
+    const proj = await drive.findChildFolder(client!, 'B2B Tracker_PR00003')
+    expect(proj).toBeTruthy()
+    expect(await drive.findChildFolder(client!, 'B2B Tracker_PR00003_2026.06.15')).toBeFalsy()
+    // the wave file itself is still dated
+    expect(await drive.findChild(proj!, '2026.06.15 — Topline.pdf')).toBeTruthy()
+  })
+
   it('stages an ambiguous deliverable in the review queue', async () => {
     const drive = new FakeDrive('root')
     const { deps, rows, replies } = makeDeps(drive)

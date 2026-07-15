@@ -7,8 +7,12 @@ export function isoToDot(iso: string): string {
   return iso.slice(0, 10).replace(/-/g, '.')
 }
 
-export function projectFolderName(projectName: string, projectCode: string, deliveredISO: string): string {
-  return `${sanitizeName(projectName)}_${projectCode}_${isoToDot(deliveredISO)}`
+// One-shot projects get a date-stamped folder. Reruns (longitudinal surveys) get ONE undated parent
+// folder — `{name}_{code}` — so every weekly/monthly wave stacks inside it as its own dated file,
+// instead of spawning a new dated folder per wave.
+export function projectFolderName(projectName: string, projectCode: string, deliveredISO: string, isRerun = false): string {
+  const base = `${sanitizeName(projectName)}_${projectCode}`
+  return isRerun ? base : `${base}_${isoToDot(deliveredISO)}`
 }
 
 export function deliverableFileName(dateISO: string, originalName: string): string {

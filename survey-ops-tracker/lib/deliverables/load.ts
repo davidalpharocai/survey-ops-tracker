@@ -20,7 +20,7 @@ export async function loadMatchData(admin: ReturnType<typeof createAdminClient>)
 }> {
   const [{ data: clients }, { data: projects }, { data: recips }] = await Promise.all([
     admin.from('clients').select('id, name, code'),
-    admin.from('survey_projects').select('id, client_id, project_code, project_name').is('deleted_at', null).not('project_code', 'is', null),
+    admin.from('survey_projects').select('id, client_id, project_code, project_name, longitudinal').is('deleted_at', null).not('project_code', 'is', null),
     admin.from('project_recipients').select('email, project_id'),
   ])
 

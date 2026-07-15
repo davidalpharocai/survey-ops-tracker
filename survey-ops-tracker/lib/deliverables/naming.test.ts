@@ -17,6 +17,11 @@ describe('deliverables/naming', () => {
       .toBe('Q2 Consumer Tracker_PR00112_2026.06.10')
   })
 
+  it('projectFolderName omits the date for a rerun (longitudinal) — one parent folder holds every wave', () => {
+    expect(projectFolderName('Holocene Tracker', 'PR00149', '2026-07-15', true))
+      .toBe('Holocene Tracker_PR00149')
+  })
+
   it('deliverableFileName prefixes the dotted date', () => {
     expect(deliverableFileName('2026-06-10', 'Topline.pdf')).toBe('2026.06.10 — Topline.pdf')
   })
