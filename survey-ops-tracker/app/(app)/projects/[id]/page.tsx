@@ -40,6 +40,7 @@ const TOOLTIPS: Record<string, string> = {
   'N Target': "Total number of survey responses you're aiming to collect.",
   'N Collected': 'Responses collected so far. Auto-synced every 15 minutes — manual edits may be overwritten by the next sync.',
   'Audience Size': 'Total size of the panel or population being surveyed. Different from N (target responses).',
+  'Audience': 'Who the survey is fielded to — the target respondent profile (free text, e.g. "US adults 18+, likely voters").',
   'N Internal Target': 'Your internal collection goal — usually a cushion above N Target to cover cleaning and terminations.',
   'Row-Level Data': 'Whether individual respondent-level data is included in the deliverable.',
   'Terminations': 'Whether any survey participants have been terminated (screened out) from the study.',
@@ -601,6 +602,13 @@ export default function ProjectDetailPage() {
                 value={project.audience_size}
                 tooltip={TOOLTIPS['Audience Size']}
                 onSave={v => updateProject.mutate({ id, updates: { audience_size: v } })}
+              />
+              <EditableRow
+                label="Audience"
+                value={project.audience ?? ''}
+                placeholder="e.g. US adults 18+, likely voters"
+                tooltip={TOOLTIPS['Audience']}
+                onSave={v => updateProject.mutate({ id, updates: { audience: v || null } })}
               />
             </SidebarCard>
 

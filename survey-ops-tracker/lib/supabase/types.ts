@@ -192,6 +192,7 @@ export type Database = {
           n_collected: number
           n_last_synced: string | null
           audience_size: number | null
+          audience: string | null
           row_level_data: boolean
           terminations: boolean
           stage_doc_programming: boolean
@@ -259,6 +260,7 @@ export type Database = {
           n_collected?: number
           n_last_synced?: string | null
           audience_size?: number | null
+          audience?: string | null
           row_level_data?: boolean
           terminations?: boolean
           stage_doc_programming?: boolean
@@ -326,6 +328,7 @@ export type Database = {
           n_collected?: number
           n_last_synced?: string | null
           audience_size?: number | null
+          audience?: string | null
           row_level_data?: boolean
           terminations?: boolean
           stage_doc_programming?: boolean
