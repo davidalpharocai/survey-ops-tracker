@@ -1,7 +1,7 @@
 // lib/deliverables/email-ingest.ts
 import type { DriveClient } from '@/lib/drive/types'
 import type { ClientRec, ContactRec, ProjectRec } from './types'
-import { matchDeliverable } from './matcher'
+import { matchDeliverable, namedClients } from './matcher'
 import { fileDeliverable, type FolderResolver } from './ingest'
 import { projectFolderName, originalSendDate } from './naming'
 import { routeMatch, describeCandidates, type LabeledCandidate } from './confidence'
@@ -76,7 +76,7 @@ export async function ingestEmail(payload: IngestPayload, deps: IngestDeps): Pro
   const dupIds = await Promise.all(files.map((f) => deps.findDup({ fileHash: f.hash })))
   const anyNew = dupIds.some((d) => !d)
 
-  let match = matchDeliverable({
+  const matchInput = {
     subject: payload.subject ?? '',
     body: payload.body ?? '',
     fromEmail: signalEmail,
@@ -85,12 +85,18 @@ export async function ingestEmail(payload: IngestPayload, deps: IngestDeps): Pro
     projects: deps.matchData.projects,
     contacts: deps.matchData.contacts,
     domainMap: deps.matchData.domainMap,
-  })
+  }
+  let match = matchDeliverable(matchInput)
   let routing = routeMatch(match)
 
   // AI matcher tier — only when the deterministic match is sub-threshold AND there is a new attachment to file.
   if (!routing.confident && anyNew && deps.aiMatch) {
-    const candidates = deps.matchData.projects.map((p) => ({
+    // Constrain the AI to the named client's projects when the filename/subject clearly names a client,
+    // so the model can't pick another client's look-alike project (a "holocene…" file → only Holocene's
+    // surveys). Falls back to all projects when no client is named.
+    const named = namedClients(matchInput)
+    const pool = named.size ? deps.matchData.projects.filter((p) => p.client_id && named.has(p.client_id)) : deps.matchData.projects
+    const candidates = pool.map((p) => ({
       projectCode: p.project_code,
       projectName: p.project_name,
       clientName: deps.matchData.clients.find((c) => c.id === p.client_id)?.name ?? 'Unknown',

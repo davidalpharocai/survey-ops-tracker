@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { matchDeliverable } from './matcher'
+import { matchDeliverable, namedClients } from './matcher'
 import type { MatchInput } from './types'
 
 const base: Omit<MatchInput, 'subject' | 'body' | 'fromEmail'> = {
@@ -174,5 +174,15 @@ describe('matchDeliverable', () => {
     // the cross-client Bain candidate is demoted below the Holocene match
     const bain = r.candidates.find((c) => c.projectId === 'p-bain')
     if (bain) expect(bain.confidence).toBeLessThanOrEqual(0.35)
+  })
+
+  // (j) namedClients: the exported helper that constrains AI candidates to the named client(s)
+  it('namedClients returns the client(s) whose distinctive name is in the signals', () => {
+    const clients = [
+      { id: 'c-holo', name: 'Holocene', code: 'Cl1' },
+      { id: 'c-bain', name: 'Bain', code: 'Cl2' },
+    ]
+    const set = namedClients({ clients, projects: [], contacts: [], domainMap: {}, subject: 'Fwd: New Occam data', body: '', fromEmail: 'x@gmail.com', filenames: ['holocene_ai_tracker_survey_0715'] })
+    expect([...set]).toEqual(['c-holo']) // "holocene" is named; "bain" is not
   })
 })
