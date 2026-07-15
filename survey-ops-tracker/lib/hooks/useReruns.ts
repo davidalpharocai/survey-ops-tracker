@@ -35,9 +35,59 @@ export interface RerunMetaPatch {
   last_wave_on?: string | null
   expected_next_on?: string | null
   owner_email?: string | null
+  backup_owner_email?: string | null
+  lead_days?: number | null
   paused?: boolean
   display_name?: string | null
   note?: string | null
+}
+
+export interface RerunReview {
+  id: string
+  reviewed_by: string | null
+  created_at: string
+}
+
+// The most recent weekly rerun-review record (or null if none yet) — drives the
+// "armed each Monday" banner.
+export function useLastRerunReview() {
+  const supabase = createClient()
+  return useQuery({
+    queryKey: ['rerun-review'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('rerun_review_log')
+        .select('id, reviewed_by, created_at')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (error) {
+        // Pre-migration-051 the table doesn't exist — treat as "never reviewed".
+        if (error.code === '42P01' || /does not exist/i.test(error.message)) return null
+        throw error
+      }
+      return (data as RerunReview) ?? null
+    },
+    staleTime: 60_000,
+  })
+}
+
+// Record that the weekly review was completed → POST /api/reruns/review.
+export function useMarkRerunReviewed() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (counts: { overdue_count: number; undefined_count: number; due_soon_count: number }) => {
+      const res = await fetch('/api/reruns/review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(counts),
+      })
+      const body = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string }
+      if (!res.ok) throw new Error(body.error ?? 'Failed to record review')
+      return body
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['rerun-review'] }),
+  })
 }
 
 // Define a rerun's cadence/owner or log its latest wave → POST /api/reruns/meta.

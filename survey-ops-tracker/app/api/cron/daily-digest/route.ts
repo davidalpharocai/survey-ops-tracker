@@ -20,6 +20,13 @@ function fmt(d: string | null): string {
   return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
+// Escape data fields before they enter the Slack `text` payload. Slack parses
+// mrkdwn, so an unescaped sheet/analyst value like "<https://x|click>" renders
+// as a live link. Escape the three control chars; leave our own literal markers.
+function escSlack(s: string | null | undefined): string {
+  return (s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
 export async function GET(req: NextRequest) {
   if (!authorized(req)) return new Response('Unauthorized', { status: 401 })
 
@@ -41,7 +48,7 @@ export async function GET(req: NextRequest) {
   const cap = (p: Row) =>
     (p.captain as { initials: string } | null)?.initials ?? '—'
   const line = (p: Row) =>
-    `• *${p.project_name}* (${p.client}) — ${p.board_column}, due ${fmt(p.due_date)}, ${p.n_collected}/${p.n_target ?? '—'} collected, ${cap(p)}`
+    `• *${escSlack(p.project_name)}* (${escSlack(p.client)}) — ${escSlack(p.board_column)}, due ${fmt(p.due_date)}, ${p.n_collected}/${p.n_target ?? '—'} collected, ${escSlack(cap(p))}`
 
   const overdue = (projects ?? []).filter(p => p.due_date && p.due_date <= today)
   const dueSoon = (projects ?? []).filter(p => p.due_date && p.due_date > today && p.due_date <= soon)
@@ -67,7 +74,28 @@ export async function GET(req: NextRequest) {
   const rerunSoon = list.filter(r => !r.is_overdue && r.effective_due && r.effective_due >= today && r.effective_due <= week)
   const rerunUndefined = list.filter(r => r.needs_definition)
   const rerunLine = (r: (typeof list)[number]) =>
-    `• *${r.client || r.cadence || 'Rerun'}*${r.client && r.cadence ? ` — ${r.cadence}` : ''} (due ${fmt(r.effective_due)}${r.owner_email ? ` · ${r.owner_email}` : ''})`
+    `• *${escSlack(r.client || r.cadence || 'Rerun')}*${r.client && r.cadence ? ` — ${escSlack(r.cadence)}` : ''} (due ${fmt(r.effective_due)})`
+  // Group by owner (named owners A-Z, unassigned last) so each person sees their
+  // name and their list. Empty owner is keyed to '' (an impossible email) rather
+  // than a printable sentinel, so no real owner_email can spoof the unassigned bucket.
+  const byOwner = (rows: typeof list): string => {
+    const map = new Map<string, typeof list>()
+    for (const r of rows) {
+      const key = (r.owner_email ?? '').trim() // '' = unassigned
+      const l = map.get(key) ?? []
+      l.push(r)
+      map.set(key, l)
+    }
+    return [...map.entries()]
+      .sort((a, b) => {
+        const au = a[0] === ''
+        const bu = b[0] === ''
+        if (au !== bu) return au ? 1 : -1 // unassigned last
+        return a[0].localeCompare(b[0])
+      })
+      .map(([owner, rs]) => `_${owner === '' ? '(unassigned)' : escSlack(owner)}_ (${rs.length})\n${rs.map(rerunLine).join('\n')}`)
+      .join('\n')
+  }
   // Mirror-staleness: if the sync froze, the whole radar is quietly out of date.
   const lastSync = list.reduce((m, r) => (r.synced_at && r.synced_at > m ? r.synced_at : m), '')
   const rerunStale = lastSync !== '' && Date.now() - new Date(lastSync).getTime() > 36 * 3600_000
@@ -86,14 +114,14 @@ export async function GET(req: NextRequest) {
 
   const sections: string[] = [`☀️ *Survey Ops daily digest* — ${fmt(today)}`]
   if (badEvents && badEvents.length) {
-    const lines = badEvents.map(e => `• \`${e.source}\` ${e.status} — ${e.detail ?? ''}`.trim())
+    const lines = badEvents.map(e => `• \`${escSlack(e.source)}\` ${escSlack(e.status)} — ${escSlack(e.detail ?? '')}`.trim())
     sections.push(`⚠️ *Backend issues in the last day (${badEvents.length})*\n${lines.join('\n')}`)
   }
   if (overdue.length) sections.push(`🔴 *Due today or overdue (${overdue.length})*\n${overdue.map(line).join('\n')}`)
   if (dueSoon.length) sections.push(`🟠 *Due in the next 3 days (${dueSoon.length})*\n${dueSoon.map(line).join('\n')}`)
   if (behind.length) sections.push(`📉 *Fielding behind target with deadline near (${behind.length})*\n${behind.map(line).join('\n')}`)
-  if (rerunOverdue.length) sections.push(`🔁 *Reruns overdue (${rerunOverdue.length})*\n${rerunOverdue.map(rerunLine).join('\n')}`)
-  if (rerunSoon.length) sections.push(`🔁 *Reruns due in the next 7 days (${rerunSoon.length})*\n${rerunSoon.map(rerunLine).join('\n')}`)
+  if (rerunOverdue.length) sections.push(`🔁 *Reruns overdue (${rerunOverdue.length})* — by owner\n${byOwner(rerunOverdue)}`)
+  if (rerunSoon.length) sections.push(`🔁 *Reruns due in the next 7 days (${rerunSoon.length})* — by owner\n${byOwner(rerunSoon)}`)
   if (rerunUndefined.length) sections.push(`🔧 *Reruns needing a cadence/date (${rerunUndefined.length})* — define them on /reruns so they can be tracked.`)
   if (rerunStale) sections.push(`⚠️ *Rerun mirror looks stale* — last synced ${fmt(lastSync.slice(0, 10))}. Run a sync from /reruns.`)
   if (sections.length === 1) sections.push('✅ Nothing overdue, nothing due in the next 3 days. Clear skies.')

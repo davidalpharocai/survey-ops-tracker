@@ -23,6 +23,8 @@ export function RerunMetaEditor({ r }: { r: RerunRow }) {
   const [lastWave, setLastWave] = useState(r.last_wave_on ?? '')
   const [nextOn, setNextOn] = useState(r.expected_next_on ?? '')
   const [owner, setOwner] = useState(r.owner_email ?? '')
+  const [backup, setBackup] = useState(r.backup_owner_email ?? '')
+  const [leadDays, setLeadDays] = useState(r.lead_days != null ? String(r.lead_days) : '')
   const [paused, setPaused] = useState(!!r.is_paused)
 
   // No stable key yet (pre-migration or pre-resync) — nothing to attach meta to.
@@ -38,6 +40,8 @@ export function RerunMetaEditor({ r }: { r: RerunRow }) {
         last_wave_on: lastWave || null,
         expected_next_on: nextOn || null,
         owner_email: owner || null,
+        backup_owner_email: backup || null,
+        lead_days: leadDays ? Number(leadDays) : null,
         paused,
         ...overrides,
       },
@@ -107,6 +111,30 @@ export function RerunMetaEditor({ r }: { r: RerunRow }) {
             onChange={(e) => setOwner(e.target.value)}
             className={`${inputCls} w-40`}
           />
+        </label>
+        <label className="flex items-center gap-1">
+          Backup
+          <input
+            type="text"
+            inputMode="email"
+            placeholder="optional"
+            value={backup}
+            onChange={(e) => setBackup(e.target.value)}
+            className={`${inputCls} w-36`}
+          />
+        </label>
+        <label className="flex items-center gap-1" title="Days before the due date to nudge the owner (default 7)">
+          Prep lead
+          <input
+            type="number"
+            min={1}
+            max={90}
+            placeholder="7"
+            value={leadDays}
+            onChange={(e) => setLeadDays(e.target.value)}
+            className={`${inputCls} w-14`}
+          />
+          d
         </label>
         <label className="flex items-center gap-1">
           <input type="checkbox" checked={paused} onChange={(e) => setPaused(e.target.checked)} /> Paused

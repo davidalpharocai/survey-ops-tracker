@@ -3,9 +3,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useReruns, useSyncReruns, type RerunRow } from '@/lib/hooks/useReruns'
 import { useProjects } from '@/lib/hooks/useProjects'
+import { useCurrentMember } from '@/lib/hooks/useCurrentMember'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
 import { Skeleton } from '@/components/shared/Skeleton'
 import { RerunMetaEditor } from '@/components/reruns/RerunMetaEditor'
+import { RerunReviewBanner } from '@/components/reruns/RerunReviewBanner'
 import { formatDate, daysOverdue } from '@/lib/utils/date'
 import { isTypingTarget } from '@/lib/utils/keyboard'
 import { toast } from '@/lib/utils/toast'
@@ -310,7 +312,7 @@ function RerunCard({ r, bucket, hrefFor }: { r: RerunRow; bucket: Bucket; hrefFo
       {/* key includes the meta fields so the editor re-seeds its form state after
           a save/log-wave refetch (Server ids are stable → no auto-remount). */}
       <RerunMetaEditor
-        key={`${r.rerun_key}:${r.cadence_months}:${r.last_wave_on}:${r.expected_next_on}:${r.owner_email}:${r.is_paused}`}
+        key={`${r.rerun_key}:${r.cadence_months}:${r.last_wave_on}:${r.expected_next_on}:${r.owner_email}:${r.backup_owner_email}:${r.lead_days}:${r.is_paused}`}
         r={r}
       />
     </li>
@@ -432,9 +434,12 @@ export default function RerunsPage() {
   const [work, setWork] = useState<'all' | 'Cadence' | 'Ad-Hoc'>('all')
   const [platform, setPlatform] = useState<'all' | 'PS' | 'B2B'>('all')
   const [client, setClient] = useState<string>('all')
+  const [mine, setMine] = useState(false)
   const [sort, setSort] = useState<SortKey>('smart')
   const searchRef = useRef<HTMLInputElement>(null)
   const sync = useSyncReruns()
+  const { data: me } = useCurrentMember()
+  const myEmail = me?.email?.toLowerCase() ?? null
   const { data: projects = [] } = useProjects()
   const projectClients = useMemo(() => projects.map((p) => p.client), [projects])
   const hrefFor = useCallback(
@@ -491,6 +496,11 @@ export default function RerunsPage() {
       if (work !== 'all' && r.work !== work) return false
       if (platform !== 'all' && r.platform !== platform) return false
       if (client !== 'all' && firmOf(r) !== client) return false
+      if (mine && myEmail) {
+        const o = (r.owner_email ?? '').toLowerCase()
+        const b = (r.backup_owner_email ?? '').toLowerCase()
+        if (o !== myEmail && b !== myEmail) return false
+      }
       if (tokens.length) {
         const hay = [r.client, r.cadence, r.note, r.status_raw, r.survey_ids, r.template, r.work, r.platform, r.freq]
           .filter(Boolean)
@@ -500,7 +510,7 @@ export default function RerunsPage() {
       }
       return true
     })
-  }, [rows, q, work, platform, client])
+  }, [rows, q, work, platform, client, mine, myEmail])
 
   const g = useMemo(() => {
     const groups: Record<Bucket, RerunRow[]> = { overdue: [], upcoming: [], done: [], unsorted: [] }
@@ -523,7 +533,13 @@ export default function RerunsPage() {
 
   const syncedAt = rows.length ? rows.reduce((m, r) => (r.synced_at > m ? r.synced_at : m), rows[0].synced_at) : null
   const stale = syncedAt ? Date.now() - new Date(syncedAt).getTime() > 36 * 3_600_000 : false
-  const filterActive = work !== 'all' || platform !== 'all' || client !== 'all' || q.trim() !== ''
+  const filterActive = work !== 'all' || platform !== 'all' || client !== 'all' || mine || q.trim() !== ''
+
+  // Board-level counts (ignore the active filters) — the weekly-review banner
+  // reflects the true state of the whole radar, not the current view.
+  const boardOverdue = useMemo(() => rows.filter((r) => r.is_overdue).length, [rows])
+  const boardNeedsDate = useMemo(() => rows.filter((r) => r.needs_definition).length, [rows])
+  const boardDueSoon = useMemo(() => rows.filter((r) => r.in_prep_window).length, [rows])
 
   if (isLoading) {
     return (
@@ -606,6 +622,24 @@ export default function RerunsPage() {
         </div>
       ) : (
         <>
+          {/* Weekly rerun-review ritual (armed Mondays; facilitator Sree) */}
+          <RerunReviewBanner
+            overdue={boardOverdue}
+            needsDate={boardNeedsDate}
+            dueSoon={boardDueSoon}
+            onJump={() => {
+              // The banner reflects the whole board, so an active filter/search may be
+              // hiding the overdue items (and their section anchor). Clear filters first
+              // so the section mounts, then scroll to it on the next tick.
+              setQ('')
+              setWork('all')
+              setPlatform('all')
+              setClient('all')
+              setMine(false)
+              setTimeout(() => jumpTo('overdue'), 0)
+            }}
+          />
+
           {/* Search + sync controls */}
           <div className="flex items-center gap-2 flex-wrap">
             <input
@@ -682,6 +716,21 @@ export default function RerunsPage() {
                 </option>
               ))}
             </select>
+            {myEmail && (
+              <button
+                type="button"
+                onClick={() => setMine((v) => !v)}
+                aria-pressed={mine}
+                title="Show only reruns I own or back up"
+                className={`text-xs rounded-lg px-2.5 py-1.5 border transition-colors ${
+                  mine
+                    ? 'bg-primary/15 text-primary border-primary/40'
+                    : 'bg-muted text-muted-foreground border-border hover:text-foreground'
+                }`}
+              >
+                👤 Mine
+              </button>
+            )}
             <select aria-label="Sort" value={sort} onChange={(e) => changeSort(e.target.value as SortKey)} className={`${selectCls} sm:ml-auto`}>
               <option value="smart">Sort: smart (by date)</option>
               <option value="client">Sort: client A–Z</option>
@@ -695,6 +744,7 @@ export default function RerunsPage() {
                   setWork('all')
                   setPlatform('all')
                   setClient('all')
+                  setMine(false)
                 }}
                 className="text-xs text-muted-foreground hover:text-foreground underline"
               >

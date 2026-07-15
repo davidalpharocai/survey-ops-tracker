@@ -1298,6 +1298,10 @@ export type Database = {
           last_wave_on: string | null
           expected_next_on: string | null
           owner_email: string | null
+          backup_owner_email: string | null
+          lead_days: number | null
+          prep_nudged_for: string | null
+          overdue_nudged_for: string | null
           paused: boolean
           note: string | null
           updated_by: string | null
@@ -1310,6 +1314,10 @@ export type Database = {
           last_wave_on?: string | null
           expected_next_on?: string | null
           owner_email?: string | null
+          backup_owner_email?: string | null
+          lead_days?: number | null
+          prep_nudged_for?: string | null
+          overdue_nudged_for?: string | null
           paused?: boolean
           note?: string | null
           updated_by?: string | null
@@ -1322,10 +1330,44 @@ export type Database = {
           last_wave_on?: string | null
           expected_next_on?: string | null
           owner_email?: string | null
+          backup_owner_email?: string | null
+          lead_days?: number | null
+          prep_nudged_for?: string | null
+          overdue_nudged_for?: string | null
           paused?: boolean
           note?: string | null
           updated_by?: string | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      rerun_review_log: {
+        Row: {
+          id: string
+          reviewed_by: string | null
+          overdue_count: number | null
+          undefined_count: number | null
+          due_soon_count: number | null
+          note: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          reviewed_by?: string | null
+          overdue_count?: number | null
+          undefined_count?: number | null
+          due_soon_count?: number | null
+          note?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          reviewed_by?: string | null
+          overdue_count?: number | null
+          undefined_count?: number | null
+          due_soon_count?: number | null
+          note?: string | null
+          created_at?: string
         }
         Relationships: []
       }
@@ -1355,11 +1397,17 @@ export type Database = {
           last_wave_on: string | null
           expected_next_on: string | null
           owner_email: string | null
+          backup_owner_email: string | null
+          lead_days: number | null
+          prep_nudged_for: string | null
+          overdue_nudged_for: string | null
           is_paused: boolean | null
           is_defined: boolean | null
           has_cadence_due: boolean | null
           effective_due: string | null
+          days_to_due: number | null
           is_overdue: boolean | null
+          in_prep_window: boolean | null
           needs_definition: boolean | null
         }
         Relationships: []

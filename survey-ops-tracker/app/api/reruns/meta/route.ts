@@ -28,6 +28,11 @@ export async function POST(req: Request) {
 
   const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null)
   const cadence = [1, 3, 6, 12].includes(Number(body.cadence_months)) ? Number(body.cadence_months) : null
+  // Prep-nudge lead time in days; clamp to a sane range, else fall back to the
+  // global default (null → the view uses 7).
+  const leadRaw = Number(body.lead_days)
+  const lead_days =
+    'lead_days' in body ? (Number.isFinite(leadRaw) && leadRaw >= 1 && leadRaw <= 90 ? Math.round(leadRaw) : null) : undefined
 
   const patch = {
     rerun_key,
@@ -35,6 +40,8 @@ export async function POST(req: Request) {
     last_wave_on: str(body.last_wave_on),
     expected_next_on: str(body.expected_next_on),
     owner_email: str(body.owner_email),
+    backup_owner_email: str(body.backup_owner_email),
+    ...(lead_days === undefined ? {} : { lead_days }),
     paused: body.paused === true,
     display_name: str(body.display_name),
     note: str(body.note),

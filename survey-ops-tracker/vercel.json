@@ -17,6 +17,10 @@
       "schedule": "30 11 * * *"
     },
     {
+      "path": "/api/cron/rerun-nudges",
+      "schedule": "15 12 * * *"
+    },
+    {
       "path": "/api/cron/email-retention",
       "schedule": "0 8 * * *"
     }
