@@ -2,7 +2,7 @@
 // "Internal" marks projects with no external sales lead.
 export const SALESPEOPLE = [
   'Alex Pinsky',
-  'Jenna Strova',
+  'Jenna Shrove',
   'Steven Stubbs',
   'Vineet Kapur',
   'Internal',

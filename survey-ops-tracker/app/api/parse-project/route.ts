@@ -21,7 +21,7 @@ const FIELDS_SCHEMA = {
     salesperson: {
       type: 'string',
       description:
-        'Full name. Map first names to: Alex Pinsky, Jenna Strova, Steven Stubbs, Vineet Kapur. Use "Internal" when there is no external sales lead.',
+        'Full name. Map first names to: Alex Pinsky, Jenna Shrove, Steven Stubbs, Vineet Kapur. Use "Internal" when there is no external sales lead.',
     },
     n_target: { type: 'integer' },
     n_collected: { type: 'integer' },

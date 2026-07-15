@@ -70,7 +70,7 @@ const CLIENT_CANON = {
   'SEMA-Lauren': 'SEMA - Lauren', 'US CoC': 'US Chamber', A4A: 'Airlines 4 America (A4A)',
   'Rerun - and then set up quarterly': 'BAM - Elliot', Goldentree: 'GoldenTree',
 }
-const SALES_CANON = { Alex: 'Alex Pinsky', Jenna: 'Jenna Strova', Vineet: 'Vineet Kapur', Steve: 'Steven Stubbs', Shanu: 'Shanu Aggarwal' }
+const SALES_CANON = { Alex: 'Alex Pinsky', Jenna: 'Jenna Shrove', Vineet: 'Vineet Kapur', Steve: 'Steven Stubbs', Shanu: 'Shanu Aggarwal' }
 
 const wb = XLSX.readFile(path.join(dir, 'survey-ops.xlsx'), { cellDates: true })
 const rows = XLSX.utils.sheet_to_json(wb.Sheets['Surveys'], { header: 1, defval: null })

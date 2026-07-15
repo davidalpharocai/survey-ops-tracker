@@ -55,7 +55,7 @@ if (existing.length === 0) {
 
 // Salespeople on projects (exact matches only — odd values left alone on purpose)
 await patch('survey_projects', 'salesperson=eq.Alex', { salesperson: 'Alex Pinsky' })
-await patch('survey_projects', 'salesperson=eq.Jenna', { salesperson: 'Jenna Strova' })
+await patch('survey_projects', 'salesperson=eq.Jenna', { salesperson: 'Jenna Shrove' })
 await patch('survey_projects', 'salesperson=eq.Vineet', { salesperson: 'Vineet Kapur' })
 await patch('survey_projects', 'salesperson=eq.Steve', { salesperson: 'Steven Stubbs' })
 await patch('survey_projects', 'salesperson=eq.Shanu', { salesperson: 'Shanu Aggarwal' })

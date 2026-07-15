@@ -64,7 +64,7 @@ const CLIENT_CANON = {
   'US CoC': 'US Chamber', A4A: 'Airlines 4 America (A4A)', 'Rerun - and then set up quarterly': 'BAM - Elliot', Goldentree: 'GoldenTree',
   'Vance Junction AI': 'Junction AI', 'Main Fraim/Junction.AI - Vance': 'Junction AI', 'Junction.AI - Vance Reavie': 'Junction AI', 'Junction.AI': 'Junction AI', // Vance Reavie is the contact, not the client
 }
-const SALES_CANON = { Alex: 'Alex Pinsky', Jenna: 'Jenna Strova', Vineet: 'Vineet Kapur', Steve: 'Steven Stubbs', Shanu: 'Shanu Aggarwal' }
+const SALES_CANON = { Alex: 'Alex Pinsky', Jenna: 'Jenna Shrove', Vineet: 'Vineet Kapur', Steve: 'Steven Stubbs', Shanu: 'Shanu Aggarwal' }
 
 // Genuine disagreements surfaced to David — never auto-overwrite these (project_code -> [fields])
 const SKIP = { PR00119: ['salesperson'], PR00122: ['salesperson'], PR00001: ['project_type', 'status'] }

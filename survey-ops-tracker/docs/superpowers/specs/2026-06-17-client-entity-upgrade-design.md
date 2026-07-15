@@ -12,7 +12,7 @@ Enrich the client entity so categorization and salesperson live at the **client 
 
 - Clients are **auto-created** by the `sync_project_client` DB trigger from a project's free-text `client` field (firm-normalized: "BAM - James Cook" → "BAM"). There is **no add-client UI**.
 - `Cl#####` codes come from the sheet's *Unique Clients* tab via a backfill script.
-- Salesperson today is a per-project free-text field (`AlphaROC Sales/POC` in the sheet; full names: Alex Pinsky, Jenna Strova, Steven Stubbs, Vineet Kapur).
+- Salesperson today is a per-project free-text field (`AlphaROC Sales/POC` in the sheet; full names: Alex Pinsky, Jenna Shrove, Steven Stubbs, Vineet Kapur).
 
 ## Pieces
 
