@@ -34,6 +34,8 @@ const SLIM_PROJECT_COLUMNS = [
   'scoping_stage',
   'launch_date',
   'due_date',
+  'deliver_date',
+  'rerun_date',
   'n_target',
   'n_collected',
   'n_actual',

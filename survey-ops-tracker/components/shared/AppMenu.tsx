@@ -91,6 +91,13 @@ export function AppMenu() {
             <span>📋</span> List view
           </Link>
           <Link
+            href="/calendar"
+            className={itemClass}
+            title="Calendar — every dated event (due, deliver, launch, rerun) plus your reminders on a month grid; filter by captain, type, client, and more"
+          >
+            <span>📅</span> Calendar
+          </Link>
+          <Link
             href="/internal"
             className={itemClass}
             title="Internal Projects — AlphaROC's own work, on a sprint-based Backlog → Done board (separate from survey projects)"
