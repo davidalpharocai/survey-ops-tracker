@@ -54,7 +54,7 @@ New projects normally start in **Scoping** (New Inquiry → Proposal Sent → Pr
 [screenshot: project page Overview]
 
 ### Hero stats (top)
-Four big tiles: **N collected** (click to edit), **Timing** — Due (internal: when our work must be done) and Deliver (client: when they need it in hand) side by side, with the buffer between them spelled out ("same day as due", "2d buffer", or a ⚠ if delivery is set before the internal due date; both dates click-to-edit) — **Budget left** (with cost per response), and **Waiting On** (computes itself from the stage checkboxes — use "Blocked by" to override when stuck on the client or on us).
+A compact three-zone strip: **N collected** (accented, click to edit) · a **Dates** tile holding all the project dates inline — **Submitted, Launch, Due (internal), Deliver (client)**, plus **Rerun** for longitudinal studies — each click-to-edit, with Due showing its urgency color and Deliver spelling out the buffer ("same day as due", "2d buffer", or a ⚠ if delivery is set before the internal due date) · and a compact **Waiting on** (computes itself from the stage checkboxes — use "Blocked by" to override when stuck on the client or on us). Budget now lives in the Money card, not the hero.
 
 ### Tabs
 - **Overview** — everything below
@@ -65,12 +65,14 @@ Four big tiles: **N collected** (click to edit), **Timing** — Due (internal: w
 
 ### Left column
 - **Pipeline progress** — check off stages (this moves the card on the board)
-- **Latest / Next Steps** and **Linked Documents** sit side by side on wide screens. Next Steps: add to-dos (Ctrl+Enter saves); check one off and it moves to the "Latest" log with date + who (old imported notes live under "History"). Linked Documents: paste any URL (its document title fills in automatically), rename via the ✎ or remove via the ✕ (this only unlinks it — the file stays in Drive); questionnaire/Edwin/data sheet links live here
+- **Linked Documents** (shown first) — paste any URL (its document title fills in automatically), rename via the ✎ or remove via the ✕ (this only unlinks it — the file stays in Drive); questionnaire/Edwin/data sheet links live here
+- **Latest / Next Steps** — add to-dos (Ctrl+Enter saves); check one off and it moves to the "Latest" log with date + who (old imported notes live under "History"). It sits below Linked Documents so a long notes log can't push the documents down the page
 - **Compliance Review** — appears only when the client requires a review (before and/or after fielding) or a review has already been submitted (see §6)
-- **✦ Edit by description** — type changes in plain English ("collected is 180, due pushed to July 20"), review the before→after preview, approve
+
+(Changes in plain English are handled by the connector now — ask your Claude to make edits instead of a per-page box.)
 
 ### Right sidebar
-Titled groups: **People** (client, the **Requested by** contact, captain + optional co-captains, salesperson from a dropdown), **Dates**, **Sample N & Audience** (N target, internal target, collected, actual, audience size), **Flags** (click a chip to toggle), **Money** (Total budget + computed Actual $ / cost-per-complete / budget-used; then, by project type: **PS** shows **Suppliers** — the PureSpectrum sample suppliers, each with a CPI (cost per interview) and a completes cap, plus an estimated cost = Σ cap×CPI; **B2B** shows **Blast Configuration** — create a blast with its $/bid + per-respondent reward + optional schedule, then mark it sent, at which point its cost (incl. incentive) counts toward spend). Most projects have one captain; "+ add" under Co-Captains shares a project, and shared projects show "+1" on their board card.
+Titled groups: **People** (spans the full sidebar width so names aren't clipped — client, the **Requested by** contact, captain + optional co-captains, salesperson from a dropdown), **Sample N & Audience** (N target, internal target, collected, actual, audience size), **Flags** (click a chip to toggle), **Money** (by project type first: **PS** shows **Suppliers** — the PureSpectrum sample suppliers, each with a $ / complete (CPI) and a completes cap, plus an estimated cost = Σ cap×CPI; **B2B** shows **Blast Configuration** — create a blast with its $/bid + per-respondent reward + optional schedule, then mark it sent, at which point its cost (incl. incentive) counts toward spend — then the **Budgets** section beneath: Total budget + computed Actual $ / cost-per-complete / budget-used). Most projects have one captain; "+ add" under Co-Captains shares a project, and shared projects show "+1" on their board card. Project dates now live in the hero strip at the top, not the sidebar.
 
 **Requested by** is the client contact who asked for the survey. Click it to pick from that client's people or add a new one inline (first + last name required; email/title/phone optional), and click a chosen name to view or edit their details. Manage the full roster — and archive/delete contacts — on the client page.
 
