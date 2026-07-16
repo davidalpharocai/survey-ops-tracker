@@ -62,7 +62,7 @@ export function SegmentedNTile({
   const segmented = (project.segment_count ?? 0) > 0 || segments.length > 0
 
   const TotalNumber = (
-    <span className="text-2xl font-semibold text-foreground leading-tight">
+    <span className="text-xl font-semibold text-foreground leading-tight">
       {fmtNum(project.n_collected)}
       {project.n_target != null ? (
         <span className="text-base font-normal text-muted-foreground"> / {fmtNum(project.n_target)}</span>
@@ -142,7 +142,7 @@ export function SegmentedNTile({
       ) : (
         <button
           onClick={() => { setDraft(String(project.n_collected)); setEditing(true) }}
-          className="text-2xl font-semibold text-foreground leading-tight text-left cursor-pointer hover:bg-accent rounded-md px-1.5 -ml-1.5 transition-colors"
+          className="text-xl font-semibold text-foreground leading-tight text-left cursor-pointer hover:bg-accent rounded-md px-1.5 -ml-1.5 transition-colors"
           title="Click to edit"
         >
           {fmtNum(project.n_collected)}

@@ -439,25 +439,17 @@ export default function ProjectDetailPage() {
         <NewProjectSetupBanner project={project} />
         <ComplianceBanner project={project} />
         {/* Hero stat strip */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+        <div className="grid grid-cols-1 md:grid-cols-[minmax(130px,0.9fr)_minmax(0,2.6fr)_minmax(116px,0.8fr)] gap-3 mb-4 items-stretch">
           <SegmentedNTile
             project={project}
             tooltip={TOOLTIPS['N Collected']}
             onSaveCollected={v => updateProject.mutate({ id, updates: { n_collected: v ?? 0 } })}
             accent
           />
-          <HeroTiming
-            due={project.due_date}
-            deliver={project.deliver_date}
+          <HeroDates
+            project={project}
             closed={project.status === 'Closed'}
-            onSaveDue={v => updateProject.mutate({ id, updates: { due_date: v } })}
-            onSaveDeliver={v => updateProject.mutate({ id, updates: { deliver_date: v } })}
-          />
-          <HeroBudgetLeft
-            budget={project.budget ?? null}
-            actualSpend={project.actual_spend ?? null}
-            nCollected={project.n_collected}
-            nActual={project.n_actual ?? null}
+            onSaveField={updates => updateProject.mutate({ id, updates })}
           />
           <HeroWaitingOn
             project={project}
@@ -510,100 +502,58 @@ export default function ProjectDetailPage() {
           {/* Right sidebar — packs into 2 columns on wide screens to cut scrolling;
               single column on narrower ones. Money spans both (it's the tallest). */}
           <div className="flex flex-col gap-4 self-start xl:grid xl:grid-cols-2 xl:items-start xl:content-start xl:gap-4">
-            <SidebarCard title="People">
-              {project.client_id ? (
-                <div className="flex justify-between items-center text-sm gap-2">
-                  <span className="text-muted-foreground flex items-center text-xs shrink-0">
-                    Client
-                    <InfoTooltip text="The client this project is for. Click the name to open their client page — all their projects, spend, and history." />
-                  </span>
-                  <Link
-                    href={`/clients/${project.client_id}`}
-                    className="text-sm text-blue-600 dark:text-blue-400 hover:underline truncate"
-                    title="Open this client's page"
-                  >
-                    {project.client}
-                  </Link>
-                </div>
-              ) : (
-                <DetailRow label="Client" value={project.client} tooltip={TOOLTIPS['Client']} />
-              )}
-              {project.client_id && (
-                <RequestedByRow
-                  clientId={project.client_id}
-                  contactId={project.requested_by_contact_id ?? null}
-                  snapshotName={project.requested_by_name ?? null}
-                  tooltip={TOOLTIPS['Requested by']}
-                  onChange={updates => updateProject.mutate({ id, updates })}
-                />
-              )}
-              <CaptainRow
-                label="Project Captain"
-                captain={project.captain}
-                teamMembers={teamMembers}
-                tooltip={TOOLTIPS['Project Captain']}
-                onSave={v => updateProject.mutate({ id, updates: { captain_id: v } })}
-              />
-              {'co_captain_ids' in project && (
-                <CoCaptainsRow
-                  ids={project.co_captain_ids ?? []}
-                  teamMembers={teamMembers}
-                  primaryId={project.captain?.id ?? null}
-                  tooltip={TOOLTIPS['Co-Captains']}
-                  onSave={ids => updateProject.mutate({ id, updates: { co_captain_ids: ids } })}
-                />
-              )}
-              <SalespersonRow
-                value={project.salesperson ?? ''}
-                tooltip={TOOLTIPS['Salesperson']}
-                onSave={v => updateProject.mutate({ id, updates: { salesperson: v } })}
-              />
-            </SidebarCard>
-
-            <SidebarCard title="Dates">
-              <EditableDateRow
-                label="Submitted"
-                value={project.submitted_date}
-                tooltip={TOOLTIPS['Submitted']}
-                onSave={v => updateProject.mutate({ id, updates: { submitted_date: v } })}
-              />
-              <EditableDateRow
-                label="Launch Date"
-                value={project.launch_date}
-                tooltip={TOOLTIPS['Launch Date']}
-                onSave={v => updateProject.mutate({ id, updates: { launch_date: v } })}
-              />
-              <EditableDateRow
-                label="Due Date"
-                value={project.due_date}
-                tooltip={TOOLTIPS['Due Date']}
-                onSave={v => updateProject.mutate({ id, updates: { due_date: v } })}
-              />
-              <EditableDateRow
-                label="Deliver Date"
-                value={project.deliver_date}
-                tooltip={TOOLTIPS['Deliver Date']}
-                onSave={v => updateProject.mutate({ id, updates: { deliver_date: v } })}
-              />
-              {project.longitudinal && (
-                <>
-                  <EditableDateRow
-                    label="Rerun date"
-                    value={project.rerun_date ?? null}
-                    tooltip="When the next wave of this longitudinal survey should run. A week before this date the system auto-creates the next wave (in Submitted), setup carried over and run-data reset."
-                    onSave={v => updateProject.mutate({ id, updates: { rerun_date: v, rerun_spawned_at: null } })}
+            <SidebarCard title="People" className="xl:col-span-2">
+              {/* Full-width People card so long names aren't clipped; fields flow
+                  into two columns once the sidebar is wide enough (xl+). */}
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-x-8 gap-y-3 items-start">
+                {project.client_id ? (
+                  <div className="flex justify-between items-center text-sm gap-2">
+                    <span className="text-muted-foreground flex items-center text-xs shrink-0">
+                      Client
+                      <InfoTooltip text="The client this project is for. Click the name to open their client page — all their projects, spend, and history." />
+                    </span>
+                    <Link
+                      href={`/clients/${project.client_id}`}
+                      className="text-sm text-blue-600 dark:text-blue-400 hover:underline truncate"
+                      title="Open this client's page"
+                    >
+                      {project.client}
+                    </Link>
+                  </div>
+                ) : (
+                  <DetailRow label="Client" value={project.client} tooltip={TOOLTIPS['Client']} />
+                )}
+                {project.client_id && (
+                  <RequestedByRow
+                    clientId={project.client_id}
+                    contactId={project.requested_by_contact_id ?? null}
+                    snapshotName={project.requested_by_name ?? null}
+                    tooltip={TOOLTIPS['Requested by']}
+                    onChange={updates => updateProject.mutate({ id, updates })}
                   />
-                  {(project.rerun_number ?? 1) > 1 && (
-                    <div className="flex justify-between items-center text-sm gap-2">
-                      <span className="text-muted-foreground text-xs">Rerun wave</span>
-                      <span className="text-sm text-foreground">{ordinal(project.rerun_number)} wave</span>
-                    </div>
-                  )}
-                  {project.rerun_spawned_at && (
-                    <p className="text-[11px] text-muted-foreground/70">↻ Next wave already created.</p>
-                  )}
-                </>
-              )}
+                )}
+                <CaptainRow
+                  label="Project Captain"
+                  captain={project.captain}
+                  teamMembers={teamMembers}
+                  tooltip={TOOLTIPS['Project Captain']}
+                  onSave={v => updateProject.mutate({ id, updates: { captain_id: v } })}
+                />
+                {'co_captain_ids' in project && (
+                  <CoCaptainsRow
+                    ids={project.co_captain_ids ?? []}
+                    teamMembers={teamMembers}
+                    primaryId={project.captain?.id ?? null}
+                    tooltip={TOOLTIPS['Co-Captains']}
+                    onSave={ids => updateProject.mutate({ id, updates: { co_captain_ids: ids } })}
+                  />
+                )}
+                <SalespersonRow
+                  value={project.salesperson ?? ''}
+                  tooltip={TOOLTIPS['Salesperson']}
+                  onSave={v => updateProject.mutate({ id, updates: { salesperson: v } })}
+                />
+              </div>
             </SidebarCard>
 
             <SidebarCard title="Sample N & Audience">
@@ -731,19 +681,18 @@ function SidebarCard({ title, children, className = '' }: { title: string; child
 
 /* ---------- Hero stat strip cards ---------- */
 
-function HeroTiming({
-  due,
-  deliver,
-  closed = false,
-  onSaveDue,
-  onSaveDeliver,
+function HeroDates({
+  project,
+  closed,
+  onSaveField,
 }: {
-  due: string | null
-  deliver: string | null
-  closed?: boolean
-  onSaveDue: (next: string | null) => void
-  onSaveDeliver: (next: string | null) => void
+  project: SurveyProject
+  closed: boolean
+  onSaveField: (updates: Partial<SurveyProject>) => void
 }) {
+  const due = project.due_date
+  const deliver = project.deliver_date
+
   // Closed projects are done — drop the red/orange/amber urgency treatment
   const urgency = closed ? null : getDueUrgency(due)
   const dueColor =
@@ -777,45 +726,76 @@ function HeroTiming({
     deliverPhrase = 'no internal due set'
   }
 
+  const longitudinal = !!project.longitudinal
+
   return (
-    <div className="bg-card border border-border shadow-sm rounded-xl p-3 grid grid-cols-2 gap-2">
-      <TimingHalf
-        label="Due"
-        hint="internal"
-        tooltip="Internal deadline — when everything needs to be finished on our side. Click the date to change it."
-        value={due}
-        valueColor={dueColor}
-        subtitle={duePhrase}
-        onSave={onSaveDue}
-      />
-      <TimingHalf
-        label="Deliver"
-        hint="client"
-        tooltip="Client-facing deadline — when the client needs the project in hand. Often the same day as the internal due date; the note below shows the buffer between the two."
-        value={deliver}
-        valueColor={deliverWarn ? 'text-amber-600 dark:text-amber-400' : 'text-foreground'}
-        subtitle={deliverPhrase}
-        onSave={onSaveDeliver}
-      />
+    <div className="bg-card border border-border shadow-sm rounded-xl p-3 flex flex-col justify-center gap-1.5">
+      <div className={`grid grid-cols-2 ${longitudinal ? 'sm:grid-cols-5' : 'sm:grid-cols-4'} gap-x-3 gap-y-2`}>
+        <HeroDateCell
+          label="Submitted"
+          tooltip={TOOLTIPS['Submitted']}
+          value={project.submitted_date}
+          onSave={v => onSaveField({ submitted_date: v })}
+        />
+        <HeroDateCell
+          label="Launch"
+          tooltip={TOOLTIPS['Launch Date']}
+          value={project.launch_date}
+          onSave={v => onSaveField({ launch_date: v })}
+        />
+        <HeroDateCell
+          label="Due"
+          hint="internal"
+          tooltip={TOOLTIPS['Due Date']}
+          value={due}
+          valueColor={dueColor}
+          subtitle={duePhrase}
+          onSave={v => onSaveField({ due_date: v })}
+        />
+        <HeroDateCell
+          label="Deliver"
+          hint="client"
+          tooltip={TOOLTIPS['Deliver Date']}
+          value={deliver}
+          valueColor={deliverWarn ? 'text-amber-600 dark:text-amber-400' : 'text-foreground'}
+          subtitle={deliverPhrase}
+          onSave={v => onSaveField({ deliver_date: v })}
+        />
+        {longitudinal && (
+          <HeroDateCell
+            label="Rerun"
+            tooltip="When the next wave of this longitudinal survey should run. A week before this date the system auto-creates the next wave, setup carried over and run-data reset."
+            value={project.rerun_date ?? null}
+            onSave={v => onSaveField({ rerun_date: v, rerun_spawned_at: null })}
+          />
+        )}
+      </div>
+      {longitudinal && ((project.rerun_number ?? 1) > 1 || project.rerun_spawned_at) && (
+        <p className="text-[10px] text-muted-foreground/70 truncate">
+          {(project.rerun_number ?? 1) > 1 ? `${ordinal(project.rerun_number)} wave` : ''}
+          {(project.rerun_number ?? 1) > 1 && project.rerun_spawned_at ? ' · ' : ''}
+          {project.rerun_spawned_at ? '↻ next wave created' : ''}
+        </p>
+      )}
     </div>
   )
 }
 
-function TimingHalf({
+function HeroDateCell({
   label,
   hint,
   tooltip,
   value,
-  valueColor,
+  valueColor = 'text-foreground',
   subtitle,
   onSave,
 }: {
   label: string
-  hint: string
+  hint?: string
   tooltip: string
   value: string | null
-  valueColor: string
-  subtitle: string
+  valueColor?: string
+  subtitle?: string
   onSave: (next: string | null) => void
 }) {
   const [editing, setEditing] = useState(false)
@@ -827,10 +807,10 @@ function TimingHalf({
   }
 
   return (
-    <div className="flex flex-col gap-1 min-w-0">
-      <span className="text-xs text-muted-foreground flex items-center whitespace-nowrap">
-        {label} <span className="text-muted-foreground/60 ml-1">({hint})</span>
-        <InfoTooltip text={tooltip} />
+    <div className="flex flex-col gap-0.5 min-w-0" title={tooltip}>
+      <span className="text-[10px] uppercase tracking-wide text-muted-foreground whitespace-nowrap">
+        {label}
+        {hint && <span className="text-muted-foreground/60 normal-case"> ({hint})</span>}
       </span>
       {editing ? (
         <input
@@ -839,7 +819,7 @@ function TimingHalf({
           value={draft}
           onChange={e => setDraft(e.target.value)}
           onBlur={save}
-          className="min-w-0 w-full bg-muted border border-border rounded px-1.5 py-1 text-sm text-foreground focus:outline-none focus:border-ring"
+          className="min-w-0 w-full bg-muted border border-border rounded px-1 py-0.5 text-sm text-foreground focus:outline-none focus:border-ring"
           onKeyDown={e => {
             if (e.key === 'Enter') save()
             if (e.key === 'Escape') setEditing(false)
@@ -851,65 +831,15 @@ function TimingHalf({
             setDraft(value ? value.slice(0, 10) : '')
             setEditing(true)
           }}
-          className={`text-xl font-semibold leading-tight text-left cursor-pointer truncate hover:bg-accent rounded-md px-1.5 -ml-1.5 transition-colors ${valueColor}`}
+          className={`text-sm font-medium leading-tight text-left cursor-pointer truncate hover:bg-accent rounded px-1 -ml-1 transition-colors ${valueColor}`}
           title="Click to edit"
         >
           {formatDate(value)}
         </button>
       )}
-      <span className="text-xs text-muted-foreground truncate">{subtitle}</span>
-    </div>
-  )
-}
-
-function HeroBudgetLeft({
-  budget,
-  actualSpend,
-  nCollected,
-  nActual,
-}: {
-  budget: number | null
-  actualSpend: number | null
-  nCollected: number
-  nActual: number | null
-}) {
-  const hasBoth = budget != null && actualSpend != null
-  const remaining = hasBoth ? budget - actualSpend : null
-
-  function compact(v: number): string {
-    const abs = Math.abs(v)
-    return abs >= 1000 ? `$${(abs / 1000).toFixed(1)}k` : `$${Math.round(abs)}`
-  }
-
-  // Mirrors BudgetWidget: spend ÷ best-known N (N Actual once cleaned, else N Collected)
-  const effectiveN = nActual ?? (nCollected > 0 ? nCollected : null)
-  const actualCostPerN =
-    actualSpend != null && effectiveN != null ? actualSpend / effectiveN : null
-
-  return (
-    <div className="bg-card border border-border shadow-sm rounded-xl p-3 flex flex-col gap-1">
-      <span className="text-xs text-muted-foreground flex items-center">
-        Budget left
-        <InfoTooltip text="Allocated budget minus actual spend. Edit the amounts in the Money card." />
-      </span>
-      {remaining == null ? (
-        <span className="text-2xl font-semibold text-foreground leading-tight">—</span>
-      ) : remaining < 0 ? (
-        <span className="text-2xl font-semibold leading-tight text-red-600 dark:text-red-400">
-          -{compact(remaining)} over
-        </span>
-      ) : (
-        <span className="text-2xl font-semibold text-foreground leading-tight">
-          {compact(remaining)}
-        </span>
+      {subtitle !== undefined && (
+        <span className="text-[10px] text-muted-foreground truncate">{subtitle}</span>
       )}
-      <span className="text-xs text-muted-foreground">
-        {remaining == null
-          ? 'Set in the Money card'
-          : actualCostPerN != null
-          ? `$${actualCostPerN.toLocaleString('en-US', { maximumFractionDigits: 2 })} / N`
-          : ' '}
-      </span>
     </div>
   )
 }
@@ -932,7 +862,7 @@ function HeroWaitingOn({
         <InfoTooltip text="Auto-derived from status, phase, stage checkboxes, and fielding progress. Mark the project blocked to force it to Client or Us." />
       </span>
       <span
-        className={`text-2xl font-semibold leading-tight truncate ${
+        className={`text-lg font-semibold leading-tight truncate ${
           main === 'Client' ? 'text-amber-600 dark:text-amber-400' : 'text-foreground'
         }`}
         title={derived}
@@ -1341,77 +1271,6 @@ function EditableNumberRow({
         title="Click to edit"
       >
         {value != null ? fmtNum(value) : <span className="text-muted-foreground/50">— click to set</span>}
-      </button>
-    </div>
-  )
-}
-
-function EditableDateRow({
-  label,
-  value,
-  tooltip,
-  valueClass = 'text-foreground hover:text-foreground/70',
-  onSave,
-}: {
-  label: string
-  value: string | null
-  tooltip?: string
-  valueClass?: string
-  onSave: (next: string | null) => void
-}) {
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState('')
-
-  function save() {
-    onSave(draft || null)
-    setEditing(false)
-  }
-
-  if (editing) {
-    return (
-      <div className="flex justify-between items-center text-sm gap-2">
-        <span className="text-muted-foreground flex items-center text-xs shrink-0">
-          {label}
-          {tooltip && <InfoTooltip text={tooltip} />}
-        </span>
-        <div className="flex gap-1.5">
-          <input
-            autoFocus
-            type="date"
-            value={draft}
-            onChange={e => setDraft(e.target.value)}
-            className="bg-muted border border-border rounded px-2 py-1 text-sm text-foreground focus:outline-none focus:border-ring"
-            onKeyDown={e => {
-              if (e.key === 'Enter') save()
-              if (e.key === 'Escape') setEditing(false)
-            }}
-          />
-          <button
-            onClick={save}
-            className="text-xs bg-muted hover:bg-accent text-foreground px-2 py-1 rounded transition-colors"
-          >
-            Save
-          </button>
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div className={`flex justify-between items-center text-sm gap-2 ${value ? '' : 'opacity-60'}`}>
-      <span className="text-muted-foreground flex items-center text-xs shrink-0">
-        {label}
-        {tooltip && <InfoTooltip text={tooltip} />}
-      </span>
-      <button
-        onClick={() => {
-          setDraft(value ? value.slice(0, 10) : '')
-          setEditing(true)
-        }}
-        className={`text-sm cursor-pointer hover:bg-accent rounded px-1.5 transition-colors ${valueClass}`}
-        title="Click to edit"
-      >
-        {value ? formatDate(value) : <span className="text-muted-foreground/50">— click to set</span>}
       </button>
     </div>
   )
