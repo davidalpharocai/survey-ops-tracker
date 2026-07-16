@@ -18,6 +18,28 @@ const ALLOWED_HOSTS = new Set([
 // Suffixes Google appends to page titles
 const TITLE_SUFFIX = / - Google (Docs|Sheets|Slides|Forms|Drive)\s*$/i
 
+// Map a Drive MIME type to a short, familiar format label for the doc chip.
+function mimeToFormat(mime: string | null): string | null {
+  if (!mime) return null
+  const map: Record<string, string> = {
+    'application/vnd.google-apps.document': 'doc',
+    'application/vnd.google-apps.spreadsheet': 'xlsx',
+    'application/vnd.google-apps.presentation': 'pptx',
+    'application/vnd.google-apps.form': 'form',
+    'application/pdf': 'pdf',
+    'text/csv': 'csv',
+    'text/plain': 'txt',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
+    'application/vnd.ms-excel': 'xls',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+    'application/msword': 'doc',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'pptx',
+  }
+  if (map[mime]) return map[mime]
+  const sub = mime.split('/')[1]
+  return sub ? sub.split('.').pop()!.slice(0, 5) : null
+}
+
 export async function GET(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -42,8 +64,8 @@ export async function GET(req: NextRequest) {
   const fileId = extractDriveFileId(parsed.toString())
   if (fileId) {
     try {
-      const name = await new GoogleDrive().getName(fileId)
-      if (name) return Response.json({ title: name })
+      const { name, mimeType } = await new GoogleDrive().getMeta(fileId)
+      if (name) return Response.json({ title: name, format: mimeToFormat(mimeType) })
     } catch {
       // Drive API not configured, or our identity lacks access — fall through.
     }

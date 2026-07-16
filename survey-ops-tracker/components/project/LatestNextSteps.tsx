@@ -298,21 +298,24 @@ export function LatestNextSteps({ projectId, notes }: LatestNextStepsProps) {
               <div className="flex flex-col gap-1">
                 {visibleCompleted.map(step => (
                   <div key={step.id} className="group flex items-start gap-2">
-                    <input
-                      type="checkbox"
-                      checked
-                      onChange={() => toggleStep(step)}
-                      className="mt-0.5 accent-blue-600 cursor-pointer shrink-0 opacity-50"
-                      title="Move back to Next Steps"
-                    />
+                    {/* Completed items are a log, not to-dos — a single done-marker
+                        (no checkbox), with a hover control to move back if needed. */}
+                    <span className="mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-400 text-xs" aria-hidden>✓</span>
                     <span className="flex-1 text-sm text-muted-foreground leading-snug">
-                      ✓ {step.text}
+                      {step.text}
                       <span className="text-xs text-muted-foreground/60">
                         {' '}
                         {step.completed_at && <>{formatStepDate(step.completed_at)}</>}
                         {step.completed_by && <> · {step.completed_by}</>}
                       </span>
                     </span>
+                    <button
+                      onClick={() => toggleStep(step)}
+                      className="text-xs text-muted-foreground/40 hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                      title="Move back to Next Steps"
+                    >
+                      ↩
+                    </button>
                   </div>
                 ))}
                 {completedSteps.length > DEFAULT_COMPLETED_SHOWN && (

@@ -556,8 +556,8 @@ export default function ProjectDetailPage() {
               </div>
             </SidebarCard>
 
-            <SidebarCard title="Sample N & Audience" className="xl:col-span-2">
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-x-8 gap-y-3 items-start">
+            <SidebarCard title="Sample N & Audience" className="xl:col-span-2" dense>
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-x-8 gap-y-2 items-start">
                 <EditableNumberRow
                   label="N Target"
                   value={project.n_target}
@@ -598,7 +598,7 @@ export default function ProjectDetailPage() {
               </div>
             </SidebarCard>
 
-            <SidebarCard title="Flags" className="xl:col-span-2">
+            <SidebarCard title="Flags" className="xl:col-span-2" dense>
               <div className="flex flex-wrap gap-1">
                 <FlagChip
                   label="Longitudinal"
@@ -670,13 +670,13 @@ export default function ProjectDetailPage() {
   )
 }
 
-function SidebarCard({ title, children, className = '' }: { title: string; children: React.ReactNode; className?: string }) {
+function SidebarCard({ title, children, className = '', dense = false }: { title: string; children: React.ReactNode; className?: string; dense?: boolean }) {
   return (
-    <div className={`bg-card border border-border shadow-sm rounded-xl p-4 ${className}`}>
-      <h3 className="text-xs text-muted-foreground uppercase tracking-widest mb-4 font-medium">
+    <div className={`bg-card border border-border shadow-sm rounded-xl ${dense ? 'p-3' : 'p-4'} ${className}`}>
+      <h3 className={`text-xs text-muted-foreground uppercase tracking-widest font-medium ${dense ? 'mb-2' : 'mb-4'}`}>
         {title}
       </h3>
-      <div className="flex flex-col gap-3">{children}</div>
+      <div className={`flex flex-col ${dense ? 'gap-2' : 'gap-3'}`}>{children}</div>
     </div>
   )
 }
@@ -731,7 +731,7 @@ function HeroDates({
   const longitudinal = !!project.longitudinal
 
   return (
-    <div className="bg-card border border-border shadow-sm rounded-xl p-3 flex flex-col justify-center gap-1.5">
+    <div className="bg-card border border-border shadow-sm rounded-xl p-2.5 flex flex-col justify-center gap-1.5">
       <div className={`grid grid-cols-2 ${longitudinal ? 'sm:grid-cols-5' : 'sm:grid-cols-4'} gap-x-3 gap-y-2`}>
         <HeroDateCell
           label="Submitted"
@@ -858,7 +858,7 @@ function HeroWaitingOn({
   const blocked = project.blocked_by === 'client' || project.blocked_by === 'internal'
   const [picking, setPicking] = useState(false)
   return (
-    <div className="bg-card border border-border shadow-sm rounded-xl p-3 flex flex-col gap-1">
+    <div className="bg-card border border-border shadow-sm rounded-xl p-2.5 flex flex-col gap-1">
       <span className="text-xs text-muted-foreground flex items-center">
         Waiting on
         <InfoTooltip text="Auto-derived from status, phase, stage checkboxes, and fielding progress. Mark the project blocked to force it to Client or Us." />
@@ -1063,10 +1063,10 @@ function EditableRow({
           setDraft(value)
           setEditing(true)
         }}
-        className="text-sm text-foreground hover:bg-accent rounded px-1.5 transition-colors truncate cursor-pointer"
+        className="text-[13px] text-foreground hover:bg-accent rounded px-1.5 transition-colors truncate cursor-pointer"
         title="Click to edit"
       >
-        {value || <span className="text-muted-foreground/50">— click to set</span>}
+        {value || <span className="text-muted-foreground/50 whitespace-nowrap">— set</span>}
       </button>
     </div>
   )
@@ -1201,7 +1201,7 @@ function DetailRow({
         {label}
         {tooltip && <InfoTooltip text={tooltip} />}
       </span>
-      <span className={`text-sm px-1.5 ${valueClass}`}>{value}</span>
+      <span className={`text-[13px] px-1.5 ${valueClass}`}>{value}</span>
     </div>
   )
 }
@@ -1269,10 +1269,10 @@ function EditableNumberRow({
           setDraft(value != null ? String(value) : '')
           setEditing(true)
         }}
-        className={`text-sm cursor-pointer hover:bg-accent rounded px-1.5 transition-colors ${valueClass}`}
+        className={`text-[13px] cursor-pointer hover:bg-accent rounded px-1.5 transition-colors ${valueClass}`}
         title="Click to edit"
       >
-        {value != null ? fmtNum(value) : <span className="text-muted-foreground/50">— click to set</span>}
+        {value != null ? fmtNum(value) : <span className="text-muted-foreground/50 whitespace-nowrap">— set</span>}
       </button>
     </div>
   )
@@ -1328,10 +1328,10 @@ function SalespersonRow({
       </span>
       <button
         onClick={() => setEditing(true)}
-        className="text-sm text-foreground hover:bg-accent rounded px-1.5 transition-colors cursor-pointer truncate"
+        className="text-[13px] text-foreground hover:bg-accent rounded px-1.5 transition-colors cursor-pointer truncate"
         title="Click to change"
       >
-        {value || <span className="text-muted-foreground/50">— click to set</span>}
+        {value || <span className="text-muted-foreground/50 whitespace-nowrap">— set</span>}
       </button>
     </div>
   )

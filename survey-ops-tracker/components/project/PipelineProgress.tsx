@@ -21,6 +21,14 @@ const STAGE_TO_FIELD: Record<string, keyof Pick<SurveyProject,
   'Delivery': 'stage_delivery',
 }
 
+// The two-word programming stages have the longest labels, so give them extra
+// width; Delivery's label is short, so it can be narrower. Others stay even.
+const STAGE_GROW: Record<string, string> = {
+  'Doc Programming': 'flex-[1.35]',
+  'Survey Programming': 'flex-[1.35]',
+  'Delivery': 'flex-[0.8]',
+}
+
 function deriveColumn(updates: Record<string, boolean>): BoardColumn {
   if (!updates['stage_doc_programming']) return 'Submitted'
   if (!updates['stage_survey_programming']) return 'Doc Programming'
@@ -131,7 +139,7 @@ export function PipelineProgress({ project }: PipelineProgressProps) {
           const isClickable = stage !== 'Submitted'
 
           return (
-            <div key={stage} className="flex items-center gap-1 flex-1 min-w-0">
+            <div key={stage} className={`flex items-center gap-1 ${STAGE_GROW[stage] ?? 'flex-1'} min-w-0`}>
               <button
                 onClick={() => isClickable && toggleStage(stage)}
                 disabled={!isClickable}

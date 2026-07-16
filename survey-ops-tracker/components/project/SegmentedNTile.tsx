@@ -14,7 +14,7 @@ import {
 } from '@/lib/hooks/useProjectSegments'
 import type { SurveyProject } from '@/lib/hooks/useProjects'
 
-const tile = 'relative border shadow-sm rounded-xl p-3 flex flex-col gap-1'
+const tile = 'relative border shadow-sm rounded-xl p-2.5 flex flex-col gap-1'
 // Default card styling vs. an accented "lead tile" treatment (used as the first
 // hero stat — the number that matters most).
 const tilePlain = `${tile} bg-card border-border`

@@ -8,15 +8,15 @@ interface LinkedDocumentsProps {
   documents: string[]
 }
 
-// Entries are either a plain URL (legacy) or JSON {"name": "...", "url": "..."}
-function parseDoc(entry: string): { name: string | null; url: string } {
+// Entries are either a plain URL (legacy) or JSON {"name","url","fmt"}
+function parseDoc(entry: string): { name: string | null; url: string; fmt: string | null } {
   if (entry.startsWith('{')) {
     try {
       const d = JSON.parse(entry)
-      if (d.url) return { name: d.name ?? null, url: d.url }
+      if (d.url) return { name: d.name ?? null, url: d.url, fmt: d.fmt ?? null }
     } catch { /* fall through */ }
   }
-  return { name: null, url: entry }
+  return { name: null, url: entry, fmt: null }
 }
 
 // Short format label shown after the name, e.g. "Survey questions (doc)".
@@ -89,11 +89,16 @@ export function LinkedDocuments({ projectId, documents }: LinkedDocumentsProps) 
     if (!url || adding) return
     setAdding(true)
     let name: string | null = null
+    let fmt: string | null = null
     try {
       const res = await fetch(`/api/doc-title?url=${encodeURIComponent(url)}`)
-      if (res.ok) name = (await res.json()).title ?? null
+      if (res.ok) {
+        const body = await res.json()
+        name = body.title ?? null
+        fmt = body.format ?? null
+      }
     } catch { /* title lookup is best-effort */ }
-    const entry = name ? JSON.stringify({ name, url }) : url
+    const entry = name || fmt ? JSON.stringify({ name, url, fmt }) : url
     updateProject.mutate({
       id: projectId,
       updates: { linked_documents: [...documents, entry] },
@@ -110,9 +115,9 @@ export function LinkedDocuments({ projectId, documents }: LinkedDocumentsProps) 
   }
 
   function saveRename(index: number) {
-    const { url } = parseDoc(documents[index])
+    const { url, fmt } = parseDoc(documents[index])
     const name = renameDraft.trim()
-    const entry = name ? JSON.stringify({ name, url }) : url
+    const entry = name || fmt ? JSON.stringify({ name: name || null, url, fmt }) : url
     updateProject.mutate({
       id: projectId,
       updates: { linked_documents: documents.map((d, i) => (i === index ? entry : d)) },
@@ -128,8 +133,8 @@ export function LinkedDocuments({ projectId, documents }: LinkedDocumentsProps) 
       </h3>
       <div className="grid grid-cols-2 gap-2 mb-3">
         {documents.map((entry, i) => {
-          const { name, url } = parseDoc(entry)
-          const fmt = docFormat(url)
+          const { name, url, fmt: storedFmt } = parseDoc(entry)
+          const fmt = storedFmt ?? docFormat(url)
           if (renaming === i) {
             return (
               <div key={i} className="col-span-2 flex items-center gap-2">

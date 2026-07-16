@@ -129,4 +129,9 @@ export class GoogleDrive implements DriveClient {
     const res = await this.drive.files.get({ fileId, fields: 'name', supportsAllDrives: true })
     return res.data.name ?? null
   }
+
+  async getMeta(fileId: string): Promise<{ name: string | null; mimeType: string | null }> {
+    const res = await this.drive.files.get({ fileId, fields: 'name,mimeType', supportsAllDrives: true })
+    return { name: res.data.name ?? null, mimeType: res.data.mimeType ?? null }
+  }
 }
