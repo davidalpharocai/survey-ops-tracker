@@ -8,7 +8,6 @@ import { useProject, useUpdateProject, useDeleteProject, type SurveyProject } fr
 import { useTeamMembers, assignableMembers, type TeamMember } from '@/lib/hooks/useTeamMembers'
 import { PipelineProgress } from '@/components/project/PipelineProgress'
 import { ScopingProgress } from '@/components/project/ScopingProgress'
-import { QuickEdit } from '@/components/project/QuickEdit'
 import { ActivityLog } from '@/components/project/ActivityLog'
 import { DataChangeLog } from '@/components/project/DataChangeLog'
 import { ProjectAuditLog } from '@/components/project/ProjectAuditLog'
@@ -470,7 +469,6 @@ export default function ProjectDetailPage() {
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_440px] gap-6">
           {/* Left column */}
           <div className="flex flex-col gap-4">
-            <QuickEdit project={project} />
             <div className="bg-card border border-border shadow-sm rounded-xl p-4">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-xs text-muted-foreground uppercase tracking-widest font-medium">
@@ -501,13 +499,11 @@ export default function ProjectDetailPage() {
                 <PipelineProgress project={project} />
               )}
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
-              <LatestNextSteps projectId={project.id} notes={project.latest_next_steps} />
-              <LinkedDocuments
-                projectId={project.id}
-                documents={project.linked_documents ?? []}
-              />
-            </div>
+            <LinkedDocuments
+              projectId={project.id}
+              documents={project.linked_documents ?? []}
+            />
+            <LatestNextSteps projectId={project.id} notes={project.latest_next_steps} />
             {showCompliance && <CompliancePanel projectId={project.id} project={project} />}
           </div>
 
@@ -691,11 +687,6 @@ export default function ProjectDetailPage() {
             </SidebarCard>
 
             <SidebarCard title="Money" className="xl:col-span-2">
-              <BudgetWidget
-                projectId={project.id}
-                budget={project.budget ?? null}
-                nCollected={project.n_collected}
-              />
               {/* PS → Suppliers (PureSpectrum), B2B → Blast Configuration.
                   Rerun/untyped show both (they don't map cleanly to one). */}
               {project.project_type === 'PS' && (
@@ -708,6 +699,14 @@ export default function ProjectDetailPage() {
                   <BlastConfigWidget projectId={project.id} />
                 </>
               )}
+              {/* Budgets sit under the supplier/blast config now (David's ordering). */}
+              <div className="border-t border-border pt-3 mt-1">
+                <BudgetWidget
+                  projectId={project.id}
+                  budget={project.budget ?? null}
+                  nCollected={project.n_collected}
+                />
+              </div>
               <div className="border-t border-border pt-3 mt-1 flex items-center gap-1.5 text-xs text-muted-foreground/50">
                 <span aria-hidden="true">＋</span> Add cost line — other costs &amp; unit economics (coming soon)
               </div>
