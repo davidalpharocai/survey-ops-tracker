@@ -11,7 +11,7 @@ import { ProjectPicker } from '@/components/shared/ProjectPicker'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
 import { Badge } from '@/components/ui/badge'
 import { toast } from '@/lib/utils/toast'
-import { formatDate } from '@/lib/utils/date'
+import { formatDate, daysSince } from '@/lib/utils/date'
 
 // Gmail deep-link from the RFC-822 Message-ID stored in external_id ('email:<id>').
 function gmailUrl(externalId: string): string | null {
@@ -127,11 +127,18 @@ export function EmailReviewQueue() {
     )
   }
 
+  const oldest = Math.max(0, ...data.map((r) => daysSince(r.occurred_at)))
   return (
-    <ul className="space-y-3">
-      {data.map((row) => (
-        <EmailCard key={row.id} row={row} />
-      ))}
-    </ul>
+    <div>
+      <p className="text-sm text-muted-foreground mb-3">
+        <span className="text-foreground font-medium">{data.length}</span> to review
+        {oldest > 0 ? ` · oldest ${oldest}d` : ''}
+      </p>
+      <ul className="space-y-3">
+        {data.map((row) => (
+          <EmailCard key={row.id} row={row} />
+        ))}
+      </ul>
+    </div>
   )
 }

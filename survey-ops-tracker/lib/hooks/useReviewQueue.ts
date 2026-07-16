@@ -13,6 +13,8 @@ export type QueueRow = {
   drive_file_id: string | null
   email_subject: string | null
   email_from: string | null
+  gmail_message_id: string | null
+  created_at: string
   match_candidates: LabeledCandidate[] | null
   client_id: string | null
   project_id: string | null
@@ -27,7 +29,7 @@ export function useReviewQueue() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('deliverables')
-        .select('id, file_name, original_file_name, kind, status, source_url, drive_file_id, email_subject, email_from, match_candidates, client_id, project_id')
+        .select('id, file_name, original_file_name, kind, status, source_url, drive_file_id, email_subject, email_from, gmail_message_id, created_at, match_candidates, client_id, project_id')
         .in('status', ['review', 'unsorted'])
         .is('deleted_at', null)
         .order('created_at', { ascending: true })

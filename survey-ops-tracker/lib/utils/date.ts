@@ -1,5 +1,18 @@
 import { differenceInCalendarDays, parseISO, isAfter, isBefore, startOfDay, endOfMonth } from 'date-fns'
 
+/** Relative age for queue items: "today" / "1d ago" / "6d ago". */
+export function daysAgoLabel(iso: string | null | undefined): string {
+  if (!iso) return ''
+  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000)
+  return days <= 0 ? 'today' : `${days}d ago`
+}
+
+/** Whole days since an ISO timestamp (0 if in the future) — for "oldest Xd". */
+export function daysSince(iso: string | null | undefined): number {
+  if (!iso) return 0
+  return Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000))
+}
+
 export type DueDateStatus = 'overdue' | 'soon' | 'normal' | null
 
 export function getDueDateStatus(dueDate: string | null): DueDateStatus {

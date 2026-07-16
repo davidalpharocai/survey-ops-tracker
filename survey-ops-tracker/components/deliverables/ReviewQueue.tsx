@@ -4,8 +4,11 @@ import { ProjectPicker } from '@/components/shared/ProjectPicker'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
 import { Badge } from '@/components/ui/badge'
 import { toast } from '@/lib/utils/toast'
+import { daysAgoLabel, daysSince } from '@/lib/utils/date'
 
 const driveUrl = (id: string) => `https://drive.google.com/file/d/${id}/view`
+const gmailUrl = (msgId: string) =>
+  `https://mail.google.com/mail/u/0/#search/rfc822msgid:${encodeURIComponent(msgId)}`
 
 function QueueCard({ row }: { row: QueueRow }) {
   const options = useProjectOptions()
@@ -34,8 +37,16 @@ function QueueCard({ row }: { row: QueueRow }) {
       </div>
       <div className="text-xs text-muted-foreground mt-1">
         <span>{row.email_subject ?? '(no subject)'}</span>
-        <span> · from </span>
-        <span>{row.email_from ?? 'unknown'}</span>
+        <span> · from {row.email_from ?? 'unknown'}</span>
+        <span> · {daysAgoLabel(row.created_at)}</span>
+        {row.gmail_message_id && (
+          <>
+            {' · '}
+            <a href={gmailUrl(row.gmail_message_id)} target="_blank" rel="noreferrer" className="hover:underline">
+              open in Gmail ↗
+            </a>
+          </>
+        )}
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -82,9 +93,16 @@ export function ReviewQueue() {
     )
   }
 
+  const oldest = Math.max(0, ...data.map((r) => daysSince(r.created_at)))
   return (
-    <ul className="space-y-3">
-      {data.map((row) => <QueueCard key={row.id} row={row} />)}
-    </ul>
+    <div>
+      <p className="text-sm text-muted-foreground mb-3">
+        <span className="text-foreground font-medium">{data.length}</span> to review
+        {oldest > 0 ? ` · oldest ${oldest}d` : ''}
+      </p>
+      <ul className="space-y-3">
+        {data.map((row) => <QueueCard key={row.id} row={row} />)}
+      </ul>
+    </div>
   )
 }
