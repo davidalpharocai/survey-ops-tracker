@@ -556,47 +556,51 @@ export default function ProjectDetailPage() {
               </div>
             </SidebarCard>
 
-            <SidebarCard title="Sample N & Audience">
-              <EditableNumberRow
-                label="N Target"
-                value={project.n_target}
-                tooltip={TOOLTIPS['N Target']}
-                onSave={v => updateProject.mutate({ id, updates: { n_target: v } })}
-              />
-              <EditableNumberRow
-                label="N Internal Target"
-                value={project.n_internal_target ?? null}
-                tooltip={TOOLTIPS['N Internal Target']}
-                onSave={v => updateProject.mutate({ id, updates: { n_internal_target: v } })}
-              />
-              <EditableNumberRow
-                label="N Collected"
-                value={project.n_collected ?? 0}
-                tooltip={TOOLTIPS['N Collected']}
-                onSave={v => updateProject.mutate({ id, updates: { n_collected: v ?? 0 } })}
-              />
-              <EditableNumberRow
-                label="N Actual"
-                value={project.n_actual}
-                tooltip={TOOLTIPS['N Actual']}
-                onSave={v => updateProject.mutate({ id, updates: { n_actual: v } })}
-              />
-              <EditableNumberRow
-                label="Audience Size"
-                value={project.audience_size}
-                tooltip={TOOLTIPS['Audience Size']}
-                onSave={v => updateProject.mutate({ id, updates: { audience_size: v } })}
-              />
-              <EditableRow
-                label="Audience"
-                value={project.audience ?? ''}
-                placeholder="e.g. US adults 18+, likely voters"
-                tooltip={TOOLTIPS['Audience']}
-                onSave={v => updateProject.mutate({ id, updates: { audience: v || null } })}
-              />
+            <SidebarCard title="Sample N & Audience" className="xl:col-span-2">
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-x-8 gap-y-3 items-start">
+                <EditableNumberRow
+                  label="N Target"
+                  value={project.n_target}
+                  tooltip={TOOLTIPS['N Target']}
+                  onSave={v => updateProject.mutate({ id, updates: { n_target: v } })}
+                />
+                <EditableNumberRow
+                  label="N Internal Target"
+                  value={project.n_internal_target ?? null}
+                  tooltip={TOOLTIPS['N Internal Target']}
+                  onSave={v => updateProject.mutate({ id, updates: { n_internal_target: v } })}
+                />
+                <EditableNumberRow
+                  label="N Collected"
+                  value={project.n_collected ?? 0}
+                  tooltip={TOOLTIPS['N Collected']}
+                  onSave={v => updateProject.mutate({ id, updates: { n_collected: v ?? 0 } })}
+                />
+                <EditableNumberRow
+                  label="N Actual"
+                  value={project.n_actual}
+                  tooltip={TOOLTIPS['N Actual']}
+                  onSave={v => updateProject.mutate({ id, updates: { n_actual: v } })}
+                />
+                <EditableNumberRow
+                  label="Audience Size"
+                  value={project.audience_size}
+                  tooltip={TOOLTIPS['Audience Size']}
+                  onSave={v => updateProject.mutate({ id, updates: { audience_size: v } })}
+                />
+                <div className="xl:col-span-2">
+                  <EditableRow
+                    label="Audience"
+                    value={project.audience ?? ''}
+                    placeholder="e.g. US adults 18+, likely voters"
+                    tooltip={TOOLTIPS['Audience']}
+                    onSave={v => updateProject.mutate({ id, updates: { audience: v || null } })}
+                  />
+                </div>
+              </div>
             </SidebarCard>
 
-            <SidebarCard title="Flags">
+            <SidebarCard title="Flags" className="xl:col-span-2">
               <div className="flex flex-wrap gap-1.5">
                 <FlagChip
                   label="Longitudinal"
