@@ -85,7 +85,7 @@ export function SuppliersWidget({ projectId, nTarget }: { projectId: string; nTa
         {list.length > 0 && (
           <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-2 text-[11px] text-muted-foreground">
             <span>Supplier</span>
-            <span className="w-20 text-right" title="Cost per interview — what this supplier charges per completed response.">CPI ($)</span>
+            <span className="w-20 text-right" title="Cost per interview (CPI) — the amount you pay this supplier for each completed response.">$ / complete</span>
             <span className="w-20 text-right" title="The most completes to buy from this supplier (default 1,000). The estimate assumes every supplier fills its cap.">Completes cap</span>
             <span className="w-5"></span>
           </div>
@@ -155,7 +155,7 @@ export function SuppliersWidget({ projectId, nTarget }: { projectId: string; nTa
             onChange={(e) => setApplyCpi(e.target.value)}
             type="number"
             step="0.01"
-            placeholder="CPI ($)"
+            placeholder="$ / complete"
             className={`${inputCls} w-20`}
           />
           <button
@@ -185,7 +185,7 @@ export function SuppliersWidget({ projectId, nTarget }: { projectId: string; nTa
           </button>
         </div>
         <p className="text-[10px] text-muted-foreground/50 mt-0.5">
-          A CPI in the box above applies to newly-added suppliers; “Apply to all” retro-sets it on every existing row.
+          The cost-per-complete (CPI) in the box above applies to newly-added suppliers; “Apply to all” retro-sets it on every existing row.
         </p>
       </div>
     </div>
