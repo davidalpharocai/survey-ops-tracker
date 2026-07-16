@@ -171,6 +171,16 @@ file it, pick another project from the dropdown, or mark it **"Not a deliverable
 Items already filed under the right client but with no project show as **unsorted** — assign a
 project the same way.
 
+### Weekly QA digest
+
+Every **Monday morning** a deliverables QA digest posts to Slack (its own QA channel) so nothing slips through the cracks. It flags:
+- **Aging in review** — items sitting in the queue over a week without being filed or dismissed.
+- **Auto-files to spot-check** — the week's AI-matched and lower-confidence filings, so someone can eyeball that they landed on the right survey.
+- **Possible duplicates** and **unsorted** items (filed with no project).
+- **Recently delivered, nothing filed** — projects delivered in the last month with no deliverable in the depository (a nudge to forward them), plus a one-line tally of what was filed that week.
+
+If everything's tidy, it just says the depository is clean.
+
 ## 9b. Email activity timeline
 
 Client emails are logged automatically to each project's **Activity** panel, so there's a clean, chronological record of what was said and when — nobody has to copy anything out of Gmail.
