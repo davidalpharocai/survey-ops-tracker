@@ -27,7 +27,7 @@ export function RerunMetaEditor({ r }: { r: RerunRow }) {
   const [leadDays, setLeadDays] = useState(r.lead_days != null ? String(r.lead_days) : '')
   const [paused, setPaused] = useState(!!r.is_paused)
   const [displayName, setDisplayName] = useState(r.display_name ?? '')
-  // meta_note is surfaced by the view as of migration 052; read defensively so
+  // meta_note is surfaced by the view as of migration 055; read defensively so
   // this compiles + degrades to blank before the migration is applied.
   const [note, setNote] = useState((r as RerunRow & { meta_note?: string | null }).meta_note ?? '')
 

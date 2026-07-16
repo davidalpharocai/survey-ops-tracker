@@ -1,4 +1,4 @@
--- 052_rerun_meta_note.sql — surface the durable per-study meta NOTE in the
+-- 055_rerun_meta_note.sql — surface the durable per-study meta NOTE in the
 -- rerun_status read model, aliased as meta_note so it stays distinct from the
 -- sheet's own `note` (s.note). The meta note is already writable via
 -- /api/reruns/meta (rerun_meta.note); this just lets the app DISPLAY it.
