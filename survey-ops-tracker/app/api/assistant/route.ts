@@ -12,7 +12,12 @@ import { NextRequest } from 'next/server'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
-const MODEL = 'claude-opus-4-8'
+// Sonnet 5 (not Opus 4.8): markedly faster to first token + to generate, which
+// is the dominant latency lever for this assistant. It retrieves, orchestrates
+// tools, and confirms — not deep reasoning — and every write is gated behind the
+// user's Confirm click server-side, so a lighter model can't do anything unsafe.
+// Revert to 'claude-opus-4-8' if answer quality on complex asks ever regresses.
+const MODEL = 'claude-sonnet-5'
 const MAX_TOKENS = 8000
 // Hard cap on model round-trips per request — a safety net against a runaway
 // tool loop. A normal answer settles in 1–3.
