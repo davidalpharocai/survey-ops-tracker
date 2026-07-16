@@ -16,18 +16,20 @@ const FORM_FIELDS = new Set(['project_name', 'client', 'project_type', 'captain_
 interface NewProjectModalProps {
   teamMembers: TeamMember[]
   knownClients?: string[]
+  /** Pre-fill the client field (e.g. from a client page's "New project"). */
+  initialClient?: string
   onClose: () => void
 }
 
 // NewProjectModal accepts `knownClients` for backward compatibility with its
 // caller, but the client field's dropdown is now powered by useClients()
 // (the actual clients table) rather than that free-text project-history list.
-export function NewProjectModal({ teamMembers, onClose }: NewProjectModalProps) {
+export function NewProjectModal({ teamMembers, initialClient, onClose }: NewProjectModalProps) {
   const router = useRouter()
   const createProject = useCreateProject()
   const { data: clients = [] } = useClients()
   const [name, setName] = useState('')
-  const [client, setClient] = useState('')
+  const [client, setClient] = useState(initialClient ?? '')
   const [showClientDropdown, setShowClientDropdown] = useState(false)
   const [showNewClientModal, setShowNewClientModal] = useState(false)
   const [projectType, setProjectType] = useState<string>('')
