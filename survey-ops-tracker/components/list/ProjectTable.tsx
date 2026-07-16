@@ -7,8 +7,29 @@ import { fmtNum } from '@/lib/utils/number'
 import type { SlimProject } from '@/lib/hooks/useProjects'
 import { useLatestSubmissionStatuses } from '@/lib/hooks/useSubmissions'
 
-export type SortField = 'project_name' | 'client' | 'board_column' | 'due_date'
+export type SortField =
+  | 'project_name'
+  | 'client'
+  | 'board_column'
+  | 'type'
+  | 'captain'
+  | 'n'
+  | 'nActual'
+  | 'due_date'
 export type SortDir = 'asc' | 'desc'
+
+const SORT_LABELS: Record<SortField, string> = {
+  project_name: 'Project',
+  client: 'Client',
+  board_column: 'Stage',
+  type: 'Type',
+  captain: 'Captain',
+  n: 'N collected',
+  nActual: 'N Actual',
+  due_date: 'Due',
+}
+
+const DENSITY_KEY = 'sot.listDensity'
 
 const STAGE_BADGE: Record<string, string> = {
   'Submitted': 'bg-blue-500/15 text-blue-600 dark:text-blue-400',
@@ -45,9 +66,9 @@ interface ProjectTableProps {
   onSortChange: (field: SortField, dir: SortDir) => void
 }
 
-function FlagCell({ value, warn = false, className = '' }: { value: boolean; warn?: boolean; className?: string }) {
+function FlagCell({ value, warn = false, pad }: { value: boolean; warn?: boolean; pad: string }) {
   return (
-    <td className={`px-4 py-3 text-xs ${className}`}>
+    <td className={`px-4 ${pad} text-xs`}>
       {value ? (
         <span className={warn ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}>✓</span>
       ) : (
@@ -55,6 +76,23 @@ function FlagCell({ value, warn = false, className = '' }: { value: boolean; war
       )}
     </td>
   )
+}
+
+/** Sort key for a project on a given field — numeric for the N columns, string
+ *  otherwise (type/captain read derived values, not a direct row column). */
+function sortValue(p: SlimProject, field: SortField): string | number {
+  switch (field) {
+    case 'type':
+      return p.project_type ?? ''
+    case 'captain':
+      return p.captain?.initials ?? ''
+    case 'n':
+      return p.n_collected ?? 0
+    case 'nActual':
+      return p.n_actual == null ? Number.NEGATIVE_INFINITY : p.n_actual
+    default:
+      return (p[field] ?? '') as string
+  }
 }
 
 export function ProjectTable({
@@ -80,15 +118,30 @@ export function ProjectTable({
   }, [colsOpen])
   const show = (key: string) => !hiddenCols.has(key)
 
+  // Row density — personal, remembered per browser (like column visibility).
+  const [density, setDensity] = useState<'comfortable' | 'compact'>('comfortable')
+  useEffect(() => {
+    const stored = localStorage.getItem(DENSITY_KEY)
+    if (stored === 'compact' || stored === 'comfortable') setDensity(stored)
+  }, [])
+  function changeDensity(next: 'comfortable' | 'compact') {
+    setDensity(next)
+    localStorage.setItem(DENSITY_KEY, next)
+  }
+  const pad = density === 'compact' ? 'py-1.5' : 'py-3'
+
   function handleSort(field: SortField) {
     onSortChange(field, sortField === field ? (sortDir === 'asc' ? 'desc' : 'asc') : 'asc')
   }
 
   const sorted = useMemo(() => {
     return [...projects].sort((a, b) => {
-      const av = (a[sortField] ?? '') as string
-      const bv = (b[sortField] ?? '') as string
-      const cmp = av.localeCompare(bv)
+      const av = sortValue(a, sortField)
+      const bv = sortValue(b, sortField)
+      const cmp =
+        typeof av === 'number' && typeof bv === 'number'
+          ? av - bv
+          : String(av).localeCompare(String(bv))
       return sortDir === 'asc' ? cmp : -cmp
     })
   }, [projects, sortField, sortDir])
@@ -98,15 +151,15 @@ export function ProjectTable({
     return <span className="text-foreground/80 ml-1">{sortDir === 'asc' ? '↑' : '↓'}</span>
   }
 
-  // key: hideable column id (null = always shown)
+  // key: hideable column id (null = always shown). field: sortable when set.
   const headers: { key: string | null; field: SortField | null; label: string; title: string }[] = [
     { key: null, field: 'project_name', label: 'Project', title: 'Project name. ⏸ marks projects on hold.' },
     { key: 'client', field: 'client', label: 'Client', title: 'The client this project is for.' },
-    { key: 'type', field: null, label: 'Type', title: 'PS = PureSpectrum consumer panel, B2B = expert/business panel, Rerun = repeat wave of an earlier study.' },
+    { key: 'type', field: 'type', label: 'Type', title: 'PS = PureSpectrum consumer panel, B2B = expert/business panel, Rerun = repeat wave. Click to sort.' },
     { key: 'stage', field: 'board_column', label: 'Stage', title: 'Current pipeline stage, from Submitted through Delivery.' },
-    { key: 'captain', field: null, label: 'Captain', title: 'Team member responsible for the project end-to-end. ! = unassigned.' },
-    { key: 'n', field: null, label: 'N / Target', title: 'Responses collected so far (auto-synced) vs the response goal.' },
-    { key: 'nActual', field: null, label: 'N Actual', title: 'Usable responses after data cleaning.' },
+    { key: 'captain', field: 'captain', label: 'Captain', title: 'Team member responsible end-to-end. ! = unassigned. Click to sort by initials.' },
+    { key: 'n', field: 'n', label: 'N / Target', title: 'Responses collected so far vs the goal. Click to sort by N collected.' },
+    { key: 'nActual', field: 'nActual', label: 'N Actual', title: 'Usable responses after data cleaning. Click to sort.' },
     { key: 'long', field: null, label: 'Long.', title: 'Longitudinal — study tracked across multiple waves.' },
     { key: 'voterQA', field: null, label: 'Voter QA', title: 'Whether the project needs the extra voter-survey QA pass.' },
     { key: 'citation', field: null, label: 'Citation', title: 'Whether deliverables need citation language.' },
@@ -116,16 +169,40 @@ export function ProjectTable({
 
   return (
     <div className="bg-card border border-border shadow-sm rounded-xl overflow-hidden">
-      <div className="flex justify-end px-2 pt-2 relative" ref={colsRef}>
-        <button
-          onClick={() => setColsOpen(o => !o)}
-          title="Choose which columns you see — personal to you, remembered in this browser"
-          className="text-xs text-muted-foreground hover:text-foreground border border-border hover:border-ring rounded px-2 py-1 transition-colors"
-        >
-          ⚙ Columns
-        </button>
+      <div className="flex items-center justify-between gap-3 px-3 pt-2 relative" ref={colsRef}>
+        <span className="text-xs text-muted-foreground">
+          <span className="text-foreground font-medium">{fmtNum(projects.length)}</span>{' '}
+          project{projects.length === 1 ? '' : 's'} · sorted by {SORT_LABELS[sortField]}{' '}
+          {sortDir === 'asc' ? '↑' : '↓'}
+        </span>
+        <div className="flex items-center gap-2">
+          {/* Row density */}
+          <span className="inline-flex bg-muted border border-border rounded-lg p-0.5" role="group" aria-label="Row density">
+            <button
+              onClick={() => changeDensity('comfortable')}
+              title="Comfortable rows"
+              className={`text-[11px] px-2 py-0.5 rounded transition-colors ${density === 'comfortable' ? 'bg-background text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+            >
+              Comfortable
+            </button>
+            <button
+              onClick={() => changeDensity('compact')}
+              title="Compact rows — fit more on screen"
+              className={`text-[11px] px-2 py-0.5 rounded transition-colors ${density === 'compact' ? 'bg-background text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+            >
+              Compact
+            </button>
+          </span>
+          <button
+            onClick={() => setColsOpen(o => !o)}
+            title="Choose which columns you see — personal to you, remembered in this browser"
+            className="text-xs text-muted-foreground hover:text-foreground border border-border hover:border-ring rounded px-2 py-1 transition-colors"
+          >
+            ⚙ Columns
+          </button>
+        </div>
         {colsOpen && (
-          <div className="absolute right-2 top-full mt-1 z-40 bg-popover border border-border rounded-lg shadow-xl p-2 flex flex-col gap-1 w-44">
+          <div className="absolute right-3 top-full mt-1 z-40 bg-popover border border-border rounded-lg shadow-xl p-2 flex flex-col gap-1 w-44">
             {headers
               .filter(h => h.key !== null)
               .map(h => (
@@ -150,14 +227,14 @@ export function ProjectTable({
       <table className="w-full">
         <thead>
           <tr className="border-b border-border">
-            {visibleHeaders.map(({ field, label, title }) => (
+            {visibleHeaders.map(({ key, field, label, title }, idx) => (
               <th
                 key={label}
                 title={field ? `${title} Click to sort.` : title}
                 onClick={() => field && handleSort(field)}
-                className={`sticky top-0 z-10 bg-background px-4 py-3 text-left text-xs text-muted-foreground uppercase tracking-wider font-medium border-b border-border ${
-                  field ? 'cursor-pointer hover:text-foreground' : ''
-                }`}
+                className={`sticky top-0 bg-background px-4 ${pad} text-left text-xs text-muted-foreground uppercase tracking-wider font-medium border-b border-border ${
+                  idx === 0 ? 'left-0 z-20' : 'z-10'
+                } ${field ? 'cursor-pointer hover:text-foreground' : ''}`}
               >
                 {label}
                 {field && <SortIcon field={field} />}
@@ -179,8 +256,6 @@ export function ProjectTable({
             const urgency = openDue ? getDueUrgency(p.due_date) : null
             const nMet = p.n_target != null && p.n_collected >= p.n_target
             const complianceStatus = complianceStatuses?.get(p.id)
-            // Left accent on the first cell only (matches the board) — no full
-            // rectangle, so adjacent overdue rows no longer fuse into one box.
             const badlyOverdue = urgency === 'overdue' && daysOverdue(p.due_date) > BADLY_OVERDUE_DAYS
             const leftBar = urgency ? URGENCY_LEFT_BAR[urgency] : ''
             const dueColor =
@@ -204,11 +279,14 @@ export function ProjectTable({
                     router.push(`/projects/${p.id}`)
                   }
                 }}
-                className={`border-t border-border cursor-pointer hover:bg-accent/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring transition-colors ${rowBg} ${
+                className={`group border-t border-border cursor-pointer hover:bg-accent/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring transition-colors ${rowBg} ${
                   p.status === 'Hold' ? 'opacity-60' : ''
                 }`}
               >
-                <td className={`px-4 py-3 text-sm text-foreground font-medium ${leftBar}`}>
+                {/* Project cell is pinned (sticky-left) so it stays visible when
+                    the table scrolls horizontally; it carries its own opaque bg
+                    (+ group-hover) so scrolled cells don't bleed under it. */}
+                <td className={`sticky left-0 z-10 bg-card group-hover:bg-accent/80 border-r border-border px-4 ${pad} text-sm text-foreground font-medium ${leftBar}`}>
                   <div className="flex items-center gap-2">
                     <span>
                       {p.status === 'Hold' && <span title="On hold">⏸ </span>}
@@ -239,10 +317,10 @@ export function ProjectTable({
                   </div>
                 </td>
                 {show('client') && (
-                  <td className="px-4 py-3 text-sm text-muted-foreground">{p.client}</td>
+                  <td className={`px-4 ${pad} text-sm text-muted-foreground`}>{p.client}</td>
                 )}
                 {show('type') && (
-                  <td className="px-4 py-3">
+                  <td className={`px-4 ${pad}`}>
                     {p.project_type && (
                       <span className={`text-xs px-2 py-0.5 rounded ${TYPE_BADGE[p.project_type] ?? ''}`}>
                         {p.project_type}
@@ -251,14 +329,14 @@ export function ProjectTable({
                   </td>
                 )}
                 {show('stage') && (
-                  <td className="px-4 py-3">
+                  <td className={`px-4 ${pad}`}>
                     <span className={`text-xs px-2 py-1 rounded ${STAGE_BADGE[p.board_column] ?? 'bg-muted text-muted-foreground'}`}>
                       {stageLabel(p.board_column)}
                     </span>
                   </td>
                 )}
                 {show('captain') && (
-                  <td className="px-4 py-3 text-sm">
+                  <td className={`px-4 ${pad} text-sm`}>
                     {p.captain ? (
                       <span className="bg-muted text-foreground/80 text-xs px-2 py-0.5 rounded-full">
                         {p.captain.initials}
@@ -269,7 +347,7 @@ export function ProjectTable({
                   </td>
                 )}
                 {show('n') && (
-                  <td className={`px-4 py-3 text-xs ${nMet ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>
+                  <td className={`px-4 ${pad} text-xs ${nMet ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>
                     {p.n_target == null && !p.n_collected ? (
                       <span className="text-muted-foreground/50">—</span>
                     ) : (
@@ -284,15 +362,15 @@ export function ProjectTable({
                   </td>
                 )}
                 {show('nActual') && (
-                  <td className="px-4 py-3 text-xs text-muted-foreground">
+                  <td className={`px-4 ${pad} text-xs text-muted-foreground`}>
                     {fmtNum(p.n_actual)}
                   </td>
                 )}
-                {show('long') && <FlagCell value={p.longitudinal ?? false} />}
-                {show('voterQA') && <FlagCell value={p.voter_survey_qa ?? false} warn />}
-                {show('citation') && <FlagCell value={p.citation_language_needed ?? false} warn />}
+                {show('long') && <FlagCell value={p.longitudinal ?? false} pad={pad} />}
+                {show('voterQA') && <FlagCell value={p.voter_survey_qa ?? false} warn pad={pad} />}
+                {show('citation') && <FlagCell value={p.citation_language_needed ?? false} warn pad={pad} />}
                 {show('due') && (
-                  <td className={`px-4 py-3 text-xs whitespace-nowrap ${dueColor}`}>
+                  <td className={`px-4 ${pad} text-xs whitespace-nowrap ${dueColor}`}>
                     {urgencyPrefix(urgency, p.due_date)}
                     {formatDate(p.due_date)}
                   </td>
