@@ -1,10 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { ThemeToggle } from '@/components/shared/ThemeToggle'
 import { RealtimeSync } from '@/components/shared/RealtimeSync'
 import { AssistantPanel } from '@/components/assistant/AssistantPanel'
 import { CommandPalette } from '@/components/shared/CommandPalette'
-import { AppMenu } from '@/components/shared/AppMenu'
+import { TopNav } from '@/components/shared/TopNav'
 import { isAllowedEmail } from '@/lib/utils/allowedDomain'
 
 export const dynamic = 'force-dynamic'
@@ -26,19 +25,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div className="min-h-screen bg-background text-foreground">
       <RealtimeSync />
-      <nav className="border-b border-border px-6 py-1.5 flex items-center gap-3">
-        <AppMenu />
-        <span className="font-bold text-foreground text-sm">Survey Ops Command Center</span>
-        <div className="ml-auto flex items-center gap-3">
-          <span
-            title="Ctrl+K opens the ✦ Assistant · Ctrl+Shift+K opens the command palette"
-            className="hidden md:inline-flex text-[11px] border border-border rounded px-1.5 py-0.5 text-muted-foreground"
-          >
-            ✦ Ctrl+K
-          </span>
-          <ThemeToggle />
-        </div>
-      </nav>
+      <TopNav />
       <main className="px-6 pt-3 pb-6">
         {children}
       </main>
