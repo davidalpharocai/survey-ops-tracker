@@ -44,12 +44,13 @@ export function CommandPalette() {
   const inputRef = useRef<HTMLInputElement>(null)
   const { data: projects = [] } = useProjects()
 
-  // Ctrl+K / Cmd+K toggles from anywhere — deliberately NOT guarded by
-  // isTypingTarget: a modified chord never types a character, so it's safe
-  // (and expected) even while focus is in an input.
+  // Ctrl+Shift+K / Cmd+Shift+K toggles from anywhere — deliberately NOT guarded
+  // by isTypingTarget: a modified chord never types a character, so it's safe
+  // (and expected) even while focus is in an input. (Plain Ctrl/Cmd+K is owned
+  // by the ✦ Assistant panel, so the palette uses the Shift variant.)
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && !e.altKey && e.key.toLowerCase() === 'k') {
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && !e.altKey && e.key.toLowerCase() === 'k') {
         e.preventDefault()
         setOpen(o => !o)
       }

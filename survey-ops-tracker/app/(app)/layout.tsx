@@ -31,10 +31,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <span className="font-bold text-foreground text-sm">Survey Ops Command Center</span>
         <div className="ml-auto flex items-center gap-3">
           <span
-            title="Open the command palette"
+            title="Ctrl+K opens the ✦ Assistant · Ctrl+Shift+K opens the command palette"
             className="hidden md:inline-flex text-[11px] border border-border rounded px-1.5 py-0.5 text-muted-foreground"
           >
-            Ctrl+K
+            ✦ Ctrl+K
           </span>
           <ThemeToggle />
         </div>

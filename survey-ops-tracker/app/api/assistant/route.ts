@@ -1,102 +1,44 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { randomUUID } from 'node:crypto'
 import { createClient } from '@/lib/supabase/server'
 import { isAllowedEmail } from '@/lib/utils/allowedDomain'
 import { getAiBudget, logAiUsage } from '@/lib/server/observability'
+import { runWithTelemetry, cleanErrorMessage, type ToolCallMeta } from '@/lib/mcp/telemetry'
+import { ANTHROPIC_TOOLS, TOOLS_BY_NAME, buildSystemPrompt, previewWrite } from '@/lib/assistant/engine'
+import { signAction } from '@/lib/assistant/token'
+import type { ToolCtx } from '@/lib/mcp/registry'
 import { NextRequest } from 'next/server'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
-const SYSTEM_PROMPT = `You are the AlphaRoc Survey Ops assistant, embedded in the team's survey project tracker.
+const MODEL = 'claude-opus-4-8'
+const MAX_TOKENS = 8000
+// Hard cap on model round-trips per request — a safety net against a runaway
+// tool loop. A normal answer settles in 1–3.
+const MAX_ITERATIONS = 12
 
-You answer questions about the team's survey projects using the project data provided below. Be concise and direct — the team wants quick answers, not essays. Use plain language. When listing projects, use short bullet lists. Format dates like "Jun 24". When relevant, mention the project's current stage, due date, or budget status.
+type StreamEvent =
+  | { type: 'text'; delta: string }
+  | { type: 'tool'; name: string; phase: 'start' | 'done' }
+  | { type: 'pending'; id: string; tool: string; summary: string; preview: unknown; token: string }
+  | { type: 'done' }
+  | { type: 'error'; message: string }
 
-Key concepts:
-- Pipeline stages (in order): Submitted → Doc Programming → Survey Programming → EdWin QA → Fielding → Data QA → Delivery
-- Scoping phase (pre-sale): New Inquiry → Proposal Sent → Pricing Discussion → Awaiting Approval
-- N Target = response goal; N Collected = responses so far; N Actual = usable responses after cleaning
-- Budget vs Actual Spend tracks internal cost; cost per N = spend ÷ responses
-- Voter surveys need extra QA and citation language
-- Project types: PS = PureSpectrum (consumer panel fielded via the PureSpectrum survey data tool), B2B = expert/business panel, Rerun = repeat wave of an earlier study
-- Next steps are checkable to-do items per project; completed ones (done=true) form the project's 'Latest' log of what was recently finished
-- Survey ID format: [file owner's initials][client+project abbreviation][YYYYMMDD file created][country/region if any].
-  Example: ALBNFOF20260529UK = Alden + Bain Future of Food + created 2026-05-29 + UK. You can decode IDs for users on request.
-
-Data notes: Open and Hold projects include full current data. Closed projects are provided as one-line summaries only (final numbers: dates, N, budget/spend, salesperson, captain) — full detail for closed projects lives in the app, so point users there if they need more.
-
-Answer style for status questions: LEAD with deadline and collection risk (overdue or behind-pace projects first), and always show N collected vs target (e.g. "142/250").
-
-If asked something unrelated to survey operations or the project data, politely steer back to the tracker. Never invent project data that isn't in the list below.`
-
-// Noisy/internal columns stripped from the context for open projects.
-// board_column already encodes the stage, so the stage_* booleans are redundant.
-const STRIPPED_PROJECT_FIELDS = [
-  'created_at',
-  'updated_at',
-  'calendar_event_id',
-  'client_id',
-  'survey_ids_from_sheet',
-  'survey_ids_synced_at',
-  'stage_doc_programming',
-  'stage_survey_programming',
-  'stage_edwin_qa',
-  'stage_fielding',
-  'stage_data_qa',
-  'stage_delivery',
-]
-
-const NEXT_STEPS_MAX_CHARS = 300
-
-type ProjectRow = Record<string, unknown> & {
-  project_name: string
-  status: string
-  latest_next_steps: string | null
-  linked_documents: string[] | null
-  captain: { name: string; initials: string } | null
-}
-
-function serializeProjects(projects: ProjectRow[]) {
-  // Deterministic order (byte-stable across requests) so identical data
-  // serializes to identical bytes — keeps any downstream caching effective.
-  const sorted = [...projects].sort((a, b) =>
-    a.project_name < b.project_name ? -1 : a.project_name > b.project_name ? 1 : 0
-  )
-
-  const openProjects: Record<string, unknown>[] = []
-  const closedProjects: Record<string, unknown>[] = []
-
-  for (const p of sorted) {
-    if (p.status === 'Closed') {
-      closedProjects.push({
-        project_name: p.project_name,
-        client: p.client,
-        project_type: p.project_type,
-        status: 'Closed',
-        submitted_date: p.submitted_date,
-        deliver_date: p.deliver_date,
-        n_target: p.n_target,
-        n_actual: p.n_actual,
-        budget: p.budget,
-        actual_spend: p.actual_spend,
-        salesperson: p.salesperson,
-        captain: p.captain?.initials ?? null,
-      })
-    } else {
-      const slim: Record<string, unknown> = { ...p }
-      for (const field of STRIPPED_PROJECT_FIELDS) delete slim[field]
-      slim.linked_docs_count = Array.isArray(p.linked_documents)
-        ? p.linked_documents.length
-        : 0
-      delete slim.linked_documents
-      slim.latest_next_steps =
-        p.latest_next_steps && p.latest_next_steps.length > NEXT_STEPS_MAX_CHARS
-          ? p.latest_next_steps.slice(0, NEXT_STEPS_MAX_CHARS) + '…'
-          : p.latest_next_steps
-      openProjects.push(slim)
-    }
+function anthropicErrorMessage(err: unknown): string {
+  if (err instanceof Anthropic.AuthenticationError) {
+    return 'The Anthropic API key was rejected. Double-check ANTHROPIC_API_KEY in Vercel (Settings → Environment Variables), then redeploy.'
   }
-
-  return { openProjects, closedProjects }
+  if (err instanceof Anthropic.PermissionDeniedError) {
+    return "The API key works but doesn't have permission for this model. Ask your Anthropic admin to enable Claude model access for this key's workspace."
+  }
+  if (err instanceof Anthropic.RateLimitError) {
+    return 'Anthropic rate limit hit — wait a minute and try again.'
+  }
+  if (err instanceof Anthropic.APIError) {
+    return `Anthropic API error (${err.status}): ${err.message}`.slice(0, 300)
+  }
+  return 'Sorry, something went wrong. Please try again.'
 }
 
 export async function POST(req: NextRequest) {
@@ -108,19 +50,19 @@ export async function POST(req: NextRequest) {
 
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey || apiKey.startsWith('your-')) {
-    return new Response(
-      'The AI assistant is not configured yet (missing API key).',
-      { status: 503 }
-    )
+    return new Response('The AI assistant is not configured yet (missing API key).', { status: 503 })
   }
 
-  const { messages } = await req.json()
+  const { messages, context } = (await req.json()) as {
+    messages?: { role: string; content: string }[]
+    context?: { pr?: string; cl?: string }
+  }
   if (!Array.isArray(messages) || messages.length === 0) {
     return new Response('Bad request', { status: 400 })
   }
 
-  // Budget guard: only blocks when the owner has turned on hard-stop AND the
-  // monthly cap is reached. Otherwise it's purely advisory (surfaced in Admin).
+  // Budget guard: only blocks when the owner turned on hard-stop AND the monthly
+  // cap is reached. Otherwise advisory (surfaced in Admin).
   const budget = await getAiBudget()
   if (budget.blocked) {
     return new Response(
@@ -129,139 +71,131 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  const { data: projects, error } = await supabase
-    .from('survey_projects')
-    .select('*, captain:team_members(name, initials)')
-    .is('deleted_at', null)
-    .or('project_type.is.null,project_type.neq.Internal')
-    .order('due_date', { ascending: true })
-
-  if (error) {
-    return new Response('Failed to load project data', { status: 500 })
-  }
-
-  // Recent logged activity (emails etc.) so the assistant can answer
-  // "what's the latest with the client" without anyone opening Gmail
-  const { data: activity } = await supabase
-    .from('project_activity')
-    .select('project_id, type, direction, sender, subject, snippet, occurred_at')
-    .is('deleted_at', null)
-    .order('occurred_at', { ascending: false })
-    .limit(80)
-
-  // Structured next steps (checkable items). If the migration hasn't been
-  // applied yet, supabase returns an error and we just fall back to [].
-  const { data: steps } = await supabase
-    .from('project_steps')
-    .select('project_id, text, done, completed_at, created_at')
-    .order('created_at', { ascending: false })
-    .limit(200)
-
-  const nameById = new Map((projects ?? []).map(p => [p.id, p.project_name]))
-  const activityContext = (activity ?? []).map(a => ({
-    project: nameById.get(a.project_id) ?? a.project_id,
-    when: a.occurred_at,
-    type: a.type,
-    direction: a.direction,
-    from: a.sender,
-    subject: a.subject,
-    snippet: a.snippet,
-  }))
-
-  const stepsContext = (steps ?? []).map(s => ({
-    project: nameById.get(s.project_id) ?? s.project_id,
-    text: s.text,
-    done: s.done,
-    completed_at: s.completed_at,
-  }))
-
-  // Manual data-change log entries (falls back to [] pre-migration)
-  const { data: dataChanges } = await supabase
-    .from('project_data_changes')
-    .select('project_id, text, created_by, created_at')
-    .order('created_at', { ascending: false })
-    .limit(100)
-
-  const dataChangesContext = (dataChanges ?? []).map(d => ({
-    project: nameById.get(d.project_id) ?? d.project_id,
-    change: d.text,
-    by: d.created_by,
-    when: d.created_at,
-  }))
-
-  const today = new Date().toISOString().split('T')[0]
-  const { openProjects, closedProjects } = serializeProjects(
-    (projects ?? []) as ProjectRow[]
-  )
-  const dynamicContext = `Today's date: ${today}\n\nOpen and Hold projects (full data, JSON):\n${JSON.stringify(openProjects)}\n\nClosed projects (one-line summaries, JSON):\n${JSON.stringify(closedProjects)}\n\nRecent logged activity (emails etc., newest first; full bodies are viewable in the app's Activity section):\n${JSON.stringify(activityContext)}\n\nStructured next steps (open and recently completed):\n${JSON.stringify(stepsContext)}\n\nData change log (manual data edits by engineers, newest first):\n${JSON.stringify(dataChangesContext)}`
+  const userEmail = user.email as string
+  const ctx: ToolCtx = { userId: user.id, userEmail }
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' })
+  const systemPrompt = buildSystemPrompt({ today, context })
 
   const anthropic = new Anthropic({ apiKey })
-
-  const stream = anthropic.messages.stream({
-    model: 'claude-opus-4-8',
-    max_tokens: 16000,
-    thinking: { type: 'adaptive' },
-    // Static instructions first, then the data block — both carry cache
-    // breakpoints. The data block is byte-stable between requests (deterministic
-    // sort), so follow-up questions within ~5 minutes hit the cache; the
-    // instructions-only breakpoint covers the case where data changed.
-    system: [
-      {
-        type: 'text',
-        text: SYSTEM_PROMPT,
-        cache_control: { type: 'ephemeral' },
-      },
-      {
-        type: 'text',
-        text: dynamicContext,
-        cache_control: { type: 'ephemeral' },
-      },
-    ],
-    messages: messages.map((m: { role: string; content: string }) => ({
-      role: m.role === 'assistant' ? ('assistant' as const) : ('user' as const),
-      content: String(m.content),
-    })),
-  })
-
   const encoder = new TextEncoder()
+
+  const conversation: Anthropic.MessageParam[] = messages.map(m => ({
+    role: m.role === 'assistant' ? ('assistant' as const) : ('user' as const),
+    content: String(m.content),
+  }))
+
   const readable = new ReadableStream({
     async start(controller) {
+      const send = (e: StreamEvent) => controller.enqueue(encoder.encode(JSON.stringify(e) + '\n'))
       try {
-        for await (const event of stream) {
-          if (
-            event.type === 'content_block_delta' &&
-            event.delta.type === 'text_delta'
-          ) {
-            controller.enqueue(encoder.encode(event.delta.text))
-          }
-        }
-        // Stream finished cleanly — record token usage (best-effort).
-        try {
-          const final = await stream.finalMessage()
-          void logAiUsage({
-            endpoint: 'assistant',
-            userEmail: user.email,
-            model: 'claude-opus-4-8',
-            usage: final.usage,
+        for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
+          const stream = anthropic.messages.stream({
+            model: MODEL,
+            max_tokens: MAX_TOKENS,
+            thinking: { type: 'adaptive' },
+            system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }],
+            tools: ANTHROPIC_TOOLS,
+            messages: conversation,
           })
-        } catch {
-          /* usage logging must never affect the response */
+
+          for await (const event of stream) {
+            if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+              send({ type: 'text', delta: event.delta.text })
+            }
+          }
+
+          const final = await stream.finalMessage()
+          // Best-effort usage logging, per model round-trip.
+          try {
+            void logAiUsage({ endpoint: 'assistant', userEmail, model: MODEL, usage: final.usage })
+          } catch {
+            /* usage logging must never affect the response */
+          }
+
+          const toolUses = final.content.filter(
+            (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use'
+          )
+          if (toolUses.length === 0) break // end_turn — the model is done
+
+          // Preserve the assistant turn (including thinking/tool_use blocks) so the
+          // follow-up tool_result message is well-formed for extended thinking.
+          conversation.push({ role: 'assistant', content: final.content })
+
+          const toolResults: Anthropic.ToolResultBlockParam[] = []
+          for (const tu of toolUses) {
+            send({ type: 'tool', name: tu.name, phase: 'start' })
+            const args = (tu.input ?? {}) as Record<string, unknown>
+            const tool = TOOLS_BY_NAME.get(tu.name)
+            let resultForModel: unknown
+
+            if (!tool) {
+              resultForModel = { error: `Unknown tool "${tu.name}".` }
+            } else if (tool.kind === 'read') {
+              const meta: ToolCallMeta = {}
+              try {
+                resultForModel = await runWithTelemetry(userEmail, tool.name, () => tool.handler(args, ctx, meta), meta)
+              } catch (err) {
+                resultForModel = { error: err instanceof Error ? err.message : cleanErrorMessage(err) }
+              }
+            } else {
+              // WRITE — preview only. The model can never commit; a signed token
+              // is minted and the real write happens in /api/assistant/act.
+              const meta: ToolCallMeta = {}
+              try {
+                // Wrap in runWithTelemetry so a thrown preview error is cleaned
+                // (never leaks DB internals to the model) and the preview call is
+                // logged to mcp_tool_calls, exactly like the connector + read path.
+                const outcome = await runWithTelemetry(
+                  userEmail,
+                  tool.name,
+                  () => previewWrite(tool, args, ctx, meta),
+                  meta
+                )
+                if (outcome.kind === 'pending') {
+                  // log_blast affects spend; pin a stable idem_key into the token
+                  // args so re-redeeming the same token can't double-count.
+                  if (tool.name === 'log_blast' && args.idem_key == null) {
+                    args.idem_key = randomUUID()
+                  }
+                  const token = signAction({ tool: tool.name, args, userEmail })
+                  const id = randomUUID()
+                  send({
+                    type: 'pending',
+                    id,
+                    tool: tool.name,
+                    summary: outcome.summary,
+                    preview: outcome.preview,
+                    token,
+                  })
+                  resultForModel = {
+                    pending_confirmation: true,
+                    summary: outcome.summary,
+                    preview: outcome.preview,
+                    note: 'This change has NOT been applied. It is shown to the user with a Confirm button in the UI. Narrate what will happen and ask them to confirm — do not call this tool again.',
+                  }
+                } else {
+                  resultForModel = outcome.result
+                }
+              } catch (err) {
+                resultForModel = { error: err instanceof Error ? err.message : cleanErrorMessage(err) }
+              }
+            }
+
+            send({ type: 'tool', name: tu.name, phase: 'done' })
+            toolResults.push({
+              type: 'tool_result',
+              tool_use_id: tu.id,
+              content: JSON.stringify(resultForModel),
+            })
+          }
+
+          conversation.push({ role: 'user', content: toolResults })
         }
+
+        send({ type: 'done' })
       } catch (err) {
-        let msg = 'Sorry, something went wrong. Please try again.'
-        if (err instanceof Anthropic.AuthenticationError) {
-          msg =
-            'The Anthropic API key was rejected. Double-check the value of ANTHROPIC_API_KEY in Vercel (Settings → Environment Variables) — make sure the full key was pasted with no spaces — then redeploy.'
-        } else if (err instanceof Anthropic.PermissionDeniedError) {
-          msg =
-            "The API key works but doesn't have permission for this model. Ask your Anthropic admin to enable Claude model access for this key's workspace."
-        } else if (err instanceof Anthropic.RateLimitError) {
-          msg = 'Anthropic rate limit hit — wait a minute and try again.'
-        } else if (err instanceof Anthropic.APIError) {
-          msg = `Anthropic API error (${err.status}): ${err.message}`.slice(0, 300)
-        }
-        controller.enqueue(encoder.encode(`\n\n[${msg}]`))
-        console.error('Assistant stream error:', err)
+        console.error('Assistant loop error:', err)
+        send({ type: 'error', message: anthropicErrorMessage(err) })
       } finally {
         controller.close()
       }
@@ -270,7 +204,7 @@ export async function POST(req: NextRequest) {
 
   return new Response(readable, {
     headers: {
-      'Content-Type': 'text/plain; charset=utf-8',
+      'Content-Type': 'application/x-ndjson; charset=utf-8',
       'Cache-Control': 'no-cache',
     },
   })

@@ -80,6 +80,13 @@ export function AppMenu() {
           <Link href="/" className={itemClass} title="The kanban board — the main view">
             <span>🗂</span> Board
           </Link>
+          <Link
+            href="/assistant"
+            className={itemClass}
+            title="Assistant — ask about projects and clients, or ask it to make a change (preview-then-confirm)"
+          >
+            <span>✦</span> Assistant
+          </Link>
           <Link href="/list" className={itemClass} title="All projects as a sortable table, with CSV export">
             <span>📋</span> List view
           </Link>
@@ -165,7 +172,7 @@ export function AppMenu() {
           </a>
           <div className="border-t border-border my-1.5" />
           <p className="px-3 py-1.5 text-xs text-muted-foreground">
-            Tip: Ctrl+K jumps to any project
+            Tip: Ctrl+K opens the Assistant · Ctrl+Shift+K jumps to any project
           </p>
         </div>
       )}
