@@ -41,6 +41,26 @@ function anthropicErrorMessage(err: unknown): string {
   return 'Sorry, something went wrong. Please try again.'
 }
 
+// Roll a prompt-cache breakpoint onto the LAST message each round. The system +
+// tools prefix is already cached; the messages were not, so every extra
+// tool-loop round (and every follow-up turn) re-processed the whole growing
+// conversation. Caching the last block makes those rounds mostly cache hits.
+function withCacheBreakpoint(messages: Anthropic.MessageParam[]): Anthropic.MessageParam[] {
+  if (messages.length === 0) return messages
+  const lastIdx = messages.length - 1
+  return messages.map((m, i) => {
+    if (i !== lastIdx) return m
+    if (typeof m.content === 'string') {
+      return { ...m, content: [{ type: 'text', text: m.content, cache_control: { type: 'ephemeral' } }] }
+    }
+    if (m.content.length === 0) return m
+    const blocks = m.content.map((b, j) =>
+      j === m.content.length - 1 ? { ...b, cache_control: { type: 'ephemeral' as const } } : b
+    )
+    return { ...m, content: blocks }
+  })
+}
+
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -93,9 +113,13 @@ export async function POST(req: NextRequest) {
             model: MODEL,
             max_tokens: MAX_TOKENS,
             thinking: { type: 'adaptive' },
+            // Lower effort than the default (high): this assistant mostly
+            // retrieves + orchestrates tools + confirms writes — it doesn't need
+            // deep reasoning, and lower effort is noticeably snappier. Tunable.
+            output_config: { effort: 'medium' },
             system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }],
             tools: ANTHROPIC_TOOLS,
-            messages: conversation,
+            messages: withCacheBreakpoint(conversation),
           })
 
           for await (const event of stream) {
@@ -121,8 +145,10 @@ export async function POST(req: NextRequest) {
           // follow-up tool_result message is well-formed for extended thinking.
           conversation.push({ role: 'assistant', content: final.content })
 
-          const toolResults: Anthropic.ToolResultBlockParam[] = []
-          for (const tu of toolUses) {
+          // Run a round's tool calls concurrently — reads are independent and
+          // write-previews don't commit, so there's no ordering hazard.
+          const toolResults: Anthropic.ToolResultBlockParam[] = await Promise.all(
+            toolUses.map(async (tu): Promise<Anthropic.ToolResultBlockParam> => {
             send({ type: 'tool', name: tu.name, phase: 'start' })
             const args = (tu.input ?? {}) as Record<string, unknown>
             const tool = TOOLS_BY_NAME.get(tu.name)
@@ -182,12 +208,13 @@ export async function POST(req: NextRequest) {
             }
 
             send({ type: 'tool', name: tu.name, phase: 'done' })
-            toolResults.push({
+            return {
               type: 'tool_result',
               tool_use_id: tu.id,
               content: JSON.stringify(resultForModel),
+            }
             })
-          }
+          )
 
           conversation.push({ role: 'user', content: toolResults })
         }

@@ -142,8 +142,13 @@ export function AssistantThread({
               </div>
             )}
             {showThinking && (
-              <div className="self-start bg-muted text-muted-foreground text-sm rounded-2xl rounded-bl-sm px-3 py-2">
-                …
+              <div
+                className="self-start bg-muted rounded-2xl rounded-bl-sm px-3 py-2.5 flex items-center gap-1"
+                aria-label="Assistant is thinking"
+              >
+                <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:0ms]" />
+                <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:150ms]" />
+                <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:300ms]" />
               </div>
             )}
             {busy && isLast && <ToolActivityLine names={activeTools} />}
