@@ -83,14 +83,29 @@ Titled groups: **People** (spans the full sidebar width so names aren't clipped 
 
 A sortable table of all projects (click column headers to sort — the header stays frozen as you scroll). It has the **same filters as the board** (Captain, Type, Due, Stage, search). **⚙ Columns** lets you hide columns you don't use — your choice is personal (saved in your browser) and doesn't affect teammates. **Saved views** here remember the whole table setup — Operations/Full, filters, which columns are showing, and the sort — under a name you pick; ⟳ Update, ✎ rename, and 🗑 delete them just like board views. Rows carry the same colored due-date edge as board cards (red overdue, orange tomorrow, amber in 2 days; dropped once a project is closed). **⬇ Export CSV** downloads whatever is currently shown, with every field regardless of hidden columns.
 
+## 4b. The Calendar
+
+Open **Calendar** in the ☰ menu to see everything dated on one **month grid** (‹ / › to change month, **Today** to jump back). Each day shows its events as color-coded chips; a busy day shows the first few plus **＋N more** (click the day to see them all), and clicking an event opens that project.
+
+**What's on it** (each colour is a type, and the legend toggles each on/off): **Due** (internal) · **Deliver** (client) · **Launch** · **Rerun** (next wave of a longitudinal study) · **Reminder** (your own). Due and Deliver keep the overdue/soon colour.
+
+**Filters** (remembered per person): **Captain**, **Type** (PS / B2B / Rerun — so Sree can isolate reruns), **Just mine**, **Client**, **Priority**, and **Status** — by default it shows **only open, active projects**; tick to also include On-Hold, Closed, or Scoping. On a phone it switches to a chronological agenda list.
+
 ## 5. The AI Assistant
 
 [screenshot: assistant panel]
 
-The **✦ Assistant** button (bottom-right) answers questions from live project data, logged emails, next steps, and the data change log:
+The **✦ Assistant** is now a full working assistant — it can both **answer questions and make changes**, right in the app (no external setup). Open it from the floating **✦** button (bottom-right), press **⌘/Ctrl-K** anywhere, or open the full-page **Assistant** tab in the ☰ menu for a roomier view.
+
+**Ask it anything** — same as before, from live project data, logged emails, next steps, and the data change log:
 - *"What's due this week?"* · *"What's at risk?"* (leads with deadline/collection risk)
 - *"Any recent emails on SPCX?"* · *"What data changes were made this month?"*
 - *"Decode ALBNFOF20260529UK"* (it knows the survey ID format)
+
+**Tell it to do things** — it has the same abilities as the "connect your Claude" connector: create/update projects, advance stages, log a blast, add next steps or notes, manage clients and contacts, set reminders, and more:
+- *"Advance Government Shutdown Poll to Fielding"* · *"Add a next step to A4A Q3: chase the client for approval"* · *"Create a new PS project for Coatue, 800 N, due Aug 1, captain Julia"*
+- Every change first shows a **preview with Confirm / Cancel** — nothing is saved until you click **Confirm**. The assistant can't change anything on its own, and the same compliance gate applies (e.g. it can't mark a gated project delivered without an approved review).
+- On a **project or client page**, it knows what you're looking at — *"log a blast here"* or *"advance this to Data QA"* just works.
 
 ## 6. Things that happen automatically
 
