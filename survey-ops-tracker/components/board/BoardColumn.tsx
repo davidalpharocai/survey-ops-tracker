@@ -2,6 +2,7 @@
 import { Droppable, Draggable } from '@hello-pangea/dnd'
 import { ProjectCard } from './ProjectCard'
 import { STAGE_DESCRIPTIONS, stageLabel } from '@/lib/utils/stage'
+import { getDueUrgency } from '@/lib/utils/date'
 import type { SlimProject } from '@/lib/hooks/useProjects'
 
 interface BoardColumnProps {
@@ -22,6 +23,11 @@ interface BoardColumnProps {
 
 export function BoardColumn({ id, title, projects, onCardClick, isNewFor, bodyClassName = '', collapseWhenEmpty = false }: BoardColumnProps) {
   const collapsed = collapseWhenEmpty && projects.length === 0
+  // Overdue count so a column's trouble is visible in its header, not only by
+  // scanning cards. Mirrors the card: Closed/Hold drop their urgency treatment.
+  const overdue = projects.filter(
+    p => p.status !== 'Closed' && p.status !== 'Hold' && getDueUrgency(p.due_date) === 'overdue'
+  ).length
   return (
     <div
       className={`bg-card border border-border rounded-xl p-2 flex flex-col gap-2 ${
@@ -35,11 +41,21 @@ export function BoardColumn({ id, title, projects, onCardClick, isNewFor, bodyCl
         >
           {stageLabel(title)}
         </span>
-        <span
-          className={`text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full ${collapsed ? 'opacity-50' : ''}`}
-          title="Number of projects in this column"
-        >
-          {projects.length}
+        <span className="flex items-center gap-1.5">
+          {overdue > 0 && !collapsed && (
+            <span
+              className="text-[11px] bg-red-500/15 text-red-600 dark:text-red-400 px-2 py-0.5 rounded-full whitespace-nowrap"
+              title={`${overdue} overdue in this column`}
+            >
+              {overdue} overdue
+            </span>
+          )}
+          <span
+            className={`text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full ${collapsed ? 'opacity-50' : ''}`}
+            title="Number of projects in this column"
+          >
+            {projects.length}
+          </span>
         </span>
       </div>
       <Droppable droppableId={id}>
