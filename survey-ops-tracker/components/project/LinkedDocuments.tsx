@@ -19,6 +19,26 @@ function parseDoc(entry: string): { name: string | null; url: string } {
   return { name: null, url: entry }
 }
 
+// Short format label shown after the name, e.g. "Survey questions (doc)".
+// Google-native types map to a familiar Office-ish label; otherwise use the
+// file extension in the URL. Returns null when the format can't be determined.
+function docFormat(url: string): string | null {
+  try {
+    const u = new URL(url)
+    if (u.hostname === 'docs.google.com') {
+      if (u.pathname.startsWith('/document')) return 'doc'
+      if (u.pathname.startsWith('/spreadsheets')) return 'xlsx'
+      if (u.pathname.startsWith('/presentation')) return 'pptx'
+      if (u.pathname.startsWith('/forms')) return 'form'
+    }
+    const m = u.pathname.toLowerCase().match(/\.([a-z0-9]{2,5})$/)
+    return m ? m[1] : null
+  } catch {
+    const m = url.toLowerCase().match(/\.([a-z0-9]{2,5})(?:[?#]|$)/)
+    return m ? m[1] : null
+  }
+}
+
 function fallbackName(url: string): string {
   try {
     const u = new URL(url)
@@ -109,6 +129,7 @@ export function LinkedDocuments({ projectId, documents }: LinkedDocumentsProps) 
       <div className="grid grid-cols-2 gap-2 mb-3">
         {documents.map((entry, i) => {
           const { name, url } = parseDoc(entry)
+          const fmt = docFormat(url)
           if (renaming === i) {
             return (
               <div key={i} className="col-span-2 flex items-center gap-2">
@@ -141,7 +162,10 @@ export function LinkedDocuments({ projectId, documents }: LinkedDocumentsProps) 
                 className="flex items-center gap-2 bg-muted rounded-lg px-3 py-2 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-accent transition-colors min-w-0"
               >
                 <span>📄</span>
-                <span className="truncate">{name ?? fallbackName(url)}</span>
+                <span className="truncate">
+                  {name ?? fallbackName(url)}
+                  {fmt && <span className="text-muted-foreground/60"> ({fmt})</span>}
+                </span>
               </a>
               <span className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center bg-muted rounded">
                 <button

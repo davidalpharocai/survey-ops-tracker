@@ -588,20 +588,18 @@ export default function ProjectDetailPage() {
                   tooltip={TOOLTIPS['Audience Size']}
                   onSave={v => updateProject.mutate({ id, updates: { audience_size: v } })}
                 />
-                <div className="xl:col-span-2">
-                  <EditableRow
-                    label="Audience"
-                    value={project.audience ?? ''}
-                    placeholder="e.g. US adults 18+, likely voters"
-                    tooltip={TOOLTIPS['Audience']}
-                    onSave={v => updateProject.mutate({ id, updates: { audience: v || null } })}
-                  />
-                </div>
+                <EditableRow
+                  label="Audience"
+                  value={project.audience ?? ''}
+                  placeholder="e.g. US adults 18+, likely voters"
+                  tooltip={TOOLTIPS['Audience']}
+                  onSave={v => updateProject.mutate({ id, updates: { audience: v || null } })}
+                />
               </div>
             </SidebarCard>
 
             <SidebarCard title="Flags" className="xl:col-span-2">
-              <div className="flex flex-wrap gap-1.5">
+              <div className="flex flex-wrap gap-1">
                 <FlagChip
                   label="Longitudinal"
                   value={project.longitudinal ?? false}
@@ -1098,7 +1096,7 @@ function FlagChip({
       onClick={() => onToggle(!value)}
       title={tooltip}
       aria-pressed={value}
-      className={`rounded-full px-2.5 py-1 text-xs cursor-pointer transition-colors ${
+      className={`rounded-full px-2 py-0.5 text-xs cursor-pointer transition-colors ${
         value
           ? CHIP_ON[tone]
           : 'border border-dashed border-border bg-transparent text-muted-foreground hover:bg-muted'
