@@ -2,7 +2,7 @@
 
 *Last updated: June 12, 2026. The team's tracker for survey projects from first inquiry through delivery.*
 
-**Finding this guide later:** the ☰ menu in the app's top-left corner links straight here, along with the Systems & Handover doc.
+**Finding this guide later:** the top navigation bar's **More** menu links straight here, along with the Systems & Handover doc.
 
 **App:** https://survey-ops-tracker.vercel.app
 **Sign in:** passwordless. Enter your **@alpharoc.ai** username on the login page (the domain is fixed, so only company accounts can get in) and click **"Email me a sign-in link"** — you'll get a one-tap magic link. Open it **on the same device** you requested it from to finish signing in. No password to set or remember.
@@ -85,7 +85,7 @@ A sortable table of all projects (click column headers to sort — the header st
 
 ## 4b. The Calendar
 
-Open **Calendar** in the ☰ menu to see everything dated on one **month grid** (‹ / › to change month, **Today** to jump back). Each day shows its events as color-coded chips; a busy day shows the first few plus **＋N more** (click the day to see them all), and clicking an event opens that project.
+Open the **Calendar** tab in the top nav to see everything dated on one **month grid** (‹ / › to change month, **Today** to jump back). Each day shows its events as color-coded chips; a busy day shows the first few plus **＋N more** (click the day to see them all), and clicking an event opens that project.
 
 **What's on it** (each colour is a type, and the legend toggles each on/off): **Due** (internal) · **Deliver** (client) · **Launch** · **Rerun** (next wave of a longitudinal study) · **Reminder** (your own). Due and Deliver keep the overdue/soon colour.
 
@@ -95,7 +95,7 @@ Open **Calendar** in the ☰ menu to see everything dated on one **month grid** 
 
 [screenshot: assistant panel]
 
-The **✦ Assistant** is now a full working assistant — it can both **answer questions and make changes**, right in the app (no external setup). Open it from the floating **✦** button (bottom-right), press **⌘/Ctrl-K** anywhere, or open the full-page **Assistant** tab in the ☰ menu for a roomier view.
+The **✦ Assistant** is now a full working assistant — it can both **answer questions and make changes**, right in the app (no external setup). Open it from the floating **✦** button (bottom-right), press **⌘/Ctrl-K** anywhere, or expand it to the full-page view from the panel for a roomier session.
 
 **Ask it anything** — same as before, from live project data, logged emails, next steps, and the data change log:
 - *"What's due this week?"* · *"What's at risk?"* (leads with deadline/collection risk)
@@ -120,7 +120,7 @@ The **✦ Assistant** is now a full working assistant — it can both **answer q
 
 - Every project has a permanent **Project ID** like `PR00042` — shown next to the project title and in the list view, included in CSV exports, and assigned automatically to new projects. It never changes, so use it when referencing a project in email or Slack. Clients have matching `Cl#####` ids.
 - **Merging duplicates**: if the same project (or client) got entered twice, open either copy and click **Merge…** in the header, search for the duplicate, and you'll get a preview. Pick which record **survives**, resolve any **fields that differ** (dates, N, budget, etc. — matching fields are hidden), and everything else — bids, blasts, next steps, deliverables, contacts, notes, activity and audit history — **combines** onto the survivor. The other record is **soft-deleted** to Recently Deleted (recoverable). Analyst-only. Two caveats: a project whose N is **split into segments** must be un-split first; and merging two **clients** doesn't auto-merge their duplicate *projects* — merge those separately.
-- The **☰ menu → Insights** page rolls up the whole pipeline: active/scoping/closed counts, overdue and due-this-week, on-time delivery %, average cycle time, stage distribution, per-captain workload, budget vs spend, and top clients — all derived live from your projects.
+- The **More → Insights** page (top nav) rolls up the whole pipeline: active/scoping/closed counts, overdue and due-this-week, on-time delivery %, average cycle time, stage distribution, per-captain workload, budget vs spend, and top clients — all derived live from your projects.
 - The **☰ menu → Internal Projects** page is a separate home for AlphaROC's own work (product, ops, hiring, tooling), kept entirely apart from survey projects. It's a sprint-based **Backlog → In Progress → Review → Done** board: "+ New internal project" defaults the client to AlphaROC, each project has an Owner, Category, Objective, a Sprint (a 2-week window — set the cadence in **Admin → Sprint cadence**), and a Next Steps checklist instead of survey N tracking. No survey fields, and internal projects never appear on the survey board, list, insights, or digest.
 - The **☰ menu → Admin** page is organized into tabs — **Overview** (systems links, system status, AI usage, data health), **Accounts & Team**, **Operations** (sprint cadence, recently deleted), and **Audit Log** — and has: links to every system behind the tracker (including Supabase Users for password resets), a **System status** panel (shows whether the automated backend jobs — the nightly Slack digest and the survey-ID sync — ran cleanly, with any failures listed; the same failures also show up in the daily Slack digest), an **AI usage** panel (what the assistant chat and AI project entry have cost this month, with an editable monthly budget and an optional "hard stop" that pauses AI features when the budget is reached), **Recently Deleted** (restore a project you deleted by mistake, or delete it permanently), a **master audit log** (every field change across all projects — who, when, old → new, including deletes and restores, with the project linked), the client list with their ids, the team roster, and a data-health checklist (open projects missing a captain or due date).
 - **Client pages**: click any client on the Admin page — or the client name on a project page — to see that client's full picture: client since, open/closed project counts, average spend per project, how often they come back, a **Contacts** roster you can add to and edit (the people who request this client's surveys — pick one as a project's "Requested by"; deleting archives a contact so it leaves the picker but stays on past projects), a **Notes** log (free-text notes about the client — each a dated, attributed bullet, newest first), every project (click one to open it), and a **Compliance** card to set that client's review requirements.
@@ -182,7 +182,7 @@ client, just **bcc, cc, or forward** that email to **deliverables@alpharoc.ai**.
 
 ### The Review queue
 
-Open **Deliverables** in the top menu. Anything emailed in that we couldn't auto-file to a single
+Open the **Deliverables** tab in the top nav. Anything emailed in that we couldn't auto-file to a single
 client + project shows here with our best guesses (High / Med / Low confidence). Click a guess to
 file it, pick another project from the dropdown, or mark it **"Not a deliverable"** to dismiss it.
 Items already filed under the right client but with no project show as **unsorted** — assign a
@@ -202,9 +202,9 @@ If everything's tidy, it just says the depository is clean.
 
 Client emails are logged automatically to each project's **Activity** panel, so there's a clean, chronological record of what was said and when — nobody has to copy anything out of Gmail.
 
-**Setup (once per captain):** ☰ menu → **Connect your Claude → Email capture setup** — verify the forwarding address and import your filter set. **How it decides where an email goes:**
+**Setup (once per captain):** **More → Connect your Claude → Email capture setup** — verify the forwarding address and import your filter set. **How it decides where an email goes:**
 - **Auto-logged** when it's confident: the email mentions a project code (PR#####) or a survey ID, or it's from a known client contact and clearly about one project (its name is in the email, or the client has just one active project).
-- **Sent to Email Review** (☰ menu → **Email Review**) when it's unsure — e.g. a client with several active projects and nothing in the email says which one. Open the queue and file each email to the right project with one click, or **Ignore** it. Confident emails skip review entirely.
+- **Sent to Email Review** (the **Email Review** tab) when it's unsure — e.g. a client with several active projects and nothing in the email says which one. Open the queue and file each email to the right project with one click, or **Ignore** it. Confident emails skip review entirely.
 
 **On the project page:** the **Activity** tab lists emails newest-first — click one to expand the full message, use **open in Gmail** to jump to the original, and use the **search box** to find a specific email by subject, body, or person.
 
@@ -214,7 +214,7 @@ Client emails are logged automatically to each project's **Activity** panel, so 
 
 ## 10. Connect your Claude
 
-The **☰ menu → Connect your Claude** page (`/connect`) links Survey Ops to Claude — claude.ai,
+The **Connect your Claude** page (`/connect`, under **More** in the top nav) links Survey Ops to Claude — claude.ai,
 Claude Desktop, or Claude Code — so you can ask about your projects and set reminders straight
 from a chat, using your own login. Analyst-only.
 
