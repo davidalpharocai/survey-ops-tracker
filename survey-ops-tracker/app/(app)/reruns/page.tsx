@@ -182,14 +182,15 @@ function cardStatus(
     return { icon: '⚠', label: d > 1 ? `${d}d overdue` : 'Overdue' }
   }
   if (bucket === 'upcoming') {
-    // A defined cadence / explicit date is exact ("Due Aug 15"). Only the
-    // free-text-inferred fallback uses the fuzzy confidence wording.
-    if (r.has_cadence_due || r.expected_next_on) return { icon: '', label: `Due ${formatDate(due)}` }
+    // Exact dates get a live countdown ("Due Aug 15 · in 12d"); free-text-inferred
+    // fuzzy dates keep the honest "Due in May" wording (no false precision).
+    const soon = typeof r.days_to_due === 'number' && r.days_to_due >= 0 ? ` · in ${r.days_to_due}d` : ''
+    if (r.has_cadence_due || r.expected_next_on) return { icon: '', label: `Due ${formatDate(due)}${soon}` }
     if ((di.gran === 'month' || di.gran === 'quarter') && due) {
       const mn = MONTHS[new Date(`${due}T00:00:00Z`).getUTCMonth()]
       if (mn) return { icon: '', label: di.gran === 'quarter' ? `Due by ${mn}` : `Due in ${mn}` }
     }
-    return { icon: '', label: `Due ${formatDate(due)}` }
+    return { icon: '', label: `Due ${formatDate(due)}${soon}` }
   }
   if (bucket === 'done') {
     if (r.is_paused) return { icon: '⏸', label: 'Paused' }
@@ -201,8 +202,9 @@ function cardStatus(
 function RerunCard({ r, bucket, hrefFor }: { r: RerunRow; bucket: Bucket; hrefFor: (r: RerunRow) => string | null }) {
   const cfg = BUCKETS[bucket]
   const [showWaves, setShowWaves] = useState(false)
-  const title = r.client || r.cadence || '(unlabeled)'
+  const title = r.display_name || r.client || r.cadence || '(unlabeled)'
   const study = r.client && r.cadence ? r.cadence : null
+  const metaNote = (r as RerunRow & { meta_note?: string | null }).meta_note
   const bits = [r.work, r.freq, r.platform, r.n ? `N ${r.n}` : null].filter(Boolean).join(' · ')
   const waves = bucket !== 'done' ? waveIds(r.survey_ids) : []
   const showNext =
@@ -250,10 +252,11 @@ function RerunCard({ r, bucket, hrefFor }: { r: RerunRow; bucket: Bucket; hrefFo
         </div>
       )}
 
-      {(r.cadence_months != null || r.owner_email || r.last_wave_on) && (
+      {(r.cadence_months != null || r.owner_email || r.backup_owner_email || r.last_wave_on) && (
         <div className="text-[11px] text-muted-foreground/90 mt-1 flex flex-wrap gap-x-2 gap-y-0.5">
           {cadenceLabel(r.cadence_months) && <span>🔁 {cadenceLabel(r.cadence_months)}</span>}
           {r.owner_email && <span>👤 {r.owner_email}</span>}
+          {r.backup_owner_email && <span title="Backup owner">＋ {r.backup_owner_email}</span>}
           {r.last_wave_on && <span>last {formatDate(r.last_wave_on)}</span>}
         </div>
       )}
@@ -309,10 +312,16 @@ function RerunCard({ r, bucket, hrefFor }: { r: RerunRow; bucket: Bucket; hrefFo
         </div>
       )}
       {bucket !== 'done' && r.note && <div className="text-xs text-muted-foreground italic mt-1 break-words">{r.note}</div>}
+      {metaNote && (
+        <div className="text-xs text-muted-foreground mt-1 flex items-start gap-1 break-words">
+          <span aria-hidden="true">📝</span>
+          <span>{metaNote}</span>
+        </div>
+      )}
       {/* key includes the meta fields so the editor re-seeds its form state after
           a save/log-wave refetch (Server ids are stable → no auto-remount). */}
       <RerunMetaEditor
-        key={`${r.rerun_key}:${r.cadence_months}:${r.last_wave_on}:${r.expected_next_on}:${r.owner_email}:${r.backup_owner_email}:${r.lead_days}:${r.is_paused}`}
+        key={`${r.rerun_key}:${r.cadence_months}:${r.last_wave_on}:${r.expected_next_on}:${r.owner_email}:${r.backup_owner_email}:${r.lead_days}:${r.is_paused}:${r.display_name ?? ''}:${metaNote ?? ''}`}
         r={r}
       />
     </li>

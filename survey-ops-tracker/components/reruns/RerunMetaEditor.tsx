@@ -26,6 +26,10 @@ export function RerunMetaEditor({ r }: { r: RerunRow }) {
   const [backup, setBackup] = useState(r.backup_owner_email ?? '')
   const [leadDays, setLeadDays] = useState(r.lead_days != null ? String(r.lead_days) : '')
   const [paused, setPaused] = useState(!!r.is_paused)
+  const [displayName, setDisplayName] = useState(r.display_name ?? '')
+  // meta_note is surfaced by the view as of migration 052; read defensively so
+  // this compiles + degrades to blank before the migration is applied.
+  const [note, setNote] = useState((r as RerunRow & { meta_note?: string | null }).meta_note ?? '')
 
   // No stable key yet (pre-migration or pre-resync) — nothing to attach meta to.
   if (!r.rerun_key) return null
@@ -43,6 +47,10 @@ export function RerunMetaEditor({ r }: { r: RerunRow }) {
         backup_owner_email: backup || null,
         lead_days: leadDays ? Number(leadDays) : null,
         paused,
+        // Send these every save — the meta upsert nulls unsent fields, so
+        // omitting them would wipe an existing name/note.
+        display_name: displayName.trim() || null,
+        note: note.trim() || null,
         ...overrides,
       },
       {
@@ -78,6 +86,16 @@ export function RerunMetaEditor({ r }: { r: RerunRow }) {
 
   return (
     <div className="mt-1.5 rounded-lg border border-border bg-muted/40 p-2 flex flex-col gap-2">
+      <label className="flex items-center gap-1 text-[11px] text-muted-foreground">
+        Name
+        <input
+          type="text"
+          placeholder="Display name (optional — overrides the sheet label)"
+          value={displayName}
+          onChange={(e) => setDisplayName(e.target.value)}
+          className={`${inputCls} flex-1 min-w-[12rem]`}
+        />
+      </label>
       <div className="flex flex-wrap gap-x-3 gap-y-1.5 items-center text-[11px] text-muted-foreground">
         <label className="flex items-center gap-1">
           Cadence
@@ -140,6 +158,16 @@ export function RerunMetaEditor({ r }: { r: RerunRow }) {
           <input type="checkbox" checked={paused} onChange={(e) => setPaused(e.target.checked)} /> Paused
         </label>
       </div>
+      <label className="flex flex-col gap-0.5 text-[11px] text-muted-foreground">
+        Note
+        <textarea
+          rows={2}
+          placeholder="Internal note (optional)"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          className={`${inputCls} resize-none`}
+        />
+      </label>
       <p className="text-[10px] text-muted-foreground/70">
         {cadence
           ? 'Next wave is computed as last-collected + cadence; log each wave to keep it current.'
