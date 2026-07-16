@@ -79,12 +79,16 @@ export function Board({ projects, teamMembers, onMoveProject, wrapInContext = tr
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
     return projects.filter(p => {
-      if (
-        captainFilter &&
-        p.captain?.id !== captainFilter &&
-        !(p.co_captain_ids ?? []).includes(captainFilter)
-      )
-        return false
+      if (captainFilter) {
+        if (captainFilter === 'unassigned') {
+          if (p.captain != null) return false
+        } else if (
+          p.captain?.id !== captainFilter &&
+          !(p.co_captain_ids ?? []).includes(captainFilter)
+        ) {
+          return false
+        }
+      }
       if (typeFilter && p.project_type !== typeFilter) return false
       if (!matchesDuePreset(p.due_date, dueFilter, dueFrom, dueTo)) return false
       if (stageFilter) {

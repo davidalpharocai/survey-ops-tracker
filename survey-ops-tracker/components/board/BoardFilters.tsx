@@ -122,7 +122,9 @@ export function BoardFilters({
   }, [open])
 
   const captainLabel = captainFilter
-    ? captains.find(c => c.id === captainFilter)?.initials ?? '—'
+    ? captainFilter === 'unassigned'
+      ? 'Unassigned'
+      : captains.find(c => c.id === captainFilter)?.initials ?? '—'
     : null
   const activeCount = [captainFilter, clientFilter, typeFilter, dueFilter, stageFilter].filter(
     Boolean
@@ -171,6 +173,7 @@ export function BoardFilters({
                   className={`${SELECT_CLASSES} w-full`}
                 >
                   <option value="">All Captains</option>
+                  <option value="unassigned">Unassigned</option>
                   {captains.map(c => (
                     <option key={c.id} value={c.id}>
                       {c.id === currentMemberId ? `${c.initials} (me)` : c.initials}

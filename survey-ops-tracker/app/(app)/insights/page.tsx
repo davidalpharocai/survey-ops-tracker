@@ -7,6 +7,7 @@ import { Skeleton } from '@/components/shared/Skeleton'
 import { STAGE_ORDER } from '@/lib/utils/stage'
 import { differenceInCalendarDays, parseISO } from 'date-fns'
 import { fmtNum } from '@/lib/utils/number'
+import Link from 'next/link'
 
 // Read-only analytics derived from data already captured — no new tables.
 interface InsightProject {
@@ -24,11 +25,11 @@ interface InsightProject {
   n_actual: number | null
   budget: number | null
   actual_spend: number | null
-  captain: { name: string; initials: string } | null
+  captain: { id: string; name: string; initials: string } | null
 }
 
 const COLS =
-  'id, client, status, phase, scoping_stage, board_column, submitted_date, due_date, deliver_date, n_target, n_collected, n_actual, budget, actual_spend, captain:team_members(name, initials)'
+  'id, client, status, phase, scoping_stage, board_column, submitted_date, due_date, deliver_date, n_target, n_collected, n_actual, budget, actual_spend, captain:team_members(id, name, initials)'
 
 function useInsights() {
   const supabase = createClient()
@@ -88,10 +89,10 @@ export default function InsightsPage() {
     const byStage = STAGE_ORDER.map(s => ({ label: s, count: open.filter(p => p.board_column === s).length }))
 
     // Captain workload (active), with overdue among them
-    const capMap = new Map<string, { open: number; overdue: number }>()
+    const capMap = new Map<string, { id: string; open: number; overdue: number }>()
     for (const p of open) {
       const name = p.captain?.name ?? 'Unassigned'
-      const c = capMap.get(name) ?? { open: 0, overdue: 0 }
+      const c = capMap.get(name) ?? { id: p.captain?.id ?? 'unassigned', open: 0, overdue: 0 }
       c.open++
       if (p.due_date && p.due_date <= today) c.overdue++
       capMap.set(name, c)
@@ -157,28 +158,28 @@ export default function InsightsPage() {
         <span className="text-sm text-muted-foreground">A rollup of the whole pipeline — derived live from your projects.</span>
       </div>
 
-      {/* KPI tiles */}
+      {/* KPI tiles — each opens the matching, pre-filtered List. */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div className={tile}>
+        <Link href="/list" title="Open the active projects list" className={`${tile} hover:border-ring transition-colors`}>
           <span className="text-xs text-muted-foreground">Active projects</span>
           <span className="text-2xl font-semibold text-foreground leading-tight">{m.openCount}</span>
           <span className="text-xs text-muted-foreground">{m.scopingCount} scoping · {m.closedCount} closed</span>
-        </div>
-        <div className={tile}>
+        </Link>
+        <Link href="/list?due=overdue" title="Open the overdue list" className={`${tile} hover:border-ring transition-colors`}>
           <span className="text-xs text-muted-foreground flex items-center">Overdue<InfoTooltip text="Active projects past their internal due date." /></span>
           <span className={`text-2xl font-semibold leading-tight ${m.overdue > 0 ? 'text-red-600 dark:text-red-400' : 'text-foreground'}`}>{m.overdue}</span>
-          <span className="text-xs text-muted-foreground">{m.dueThisWeek} due within 7 days</span>
-        </div>
-        <div className={tile}>
+          <span className="text-xs text-muted-foreground">{m.dueThisWeek} due within 7 days →</span>
+        </Link>
+        <Link href="/list?view=full&stage=Closed" title="Open the closed projects list" className={`${tile} hover:border-ring transition-colors`}>
           <span className="text-xs text-muted-foreground flex items-center">On-time delivery<InfoTooltip text="Of closed projects with both a due and deliver date, the share delivered on or before the due date." /></span>
           <span className="text-2xl font-semibold text-foreground leading-tight">{m.onTimePct == null ? '—' : `${m.onTimePct}%`}</span>
-          <span className="text-xs text-muted-foreground">{m.onTimeDenom} delivered w/ dates</span>
-        </div>
-        <div className={tile}>
+          <span className="text-xs text-muted-foreground">{m.onTimeDenom} delivered w/ dates →</span>
+        </Link>
+        <Link href="/list?view=full&stage=Closed" title="Open the closed projects list" className={`${tile} hover:border-ring transition-colors`}>
           <span className="text-xs text-muted-foreground flex items-center">Avg cycle time<InfoTooltip text="Average days from submitted to delivered across closed projects that have both dates." /></span>
           <span className="text-2xl font-semibold text-foreground leading-tight">{m.avgCycle == null ? '—' : `${m.avgCycle}d`}</span>
           <span className="text-xs text-muted-foreground">{m.cycleDenom} closed w/ dates</span>
-        </div>
+        </Link>
       </div>
 
       {/* Pipeline distribution */}
@@ -186,13 +187,18 @@ export default function InsightsPage() {
         <h3 className={heading}>Active pipeline by stage<InfoTooltip text="Where your open work sits right now." /></h3>
         <div className="flex flex-col gap-1.5">
           {m.byStage.map(s => (
-            <div key={s.label} className="flex items-center gap-3 text-sm">
+            <Link
+              key={s.label}
+              href={`/list?stage=${encodeURIComponent(s.label)}`}
+              title={`Open ${s.label} projects in the list`}
+              className="flex items-center gap-3 text-sm hover:bg-accent/50 rounded-lg px-1.5 -mx-1.5 transition-colors"
+            >
               <span className="w-40 shrink-0 text-muted-foreground">{s.label}</span>
               <div className="flex-1 bg-muted rounded-full h-4 overflow-hidden">
                 <div className="h-full bg-primary/70 rounded-full" style={{ width: `${(s.count / maxStage) * 100}%` }} />
               </div>
               <span className="w-8 text-right text-foreground tabular-nums">{s.count}</span>
-            </div>
+            </Link>
           ))}
         </div>
         {collectionPct != null && (
@@ -209,17 +215,27 @@ export default function InsightsPage() {
           <p className="text-xs text-muted-foreground/50">No active projects.</p>
         ) : (
           <div className="flex flex-col gap-1.5">
-            {m.workload.map(w => (
-              <div key={w.name} className="flex items-center gap-3 text-sm">
-                <span className="w-40 shrink-0 text-muted-foreground truncate">{w.name}</span>
-                <div className="flex-1 bg-muted rounded-full h-4 overflow-hidden">
-                  <div className="h-full bg-primary/45 rounded-full" style={{ width: `${(w.open / maxCap) * 100}%` }} />
-                </div>
-                <span className="w-20 text-right text-foreground tabular-nums">
-                  {w.open}{w.overdue > 0 && <span className="text-red-600 dark:text-red-400"> · {w.overdue} od</span>}
-                </span>
-              </div>
-            ))}
+            {m.workload.map(w => {
+              const unassigned = w.id === 'unassigned'
+              return (
+                <Link
+                  key={w.name}
+                  href={`/list?captain=${w.id}`}
+                  title={unassigned ? 'Open the unassigned projects — they need a captain' : `Open ${w.name}'s projects`}
+                  className="flex items-center gap-3 text-sm hover:bg-accent/50 rounded-lg px-1.5 -mx-1.5 transition-colors"
+                >
+                  <span className={`w-40 shrink-0 truncate ${unassigned ? 'text-red-600 dark:text-red-400 font-medium' : 'text-muted-foreground'}`}>
+                    {unassigned ? '⚠ Unassigned' : w.name}
+                  </span>
+                  <div className="flex-1 bg-muted rounded-full h-4 overflow-hidden">
+                    <div className={`h-full rounded-full ${unassigned ? 'bg-red-500/50' : 'bg-primary/45'}`} style={{ width: `${(w.open / maxCap) * 100}%` }} />
+                  </div>
+                  <span className={`w-20 text-right tabular-nums ${unassigned ? 'text-red-600 dark:text-red-400' : 'text-foreground'}`}>
+                    {w.open}{w.overdue > 0 && <span className="text-red-600 dark:text-red-400"> · {w.overdue} od</span>}
+                  </span>
+                </Link>
+              )
+            })}
           </div>
         )}
       </div>
@@ -231,6 +247,17 @@ export default function InsightsPage() {
           <div className="flex flex-col gap-2 text-sm">
             <div className="flex justify-between"><span className="text-muted-foreground">Allocated</span><span className="text-foreground">{money(m.totalBudget)}</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Actual spend</span><span className="text-foreground">{money(m.totalSpend)}</span></div>
+            {m.totalBudget > 0 && (
+              <div className="mt-0.5">
+                <div className="h-2 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full ${m.totalSpend > m.totalBudget ? 'bg-red-500' : 'bg-primary/70'}`}
+                    style={{ width: `${Math.min(100, (m.totalSpend / m.totalBudget) * 100)}%` }}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">{Math.round((m.totalSpend / m.totalBudget) * 100)}% of allocated used</p>
+              </div>
+            )}
             <div className="flex justify-between"><span className="text-muted-foreground">Over budget</span><span className={m.overBudget > 0 ? 'text-red-600 dark:text-red-400' : 'text-foreground'}>{m.overBudget} project{m.overBudget === 1 ? '' : 's'}</span></div>
             <p className="text-xs text-muted-foreground/60 mt-1">{m.withBudgetCount} projects have a budget set.</p>
           </div>

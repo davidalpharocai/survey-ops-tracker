@@ -108,6 +108,13 @@ export default function ListView() {
     const s = params.get('search')
     if (s) setSearch(s)
     if (params.get('view') === 'full') setForceFull(true)
+    // Deep-link filters (e.g. from the Insights drill-throughs).
+    const cap = params.get('captain')
+    if (cap) setCaptainFilter(cap)
+    const due = params.get('due')
+    if (due) setDueFilter(due)
+    const stage = params.get('stage')
+    if (stage) setStageFilter(stage)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -142,12 +149,16 @@ export default function ListView() {
   const q = search.trim().toLowerCase()
   const visibleProjects = projects.filter(p => {
     if (!(effectiveMode === 'full' ? true : p.phase === 'Active' && p.status === 'Open')) return false
-    if (
-      captainFilter &&
-      p.captain?.id !== captainFilter &&
-      !(p.co_captain_ids ?? []).includes(captainFilter)
-    )
-      return false
+    if (captainFilter) {
+      if (captainFilter === 'unassigned') {
+        if (p.captain != null) return false
+      } else if (
+        p.captain?.id !== captainFilter &&
+        !(p.co_captain_ids ?? []).includes(captainFilter)
+      ) {
+        return false
+      }
+    }
     if (typeFilter && p.project_type !== typeFilter) return false
     if (!matchesDuePreset(p.due_date, dueFilter, dueFrom, dueTo)) return false
     if (stageFilter) {
