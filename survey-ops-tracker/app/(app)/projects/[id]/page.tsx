@@ -8,6 +8,7 @@ import { useProject, useUpdateProject, useDeleteProject, type SurveyProject } fr
 import { useTeamMembers, assignableMembers, type TeamMember } from '@/lib/hooks/useTeamMembers'
 import { PipelineProgress } from '@/components/project/PipelineProgress'
 import { WaveHistory } from '@/components/project/WaveHistory'
+import { GenPopNWarning } from '@/components/project/GenPopNWarning'
 import { ScopingProgress } from '@/components/project/ScopingProgress'
 import { ActivityLog } from '@/components/project/ActivityLog'
 import { DataChangeLog } from '@/components/project/DataChangeLog'
@@ -597,6 +598,7 @@ export default function ProjectDetailPage() {
                   onSave={v => updateProject.mutate({ id, updates: { audience: v || null } })}
                 />
               </div>
+              <GenPopNWarning project={project} />
             </SidebarCard>
 
             <SidebarCard title="Flags" className="xl:col-span-2" dense>

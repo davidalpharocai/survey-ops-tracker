@@ -244,6 +244,8 @@ export type Database = {
           updated_at: string
           sheet_synced_at: string | null
           sheet_synced_hash: string | null
+          n_floor_override: boolean | null
+          n_floor_override_reason: string | null
         }
         Insert: {
           id?: string
@@ -314,6 +316,8 @@ export type Database = {
           updated_at?: string
           sheet_synced_at?: string | null
           sheet_synced_hash?: string | null
+          n_floor_override?: boolean | null
+          n_floor_override_reason?: string | null
         }
         Update: {
           id?: string
@@ -384,6 +388,8 @@ export type Database = {
           updated_at?: string
           sheet_synced_at?: string | null
           sheet_synced_hash?: string | null
+          n_floor_override?: boolean | null
+          n_floor_override_reason?: string | null
         }
         Relationships: [
           {
