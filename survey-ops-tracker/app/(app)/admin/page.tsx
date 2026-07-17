@@ -4,13 +4,13 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useClients } from '@/lib/hooks/useClients'
 import { useProjects } from '@/lib/hooks/useProjects'
-import { useTeamMembers } from '@/lib/hooks/useTeamMembers'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
 import { MasterAuditLog } from '@/components/admin/MasterAuditLog'
 import { RecentlyDeleted } from '@/components/admin/RecentlyDeleted'
 import { SprintCadence } from '@/components/admin/SprintCadence'
 import { SystemStatus } from '@/components/admin/SystemStatus'
 import { AiUsagePanel } from '@/components/admin/AiUsagePanel'
+import { TeamRoster } from '@/components/admin/TeamRoster'
 import { NewClientModal } from '@/components/client/NewClientModal'
 
 const SUPABASE_PROJECT = 'xcfoyxyxovibltwfydbf'
@@ -71,7 +71,6 @@ export default function AdminPage() {
   const router = useRouter()
   const { data: projects = [] } = useProjects()
   const { data: clients = [], isLoading: clientsLoading } = useClients()
-  const { data: teamMembers = [] } = useTeamMembers()
   const [showNewClient, setShowNewClient] = useState(false)
 
   // Slim projects carry the contact-level text ("BAM - Jeff Cummings");
@@ -359,27 +358,8 @@ export default function AdminPage() {
         )}
       </div>
 
-      {/* Roster */}
-      <div className={tile}>
-        <h3 className={heading}>
-          Team roster
-          <InfoTooltip text="Everyone the tracker knows. Members marked (former employee) stay for history but can't be assigned to projects. Logins are managed in Supabase — Users." />
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 max-h-[16rem] overflow-y-auto thin-scroll pr-1">
-          {teamMembers.map(m => (
-            <div
-              key={m.id}
-              className="flex items-center justify-between gap-2 py-1 border-b border-border/40 last:border-0"
-            >
-              <span className="text-sm text-foreground truncate">
-                <span className="text-xs font-mono text-muted-foreground mr-2">{m.initials}</span>
-                {m.name}
-              </span>
-              <span className="text-xs text-muted-foreground shrink-0">{m.email}</span>
-            </div>
-          ))}
-        </div>
-      </div>
+      {/* Roster — add/edit captains */}
+      <TeamRoster />
         </>
       )}
 

@@ -90,6 +90,72 @@ function monthStartISO(): string {
   return new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
 }
 
+// ---- Usage breakdown (admin): who is spending, over a chosen time range ----
+
+export type UsageRange = 'month' | '30d' | '90d' | 'all'
+
+export const USAGE_RANGES: { key: UsageRange; label: string }[] = [
+  { key: 'month', label: 'This month' },
+  { key: '30d', label: 'Last 30 days' },
+  { key: '90d', label: 'Last 90 days' },
+  { key: 'all', label: 'All time' },
+]
+
+/** Start of a range as ISO, or null for "all time" (no lower bound). */
+function rangeStartISO(range: UsageRange): string | null {
+  const now = new Date()
+  if (range === 'month') return new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+  if (range === '30d') return new Date(now.getTime() - 30 * 86_400_000).toISOString()
+  if (range === '90d') return new Date(now.getTime() - 90 * 86_400_000).toISOString()
+  return null
+}
+
+export interface AiUsageBreakdown {
+  total: number
+  count: number
+  byEndpoint: { endpoint: string; cost: number; count: number }[]
+  byUser: { user: string; cost: number; count: number }[]
+}
+
+/** AI spend over a chosen range, grouped by feature AND by person. Admin-only
+ *  view (rendered on the analyst-gated Admin page). */
+export function useAiUsageBreakdown(range: UsageRange) {
+  const supabase = createClient()
+  return useQuery({
+    queryKey: ['ai-usage-breakdown', range],
+    queryFn: async (): Promise<AiUsageBreakdown> => {
+      let query = supabase.from('ai_usage').select('endpoint, user_email, cost_usd, created_at')
+      const since = rangeStartISO(range)
+      if (since) query = query.gte('created_at', since)
+      const { data, error } = await query
+      if (error) throw error
+      const rows = (data ?? []) as { endpoint: string; user_email: string | null; cost_usd: number }[]
+      const total = rows.reduce((s, r) => s + Number(r.cost_usd ?? 0), 0)
+      const ep = new Map<string, { cost: number; count: number }>()
+      const us = new Map<string, { cost: number; count: number }>()
+      for (const r of rows) {
+        const e = ep.get(r.endpoint) ?? { cost: 0, count: 0 }
+        e.cost += Number(r.cost_usd ?? 0)
+        e.count += 1
+        ep.set(r.endpoint, e)
+        const uk = r.user_email || 'Unknown'
+        const u = us.get(uk) ?? { cost: 0, count: 0 }
+        u.cost += Number(r.cost_usd ?? 0)
+        u.count += 1
+        us.set(uk, u)
+      }
+      return {
+        total,
+        count: rows.length,
+        byEndpoint: [...ep.entries()].map(([endpoint, v]) => ({ endpoint, ...v })).sort((a, b) => b.cost - a.cost),
+        byUser: [...us.entries()].map(([user, v]) => ({ user, ...v })).sort((a, b) => b.cost - a.cost),
+      }
+    },
+    retry: false,
+    staleTime: 30_000,
+  })
+}
+
 /** Current calendar month's AI spend, grouped by endpoint, plus recent calls. */
 export function useAiUsageSummary() {
   const supabase = createClient()

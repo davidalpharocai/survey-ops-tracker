@@ -4,6 +4,9 @@ import {
   useAppConfig,
   useUpdateAppConfig,
   useAiUsageSummary,
+  useAiUsageBreakdown,
+  USAGE_RANGES,
+  type UsageRange,
 } from '@/lib/hooks/useObservability'
 import { formatUsd } from '@/lib/utils/aiCost'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
@@ -13,12 +16,18 @@ const ENDPOINT_LABELS: Record<string, string> = {
   'parse-project': 'AI project entry',
 }
 
+// Emails render as their local part (david@alpharoc.ai -> "david"); full
+// address on hover.
+const shortUser = (e: string) => (e.includes('@') ? e.split('@')[0] : e)
+
 export function AiUsagePanel() {
   const { data: cfg, isLoading: cfgLoading, isError: cfgError } = useAppConfig()
   const { data: usage, isLoading: usageLoading } = useAiUsageSummary()
   const update = useUpdateAppConfig()
   const [editingCap, setEditingCap] = useState(false)
   const [draftCap, setDraftCap] = useState('')
+  const [range, setRange] = useState<UsageRange>('month')
+  const { data: breakdown } = useAiUsageBreakdown(range)
 
   const heading = 'text-xs text-muted-foreground uppercase tracking-widest mb-3 font-medium flex items-center'
 
@@ -126,21 +135,59 @@ export function AiUsagePanel() {
             </label>
           </div>
 
-          {/* Per-feature breakdown */}
-          {usage && usage.byEndpoint.length > 0 && (
-            <div className="border-t border-border/50 pt-2">
-              {usage.byEndpoint.map(e => (
-                <div key={e.endpoint} className="flex items-center justify-between py-0.5 text-xs">
-                  <span className="text-muted-foreground">{ENDPOINT_LABELS[e.endpoint] ?? e.endpoint}</span>
-                  <span className="text-foreground">{formatUsd(e.cost)} <span className="text-muted-foreground/60">· {e.count}</span></span>
-                </div>
-              ))}
+          {/* Usage detail — who is spending + on what, over a chosen range */}
+          <div className="border-t border-border/50 pt-3">
+            <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+              <span className="text-[11px] text-muted-foreground uppercase tracking-wide">Breakdown</span>
+              <div className="flex bg-muted border border-border rounded-lg p-0.5 gap-0.5">
+                {USAGE_RANGES.map(r => (
+                  <button
+                    key={r.key}
+                    onClick={() => setRange(r.key)}
+                    className={`text-[11px] px-2 py-0.5 rounded transition-colors ${
+                      range === r.key ? 'bg-background text-foreground' : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    {r.label}
+                  </button>
+                ))}
+              </div>
             </div>
-          )}
 
-          {usage && usage.count === 0 && (
-            <p className="text-xs text-muted-foreground/60">No AI calls yet this month.</p>
-          )}
+            {!breakdown || breakdown.count === 0 ? (
+              <p className="text-xs text-muted-foreground/60">No AI calls in this period.</p>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
+                  <div>
+                    <p className="text-[11px] text-muted-foreground mb-1">By person</p>
+                    {breakdown.byUser.map(u => (
+                      <div key={u.user} className="flex items-center justify-between py-0.5 text-xs gap-2">
+                        <span className="text-muted-foreground truncate" title={u.user}>{shortUser(u.user)}</span>
+                        <span className="text-foreground shrink-0">
+                          {formatUsd(u.cost)} <span className="text-muted-foreground/60">· {u.count}</span>
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  <div>
+                    <p className="text-[11px] text-muted-foreground mb-1">By feature</p>
+                    {breakdown.byEndpoint.map(e => (
+                      <div key={e.endpoint} className="flex items-center justify-between py-0.5 text-xs gap-2">
+                        <span className="text-muted-foreground truncate">{ENDPOINT_LABELS[e.endpoint] ?? e.endpoint}</span>
+                        <span className="text-foreground shrink-0">
+                          {formatUsd(e.cost)} <span className="text-muted-foreground/60">· {e.count}</span>
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <p className="text-[11px] text-muted-foreground/70 mt-2">
+                  {formatUsd(breakdown.total)} · {breakdown.count} call{breakdown.count === 1 ? '' : 's'} in this period
+                </p>
+              </>
+            )}
+          </div>
         </div>
       )}
     </div>
