@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useProject, useUpdateProject, useDeleteProject, type SurveyProject } from '@/lib/hooks/useProjects'
 import { useTeamMembers, assignableMembers, type TeamMember } from '@/lib/hooks/useTeamMembers'
 import { PipelineProgress } from '@/components/project/PipelineProgress'
+import { WaveHistory } from '@/components/project/WaveHistory'
 import { ScopingProgress } from '@/components/project/ScopingProgress'
 import { ActivityLog } from '@/components/project/ActivityLog'
 import { DataChangeLog } from '@/components/project/DataChangeLog'
@@ -662,6 +663,10 @@ export default function ProjectDetailPage() {
               <div className="border-t border-border pt-3 mt-1 flex items-center gap-1.5 text-xs text-muted-foreground/50">
                 <span aria-hidden="true">＋</span> Add cost line — other costs &amp; unit economics (coming soon)
               </div>
+            </SidebarCard>
+
+            <SidebarCard title="Rerun history" className="xl:col-span-2" dense>
+              <WaveHistory project={project} />
             </SidebarCard>
           </div>
         </div>
