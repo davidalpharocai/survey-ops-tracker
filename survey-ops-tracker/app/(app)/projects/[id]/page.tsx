@@ -1328,7 +1328,7 @@ function SalespersonRow({
       </span>
       <button
         onClick={() => setEditing(true)}
-        className="text-[13px] text-foreground hover:bg-accent rounded px-1.5 transition-colors cursor-pointer truncate"
+        className="text-sm text-foreground hover:bg-accent rounded px-1.5 transition-colors cursor-pointer truncate"
         title="Click to change"
       >
         {value || <span className="text-muted-foreground/50 whitespace-nowrap">— set</span>}
