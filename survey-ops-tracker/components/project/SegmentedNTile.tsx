@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
 import { NProgressBar } from '@/components/shared/NProgressBar'
 import { fmtNum } from '@/lib/utils/number'
@@ -57,9 +57,23 @@ export function SegmentedNTile({
   const unsplit = useUnsplitProject(project.id)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
+  // Segmented view collapses to a compact summary by default so many segments
+  // don't take over the hero row; expand to edit, collapse when clicking away.
+  const [expanded, setExpanded] = useState(false)
+  const boxRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!expanded) return
+    function onDown(e: MouseEvent) {
+      if (boxRef.current && !boxRef.current.contains(e.target as Node)) setExpanded(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [expanded])
 
   const cls = accent ? tileAccent : tilePlain
   const segmented = (project.segment_count ?? 0) > 0 || segments.length > 0
+  const segLabels = segments.map(s => s.label).filter(Boolean) as string[]
+  const segPreview = segLabels.slice(0, 2).join(', ') + (segLabels.length > 2 ? ` +${segLabels.length - 2}` : '')
 
   const TotalNumber = (
     <span className="text-xl font-semibold text-foreground leading-tight">
@@ -74,12 +88,12 @@ export function SegmentedNTile({
 
   if (segmented) {
     return (
-      <div className={cls}>
+      <div className={cls} ref={boxRef}>
         <DeliveredActualBadge project={project} />
         <div className="flex items-center justify-between">
           <span className="text-xs text-muted-foreground flex items-center">
             N collected · total
-            <InfoTooltip text="This project's N is split into segments, each with its own target. The total here is the sum of the segments — edit them below." />
+            <InfoTooltip text="This project's N is split into segments, each with its own target. The total here is the sum of the segments — click to expand and edit them." />
           </span>
           <button
             onClick={() => {
@@ -95,18 +109,42 @@ export function SegmentedNTile({
         <div className="mt-1 mb-2">
           <NProgressBar collected={project.n_collected} target={project.n_target} showLabel={false} />
         </div>
-        <div className="flex flex-col gap-2">
-          {segments.map(s => (
-            <SegmentRow key={s.id} segment={s} projectId={project.id} canRemove={segments.length > 1} />
-          ))}
-        </div>
-        {/* No cap — a project can be split into as many segments as needed. */}
-        <button
-          onClick={() => addSeg.mutate(segments.length)}
-          className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline mt-1 self-start"
-        >
-          + Add segment
-        </button>
+        {expanded ? (
+          <>
+            {/* Bounded + scrollable so a long segment list never overtakes the row. */}
+            <div className="flex flex-col gap-2 max-h-80 overflow-y-auto thin-scroll pr-1">
+              {segments.map(s => (
+                <SegmentRow key={s.id} segment={s} projectId={project.id} canRemove={segments.length > 1} />
+              ))}
+            </div>
+            <div className="flex items-center gap-3 mt-1">
+              {/* No cap — a project can be split into as many segments as needed. */}
+              <button
+                onClick={() => addSeg.mutate(segments.length)}
+                className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline"
+              >
+                + Add segment
+              </button>
+              <button
+                onClick={() => setExpanded(false)}
+                className="text-[11px] text-muted-foreground hover:text-foreground ml-auto"
+              >
+                ▾ collapse
+              </button>
+            </div>
+          </>
+        ) : (
+          <button
+            onClick={() => setExpanded(true)}
+            className="flex items-baseline gap-1.5 text-left group min-w-0"
+            title="Show and edit the segment breakdown"
+          >
+            <span className="text-[11px] text-blue-600 dark:text-blue-400 group-hover:underline shrink-0">
+              ▸ {segments.length} segment{segments.length === 1 ? '' : 's'}
+            </span>
+            {segPreview && <span className="text-[11px] text-muted-foreground truncate">— {segPreview}</span>}
+          </button>
+        )}
       </div>
     )
   }
