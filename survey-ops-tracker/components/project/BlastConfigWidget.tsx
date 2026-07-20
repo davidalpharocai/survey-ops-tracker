@@ -15,7 +15,18 @@ function rate(v: number | null): string {
 }
 function fmtWhen(iso: string | null): string {
   if (!iso) return '—'
-  return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+  // Backend always stores the full timestamp (year + time). The display shows
+  // the year only when the blast isn't in the current year; time is 12-hour
+  // AM/PM. (The datetime-local picker itself shows AM/PM on a 12-hour system.)
+  const d = new Date(iso)
+  const sameYear = d.getFullYear() === new Date().getFullYear()
+  return d.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    ...(sameYear ? {} : { year: 'numeric' }),
+    hour: 'numeric',
+    minute: '2-digit',
+  })
 }
 const inputCls =
   'bg-muted border border-border rounded px-1.5 py-1 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring'
@@ -78,20 +89,32 @@ export function BlastConfigWidget({ projectId }: { projectId: string }) {
         <div className="rounded-lg border border-border bg-muted/40 p-2 flex flex-col gap-1.5" onKeyDown={(e) => { if (e.key === 'Enter') create() }}>
           <div className="flex gap-1.5">
             <label className="flex-1 flex flex-col gap-0.5">
-              <span className="text-[10px] text-muted-foreground">$/bid</span>
+              <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                $/bid
+                <InfoTooltip text="The dollar cost per person contacted in this blast. Combined with the # of people, it sets the blast's cost ($/bid × # of people), which counts toward the project's spend." />
+              </span>
               <input type="number" step="0.01" value={bid} onChange={(e) => setBid(e.target.value)} placeholder="0.00" className={inputCls} />
             </label>
             <label className="flex-1 flex flex-col gap-0.5">
-              <span className="text-[10px] text-muted-foreground"># of people</span>
+              <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                # of people
+                <InfoTooltip text="How many people this blast went out to (the audience reached). This × $/bid is the blast's cost." />
+              </span>
               <input type="number" value={people} onChange={(e) => setPeople(e.target.value)} placeholder="0" className={inputCls} />
             </label>
           </div>
           <label className="flex flex-col gap-0.5">
-            <span className="text-[10px] text-muted-foreground">Date/time of the blast (ET)</span>
+            <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+              Date/time of the blast (ET)
+              <InfoTooltip text="When the blast actually went out. Pick the date and time (AM/PM). The full date + time is stored; the list shows the year only when it's not the current year." />
+            </span>
             <input type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} className={inputCls} />
           </label>
           <label className="flex flex-col gap-0.5">
-            <span className="text-[10px] text-muted-foreground">Description (optional — audience)</span>
+            <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+              Description (optional)
+              <InfoTooltip text="Optional note on who this blast targeted — e.g. '3PL companies + retailers'. For your reference; it doesn't affect the cost." />
+            </span>
             <input type="text" value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="e.g. 3PL companies + retailers" className={inputCls} />
           </label>
           <button
