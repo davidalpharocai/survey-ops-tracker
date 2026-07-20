@@ -1,5 +1,5 @@
 'use client'
-import { useCallback, useState } from 'react'
+import { useCallback, useState, useRef } from 'react'
 
 /**
  * Shared chat engine for the in-app ✦ Assistant — used by BOTH the floating
@@ -96,6 +96,11 @@ function resultMessage(result: unknown): string | undefined {
 export function useAssistantChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [busy, setBusy] = useState(false)
+  // Latest messages, readable synchronously from event handlers (confirm) that
+  // aren't in the messages-dependency closure — avoids reading state via a
+  // setState-updater side-effect, which doesn't run synchronously.
+  const messagesRef = useRef(messages)
+  messagesRef.current = messages
 
   const updatePending = useCallback(
     (msgId: string, pendingId: string, fn: (p: PendingAction) => PendingAction) => {
@@ -227,25 +232,18 @@ export function useAssistantChat() {
 
   const confirm = useCallback(
     (msgId: string, pendingId: string) => {
-      // Read the token during the state transition so we never double-submit
-      // and never depend on a possibly-stale `messages` closure.
-      let token: string | undefined
-      setMessages(prev =>
-        prev.map(m => {
-          if (m.id !== msgId) return m
-          return {
-            ...m,
-            pending: m.pending.map(p => {
-              if (p.id !== pendingId || p.status !== 'pending') return p
-              token = p.token
-              return { ...p, status: 'confirming' }
-            }),
-          }
-        })
-      )
-      if (!token) return
+      // Read the token from the latest state (via ref) and guard BEFORE flipping
+      // the card to "confirming" — so a not-pending/missing-token case never
+      // leaves it stuck on "Applying…". (The old version read the token as a
+      // side-effect inside a setState updater and checked it synchronously, but
+      // React doesn't run the updater synchronously, so it always bailed out
+      // after showing "Applying…" and never called the server.)
+      const msg = messagesRef.current.find(m => m.id === msgId)
+      const pa = msg?.pending.find(p => p.id === pendingId)
+      if (!pa || pa.status !== 'pending' || !pa.token) return
+      const capturedToken = pa.token
+      updatePending(msgId, pendingId, p => ({ ...p, status: 'confirming' }))
 
-      const capturedToken = token
       void (async () => {
         try {
           const res = await fetch('/api/assistant/act', {
