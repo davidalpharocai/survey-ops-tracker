@@ -749,6 +749,8 @@ export type Database = {
           delivered: number
           bid: number
           blast_cost: number
+          people: number
+          blast_at: string | null
           reward: number
           scheduled_at: string | null
           status: string
@@ -763,6 +765,8 @@ export type Database = {
           delivered?: number
           bid?: number
           blast_cost?: number
+          people?: number
+          blast_at?: string | null
           reward?: number
           scheduled_at?: string | null
           status?: string
@@ -777,6 +781,8 @@ export type Database = {
           delivered?: number
           bid?: number
           blast_cost?: number
+          people?: number
+          blast_at?: string | null
           reward?: number
           scheduled_at?: string | null
           status?: string
@@ -1557,9 +1563,9 @@ export type Database = {
       mcp_log_blast: {
         Args: {
           p_project: string
-          p_delivered: number
           p_bid: number
-          p_blast_cost: number
+          p_people: number
+          p_blast_at: string | null
           p_note: string
           p_created_by: string
           p_idem: string

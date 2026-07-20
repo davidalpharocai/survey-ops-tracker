@@ -279,15 +279,15 @@ export async function runEditStep(stepId: string, text: string, actor: string): 
 }
 
 export async function runLogBlast(opts: {
-  projectId: string; delivered: number; bid: number; blastCost: number
+  projectId: string; bid: number; people: number; blastAt: string | null
   note: string | null; createdBy: string; idemKey: string; actor: string
 }): Promise<ProjectBlastRow> {
   const supabase = createAdminClient()
   const { data, error } = await supabase.rpc('mcp_log_blast', {
     p_project: opts.projectId,
-    p_delivered: opts.delivered,
     p_bid: opts.bid,
-    p_blast_cost: opts.blastCost,
+    p_people: opts.people,
+    p_blast_at: opts.blastAt,
     p_note: opts.note ?? '',
     p_created_by: opts.createdBy,
     p_idem: opts.idemKey,
