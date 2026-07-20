@@ -100,14 +100,13 @@ export function SegmentedNTile({
             <SegmentRow key={s.id} segment={s} projectId={project.id} canRemove={segments.length > 1} />
           ))}
         </div>
-        {segments.length < 2 && (
-          <button
-            onClick={() => addSeg.mutate(segments.length)}
-            className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline mt-1 self-start"
-          >
-            + Add segment
-          </button>
-        )}
+        {/* No cap — a project can be split into as many segments as needed. */}
+        <button
+          onClick={() => addSeg.mutate(segments.length)}
+          className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline mt-1 self-start"
+        >
+          + Add segment
+        </button>
       </div>
     )
   }
@@ -159,7 +158,7 @@ export function SegmentedNTile({
       <button
         onClick={() => split.mutate({ n_target: project.n_target, n_collected: project.n_collected, n_actual: project.n_actual ?? null })}
         className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline mt-1 self-start"
-        title="Track two collections (e.g. Buyers / Sellers) under this project"
+        title="Track separate collections (e.g. Buyers / Sellers) under this project — add as many segments as you need"
       >
         ＋ Split into segments
       </button>
