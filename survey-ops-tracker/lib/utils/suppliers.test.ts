@@ -1,24 +1,36 @@
 import { describe, it, expect } from 'vitest'
-import { estimatedCost, totalCappedCompletes, blendedCpi } from './suppliers'
+import { actualCost, totalCollected, blendedActualCpi, estimateRange, totalCappedCompletes } from './suppliers'
 
 describe('suppliers math', () => {
   const rows = [
-    { cpi: 1.25, completes_cap: 1000 },
-    { cpi: 0.85, completes_cap: 500 },
+    { cpi: 1.05, completes_cap: 2000, n_collected: 400 },
+    { cpi: 0.85, completes_cap: 2000, n_collected: 700 },
+    { cpi: 0.75, completes_cap: 2000, n_collected: 500 },
+    { cpi: 0.65, completes_cap: 2000, n_collected: 400 },
   ]
-  it('estimatedCost = Σ(cap × CPI)', () => {
-    expect(estimatedCost(rows)).toBeCloseTo(1250 + 425) // 1675
+
+  it('actualCost = Σ(CPI × N collected)', () => {
+    expect(actualCost(rows)).toBeCloseTo(420 + 595 + 375 + 260) // 1650
+  })
+  it('totalCollected = Σ N collected', () => {
+    expect(totalCollected(rows)).toBe(2000)
+  })
+  it('blendedActualCpi = actualCost ÷ collected', () => {
+    expect(blendedActualCpi(rows)).toBeCloseTo(1650 / 2000) // 0.825
+  })
+  it('blendedActualCpi is null with nothing collected', () => {
+    expect(blendedActualCpi([{ cpi: 1, completes_cap: 100, n_collected: 0 }])).toBeNull()
+    expect(blendedActualCpi([])).toBeNull()
+  })
+  it('estimateRange = target × [min CPI, max CPI]', () => {
+    expect(estimateRange(2000, rows)).toEqual({ low: 1300, high: 2100 })
+  })
+  it('estimateRange is null without a target or priced suppliers', () => {
+    expect(estimateRange(null, rows)).toBeNull()
+    expect(estimateRange(0, rows)).toBeNull()
+    expect(estimateRange(2000, [])).toBeNull()
   })
   it('totalCappedCompletes = Σ cap', () => {
-    expect(totalCappedCompletes(rows)).toBe(1500)
-  })
-  it('blendedCpi = estimatedCost / Σcap', () => {
-    expect(blendedCpi(rows)).toBeCloseTo(1675 / 1500)
-  })
-  it('handles empty + zero caps', () => {
-    expect(estimatedCost([])).toBe(0)
-    expect(totalCappedCompletes([])).toBe(0)
-    expect(blendedCpi([])).toBeNull()
-    expect(blendedCpi([{ cpi: 2, completes_cap: 0 }])).toBeNull()
+    expect(totalCappedCompletes(rows)).toBe(8000)
   })
 })

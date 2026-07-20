@@ -22,7 +22,13 @@ export function useProjectSuppliers(projectId: string) {
   })
 }
 
-const inval = (qc: QueryClient, projectId: string) => qc.invalidateQueries({ queryKey: ['project-suppliers', projectId] })
+const inval = (qc: QueryClient, projectId: string) => {
+  qc.invalidateQueries({ queryKey: ['project-suppliers', projectId] })
+  // A supplier's N collected drives actual_spend (via DB trigger), so refresh the
+  // project detail + board caches that read that column (hero budget, Insights).
+  qc.invalidateQueries({ queryKey: ['project', projectId] })
+  qc.invalidateQueries({ queryKey: ['projects'] })
+}
 
 export function useAddProjectSupplier(projectId: string) {
   const supabase = createClient()
@@ -41,7 +47,7 @@ export function useUpdateProjectSupplier(projectId: string) {
   const supabase = createClient()
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async ({ id, updates }: { id: string; updates: { cpi?: number; completes_cap?: number } }) => {
+    mutationFn: async ({ id, updates }: { id: string; updates: { cpi?: number; completes_cap?: number; n_collected?: number } }) => {
       const { error } = await supabase.from('project_suppliers').update(updates).eq('id', id)
       if (error) throw error
     },

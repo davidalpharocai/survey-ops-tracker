@@ -806,6 +806,7 @@ export type Database = {
           supplier_id: string
           cpi: number
           completes_cap: number
+          n_collected: number
           created_by: string | null
           created_at: string
         }
@@ -815,6 +816,7 @@ export type Database = {
           supplier_id: string
           cpi?: number
           completes_cap?: number
+          n_collected?: number
           created_by?: string | null
           created_at?: string
         }
@@ -824,6 +826,7 @@ export type Database = {
           supplier_id?: string
           cpi?: number
           completes_cap?: number
+          n_collected?: number
           created_by?: string | null
           created_at?: string
         }

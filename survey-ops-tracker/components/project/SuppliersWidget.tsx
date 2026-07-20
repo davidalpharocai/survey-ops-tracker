@@ -10,7 +10,7 @@ import {
   useUpdateProjectSupplier,
   useRemoveProjectSupplier,
 } from '@/lib/hooks/useProjectSuppliers'
-import { estimatedCost, blendedCpi, totalCappedCompletes } from '@/lib/utils/suppliers'
+import { actualCost, totalCollected, blendedActualCpi, estimateRange } from '@/lib/utils/suppliers'
 import { fmtNum } from '@/lib/utils/number'
 
 function money(v: number): string {
@@ -22,7 +22,17 @@ function rate(v: number | null): string {
 const inputCls =
   'bg-muted border border-border rounded px-1.5 py-0.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring'
 
-export function SuppliersWidget({ projectId, nTarget }: { projectId: string; nTarget: number | null }) {
+export function SuppliersWidget({
+  projectId,
+  nTarget,
+  nInternalTarget,
+  nActual,
+}: {
+  projectId: string
+  nTarget: number | null
+  nInternalTarget?: number | null
+  nActual?: number | null
+}) {
   const supabase = createClient()
   const { data: catalog } = useSuppliers()
   const { data: rows, isError } = useProjectSuppliers(projectId)
@@ -53,10 +63,16 @@ export function SuppliersWidget({ projectId, nTarget }: { projectId: string; nTa
   const list = rows ?? []
   const chosenIds = new Set(list.map((r) => r.supplier_id))
   const available = (catalog ?? []).filter((s) => !chosenIds.has(s.id))
-  const lines = list.map((r) => ({ cpi: r.cpi, completes_cap: r.completes_cap }))
-  const est = estimatedCost(lines)
-  const capTotal = totalCappedCompletes(lines)
-  const underN = nTarget != null && capTotal < nTarget
+  const lines = list.map((r) => ({ cpi: r.cpi, completes_cap: r.completes_cap, n_collected: r.n_collected }))
+  // Suppliers fill toward ONE shared pool = the internal target (the collection
+  // goal with cushion), falling back to N target if internal isn't set.
+  const target = nInternalTarget ?? nTarget
+  const collected = totalCollected(lines)
+  const hasCollected = collected > 0
+  const actual = actualCost(lines)
+  const blended = blendedActualCpi(lines)
+  const range = estimateRange(target, lines)
+  const overTarget = target != null && collected > target
 
   function addByCatalog(supplierId: string) {
     if (!supplierId) return
@@ -78,60 +94,101 @@ export function SuppliersWidget({ projectId, nTarget }: { projectId: string; nTa
     <div className="border-t border-border pt-3 mt-1">
       <p className="text-xs text-muted-foreground uppercase tracking-widest mb-2 font-medium flex items-center">
         Suppliers
-        <InfoTooltip text="PureSpectrum sample suppliers for this study. Each has a CPI (cost per interview) and a completes cap. Estimated cost = Σ(cap × CPI) — the most you'd spend if every supplier fills its cap." />
+        <InfoTooltip text="PureSpectrum sample suppliers. Each has a CPI (cost per complete) and a per-supplier cap. Caps are ceilings on ONE shared pool — all suppliers together fill the internal target — so they don't add up. Before completes are recorded the cost is a range; once you enter each supplier's N collected, the actual cost = Σ(CPI × N collected)." />
       </p>
 
       <div className="flex flex-col gap-1 text-xs">
         {list.length > 0 && (
-          <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-2 text-[11px] text-muted-foreground">
+          <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-x-2 text-[11px] text-muted-foreground">
             <span>Supplier</span>
-            <span className="w-20 text-right" title="Cost per interview (CPI) — the amount you pay this supplier for each completed response.">$ / complete</span>
-            <span className="w-20 text-right" title="The most completes to buy from this supplier (default 1,000). The estimate assumes every supplier fills its cap.">Completes cap</span>
+            <span className="w-16 text-right" title="Cost per complete (CPI) — what you pay this supplier per completed response.">$ / complete</span>
+            <span className="w-16 text-right" title="The most completes to buy from this supplier — a per-supplier ceiling, not added to the others.">cap</span>
+            <span className="w-16 text-right" title="How many this supplier actually collected. Fill these in as data comes; they sum to N collected and set the actual cost.">N collected</span>
             <span className="w-5"></span>
           </div>
         )}
-        {list.map((r) => (
-          <div key={r.id} className="grid grid-cols-[1fr_auto_auto_auto] gap-x-2 items-center group">
-            <span className="text-foreground truncate" title={r.suppliers?.name ?? undefined}>{r.suppliers?.name ?? '—'}</span>
-            <input
-              key={`cpi-${r.id}-${r.cpi}`}
-              type="number"
-              step="0.01"
-              defaultValue={r.cpi}
-              onBlur={(e) => {
-                const v = parseFloat(e.target.value)
-                if (!isNaN(v) && v !== r.cpi) updateRow.mutate({ id: r.id, updates: { cpi: v } })
-              }}
-              className={`${inputCls} w-20 text-right`}
-            />
-            <input
-              key={`cap-${r.id}-${r.completes_cap}`}
-              type="number"
-              defaultValue={r.completes_cap}
-              onBlur={(e) => {
-                const v = parseInt(e.target.value, 10)
-                if (!isNaN(v) && v !== r.completes_cap) updateRow.mutate({ id: r.id, updates: { completes_cap: v } })
-              }}
-              className={`${inputCls} w-20 text-right`}
-            />
-            <button
-              onClick={() => removeRow.mutate(r.id)}
-              title="Remove supplier"
-              className="w-5 text-center text-muted-foreground/50 hover:text-red-600 dark:hover:text-red-400"
-            >
-              ✕
-            </button>
-          </div>
-        ))}
+        {list.map((r) => {
+          const overCap = (r.n_collected ?? 0) > r.completes_cap
+          return (
+            <div key={r.id} className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-x-2 items-center group">
+              <span className="text-foreground truncate" title={r.suppliers?.name ?? undefined}>{r.suppliers?.name ?? '—'}</span>
+              <input
+                key={`cpi-${r.id}-${r.cpi}`}
+                type="number"
+                step="0.01"
+                defaultValue={r.cpi}
+                onBlur={(e) => {
+                  const v = parseFloat(e.target.value)
+                  if (!isNaN(v) && v !== r.cpi) updateRow.mutate({ id: r.id, updates: { cpi: v } })
+                }}
+                className={`${inputCls} w-16 text-right`}
+              />
+              <input
+                key={`cap-${r.id}-${r.completes_cap}`}
+                type="number"
+                defaultValue={r.completes_cap}
+                onBlur={(e) => {
+                  const v = parseInt(e.target.value, 10)
+                  if (!isNaN(v) && v !== r.completes_cap) updateRow.mutate({ id: r.id, updates: { completes_cap: v } })
+                }}
+                className={`${inputCls} w-16 text-right`}
+              />
+              <input
+                key={`col-${r.id}-${r.n_collected}`}
+                type="number"
+                defaultValue={r.n_collected ?? 0}
+                title={overCap ? "Above this supplier's cap" : undefined}
+                onBlur={(e) => {
+                  const v = parseInt(e.target.value, 10)
+                  if (!isNaN(v) && v !== (r.n_collected ?? 0)) updateRow.mutate({ id: r.id, updates: { n_collected: v } })
+                }}
+                className={`${inputCls} w-16 text-right ${overCap ? 'border-amber-500/60 text-amber-600 dark:text-amber-400' : ''}`}
+              />
+              <button
+                onClick={() => removeRow.mutate(r.id)}
+                title="Remove supplier"
+                className="w-5 text-center text-muted-foreground/50 hover:text-red-600 dark:hover:text-red-400"
+              >
+                ✕
+              </button>
+            </div>
+          )
+        })}
 
         {list.length > 0 && (
-          <div className="flex justify-between text-[11px] mt-1 pt-1 border-t border-border">
-            <span className="text-muted-foreground">
-              Est. cost <span className="text-foreground font-medium">{money(est)}</span> · blended {rate(blendedCpi(lines))}
-            </span>
-            <span className={underN ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'}>
-              {fmtNum(capTotal)} cap{underN ? ` · under N ${fmtNum(nTarget!)}` : ''}
-            </span>
+          <div className="mt-1 pt-1 border-t border-border flex flex-col gap-0.5">
+            {hasCollected ? (
+              <>
+                <div className="flex justify-between text-[11px]">
+                  <span className="text-muted-foreground">
+                    Actual cost <span className="text-foreground font-medium">{money(actual)}</span>
+                  </span>
+                  <span className={overTarget ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'}>
+                    {fmtNum(collected)} collected{target != null ? ` / ${fmtNum(target)}` : ''}
+                    {overTarget ? ' · over target' : ''} · blended {rate(blended)}
+                  </span>
+                </div>
+                {nActual != null && blended != null && (
+                  <p className="text-[10px] text-muted-foreground/60">
+                    ↳ blended {rate(blended)} × N actual {fmtNum(nActual)} = {money(blended * nActual)}
+                  </p>
+                )}
+              </>
+            ) : (
+              <div className="flex justify-between text-[11px] text-muted-foreground">
+                <span>
+                  {range ? (
+                    <>
+                      Est. <span className="text-foreground font-medium">{money(range.low)}–{money(range.high)}</span>
+                    </>
+                  ) : (
+                    'Set CPIs to estimate'
+                  )}
+                  {target != null ? ` · target ${fmtNum(target)}` : ''}
+                </span>
+                <span className="text-muted-foreground/60">enter N collected for actual cost</span>
+              </div>
+            )}
           </div>
         )}
 

@@ -645,12 +645,12 @@ export default function ProjectDetailPage() {
               {/* PS → Suppliers (PureSpectrum), B2B → Blast Configuration.
                   Rerun/untyped show both (they don't map cleanly to one). */}
               {project.project_type === 'PS' && (
-                <SuppliersWidget projectId={project.id} nTarget={project.n_target} />
+                <SuppliersWidget projectId={project.id} nTarget={project.n_target} nInternalTarget={project.n_internal_target} nActual={project.n_actual} />
               )}
               {project.project_type === 'B2B' && <BlastConfigWidget projectId={project.id} />}
               {(project.project_type === 'Rerun' || project.project_type == null) && (
                 <>
-                  <SuppliersWidget projectId={project.id} nTarget={project.n_target} />
+                  <SuppliersWidget projectId={project.id} nTarget={project.n_target} nInternalTarget={project.n_internal_target} nActual={project.n_actual} />
                   <BlastConfigWidget projectId={project.id} />
                 </>
               )}
