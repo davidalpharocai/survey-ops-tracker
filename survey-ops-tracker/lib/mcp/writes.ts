@@ -13,6 +13,8 @@ export const PROJECT_WRITE_FIELDS = [
   'n_target','n_collected','n_actual','n_internal_target','audience_size','budget',
   'longitudinal','voter_survey_qa','citation_language_needed','row_level_data','terminations',
   'survey_tool_id','slack_channel_url','latest_next_steps',
+  // Added 2026-07-20 (migration 057): plain fields the connector couldn't set before.
+  'audience','category','objective','sprint_number','n_floor_override','n_floor_override_reason',
 ] as const
 
 type Patch = Record<string, unknown>
@@ -149,6 +151,30 @@ export async function resolveStep(
   return { ambiguous: matches.map(r => ({ id: r.id as string, label: String(r.text) })) }
 }
 
+/** Resolve a segment within a project: exact id match, else a case-insensitive
+ *  substring match on its label. 0 -> null, 1 -> row, >1 -> ambiguous candidates. */
+export async function resolveSegment(
+  projectId: string, ref: string
+): Promise<Row | { ambiguous: Candidate[] } | null> {
+  const supabase = createAdminClient()
+  const { data, error } = await supabase
+    .from('project_segments')
+    .select('*')
+    .eq('project_id', projectId)
+    .order('sort_order')
+  if (error) throw error
+  const rows = (data ?? []) as unknown as Row[]
+
+  const byId = rows.find(r => r.id === ref)
+  if (byId) return byId
+
+  const s = ref.trim().toLowerCase()
+  const matches = rows.filter(r => String(r.label ?? '').toLowerCase().includes(s))
+  if (matches.length === 0) return null
+  if (matches.length === 1) return matches[0]
+  return { ambiguous: matches.map(r => ({ id: r.id as string, label: String(r.label) })) }
+}
+
 /** Resolve a contact within a client: exact id match, else a case-insensitive match on
  *  "First Last" or email. Archived contacts are excluded by default — pass includeArchived:true
  *  (e.g. to let archive_contact find an already-archived contact so it can restore it).
@@ -185,6 +211,7 @@ export async function resolveContact(
 type SurveyProjectRow = Database['public']['Tables']['survey_projects']['Row']
 type ProjectStepRow = Database['public']['Tables']['project_steps']['Row']
 type ProjectBlastRow = Database['public']['Tables']['project_blasts']['Row']
+type ProjectSegmentRow = Database['public']['Tables']['project_segments']['Row']
 
 /** A clean "someone else changed this first" result — never a throw, so the tool can surface it as-is. */
 export type StaleWriteError = { error: string }
@@ -268,6 +295,46 @@ export async function runLogBlast(opts: {
   })
   if (error) throw new Error(error.message)
   return data as ProjectBlastRow
+}
+
+// ---- Segment runners (project_segments; parent N totals kept by trigger) ----
+
+export async function runAddSegment(
+  opts: { projectId: string; label: string; target: number | null; collected: number | null; actual: number | null; actor: string }
+): Promise<ProjectSegmentRow> {
+  const supabase = createAdminClient()
+  const { data, error } = await supabase.rpc('mcp_add_segment', {
+    p_project: opts.projectId,
+    p_label: opts.label,
+    p_actor: opts.actor,
+    p_target: opts.target,
+    p_collected: opts.collected,
+    p_actual: opts.actual,
+  })
+  if (error) throw new Error(error.message)
+  return data as ProjectSegmentRow
+}
+
+export async function runUpdateSegment(
+  segmentId: string, patch: Record<string, unknown>, actor: string
+): Promise<ProjectSegmentRow> {
+  const supabase = createAdminClient()
+  const { data, error } = await supabase.rpc('mcp_update_segment', {
+    p_segment: segmentId,
+    p_patch: patch as unknown as Json,
+    p_actor: actor,
+  })
+  if (error) throw new Error(error.message)
+  return data as ProjectSegmentRow
+}
+
+export async function runRemoveSegment(segmentId: string, actor: string): Promise<void> {
+  const supabase = createAdminClient()
+  const { error } = await supabase.rpc('mcp_remove_segment', {
+    p_segment: segmentId,
+    p_actor: actor,
+  })
+  if (error) throw new Error(error.message)
 }
 
 export async function runRenameClient(clientId: string, newName: string, actor: string): Promise<void> {

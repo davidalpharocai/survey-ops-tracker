@@ -10,8 +10,9 @@ import { blastTotal } from '@/lib/utils/blast'
 import type { Database } from '@/lib/supabase/types'
 import * as data from '@/lib/mcp/data'
 import {
-  resolveProjectWritable, resolveStep, resolveContact, loadGateInput,
+  resolveProjectWritable, resolveStep, resolveContact, resolveSegment, loadGateInput,
   runAddStep, runCompleteStep, runEditStep, runProjectWrite, runLogBlast,
+  runAddSegment, runUpdateSegment, runRemoveSegment,
   runRenameClient, runCreateProject,
   pickProjectPatch, diffSummary, stageColumnsFor,
 } from '@/lib/mcp/writes'
@@ -489,7 +490,8 @@ export const TOOLS: AssistantTool[] = [
   // -------------------------------------------------------------------------
   {
     name: 'update_project',
-    description: "Update a project's fields (preview first; confirm to apply).",
+    description:
+      "Update a project's fields (preview first; confirm to apply). Handles name, client, type, captain/co-captains, salesperson, priority, all dates, N target/internal/collected/actual, audience_size, the free-text audience, category, objective, sprint_number, budget, the Y/N flags, survey_tool_id, slack channel, latest/next-steps, and the gen-pop N-floor override (n_floor_override + n_floor_override_reason). For status/stage moves use advance_project/approve_scoping/set_project_status; for compliance override, requested-by, or linked docs use their tools; for a project whose N is split into segments, use add_segment/update_segment/remove_segment.",
     kind: 'write',
     schema: {
       project: z.string(),
@@ -518,7 +520,10 @@ export const TOOLS: AssistantTool[] = [
         ('n_target' in patch || 'n_collected' in patch || 'n_actual' in patch) &&
         ((p.segment_count as number | null) ?? 0) > 0
       ) {
-        return { error: "This project's N is segmented — edit the segments in the app." }
+        return {
+          error:
+            "This project's N is split into segments, so its total N is the sum of them and can't be set directly. Use update_segment to change a segment's numbers, add_segment to add one, or remove_segment (remove all to revert to a single N).",
+        }
       }
       if ('client' in patch) patch.client = normalizeClientText(String(patch.client))
       if ('latest_next_steps' in patch) {
@@ -549,6 +554,138 @@ export const TOOLS: AssistantTool[] = [
           if ('error' in result) return result
           meta.detail = { changed }
           return { ok: true, project_code: result.project_code, changed }
+        }
+      )
+    },
+  },
+  {
+    name: 'add_segment',
+    description:
+      "Add an N segment to a project — e.g. split N into Buyers / Sellers, each with its own target. Adding the first segment converts the project to a segmented N (its total N becomes the sum of the segments). If the label or target isn't given, ask before adding. Preview first; confirm to apply.",
+    kind: 'write',
+    schema: {
+      project: z.string(),
+      label: z.string().min(1).max(120),
+      target: z.number().int().nullable().optional(),
+      collected: z.number().int().nullable().optional(),
+      actual: z.number().int().nullable().optional(),
+      confirm: z.boolean().optional(),
+    },
+    handler: async (rawArgs, ctx, meta) => {
+      const args = rawArgs as {
+        project: string; label: string; target?: number | null; collected?: number | null; actual?: number | null; confirm?: boolean
+      }
+      const { userEmail } = ctx
+      const p = await resolveProjectWritable(args.project)
+      if (!p) return { error: 'Project not found.' }
+      if ('error' in p) return p
+      if ('ambiguous' in p) return p
+      meta.project_id = p.id as string
+      const existing = (p.segment_count as number | null) ?? 0
+      return confirmable(
+        args,
+        async () => ({
+          summary:
+            `Add segment "${args.label}" (target ${args.target ?? '—'}, collected ${args.collected ?? 0}) to ${p.project_code}` +
+            (existing === 0
+              ? ' — this splits its single N into segments; the total N becomes the sum of the segments'
+              : ` (segment ${existing + 1})`),
+        }),
+        async () => {
+          const row = await runAddSegment({
+            projectId: p.id as string,
+            label: args.label,
+            target: args.target ?? null,
+            collected: args.collected ?? null,
+            actual: args.actual ?? null,
+            actor: `${userEmail} via Claude`,
+          })
+          meta.detail = { created_segment: { id: row.id, label: row.label } }
+          return { ok: true, segment: { id: row.id, label: row.label, n_target: row.n_target, n_collected: row.n_collected, n_actual: row.n_actual } }
+        }
+      )
+    },
+  },
+  {
+    name: 'update_segment',
+    description:
+      "Edit an N segment's label or numbers (target / collected / actual). Identify the segment by its name or id. If it's unclear which segment, ask. Preview first; confirm to apply.",
+    kind: 'write',
+    schema: {
+      project: z.string(),
+      segment_ref: z.string(),
+      label: z.string().min(1).max(120).optional(),
+      target: z.number().int().nullable().optional(),
+      collected: z.number().int().nullable().optional(),
+      actual: z.number().int().nullable().optional(),
+      confirm: z.boolean().optional(),
+    },
+    handler: async (rawArgs, ctx, meta) => {
+      const args = rawArgs as {
+        project: string; segment_ref: string; label?: string; target?: number | null; collected?: number | null; actual?: number | null; confirm?: boolean
+      }
+      const { userEmail } = ctx
+      const p = await resolveProjectWritable(args.project)
+      if (!p) return { error: 'Project not found.' }
+      if ('error' in p) return p
+      if ('ambiguous' in p) return p
+      meta.project_id = p.id as string
+      const seg = await resolveSegment(p.id as string, args.segment_ref)
+      if (!seg) return { error: `No segment found matching "${args.segment_ref}" on this project.` }
+      if ('ambiguous' in seg) return { note: 'Multiple segments match — be more specific.', candidates: seg.ambiguous }
+
+      const patch: Record<string, unknown> = {}
+      if (args.label !== undefined) patch.label = args.label
+      if (args.target !== undefined) patch.n_target = args.target
+      if (args.collected !== undefined) patch.n_collected = args.collected
+      if (args.actual !== undefined) patch.n_actual = args.actual
+      if (Object.keys(patch).length === 0) {
+        return { needs: 'a change', message: 'Specify at least one of: label, target, collected, actual.' }
+      }
+      const desc = [
+        args.label !== undefined ? `label → "${args.label}"` : null,
+        args.target !== undefined ? `target → ${args.target ?? '—'}` : null,
+        args.collected !== undefined ? `collected → ${args.collected ?? 0}` : null,
+        args.actual !== undefined ? `actual → ${args.actual ?? '—'}` : null,
+      ].filter(Boolean).join(', ')
+      return confirmable(
+        args,
+        async () => ({ summary: `Update segment "${seg.label}" on ${p.project_code}: ${desc}` }),
+        async () => {
+          const row = await runUpdateSegment(seg.id as string, patch, `${userEmail} via Claude`)
+          meta.detail = { segment_id: row.id, updated: patch }
+          return { ok: true, segment: { id: row.id, label: row.label, n_target: row.n_target, n_collected: row.n_collected, n_actual: row.n_actual } }
+        }
+      )
+    },
+  },
+  {
+    name: 'remove_segment',
+    description:
+      "Remove an N segment from a project (by name or id). Removing the last segment reverts the project to a single, non-segmented N. If it's unclear which segment, ask. Preview first; confirm to apply.",
+    kind: 'write',
+    schema: { project: z.string(), segment_ref: z.string(), confirm: z.boolean().optional() },
+    handler: async (rawArgs, ctx, meta) => {
+      const args = rawArgs as { project: string; segment_ref: string; confirm?: boolean }
+      const { userEmail } = ctx
+      const p = await resolveProjectWritable(args.project)
+      if (!p) return { error: 'Project not found.' }
+      if ('error' in p) return p
+      if ('ambiguous' in p) return p
+      meta.project_id = p.id as string
+      const seg = await resolveSegment(p.id as string, args.segment_ref)
+      if (!seg) return { error: `No segment found matching "${args.segment_ref}" on this project.` }
+      if ('ambiguous' in seg) return { note: 'Multiple segments match — be more specific.', candidates: seg.ambiguous }
+      const last = ((p.segment_count as number | null) ?? 0) <= 1
+      return confirmable(
+        args,
+        async () => ({
+          summary: `Remove segment "${seg.label}" from ${p.project_code}` + (last ? ' — the last segment; the project reverts to a single N' : ''),
+        }),
+        async () => {
+          await runRemoveSegment(seg.id as string, `${userEmail} via Claude`)
+          meta.detail = { removed_segment: { id: seg.id, label: seg.label } }
+          return { ok: true, removed: seg.label }
         }
       )
     },

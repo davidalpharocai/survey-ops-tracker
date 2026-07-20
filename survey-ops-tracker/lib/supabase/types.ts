@@ -1523,6 +1523,26 @@ export type Database = {
         Args: { p_step: string; p_text: string; p_actor: string }
         Returns: unknown
       }
+      mcp_add_segment: {
+        Args: {
+          p_project: string
+          p_label: string
+          p_actor: string
+          p_target?: number | null
+          p_collected?: number | null
+          p_actual?: number | null
+          p_sort?: number | null
+        }
+        Returns: unknown
+      }
+      mcp_update_segment: {
+        Args: { p_segment: string; p_patch: Json; p_actor: string }
+        Returns: unknown
+      }
+      mcp_remove_segment: {
+        Args: { p_segment: string; p_actor: string }
+        Returns: undefined
+      }
       mcp_set_bid_budget: {
         Args: {
           p_project: string
