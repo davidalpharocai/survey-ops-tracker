@@ -774,12 +774,13 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'log_blast',
     description:
-      "Log a B2B blast against a project — its $/bid, the # of people it went to, when it ran (optional), and an optional description of the audience. Its cost ($/bid × # of people) counts toward the project's spend. If $/bid or # of people is missing, ask. Preview first; confirm to apply.",
+      "Log a B2B blast against a project — its $/bid (the per-completion reward), the # of people it went to, the # of those who COMPLETED the survey, when it ran (optional), and an optional description of the audience. Its cost is $/bid × # of completes (we only pay people who completed, not everyone reached), and that counts toward the project's spend. If $/bid or # of people is missing, ask. If completes aren't known yet, pass 0 (spend stays $0 for this blast) and the user can fill them in later in the app. Preview first; confirm to apply.",
     kind: 'write',
     schema: {
       project: z.string(),
       bid: z.number().min(0),
       people: z.number().int().min(0),
+      completes: z.number().int().min(0).optional(),
       blast_at: z.string().optional(),
       description: z.string().max(1000).optional(),
       confirm: z.boolean().optional(),
@@ -787,7 +788,7 @@ export const TOOLS: AssistantTool[] = [
     },
     handler: async (rawArgs, ctx, meta) => {
       const args = rawArgs as {
-        project: string; bid: number; people: number; blast_at?: string
+        project: string; bid: number; people: number; completes?: number; blast_at?: string
         description?: string; confirm?: boolean; idem_key?: string
       }
       const { userEmail } = ctx
@@ -797,26 +798,27 @@ export const TOOLS: AssistantTool[] = [
       if ('ambiguous' in p) return p
       meta.project_id = p.id as string
 
-      const thisBlastTotal = blastTotal({ bid: args.bid, people: args.people })
+      const completes = args.completes ?? 0
+      const thisBlastTotal = blastTotal({ bid: args.bid, completes })
       const currentSpend = (p.actual_spend as number | null) ?? 0
       const projectedSpend = currentSpend + thisBlastTotal
 
       return confirmable(
         args,
         async () => ({
-          summary: `Log blast: ${args.people} people @ $${args.bid}/bid = $${thisBlastTotal} → projected spend $${projectedSpend}`,
-          people: args.people, bid: args.bid, blast_at: args.blast_at ?? null,
+          summary: `Log blast: ${completes} completes / ${args.people} people @ $${args.bid}/bid = $${thisBlastTotal} → projected spend $${projectedSpend}`,
+          people: args.people, completes, bid: args.bid, blast_at: args.blast_at ?? null,
           projected_actual_spend: projectedSpend,
         }),
         async () => {
           const row = await runLogBlast({
-            projectId: p.id as string, bid: args.bid, people: args.people,
+            projectId: p.id as string, bid: args.bid, people: args.people, completes,
             blastAt: args.blast_at ?? null, note: args.description ?? null,
             createdBy: userEmail.split('@')[0], idemKey: args.idem_key ?? randomUUID(),
             actor: `${userEmail} via Claude`,
           })
-          meta.detail = { created: { id: row.id, people: row.people, bid: row.bid } }
-          return { ok: true, blast: { id: row.id, people: row.people, bid: row.bid, blast_at: row.blast_at } }
+          meta.detail = { created: { id: row.id, people: row.people, completes: row.completes, bid: row.bid } }
+          return { ok: true, blast: { id: row.id, people: row.people, completes: row.completes, bid: row.bid, blast_at: row.blast_at } }
         }
       )
     },

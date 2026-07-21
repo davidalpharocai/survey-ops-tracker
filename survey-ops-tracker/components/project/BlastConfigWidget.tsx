@@ -1,10 +1,10 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
-import { useProjectBlasts, useAddBlast, useDeleteBlast, type Blast } from '@/lib/hooks/useProjectBlasts'
-import { blastTotal, totalBidDollars, totalPeople, blendedBid } from '@/lib/utils/blast'
+import { useProjectBlasts, useAddBlast, useUpdateBlast, useDeleteBlast, type Blast } from '@/lib/hooks/useProjectBlasts'
+import { blastTotal, totalBidDollars, totalPeople, totalCompletes, blendedBid } from '@/lib/utils/blast'
 import { fmtNum } from '@/lib/utils/number'
 
 function money(v: number): string {
@@ -31,10 +31,38 @@ function fmtWhen(iso: string | null): string {
 const inputCls =
   'bg-muted border border-border rounded px-1.5 py-1 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring'
 
+/**
+ * The completes count trickles in AFTER a blast is sent, so it's editable in
+ * place. Local state commits on blur / Enter, only when it actually changed.
+ */
+function CompletesCell({ blast, onSave }: { blast: Blast; onSave: (completes: number) => void }) {
+  const current = blast.completes ?? 0
+  const [val, setVal] = useState(String(current))
+  useEffect(() => { setVal(String(current)) }, [current])
+  function commit() {
+    const n = parseInt(val, 10)
+    if (isNaN(n) || n < 0) { setVal(String(current)); return }
+    if (n !== current) onSave(n)
+  }
+  return (
+    <input
+      type="number"
+      value={val}
+      onChange={(e) => setVal(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+      className="w-12 bg-transparent border border-transparent hover:border-border focus:border-ring rounded px-1 py-0.5 text-right text-foreground focus:outline-none"
+      title="How many completed the survey — editable; drives this blast's cost ($/bid × completes)"
+      aria-label="Number of completes"
+    />
+  )
+}
+
 export function BlastConfigWidget({ projectId }: { projectId: string }) {
   const supabase = createClient()
   const { data: blasts, isError } = useProjectBlasts(projectId)
   const add = useAddBlast(projectId)
+  const upd = useUpdateBlast(projectId)
   const del = useDeleteBlast(projectId)
 
   const { data: user } = useQuery({
@@ -44,9 +72,10 @@ export function BlastConfigWidget({ projectId }: { projectId: string }) {
   })
   const userName = user?.email?.split('@')[0] ?? 'Unknown'
 
-  // Create form: $/bid · # of people · date/time · description.
+  // Create form: $/bid · # of people · # of completes · date/time · description.
   const [bid, setBid] = useState('')
   const [people, setPeople] = useState('')
+  const [completes, setCompletes] = useState('')
   const [when, setWhen] = useState('')
   const [desc, setDesc] = useState('')
 
@@ -64,16 +93,18 @@ export function BlastConfigWidget({ projectId }: { projectId: string }) {
   function create() {
     const b = parseFloat(bid)
     const p = parseInt(people, 10)
-    if (isNaN(b) || isNaN(p)) return
+    if (isNaN(b) || isNaN(p) || b < 0 || p < 0) return
+    const c = parseInt(completes, 10)
     add.mutate(
       {
         bid: b,
         people: p,
+        completes: isNaN(c) || c < 0 ? 0 : c,
         blast_at: when ? new Date(when).toISOString() : null,
         note: desc.trim() || null,
         created_by: userName,
       },
-      { onSuccess: () => { setBid(''); setPeople(''); setWhen(''); setDesc('') } }
+      { onSuccess: () => { setBid(''); setPeople(''); setCompletes(''); setWhen(''); setDesc('') } }
     )
   }
 
@@ -81,7 +112,7 @@ export function BlastConfigWidget({ projectId }: { projectId: string }) {
     <div className="border-t border-border pt-3 mt-1">
       <p className="text-xs text-muted-foreground uppercase tracking-widest mb-2 font-medium flex items-center">
         Blast Configuration
-        <InfoTooltip text="Log each B2B blast: its $/bid, when it went out, how many people it went to, and an optional description of the audience. A blast's cost ($/bid × # of people) counts toward the project's spend." />
+        <InfoTooltip text="Log each B2B blast: its $/bid (the per-completion reward), when it went out, how many people it reached, and how many completed the survey. A blast's cost ($/bid × # of completes) counts toward the project's spend — we only pay for completes, not everyone reached." />
       </p>
 
       <div className="flex flex-col gap-2 text-xs">
@@ -91,16 +122,23 @@ export function BlastConfigWidget({ projectId }: { projectId: string }) {
             <label className="flex-1 flex flex-col gap-0.5">
               <span className="text-[10px] text-muted-foreground flex items-center gap-1">
                 $/bid
-                <InfoTooltip text="The dollar cost per person contacted in this blast. Combined with the # of people, it sets the blast's cost ($/bid × # of people), which counts toward the project's spend." />
+                <InfoTooltip text="The per-completion reward — the dollars paid for each completed response. Combined with the # of completes, it sets the blast's cost ($/bid × # of completes), which counts toward the project's spend." />
               </span>
-              <input type="number" step="0.01" value={bid} onChange={(e) => setBid(e.target.value)} placeholder="0.00" className={inputCls} />
+              <input type="number" step="0.01" min="0" value={bid} onChange={(e) => setBid(e.target.value)} placeholder="0.00" className={inputCls} />
             </label>
             <label className="flex-1 flex flex-col gap-0.5">
               <span className="text-[10px] text-muted-foreground flex items-center gap-1">
                 # of people
-                <InfoTooltip text="How many people this blast went out to (the audience reached). This × $/bid is the blast's cost." />
+                <InfoTooltip text="How many people this blast went out to (the audience reached). Informational — it does not drive the cost." />
               </span>
-              <input type="number" value={people} onChange={(e) => setPeople(e.target.value)} placeholder="0" className={inputCls} />
+              <input type="number" min="0" value={people} onChange={(e) => setPeople(e.target.value)} placeholder="0" className={inputCls} />
+            </label>
+            <label className="flex-1 flex flex-col gap-0.5">
+              <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                # of completes
+                <InfoTooltip text="How many of those people completed the survey. This × $/bid is the blast's cost — we don't pay people who didn't take the survey or terminated. Can be 0 now and filled in later (it's editable in the list)." />
+              </span>
+              <input type="number" min="0" value={completes} onChange={(e) => setCompletes(e.target.value)} placeholder="0" className={inputCls} />
             </label>
           </div>
           <label className="flex flex-col gap-0.5">
@@ -129,19 +167,26 @@ export function BlastConfigWidget({ projectId }: { projectId: string }) {
         {/* Blast list */}
         {list.length > 0 && (
           <div className="flex flex-col gap-0.5">
-            <div className="grid grid-cols-[auto_1fr_auto_auto_auto] gap-x-2 text-[11px] text-muted-foreground">
+            <div className="grid grid-cols-[auto_1fr_auto_auto_auto_auto] gap-x-2 text-[11px] text-muted-foreground items-center">
               <span>when</span>
               <span># people · description</span>
+              <span className="text-right flex items-center gap-1 justify-end">
+                completes
+                <InfoTooltip text="Number who completed the survey. Editable — click to update as completes come in. Cost = $/bid × completes." />
+              </span>
               <span className="text-right">$/bid</span>
               <span className="text-right">cost</span>
               <span></span>
             </div>
             {list.map((b: Blast) => (
-              <div key={b.id} className="grid grid-cols-[auto_1fr_auto_auto_auto] gap-x-2 items-center group text-foreground">
+              <div key={b.id} className="grid grid-cols-[auto_1fr_auto_auto_auto_auto] gap-x-2 items-center group text-foreground">
                 <span className="text-muted-foreground whitespace-nowrap">{fmtWhen(b.blast_at)}</span>
                 <span className="truncate">
                   {fmtNum(b.people ?? 0)}
                   {b.note ? ` · ${b.note}` : ''}
+                </span>
+                <span className="text-right">
+                  <CompletesCell blast={b} onSave={(c) => upd.mutate({ id: b.id, updates: { completes: c } })} />
                 </span>
                 <span className="text-right">{rate(b.bid)}</span>
                 <span className="text-right font-medium">{money(blastTotal(b))}</span>
@@ -150,7 +195,7 @@ export function BlastConfigWidget({ projectId }: { projectId: string }) {
             ))}
             <div className="flex justify-between text-[11px] text-muted-foreground mt-1 pt-1 border-t border-border">
               <span>Total spend <span className="text-foreground font-medium">{money(totalBidDollars(list))}</span></span>
-              <span>{fmtNum(totalPeople(list))} people · blended {rate(blendedBid(list))}/bid</span>
+              <span>{fmtNum(totalCompletes(list))} completes · {fmtNum(totalPeople(list))} people · blended {rate(blendedBid(list))}/bid</span>
             </div>
           </div>
         )}

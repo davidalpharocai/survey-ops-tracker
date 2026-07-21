@@ -279,7 +279,7 @@ export async function runEditStep(stepId: string, text: string, actor: string): 
 }
 
 export async function runLogBlast(opts: {
-  projectId: string; bid: number; people: number; blastAt: string | null
+  projectId: string; bid: number; people: number; completes: number; blastAt: string | null
   note: string | null; createdBy: string; idemKey: string; actor: string
 }): Promise<ProjectBlastRow> {
   const supabase = createAdminClient()
@@ -287,6 +287,7 @@ export async function runLogBlast(opts: {
     p_project: opts.projectId,
     p_bid: opts.bid,
     p_people: opts.people,
+    p_completes: opts.completes,
     p_blast_at: opts.blastAt,
     p_note: opts.note ?? '',
     p_created_by: opts.createdBy,

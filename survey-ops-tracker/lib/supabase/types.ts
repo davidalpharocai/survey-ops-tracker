@@ -750,6 +750,7 @@ export type Database = {
           bid: number
           blast_cost: number
           people: number
+          completes: number
           blast_at: string | null
           reward: number
           scheduled_at: string | null
@@ -766,6 +767,7 @@ export type Database = {
           bid?: number
           blast_cost?: number
           people?: number
+          completes?: number
           blast_at?: string | null
           reward?: number
           scheduled_at?: string | null
@@ -782,6 +784,7 @@ export type Database = {
           bid?: number
           blast_cost?: number
           people?: number
+          completes?: number
           blast_at?: string | null
           reward?: number
           scheduled_at?: string | null
@@ -1568,6 +1571,7 @@ export type Database = {
           p_project: string
           p_bid: number
           p_people: number
+          p_completes: number
           p_blast_at: string | null
           p_note: string
           p_created_by: string

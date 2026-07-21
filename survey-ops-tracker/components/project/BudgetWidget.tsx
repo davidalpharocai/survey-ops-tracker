@@ -101,7 +101,7 @@ export function BudgetWidget({ projectId, budget, nCollected }: BudgetWidgetProp
         <div className="flex justify-between items-center">
           <span className="text-xs text-muted-foreground flex items-center">
             Actual $
-            <InfoTooltip text="N Collected × the blended $/bid — equals the sum of all blast totals below. Computed, not typed." />
+            <InfoTooltip text="The sum of all blast totals below ($/bid × # of completes for each). Computed, not typed." />
           </span>
           <span className="text-sm font-medium text-foreground">{isError ? '—' : money(actual)}</span>
         </div>

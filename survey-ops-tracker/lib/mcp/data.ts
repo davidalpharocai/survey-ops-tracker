@@ -210,7 +210,7 @@ export async function getProjectDetail(id: string, userId: string) {
     clientRes, submissionsRes, remindersRes,
   ] = await Promise.all([
     supabase.from('project_bids').select('amount, blasts, note, created_at').eq('project_id', id).order('created_at', { ascending: false }),
-    supabase.from('project_blasts').select('bid, people, blast_at, note, created_at').eq('project_id', id).order('created_at', { ascending: false }),
+    supabase.from('project_blasts').select('bid, people, completes, blast_at, note, created_at').eq('project_id', id).order('created_at', { ascending: false }),
     supabase.from('project_steps').select('id, text, done, completed_at, created_at').eq('project_id', id).order('created_at', { ascending: false }).limit(50),
     supabase.from('project_activity').select('type, direction, sender, subject, snippet, occurred_at').eq('project_id', id).is('deleted_at', null).order('occurred_at', { ascending: false }).limit(10),
     supabase.from('deliverables').select('file_name, status, source_url, kind, created_at').eq('project_id', id).is('deleted_at', null).order('created_at', { ascending: false }),
