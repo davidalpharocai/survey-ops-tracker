@@ -16,6 +16,7 @@ import {
   runRenameClient, runCreateProject,
   pickProjectPatch, diffSummary, stageColumnsFor,
 } from '@/lib/mcp/writes'
+import { cloneProject } from '@/lib/server/clone'
 import {
   confirmable, describeChanges, fmtChangeVal, todayEastern, fetchDocTitle,
   DUE_DATE_RE, CLIENT_WRITE_FIELDS, CONTACT_WRITE_FIELDS,
@@ -1410,6 +1411,65 @@ export const TOOLS: AssistantTool[] = [
             ok: true, project_code: row.project_code, id: row.id,
             client: row.client, client_id: row.client_id, phase: row.phase, board_column: row.board_column,
           }
+        }
+      )
+    },
+  },
+  {
+    name: 'clone_project',
+    description:
+      "Clone a project into a fresh copy — new PR code, setup fields carried over, run-data reset (dates, N collected/actual, survey-tool ID, pipeline stage → Submitted). Blasts, deliverables, and activity are NOT copied. Records what it was cloned from in the audit log. By default it carries people, audience/N targets, flags, suppliers (CPIs + caps, collected reset), and budget — pass a carry_* as false to start that group blank. Great for the next wave of a recurring study. Preview first; confirm to apply.",
+    kind: 'write',
+    schema: {
+      source: z.string(),
+      new_name: z.string().min(1),
+      carry_people: z.boolean().optional(),
+      carry_audience: z.boolean().optional(),
+      carry_flags: z.boolean().optional(),
+      carry_suppliers: z.boolean().optional(),
+      carry_budget: z.boolean().optional(),
+      confirm: z.boolean().optional(),
+    },
+    handler: async (rawArgs, ctx, meta) => {
+      const args = rawArgs as {
+        source: string; new_name: string
+        carry_people?: boolean; carry_audience?: boolean; carry_flags?: boolean
+        carry_suppliers?: boolean; carry_budget?: boolean; confirm?: boolean
+      }
+      const { userEmail } = ctx
+      const p = await resolveProjectWritable(args.source)
+      if (!p) return { error: 'Project not found.' }
+      if ('error' in p) return p
+      if ('ambiguous' in p) return p
+      meta.project_id = p.id as string
+      const carry = {
+        people: args.carry_people,
+        audienceN: args.carry_audience,
+        flags: args.carry_flags,
+        suppliers: args.carry_suppliers,
+        budget: args.carry_budget,
+      }
+      const blanked = [
+        args.carry_people === false ? 'people' : null,
+        args.carry_audience === false ? 'audience/N' : null,
+        args.carry_flags === false ? 'flags' : null,
+        args.carry_suppliers === false ? 'suppliers' : null,
+        args.carry_budget === false ? 'budget' : null,
+      ].filter(Boolean)
+      return confirmable(
+        args,
+        async () => ({
+          summary: `Clone ${p.project_code} "${p.project_name}" → "${args.new_name}" (dates/N/stage reset${blanked.length ? `; also blanking ${blanked.join(', ')}` : ''})`,
+        }),
+        async () => {
+          const res = await cloneProject({
+            sourceId: p.id as string,
+            newName: args.new_name,
+            carry,
+            actor: `${userEmail} via Claude`,
+          })
+          meta.detail = { cloned_from: p.project_code, created: { id: res.id, project_code: res.project_code } }
+          return { ok: true, project_code: res.project_code, id: res.id, cloned_from: res.cloned_from }
         }
       )
     },

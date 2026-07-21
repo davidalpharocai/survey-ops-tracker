@@ -8,6 +8,7 @@ import { useProject, useUpdateProject, useDeleteProject, type SurveyProject } fr
 import { useTeamMembers, assignableMembers, type TeamMember } from '@/lib/hooks/useTeamMembers'
 import { PipelineProgress } from '@/components/project/PipelineProgress'
 import { WaveHistory } from '@/components/project/WaveHistory'
+import { CloneProjectModal } from '@/components/project/CloneProjectModal'
 import { GenPopNWarning } from '@/components/project/GenPopNWarning'
 import { ScopingProgress } from '@/components/project/ScopingProgress'
 import { ActivityLog } from '@/components/project/ActivityLog'
@@ -77,6 +78,7 @@ export default function ProjectDetailPage() {
   const updateProject = useUpdateProject()
   const deleteProject = useDeleteProject()
   const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [cloning, setCloning] = useState(false)
   const [activeTab, setActiveTab] = useState<'overview' | 'activity' | 'deliverables' | 'links' | 'logs'>('overview')
   // Where to return on "← Back": the board or list, whichever the user came from
   const [backTo, setBackTo] = useState<{ href: string; label: string }>({ href: '/', label: 'Board' })
@@ -281,6 +283,14 @@ export default function ProjectDetailPage() {
               </button>
             </HelpTip>
           )}
+          <HelpTip text="Create a fresh copy of this project — a new PR code, setup fields carried over (your choice), run-data reset. Great for the next wave of a recurring study.">
+            <button
+              onClick={() => setCloning(true)}
+              className="text-sm border border-border text-muted-foreground hover:text-foreground hover:border-ring px-3 py-1.5 rounded-lg transition-colors shrink-0"
+            >
+              ⎘ Clone
+            </button>
+          </HelpTip>
           {/* Destructive action set apart from Close by a divider + a red tint
               that's visible at rest, so it can't be hit by reflex. */}
           <span className="flex items-center border-l border-border pl-2 ml-1 gap-2">
@@ -296,6 +306,15 @@ export default function ProjectDetailPage() {
           </span>
         </div>
       </div>
+
+      {cloning && (
+        <CloneProjectModal
+          sourceId={id}
+          sourceName={project.project_name}
+          sourceCode={project.project_code}
+          onClose={() => setCloning(false)}
+        />
+      )}
 
       {confirmingDelete && (
         <DeleteProjectModal
