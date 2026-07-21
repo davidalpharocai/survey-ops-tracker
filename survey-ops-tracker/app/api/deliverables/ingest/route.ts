@@ -9,18 +9,29 @@ import { aiMatch } from '@/lib/deliverables/ai-matcher'
 import { findDuplicateAnywhere } from '@/lib/deliverables/persist'
 import { ensureClientFolder } from '@/lib/deliverables/folders'
 import { sendAndLog } from '@/lib/email/send'
+import { logSystemEvent } from '@/lib/server/observability'
 import type { Database } from '@/lib/supabase/types'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
-function authorized(req: Request): boolean {
+function authorized(req: Request): { ok: boolean; provided: boolean } {
   const header = req.headers.get('x-webhook-secret') ?? req.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
-  return safeEqual(header, process.env.WEBHOOK_SECRET)
+  return { ok: safeEqual(header, process.env.WEBHOOK_SECRET), provided: !!header }
 }
 
 export async function POST(req: Request) {
-  if (!authorized(req)) return new Response('Unauthorized', { status: 401 })
+  const auth = authorized(req)
+  if (!auth.ok) {
+    // A caller that SENT a secret but was rejected is a misconfigured legitimate client — almost always
+    // the Gmail Apps Script forwarder running a stale WEBHOOK_SECRET. Log it so a silent forwarding
+    // outage surfaces (daily digest + weekly QA report) instead of failing invisibly. Bare scans with no
+    // secret header are ignored so we don't create noise.
+    if (auth.provided) {
+      await logSystemEvent({ source: 'deliverables-ingest', status: 'error', detail: 'Rejected a forward: wrong/stale WEBHOOK_SECRET (401). The email forwarder cannot post — re-sync the Apps Script secret with Vercel.' })
+    }
+    return new Response('Unauthorized', { status: 401 })
+  }
   const sharedDriveId = process.env.DELIVERABLES_SHARED_DRIVE_ID
   if (!sharedDriveId) return NextResponse.json({ error: 'Deliverables drive not configured' }, { status: 500 })
 

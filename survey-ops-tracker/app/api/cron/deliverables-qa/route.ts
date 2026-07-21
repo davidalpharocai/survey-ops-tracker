@@ -21,7 +21,9 @@ export async function GET(req: NextRequest) {
   const admin = createAdminClient()
   let text: string
   try {
-    const [{ data: deliverables }, { data: projects }] = await Promise.all([
+    const now = new Date()
+    const since7d = new Date(now.getTime() - 7 * 86_400_000).toISOString()
+    const [{ data: deliverables }, { data: projects }, { count: authRejections7d }] = await Promise.all([
       admin
         .from('deliverables')
         .select('id, status, match_method, match_confidence, match_candidates, source, file_hash, project_id, file_name, original_file_name, forwarded_by, created_at, filed_at, deleted_at')
@@ -32,10 +34,17 @@ export async function GET(req: NextRequest) {
         .select('id, project_code, project_name, client, deliver_date, project_type, deleted_at')
         .is('deleted_at', null)
         .limit(2000),
+      // Rejected forwards (ingest 401s) in the last 7 days — the silent-outage signal.
+      admin
+        .from('system_events')
+        .select('*', { count: 'exact', head: true })
+        .eq('source', 'deliverables-ingest')
+        .eq('status', 'error')
+        .gte('created_at', since7d),
     ])
     const report = buildQaReport(
-      { deliverables: (deliverables ?? []) as QaDeliverable[], projects: (projects ?? []) as QaProject[] },
-      { ...DEFAULT_QA_CONFIG, now: new Date() },
+      { deliverables: (deliverables ?? []) as QaDeliverable[], projects: (projects ?? []) as QaProject[], authRejections7d: authRejections7d ?? 0 },
+      { ...DEFAULT_QA_CONFIG, now },
     )
     text = renderQaReportText(report)
   } catch (err) {
