@@ -68,7 +68,7 @@ export function MergeModal({ kind, a, b, open, onClose }: Props) {
               onClick={() => { setSurvivorId(rec.id); setPicks({}) }}
               className={`text-left rounded-lg p-3 border ${survivorId === rec.id ? 'border-2 border-blue-500' : 'border-border'}`}
             >
-              <span className={`text-[11px] ${survivorId === rec.id ? 'text-blue-600 dark:text-blue-400' : 'text-muted-foreground'}`}>
+              <span className={`text-[12px] ${survivorId === rec.id ? 'text-blue-600 dark:text-blue-400' : 'text-muted-foreground'}`}>
                 {survivorId === rec.id ? 'Survivor' : 'Retired'}
               </span>
               <span className="block text-sm text-foreground truncate">{fmt(rec[nameKey])}</span>
@@ -79,7 +79,7 @@ export function MergeModal({ kind, a, b, open, onClose }: Props) {
 
         {diff.length > 0 && (
           <div className="mb-4">
-            <p className="text-[11px] uppercase tracking-widest text-muted-foreground mb-2">Resolve differences ({diff.length})</p>
+            <p className="text-[12px] uppercase tracking-widest text-muted-foreground mb-2">Resolve differences ({diff.length})</p>
             <div className="flex flex-col gap-2">
               {diff.map(f => {
                 const chosen = picks[f.key] ?? 'survivor'
@@ -107,7 +107,7 @@ export function MergeModal({ kind, a, b, open, onClose }: Props) {
         )}
 
         <div className="mb-4">
-          <p className="text-[11px] uppercase tracking-widest text-muted-foreground mb-1">Everything else combines</p>
+          <p className="text-[12px] uppercase tracking-widest text-muted-foreground mb-1">Everything else combines</p>
           <p className="text-xs text-muted-foreground">{COMBINES[kind].join(' · ')}</p>
         </div>
 

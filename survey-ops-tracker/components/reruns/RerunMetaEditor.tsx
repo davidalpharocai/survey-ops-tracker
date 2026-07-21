@@ -14,7 +14,7 @@ const CADENCE_OPTS = [
   { v: '12', label: 'Yearly' },
 ]
 const inputCls =
-  'bg-muted border border-border text-foreground text-[11px] rounded-md px-1.5 py-1 focus:outline-none focus:border-ring'
+  'bg-muted border border-border text-foreground text-[12px] rounded-md px-1.5 py-1 focus:outline-none focus:border-ring'
 
 export function RerunMetaEditor({ r }: { r: RerunRow }) {
   const [open, setOpen] = useState(false)
@@ -65,7 +65,7 @@ export function RerunMetaEditor({ r }: { r: RerunRow }) {
 
   if (!open) {
     return (
-      <div className="mt-1.5 flex items-center gap-3 text-[11px]">
+      <div className="mt-1.5 flex items-center gap-3 text-[12px]">
         <button type="button" onClick={() => setOpen(true)} className="text-primary hover:underline">
           {r.is_defined ? '✎ Edit cadence / owner' : '＋ Define cadence'}
         </button>
@@ -86,7 +86,7 @@ export function RerunMetaEditor({ r }: { r: RerunRow }) {
 
   return (
     <div className="mt-1.5 rounded-lg border border-border bg-muted/40 p-2 flex flex-col gap-2">
-      <label className="flex items-center gap-1 text-[11px] text-muted-foreground">
+      <label className="flex items-center gap-1 text-[12px] text-muted-foreground">
         Name
         <input
           type="text"
@@ -96,7 +96,7 @@ export function RerunMetaEditor({ r }: { r: RerunRow }) {
           className={`${inputCls} flex-1 min-w-[12rem]`}
         />
       </label>
-      <div className="flex flex-wrap gap-x-3 gap-y-1.5 items-center text-[11px] text-muted-foreground">
+      <div className="flex flex-wrap gap-x-3 gap-y-1.5 items-center text-[12px] text-muted-foreground">
         <label className="flex items-center gap-1">
           Cadence
           <select value={cadence} onChange={(e) => setCadence(e.target.value)} className={inputCls}>
@@ -118,7 +118,7 @@ export function RerunMetaEditor({ r }: { r: RerunRow }) {
           </label>
         )}
       </div>
-      <div className="flex flex-wrap gap-x-3 gap-y-1.5 items-center text-[11px] text-muted-foreground">
+      <div className="flex flex-wrap gap-x-3 gap-y-1.5 items-center text-[12px] text-muted-foreground">
         <label className="flex items-center gap-1">
           Owner
           <input
@@ -158,7 +158,7 @@ export function RerunMetaEditor({ r }: { r: RerunRow }) {
           <input type="checkbox" checked={paused} onChange={(e) => setPaused(e.target.checked)} /> Paused
         </label>
       </div>
-      <label className="flex flex-col gap-0.5 text-[11px] text-muted-foreground">
+      <label className="flex flex-col gap-0.5 text-[12px] text-muted-foreground">
         Note
         <textarea
           rows={2}
@@ -168,7 +168,7 @@ export function RerunMetaEditor({ r }: { r: RerunRow }) {
           className={`${inputCls} resize-none`}
         />
       </label>
-      <p className="text-[10px] text-muted-foreground/70">
+      <p className="text-[11px] text-muted-foreground/70">
         {cadence
           ? 'Next wave is computed as last-collected + cadence; log each wave to keep it current.'
           : 'Ad-hoc: set an explicit next date. Leave the date blank + check Paused to retire it from tracking.'}
@@ -178,11 +178,11 @@ export function RerunMetaEditor({ r }: { r: RerunRow }) {
           type="button"
           disabled={save.isPending}
           onClick={() => save_({})}
-          className="text-[11px] px-2.5 py-1 rounded-lg bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-40"
+          className="text-[12px] px-2.5 py-1 rounded-lg bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-40"
         >
           {save.isPending ? 'Saving…' : 'Save'}
         </button>
-        <button type="button" onClick={() => setOpen(false)} className="text-[11px] text-muted-foreground hover:text-foreground">
+        <button type="button" onClick={() => setOpen(false)} className="text-[12px] text-muted-foreground hover:text-foreground">
           Cancel
         </button>
       </div>

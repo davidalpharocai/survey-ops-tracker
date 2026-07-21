@@ -34,12 +34,12 @@ export function InternalCard({
         </span>
         <span className="flex items-center gap-1 flex-wrap justify-end shrink-0">
           {priorityChip && (
-            <span className={`text-[11px] px-1.5 py-0.5 rounded ${priorityChip.classes}`} title={priorityChip.label}>
+            <span className={`text-[12px] px-1.5 py-0.5 rounded ${priorityChip.classes}`} title={priorityChip.label}>
               {priorityChip.symbol}
             </span>
           )}
           {category && (
-            <span className="text-[11px] px-2 py-0.5 rounded bg-blue-500/15 text-blue-600 dark:text-blue-400">
+            <span className="text-[12px] px-2 py-0.5 rounded bg-blue-500/15 text-blue-600 dark:text-blue-400">
               {category}
             </span>
           )}
@@ -62,7 +62,7 @@ export function InternalCard({
           )}
           {sprintNum != null && (
             <span
-              className="text-[10px] text-muted-foreground"
+              className="text-[11px] text-muted-foreground"
               title={sprintConfig ? sprintLabel(sprintNum, sprintConfig) : `Sprint ${sprintNum}`}
             >
               S{sprintNum}

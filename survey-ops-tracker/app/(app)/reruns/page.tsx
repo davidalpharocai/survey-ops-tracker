@@ -72,7 +72,7 @@ const TIPS: Partial<Record<Bucket, string>> = {
 
 const tile = 'bg-card border border-border shadow-sm rounded-xl p-3 flex flex-col gap-1 text-left'
 const panel = 'bg-card border border-border shadow-sm rounded-xl p-4'
-const groupLabel = 'text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mt-1'
+const groupLabel = 'text-[12px] font-semibold uppercase tracking-wider text-muted-foreground mt-1'
 const headCls = 'flex items-center gap-2 text-xs uppercase tracking-widest font-medium text-muted-foreground'
 const selectCls =
   'bg-muted border border-border text-foreground/80 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-ring'
@@ -253,7 +253,7 @@ function RerunCard({ r, bucket, hrefFor }: { r: RerunRow; bucket: Bucket; hrefFo
       )}
 
       {(r.cadence_months != null || r.owner_email || r.backup_owner_email || r.last_wave_on) && (
-        <div className="text-[11px] text-muted-foreground/90 mt-1 flex flex-wrap gap-x-2 gap-y-0.5">
+        <div className="text-[12px] text-muted-foreground/90 mt-1 flex flex-wrap gap-x-2 gap-y-0.5">
           {cadenceLabel(r.cadence_months) && <span>🔁 {cadenceLabel(r.cadence_months)}</span>}
           {r.owner_email && <span>👤 {r.owner_email}</span>}
           {r.backup_owner_email && <span title="Backup owner">＋ {r.backup_owner_email}</span>}
@@ -262,7 +262,7 @@ function RerunCard({ r, bucket, hrefFor }: { r: RerunRow; bucket: Bucket; hrefFo
       )}
 
       {waves.length > 0 && (
-        <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px]">
+        <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[12px]">
           <button
             type="button"
             onClick={() => copy(waves[0])}
@@ -291,7 +291,7 @@ function RerunCard({ r, bucket, hrefFor }: { r: RerunRow; bucket: Bucket; hrefFo
                 type="button"
                 onClick={() => copy(w)}
                 title="Click to copy"
-                className="font-mono text-[11px] text-muted-foreground hover:text-foreground text-left truncate max-w-full"
+                className="font-mono text-[12px] text-muted-foreground hover:text-foreground text-left truncate max-w-full"
               >
                 {w}
               </button>
@@ -301,13 +301,13 @@ function RerunCard({ r, bucket, hrefFor }: { r: RerunRow; bucket: Bucket; hrefFo
       )}
 
       {conflict && (
-        <div className="mt-1 flex items-center gap-1 text-[11px] text-amber-600 dark:text-amber-400">
+        <div className="mt-1 flex items-center gap-1 text-[12px] text-amber-600 dark:text-amber-400">
           <span aria-hidden="true">⚠</span> conflicting cells
           <InfoTooltip text={conflict} />
         </div>
       )}
       {bucket === 'unsorted' && (
-        <div className="mt-1 text-[11px] text-amber-600 dark:text-amber-400 break-words">
+        <div className="mt-1 text-[12px] text-amber-600 dark:text-amber-400 break-words">
           → {needsDateReason(r)} — define a cadence below to start tracking it.
         </div>
       )}
@@ -812,7 +812,7 @@ export default function RerunsPage() {
             </div>
           )}
           {shown > 0 && (
-            <p className="text-[11px] text-muted-foreground flex items-center flex-wrap">
+            <p className="text-[12px] text-muted-foreground flex items-center flex-wrap">
               {withDate} of {shown} studies have a real collection date
               <InfoTooltip text="Write a real date (or e.g. “May 2026”) in the sheet's Next-Collection cell and a study sorts itself instead of landing in “Needs a date”." />
             </p>

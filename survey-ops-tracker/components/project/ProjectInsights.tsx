@@ -6,9 +6,7 @@ import type { SurveyProject } from '@/lib/hooks/useProjects'
 import { useProjectBlasts, type Blast } from '@/lib/hooks/useProjectBlasts'
 import { useProjectLaunches, type ProjectLaunch } from '@/lib/hooks/useProjectLaunches'
 import { useProjectSuppliers, type ProjectSupplier } from '@/lib/hooks/useProjectSuppliers'
-import {
-  projectEstimateRange, projectActualCost, projectCollected, projectTarget, modalCap,
-} from '@/lib/utils/suppliers'
+import { projectEstimateRange, projectTarget, modalCap } from '@/lib/utils/suppliers'
 import {
   pctOf, computePace, costPerComplete, projectedFinalCost,
   blastCompletionRate, cumulativeCompletes, supplierMix, bestValueSupplier, daysBetween,
@@ -36,7 +34,7 @@ const sectionTitle = 'text-xs uppercase tracking-widest text-muted-foreground fo
 function KpiCard({ label, tooltip, children }: { label: string; tooltip?: string; children: React.ReactNode }) {
   return (
     <div className={card}>
-      <p className="text-[11px] uppercase tracking-wide text-muted-foreground flex items-center">
+      <p className="text-[12px] uppercase tracking-wide text-muted-foreground flex items-center">
         {label}
         {tooltip && <InfoTooltip text={tooltip} />}
       </p>
@@ -86,7 +84,7 @@ export function ProjectInsights({ project }: { project: SurveyProject }) {
   const spend = project.actual_spend ?? 0
   const budget = project.budget ?? null
   const cpc = costPerComplete(spend, collected)
-  const projFinal = projectedFinalCost(cpc, target)
+  const projFinal = projectedFinalCost(cpc, target, collected)
   const startISO = project.launch_date ?? project.created_at ?? null
   const pace = computePace({ collected, target, startISO, todayISO })
 
@@ -137,12 +135,12 @@ export function ProjectInsights({ project }: { project: SurveyProject }) {
             <span className="text-sm font-normal text-muted-foreground">{budget != null ? ` / ${money(budget)}` : ''}</span>
             {budgetUsed != null && <span className={`text-xs font-normal ${burningFast ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'}`}> · {pctStr(budgetUsed * 100)}</span>}
           </p>
-          <p className="text-[11px] text-muted-foreground mt-0.5">proj. final {money(projFinal)}</p>
+          <p className="text-[12px] text-muted-foreground mt-0.5">proj. final {money(projFinal)}</p>
         </KpiCard>
 
         <KpiCard label="Cost / complete" tooltip="Blended all-in cost per completed response = actual spend ÷ N collected.">
           <p className="text-lg font-semibold text-foreground leading-tight">{money2(cpc)}</p>
-          <p className="text-[11px] text-muted-foreground mt-0.5">blended, to date</p>
+          <p className="text-[12px] text-muted-foreground mt-0.5">blended, to date</p>
         </KpiCard>
 
         <KpiCard label="Pace" tooltip="Completes per day since fielding started, and a linear projection of when the N target is reached.">
@@ -150,14 +148,14 @@ export function ProjectInsights({ project }: { project: SurveyProject }) {
             {pace.perDay != null ? `${fmtNum(Math.round(pace.perDay))}` : '—'}
             <span className="text-sm font-normal text-muted-foreground">/day</span>
           </p>
-          <p className="text-[11px] text-muted-foreground mt-0.5">
+          <p className="text-[12px] text-muted-foreground mt-0.5">
             {pace.projectedFinishISO ? <>≈ {shortDate(pace.projectedFinishISO)}{paceNote && <span className={paceNote.tone === 'warn' ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}> · {paceNote.text}</span>}</> : 'set a target + start date'}
           </p>
         </KpiCard>
       </div>
 
       {burningFast && (
-        <p className="text-[11px] text-amber-600/90 dark:text-amber-400/90 -mt-2">
+        <p className="text-[12px] text-amber-600/90 dark:text-amber-400/90 -mt-2">
           ⚠ Spending is running ahead of collection ({pctStr(budgetUsed! * 100)} of budget for {pctStr(nProgress! * 100)} of N) — check cost per complete.
         </p>
       )}
@@ -190,9 +188,9 @@ function B2BPerformance({ blasts, target }: { blasts: Blast[]; target: number | 
       </p>
 
       <Sparkline points={cum} target={target} />
-      <p className="text-[10px] text-muted-foreground/70 mb-2">cumulative completes over time{target != null ? ' (dashed = N target)' : ''}</p>
+      <p className="text-[11px] text-muted-foreground/70 mb-2">cumulative completes over time{target != null ? ' (dashed = N target)' : ''}</p>
 
-      <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-x-3 gap-y-1 text-[11px] items-center">
+      <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-x-3 gap-y-1 text-[12px] items-center">
         <span className="text-muted-foreground">when · description</span>
         <span className="text-muted-foreground text-right w-14">people</span>
         <span className="text-muted-foreground text-right w-16">completes</span>
@@ -210,7 +208,7 @@ function B2BPerformance({ blasts, target }: { blasts: Blast[]; target: number | 
       </div>
 
       {best && worst && best.id !== worst.id && (
-        <p className="text-[11px] text-muted-foreground mt-2">
+        <p className="text-[12px] text-muted-foreground mt-2">
           Best: <span className="text-foreground">{shortDate(best.blast_at)}</span> {pctStr(blastCompletionRate(best))} · Worst: <span className="text-foreground">{shortDate(worst.blast_at)}</span> {pctStr(blastCompletionRate(worst))}
         </p>
       )}
@@ -224,10 +222,13 @@ function PSPerformance({ launches, suppliers }: { launches: ProjectLaunch[]; sup
     const lines = rowsFor(l.id).map((r) => ({ cpi: r.cpi, completes_cap: r.completes_cap, n_collected: r.n_collected }))
     return { launch: l, lines, target: l.target ?? modalCap(lines) }
   })
-  const pCollected = projectCollected(launchesLite.map((x) => ({ target: x.target, lines: x.lines })))
-  const pActual = projectActualCost(launchesLite.map((x) => ({ target: x.target, lines: x.lines })))
-  const pRange = projectEstimateRange(launchesLite.map((x) => ({ target: x.target, lines: x.lines })))
-  const pTarget = projectTarget(launchesLite.map((x) => ({ target: x.target, lines: x.lines })))
+  // Totals from ALL supplier rows (not just launch-matched) so they reconcile with the
+  // project's actual_spend and the supplier-mix even if a row's launch_id is unset.
+  const pActual = suppliers.reduce((s, r) => s + (r.cpi || 0) * (r.n_collected || 0), 0)
+  const pCollected = suppliers.reduce((s, r) => s + (r.n_collected || 0), 0)
+  const liteForEst = launchesLite.map((x) => ({ target: x.target, lines: x.lines }))
+  const pRange = projectEstimateRange(liteForEst)
+  const pTarget = projectTarget(liteForEst)
 
   const mix = supplierMix(suppliers.map((r) => ({ name: r.suppliers?.name ?? '—', cpi: r.cpi, n_collected: r.n_collected })))
   const mixTotal = mix.reduce((s, m) => s + m.collected, 0)
@@ -239,11 +240,11 @@ function PSPerformance({ launches, suppliers }: { launches: ProjectLaunch[]; sup
       <p className={sectionTitle}>
         Launch &amp; supplier performance
         <InfoTooltip text="Fill rate = N collected ÷ target per launch. Supplier mix is each supplier's share of all completes. Actual cost = Σ(CPI × N collected)." />
-        <span className="ml-auto normal-case tracking-normal text-foreground font-medium">{money(pActual)} actual</span>
+        <span className="ml-auto normal-case tracking-normal text-foreground font-medium">{money(pActual)} suppliers</span>
       </p>
 
       {/* Per-launch */}
-      <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-3 gap-y-1 text-[11px] items-center mb-3">
+      <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-3 gap-y-1 text-[12px] items-center mb-3">
         <span className="text-muted-foreground">launch</span>
         <span className="text-muted-foreground text-right w-24">collected / target</span>
         <span className="text-muted-foreground text-right w-16">fill</span>
@@ -266,9 +267,9 @@ function PSPerformance({ launches, suppliers }: { launches: ProjectLaunch[]; sup
       {/* Supplier mix */}
       {mixTotal > 0 && (
         <div className="flex flex-col gap-1.5 mb-2">
-          <p className="text-[11px] text-muted-foreground">Supplier mix (share of completes)</p>
+          <p className="text-[12px] text-muted-foreground">Supplier mix (share of completes)</p>
           {mix.filter((m) => m.collected > 0).map((m) => (
-            <div key={m.name} className="flex items-center gap-2 text-[11px]">
+            <div key={m.name} className="flex items-center gap-2 text-[12px]">
               <span className="w-28 truncate text-foreground" title={m.name}>{m.name}</span>
               <div className="flex-1 min-w-0"><Bar frac={m.collected / mixTotal} /></div>
               <span className="w-24 text-right tabular-nums text-muted-foreground">{fmtNum(m.collected)} · {pctStr((m.collected / mixTotal) * 100)}</span>
@@ -277,7 +278,7 @@ function PSPerformance({ launches, suppliers }: { launches: ProjectLaunch[]; sup
         </div>
       )}
 
-      <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground border-t border-border pt-2">
+      <div className="flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-muted-foreground border-t border-border pt-2">
         {best && <span>Best value: <span className="text-foreground">{best.name}</span> @ {money2(best.effectiveCpi)}/complete</span>}
         {pRange && pCollected === 0 && <span>Est. {money(pRange.low)}–{money(pRange.high)}</span>}
         {pCollected > 0 && <span>{fmtNum(pCollected)} collected{pTarget > 0 ? ` / ${fmtNum(pTarget)}` : ''}</span>}

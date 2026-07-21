@@ -2,13 +2,14 @@
 import { useState } from 'react'
 import { useUpdateProject } from '@/lib/hooks/useProjects'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
-import { useProjectBlasts } from '@/lib/hooks/useProjectBlasts'
-import { totalBidDollars, costPerN } from '@/lib/utils/blast'
+import { costPerN } from '@/lib/utils/blast'
 
 interface BudgetWidgetProps {
   projectId: string
   budget: number | null
   nCollected: number
+  /** Combined actual spend (blasts + PS suppliers) — the DB source of truth. */
+  actualSpend: number | null
 }
 
 function money(value: number | null): string {
@@ -67,12 +68,13 @@ function EditableAmount({
   )
 }
 
-export function BudgetWidget({ projectId, budget, nCollected }: BudgetWidgetProps) {
+export function BudgetWidget({ projectId, budget, nCollected, actualSpend }: BudgetWidgetProps) {
   const updateProject = useUpdateProject()
-  const { data: blasts, isError } = useProjectBlasts(projectId)
 
-  const actual = blasts ? totalBidDollars(blasts) : null
-  const cpn = actual != null ? costPerN(actual, nCollected) : null
+  // actual_spend is trigger-maintained (Σ blast bid×completes + Σ supplier cpi×n_collected),
+  // so this reconciles with the hero budget and the Insights tab for every project type.
+  const actual = actualSpend ?? 0
+  const cpn = costPerN(actual, nCollected)
   const hasBudget = budget != null && budget > 0
   const usedPct = hasBudget && actual != null ? Math.min((actual / budget) * 100, 100) : 0
   const remaining = hasBudget && actual != null ? budget - actual : null
@@ -97,27 +99,23 @@ export function BudgetWidget({ projectId, budget, nCollected }: BudgetWidgetProp
           <EditableAmount value={budget} onSave={saveBudget} placeholder="e.g. 6000" />
         </div>
 
-        <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-2 font-medium">Spend</p>
+        <p className="text-[11px] text-muted-foreground uppercase tracking-widest mt-2 font-medium">Spend</p>
         <div className="flex justify-between items-center">
           <span className="text-xs text-muted-foreground flex items-center">
             Actual $
-            <InfoTooltip text="The sum of all blast totals below ($/bid × # of completes for each). Computed, not typed." />
+            <InfoTooltip text="Actual spend to date — blasts ($/bid × completes) plus PS suppliers (CPI × N collected). Computed, not typed." />
           </span>
-          <span className="text-sm font-medium text-foreground">{isError ? '—' : money(actual)}</span>
+          <span className="text-sm font-medium text-foreground">{money(actual)}</span>
         </div>
         <div className="flex justify-between items-center">
           <span className="text-xs text-muted-foreground flex items-center">
-            Total bid / N
-            <InfoTooltip text="Actual $ ÷ N Collected — the all-in cost per completed response (includes blast fees)." />
+            Cost / N
+            <InfoTooltip text="Actual $ ÷ N Collected — the all-in cost per completed response." />
           </span>
-          <span className="text-sm text-foreground">{isError ? '—' : rate(cpn)}</span>
+          <span className="text-sm text-foreground">{rate(cpn)}</span>
         </div>
 
-        {isError && (
-          <p className="text-xs text-muted-foreground/60">Spend appears once the latest database migration is applied.</p>
-        )}
-
-        {hasBudget && actual != null && (
+        {hasBudget && (
           <>
             <div className="h-1.5 bg-muted rounded-full overflow-hidden mt-1">
               <div

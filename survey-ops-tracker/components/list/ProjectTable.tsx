@@ -181,14 +181,14 @@ export function ProjectTable({
             <button
               onClick={() => changeDensity('comfortable')}
               title="Comfortable rows"
-              className={`text-[11px] px-2 py-0.5 rounded transition-colors ${density === 'comfortable' ? 'bg-background text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+              className={`text-[12px] px-2 py-0.5 rounded transition-colors ${density === 'comfortable' ? 'bg-background text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
             >
               Comfortable
             </button>
             <button
               onClick={() => changeDensity('compact')}
               title="Compact rows — fit more on screen"
-              className={`text-[11px] px-2 py-0.5 rounded transition-colors ${density === 'compact' ? 'bg-background text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+              className={`text-[12px] px-2 py-0.5 rounded transition-colors ${density === 'compact' ? 'bg-background text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
             >
               Compact
             </button>

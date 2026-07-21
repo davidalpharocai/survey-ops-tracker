@@ -73,7 +73,7 @@ export function WaveHistory({ project }: { project: P }) {
           const body = (
             <span className="flex items-center justify-between gap-2 w-full">
               <span className="flex items-center gap-2 min-w-0">
-                <span className="text-[11px] font-mono text-muted-foreground shrink-0">
+                <span className="text-[12px] font-mono text-muted-foreground shrink-0">
                   {w.rerun_number && w.rerun_number > 1 ? `Wave ${w.rerun_number}` : 'Original'}
                 </span>
                 <span
@@ -100,7 +100,7 @@ export function WaveHistory({ project }: { project: P }) {
         <button
           onClick={unlink}
           disabled={link.isPending}
-          className="text-[11px] text-muted-foreground hover:text-red-600 dark:hover:text-red-400 self-start disabled:opacity-40"
+          className="text-[12px] text-muted-foreground hover:text-red-600 dark:hover:text-red-400 self-start disabled:opacity-40"
         >
           Unlink this wave from the series
         </button>
@@ -125,7 +125,7 @@ function ParentPicker({
 
   return (
     <div className="rounded-lg border border-border bg-muted/40 p-2 flex flex-col gap-1">
-      <p className="text-[11px] text-muted-foreground">Pick the original survey this is a rerun of:</p>
+      <p className="text-[12px] text-muted-foreground">Pick the original survey this is a rerun of:</p>
       {isLoading ? (
         <p className="text-xs text-muted-foreground/50">Loading…</p>
       ) : candidates.length === 0 ? (
@@ -143,12 +143,12 @@ function ParentPicker({
                 {c.project_code ? `${c.project_code} · ` : ''}
                 {c.project_name}
               </span>
-              <span className="block text-[11px] text-muted-foreground truncate">{c.client}</span>
+              <span className="block text-[12px] text-muted-foreground truncate">{c.client}</span>
             </button>
           ))}
         </div>
       )}
-      <button onClick={onCancel} className="text-[11px] text-muted-foreground hover:text-foreground self-start">
+      <button onClick={onCancel} className="text-[12px] text-muted-foreground hover:text-foreground self-start">
         Cancel
       </button>
     </div>

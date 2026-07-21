@@ -269,7 +269,7 @@ export function CompliancePanel({ projectId, project }: { projectId: string; pro
                   <span className="text-foreground">
                     Version {s.version} · {formatDate(s.submitted_at)}
                     {s.submitter_name && <span className="text-muted-foreground"> · {s.submitter_name}</span>}
-                    <span className="text-muted-foreground/70 italic ml-2 text-[11px]">click for details</span>
+                    <span className="text-muted-foreground/70 italic ml-2 text-[12px]">click for details</span>
                   </span>
                   <span className={`px-2 py-0.5 rounded ${STATUS_BADGE[s.status]}`}>
                     {STATUS_LABEL[s.status]}

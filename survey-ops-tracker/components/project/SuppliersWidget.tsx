@@ -149,9 +149,9 @@ function LaunchBlock({
           <span className="text-xs font-medium text-foreground whitespace-nowrap">{expanded ? '▾' : '▸'} Launch {index + 1}</span>
           {!expanded && (
             <>
-              {launch.launch_date && <span className="text-[11px] text-muted-foreground whitespace-nowrap">{launch.launch_date}</span>}
-              {launch.label && <span className="text-[11px] text-muted-foreground truncate">· {launch.label}</span>}
-              <span className={`ml-auto text-[11px] whitespace-nowrap ${overTarget ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'}`}>{summary}</span>
+              {launch.launch_date && <span className="text-[12px] text-muted-foreground whitespace-nowrap">{launch.launch_date}</span>}
+              {launch.label && <span className="text-[12px] text-muted-foreground truncate">· {launch.label}</span>}
+              <span className={`ml-auto text-[12px] whitespace-nowrap ${overTarget ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'}`}>{summary}</span>
             </>
           )}
         </button>
@@ -181,7 +181,7 @@ function LaunchBlock({
         <div className="px-2 pb-2 flex flex-col gap-1.5">
           {/* Supplier table */}
           {rows.length > 0 && (
-            <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-x-2 text-[11px] text-muted-foreground">
+            <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-x-2 text-[12px] text-muted-foreground">
               <span>Supplier</span>
               <span className="w-16 text-right" title="Cost per complete (CPI) — what you pay this supplier per completed response.">$ / complete</span>
               <span className="w-16 text-right" title="The most completes to buy from this supplier in this launch — a per-supplier ceiling.">cap</span>
@@ -226,7 +226,7 @@ function LaunchBlock({
 
           {/* Target (defaults to the cap) + this launch's subtotal */}
           <div className="flex items-center justify-between gap-2">
-            <label className="flex items-center gap-1 text-[11px] text-muted-foreground">
+            <label className="flex items-center gap-1 text-[12px] text-muted-foreground">
               Target
               <InfoTooltip text="This launch's target # of completes — the desired/capped volume for the wave. Defaults to the per-supplier cap (they're usually the same); type a number to override. Its estimate range = target × [cheapest…priciest CPI]." />
               <input
@@ -244,7 +244,7 @@ function LaunchBlock({
                 className={`${inputCls} w-16 text-right`}
               />
             </label>
-            <span className="text-[11px] text-right">
+            <span className="text-[12px] text-right">
               {hasCollected ? (
                 <span className={overTarget ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'}>
                   Actual <span className="text-foreground font-medium">{money(actual)}</span> · {fmtNum(collected)} collected
@@ -397,7 +397,7 @@ export function SuppliersWidget({
           <div className="mt-1 pt-1 border-t border-border flex flex-col gap-0.5">
             {hasCollected ? (
               <>
-                <div className="flex justify-between text-[11px]">
+                <div className="flex justify-between text-[12px]">
                   <span className="text-muted-foreground">
                     Actual cost <span className="text-foreground font-medium">{money(pActual)}</span>
                   </span>
@@ -406,13 +406,13 @@ export function SuppliersWidget({
                   </span>
                 </div>
                 {nActual != null && pBlended != null && (
-                  <p className="text-[10px] text-muted-foreground/60">
+                  <p className="text-[11px] text-muted-foreground/60">
                     ↳ blended {rate(pBlended)} × N actual {fmtNum(nActual)} = {money(pBlended * nActual)}
                   </p>
                 )}
               </>
             ) : (
-              <div className="flex justify-between text-[11px] text-muted-foreground">
+              <div className="flex justify-between text-[12px] text-muted-foreground">
                 <span>
                   {pRange ? (
                     <>Est. <span className="text-foreground font-medium">{money(pRange.low)}–{money(pRange.high)}</span></>

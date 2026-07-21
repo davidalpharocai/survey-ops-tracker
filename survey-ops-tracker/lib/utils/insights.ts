@@ -29,6 +29,11 @@ export function computePace(opts: {
   const { collected, target, startISO, todayISO } = opts
   const empty: Pace = { perDay: null, daysElapsed: 0, remaining: null, projectedDaysToTarget: null, projectedFinishISO: null }
   if (!startISO) return empty
+  // A future (or unparseable) start date means fielding hasn't begun — no meaningful
+  // pace yet. (Guards pre-launch data entry from inflating per-day / finish.)
+  const startMs = new Date(startISO).getTime()
+  const todayMs = new Date(todayISO).getTime()
+  if (!Number.isFinite(startMs) || startMs > todayMs) return empty
   const daysElapsed = Math.max(1, daysBetween(startISO, todayISO))
   const perDay = collected > 0 ? collected / daysElapsed : 0
   const remaining = target != null ? Math.max(0, target - collected) : null
@@ -47,9 +52,11 @@ export function costPerComplete(actualSpend: number, collected: number): number 
   return collected > 0 ? actualSpend / collected : null
 }
 
-/** Projected final cost = blended cost/complete × target. */
-export function projectedFinalCost(blended: number | null, target: number | null): number | null {
-  return blended != null && target != null ? blended * target : null
+/** Projected final cost = blended cost/complete × the completes we'll end up paying for.
+ *  Floored at what's already collected so an over-quota project never projects a final
+ *  cost below money already spent. */
+export function projectedFinalCost(blended: number | null, target: number | null, collected = 0): number | null {
+  return blended != null && target != null ? blended * Math.max(target, collected) : null
 }
 
 // ---- B2B (blasts) ----

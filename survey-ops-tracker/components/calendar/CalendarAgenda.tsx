@@ -65,7 +65,7 @@ export function CalendarAgenda({ byDate }: CalendarAgendaProps) {
                       }`}
                     >
                       <span
-                        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium shrink-0 ${meta.chip} ${ring}`}
+                        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[12px] font-medium shrink-0 ${meta.chip} ${ring}`}
                       >
                         <span aria-hidden="true">{meta.icon}</span>
                         {meta.short}

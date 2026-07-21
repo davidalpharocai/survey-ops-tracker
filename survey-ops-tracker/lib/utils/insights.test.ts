@@ -16,6 +16,11 @@ describe('kpi math', () => {
     expect(projectedFinalCost(5, 1000)).toBe(5000)
     expect(projectedFinalCost(null, 1000)).toBeNull()
   })
+  it('projectedFinalCost is floored at completes collected (over-quota)', () => {
+    // blended $10, target 100 but 150 already collected → project ≥ spend, not 10×100.
+    expect(projectedFinalCost(10, 100, 150)).toBe(1500)
+    expect(projectedFinalCost(10, 100, 80)).toBe(1000) // under target → projects to target
+  })
   it('daysBetween floors and never goes negative', () => {
     expect(daysBetween('2026-07-01', '2026-07-11')).toBe(10)
     expect(daysBetween('2026-07-11', '2026-07-01')).toBe(0)
@@ -39,6 +44,11 @@ describe('computePace', () => {
   })
   it('no start date → empty', () => {
     expect(computePace({ collected: 10, target: 100, startISO: null, todayISO: '2026-07-11' }).perDay).toBeNull()
+  })
+  it('future start date (pre-launch) → empty, no inflated pace', () => {
+    const p = computePace({ collected: 50, target: 1000, startISO: '2026-08-01', todayISO: '2026-07-11' })
+    expect(p.perDay).toBeNull()
+    expect(p.projectedFinishISO).toBeNull()
   })
 })
 

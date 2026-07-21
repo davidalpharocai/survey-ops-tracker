@@ -65,7 +65,7 @@ export function CloneProjectModal({
         </div>
 
         <label className="flex flex-col gap-1">
-          <span className="text-[11px] text-muted-foreground">New name</span>
+          <span className="text-[12px] text-muted-foreground">New name</span>
           <input
             autoFocus
             value={name}
@@ -76,7 +76,7 @@ export function CloneProjectModal({
         </label>
 
         <div className="flex flex-col gap-0.5">
-          <span className="text-[11px] text-muted-foreground mb-0.5">Carry over</span>
+          <span className="text-[12px] text-muted-foreground mb-0.5">Carry over</span>
           {GROUPS.map((g) => (
             <label key={g.key} className="flex items-start gap-2 text-xs cursor-pointer py-0.5">
               <input

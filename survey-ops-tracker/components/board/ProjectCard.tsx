@@ -103,7 +103,7 @@ export function ProjectCard({ project, onClick, isNew }: ProjectCardProps) {
       {/* Hold badge floats on the top-right corner, on purpose */}
       {onHold && (
         <span
-          className="absolute -top-2.5 right-2 text-[11px] px-2 py-0.5 rounded-full bg-muted border border-muted-foreground/40 text-muted-foreground"
+          className="absolute -top-2.5 right-2 text-[12px] px-2 py-0.5 rounded-full bg-muted border border-muted-foreground/40 text-muted-foreground"
           title="On hold — paused; greyed out and sorted to the bottom of the column"
         >
           ⏸ Hold
@@ -113,7 +113,7 @@ export function ProjectCard({ project, onClick, isNew }: ProjectCardProps) {
       {/* NEW! badge floats on the top-right corner, like Hold */}
       {showNew && (
         <span
-          className="absolute -top-2.5 right-2 rounded-full bg-emerald-500/15 border border-emerald-500 text-emerald-700 dark:text-emerald-300 px-2 text-[11px] font-medium"
+          className="absolute -top-2.5 right-2 rounded-full bg-emerald-500/15 border border-emerald-500 text-emerald-700 dark:text-emerald-300 px-2 text-[12px] font-medium"
           title="Newly assigned to you — opens the project to dismiss"
         >
           NEW!
@@ -133,7 +133,7 @@ export function ProjectCard({ project, onClick, isNew }: ProjectCardProps) {
         <span className="flex items-center gap-1 flex-wrap justify-end shrink-0">
           {stale && (
             <span
-              className="text-[11px] px-1.5 py-0.5 rounded-full bg-muted border border-muted-foreground/40 text-muted-foreground whitespace-nowrap"
+              className="text-[12px] px-1.5 py-0.5 rounded-full bg-muted border border-muted-foreground/40 text-muted-foreground whitespace-nowrap"
               title="No dates set and no updates in 30+ days — review whether this project is still real."
             >
               💤 Stale?
@@ -141,7 +141,7 @@ export function ProjectCard({ project, onClick, isNew }: ProjectCardProps) {
           )}
           {priorityChip && (
             <span
-              className={`text-[11px] px-1.5 py-0.5 rounded ${priorityChip.classes}`}
+              className={`text-[12px] px-1.5 py-0.5 rounded ${priorityChip.classes}`}
               title={priorityChip.label}
             >
               {priorityChip.symbol}
@@ -149,7 +149,7 @@ export function ProjectCard({ project, onClick, isNew }: ProjectCardProps) {
           )}
           {project.project_type && (
             <span
-              className={`text-[11px] px-2 py-0.5 rounded ${TYPE_BADGE[project.project_type] ?? ''}`}
+              className={`text-[12px] px-2 py-0.5 rounded ${TYPE_BADGE[project.project_type] ?? ''}`}
               title={TYPE_TITLE[project.project_type]}
             >
               {project.project_type}
@@ -158,7 +158,7 @@ export function ProjectCard({ project, onClick, isNew }: ProjectCardProps) {
           {complianceStatus && (
             <span
               title={`Compliance: ${complianceStatus.replace('_', ' ')}`}
-              className={`text-[11px] px-1.5 py-0.5 rounded whitespace-nowrap ${
+              className={`text-[12px] px-1.5 py-0.5 rounded whitespace-nowrap ${
                 complianceStatus === 'approved'
                   ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400'
                   : complianceStatus === 'rejected'
@@ -179,7 +179,7 @@ export function ProjectCard({ project, onClick, isNew }: ProjectCardProps) {
       <div title="Responses collected so far vs the response goal (N Target)">
         <NProgressBar collected={project.n_collected} target={project.n_target} />
         {(project.segment_count ?? 0) > 1 && (
-          <p className="text-[10px] text-muted-foreground/60 mt-0.5">{project.segment_count} segments</p>
+          <p className="text-[11px] text-muted-foreground/60 mt-0.5">{project.segment_count} segments</p>
         )}
       </div>
 
@@ -216,7 +216,7 @@ export function ProjectCard({ project, onClick, isNew }: ProjectCardProps) {
             </span>
           )}
           {showWaitingOn && (
-            <span className="text-[10px] text-muted-foreground truncate" title={`Waiting on: ${waitingOn}`}>
+            <span className="text-[11px] text-muted-foreground truncate" title={`Waiting on: ${waitingOn}`}>
               ⏳ {waitingOn}
             </span>
           )}

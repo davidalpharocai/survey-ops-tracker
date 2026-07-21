@@ -24,7 +24,7 @@ function Field({
 }) {
   return (
     <label className="flex flex-col gap-0.5">
-      <span className="flex items-center text-[11px] text-muted-foreground uppercase tracking-wider">
+      <span className="flex items-center text-[12px] text-muted-foreground uppercase tracking-wider">
         {label}
         {tooltip && <InfoTooltip text={tooltip} />}
       </span>
@@ -85,7 +85,7 @@ export function CalendarFilters({ filters, onChange }: CalendarFiltersProps) {
     <div className="flex flex-col gap-3">
       {/* Legend — doubles as the event-type on/off toggles. */}
       <div className="flex items-center gap-2 flex-wrap">
-        <span className="flex items-center text-[11px] text-muted-foreground uppercase tracking-wider">
+        <span className="flex items-center text-[12px] text-muted-foreground uppercase tracking-wider">
           Show
           <InfoTooltip text="Color legend + on/off toggles. Click a type to hide it from the calendar. Reminders are your own personal reminders." />
         </span>

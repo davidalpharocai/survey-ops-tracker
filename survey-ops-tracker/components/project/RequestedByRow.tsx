@@ -96,7 +96,7 @@ export function RequestedByRow({ clientId, contactId, snapshotName, tooltip, onC
                   )}
                   {current.phone && <p className="text-xs text-muted-foreground">{current.phone}</p>}
                   {current.archived && (
-                    <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1">Archived contact</p>
+                    <p className="text-[12px] text-amber-600 dark:text-amber-400 mt-1">Archived contact</p>
                   )}
                 </div>
                 <div className="flex items-center gap-3 border-t border-border pt-2 text-xs">
@@ -115,7 +115,7 @@ export function RequestedByRow({ clientId, contactId, snapshotName, tooltip, onC
 
             {mode === 'pick' && (
               <div className="flex flex-col">
-                <p className="text-[11px] text-muted-foreground px-1 pb-1">Pick a contact</p>
+                <p className="text-[12px] text-muted-foreground px-1 pb-1">Pick a contact</p>
                 <div className="max-h-[12rem] overflow-y-auto">
                   {active.length === 0 && (
                     <p className="text-xs text-muted-foreground/60 px-1 py-2">No contacts yet.</p>
@@ -130,7 +130,7 @@ export function RequestedByRow({ clientId, contactId, snapshotName, tooltip, onC
                     >
                       <span className="block text-sm text-foreground truncate">{contactName(c)}</span>
                       {contactSubtitle(c) && (
-                        <span className="block text-[11px] text-muted-foreground truncate">{contactSubtitle(c)}</span>
+                        <span className="block text-[12px] text-muted-foreground truncate">{contactSubtitle(c)}</span>
                       )}
                     </button>
                   ))}

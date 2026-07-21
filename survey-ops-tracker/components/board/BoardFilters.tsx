@@ -32,7 +32,7 @@ function Field({
 }) {
   return (
     <label className="flex flex-col gap-0.5">
-      <span className="flex items-center text-[11px] text-muted-foreground uppercase tracking-wider">
+      <span className="flex items-center text-[12px] text-muted-foreground uppercase tracking-wider">
         {label}
         {tooltip && <InfoTooltip text={tooltip} />}
       </span>
@@ -158,7 +158,7 @@ export function BoardFilters({
           >
             <span aria-hidden="true">⧩</span> Filters
             {activeCount > 0 && (
-              <span className="ml-0.5 text-[11px] font-medium bg-primary/15 text-primary rounded-full px-1.5">
+              <span className="ml-0.5 text-[12px] font-medium bg-primary/15 text-primary rounded-full px-1.5">
                 {activeCount}
               </span>
             )}

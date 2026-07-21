@@ -44,7 +44,7 @@ export function BoardColumn({ id, title, projects, onCardClick, isNewFor, bodyCl
         <span className="flex items-center gap-1.5">
           {overdue > 0 && !collapsed && (
             <span
-              className="text-[11px] bg-red-500/15 text-red-600 dark:text-red-400 px-2 py-0.5 rounded-full whitespace-nowrap"
+              className="text-[12px] bg-red-500/15 text-red-600 dark:text-red-400 px-2 py-0.5 rounded-full whitespace-nowrap"
               title={`${overdue} overdue in this column`}
             >
               {overdue} overdue
@@ -68,7 +68,7 @@ export function BoardColumn({ id, title, projects, onCardClick, isNewFor, bodyCl
             } ${snapshot.isDraggingOver ? 'bg-accent/50' : ''}`}
           >
             {collapsed && !snapshot.isDraggingOver && (
-              <span className="text-[11px] text-muted-foreground/40 text-center py-3 px-1 border border-dashed border-border/50 rounded leading-snug">
+              <span className="text-[12px] text-muted-foreground/40 text-center py-3 px-1 border border-dashed border-border/50 rounded leading-snug">
                 No projects
               </span>
             )}

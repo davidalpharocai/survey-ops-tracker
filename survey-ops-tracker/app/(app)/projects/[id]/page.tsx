@@ -419,13 +419,13 @@ export default function ProjectDetailPage() {
                     updates: { survey_tool_id: m?.[1] ?? project.survey_tool_id, survey_id_discrepancy: null },
                   })
                 }}
-                className="text-[11px] bg-amber-500/20 hover:bg-amber-500/30 text-amber-700 dark:text-amber-300 px-2 py-1 rounded transition-colors"
+                className="text-[12px] bg-amber-500/20 hover:bg-amber-500/30 text-amber-700 dark:text-amber-300 px-2 py-1 rounded transition-colors"
               >
                 Use Edwin ID
               </button>
               <button
                 onClick={() => updateProject.mutate({ id, updates: { survey_id_discrepancy: null } })}
-                className="text-[11px] text-muted-foreground hover:text-foreground px-2 py-1 transition-colors"
+                className="text-[12px] text-muted-foreground hover:text-foreground px-2 py-1 transition-colors"
               >
                 Keep current — dismiss
               </button>
@@ -693,6 +693,7 @@ export default function ProjectDetailPage() {
                   projectId={project.id}
                   budget={project.budget ?? null}
                   nCollected={project.n_collected}
+                  actualSpend={project.actual_spend ?? null}
                 />
               </div>
               <div className="border-t border-border pt-3 mt-1 flex items-center gap-1.5 text-xs text-muted-foreground/50">
@@ -813,7 +814,7 @@ function HeroDates({
         )}
       </div>
       {longitudinal && ((project.rerun_number ?? 1) > 1 || project.rerun_spawned_at) && (
-        <p className="text-[10px] text-muted-foreground/70 truncate">
+        <p className="text-[11px] text-muted-foreground/70 truncate">
           {(project.rerun_number ?? 1) > 1 ? `${ordinal(project.rerun_number)} wave` : ''}
           {(project.rerun_number ?? 1) > 1 && project.rerun_spawned_at ? ' · ' : ''}
           {project.rerun_spawned_at ? '↻ next wave created' : ''}
@@ -850,7 +851,7 @@ function HeroDateCell({
 
   return (
     <div className="flex flex-col gap-0.5 min-w-0" title={tooltip}>
-      <span className="text-[10px] uppercase tracking-wide text-muted-foreground whitespace-nowrap">
+      <span className="text-[11px] uppercase tracking-wide text-muted-foreground whitespace-nowrap">
         {label}
         {hint && <span className="text-muted-foreground/60 normal-case"> ({hint})</span>}
       </span>
@@ -880,7 +881,7 @@ function HeroDateCell({
         </button>
       )}
       {subtitle !== undefined && (
-        <span className="text-[10px] text-muted-foreground truncate">{subtitle}</span>
+        <span className="text-[11px] text-muted-foreground truncate">{subtitle}</span>
       )}
     </div>
   )
@@ -917,7 +918,7 @@ function HeroWaitingOn({
         <button
           onClick={() => onSetBlockedBy('none')}
           title="Clear the manual block"
-          className="mt-1 self-start text-[11px] inline-flex items-center gap-1 rounded-full px-2 py-0.5 bg-amber-500/15 text-amber-600 dark:text-amber-400 hover:bg-amber-500/25 transition-colors"
+          className="mt-1 self-start text-[12px] inline-flex items-center gap-1 rounded-full px-2 py-0.5 bg-amber-500/15 text-amber-600 dark:text-amber-400 hover:bg-amber-500/25 transition-colors"
         >
           {project.blocked_by === 'client' ? 'Blocked — client' : 'Blocked — us'} ✕
         </button>
@@ -930,7 +931,7 @@ function HeroWaitingOn({
             setPicking(false)
           }}
           onBlur={() => setPicking(false)}
-          className="mt-1 self-start bg-muted border border-border rounded px-1 py-0.5 text-[11px] text-muted-foreground focus:outline-none focus:border-ring cursor-pointer"
+          className="mt-1 self-start bg-muted border border-border rounded px-1 py-0.5 text-[12px] text-muted-foreground focus:outline-none focus:border-ring cursor-pointer"
         >
         <option value="none">None</option>
         <option value="client">Blocked — client</option>
@@ -940,7 +941,7 @@ function HeroWaitingOn({
         <button
           onClick={() => setPicking(true)}
           title="Mark this project blocked (forces Waiting On to Client or Us)"
-          className="mt-1 self-start text-[11px] text-muted-foreground/50 hover:text-foreground transition-colors"
+          className="mt-1 self-start text-[12px] text-muted-foreground/50 hover:text-foreground transition-colors"
         >
           + mark blocked
         </button>

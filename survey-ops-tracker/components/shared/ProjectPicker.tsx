@@ -66,7 +66,7 @@ export function ProjectPicker({
             ))
           )}
           {matches.length > shown.length && (
-            <li className="px-3 py-1.5 text-[11px] text-muted-foreground/70">
+            <li className="px-3 py-1.5 text-[12px] text-muted-foreground/70">
               +{matches.length - shown.length} more — keep typing to narrow
             </li>
           )}

@@ -120,7 +120,7 @@ export function RecipientsManager({ projectId, suggestedContact }: { projectId: 
         <p className="text-xs text-muted-foreground">
           Automatic: the submitting analyst, the project captain, and shanu@alpharoc.ai
         </p>
-        <p className="text-[11px] text-muted-foreground/70 italic">
+        <p className="text-[12px] text-muted-foreground/70 italic">
           During beta, all AlphaRoc notifications route to david@alpharoc.ai only.
         </p>
         {recipients.filter(r => r.role === 'alpharoc').map(r => (

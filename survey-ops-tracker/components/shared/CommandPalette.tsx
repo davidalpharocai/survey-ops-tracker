@@ -181,7 +181,7 @@ export function CommandPalette() {
                     <span className="text-muted-foreground truncate">
                       {item.project.client}
                     </span>
-                    <span className="ml-auto shrink-0 text-[11px] text-muted-foreground border border-border rounded-full px-2 py-0.5">
+                    <span className="ml-auto shrink-0 text-[12px] text-muted-foreground border border-border rounded-full px-2 py-0.5">
                       {item.project.phase === 'Active'
                         ? item.project.status === 'Open'
                           ? item.project.board_column
@@ -191,7 +191,7 @@ export function CommandPalette() {
                   </>
                 ) : (
                   <>
-                    <span className="shrink-0 text-[11px] text-muted-foreground border border-border rounded px-1.5 py-0.5">
+                    <span className="shrink-0 text-[12px] text-muted-foreground border border-border rounded px-1.5 py-0.5">
                       ⌘
                     </span>
                     <span className="text-foreground">{item.label}</span>
@@ -201,7 +201,7 @@ export function CommandPalette() {
             ))
           )}
         </div>
-        <div className="px-4 py-2 border-t border-border text-[11px] text-muted-foreground">
+        <div className="px-4 py-2 border-t border-border text-[12px] text-muted-foreground">
           ↑↓ navigate · ↵ open · esc close
         </div>
       </div>

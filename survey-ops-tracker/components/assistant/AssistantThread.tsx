@@ -68,7 +68,7 @@ function PendingCard({
   return (
     <div className={`self-start w-full max-w-full rounded-xl border ${s.border} bg-card px-3 py-2.5 flex flex-col gap-2`}>
       <div className="flex items-start gap-2">
-        <span className="mt-0.5 text-[10px] uppercase tracking-wide font-medium text-muted-foreground bg-muted rounded px-1.5 py-0.5 shrink-0">
+        <span className="mt-0.5 text-[11px] uppercase tracking-wide font-medium text-muted-foreground bg-muted rounded px-1.5 py-0.5 shrink-0">
           {action.tool.replace(/_/g, ' ')}
         </span>
         <p className="text-sm text-foreground flex-1 break-words">{action.summary}</p>

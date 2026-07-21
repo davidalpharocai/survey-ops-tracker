@@ -50,7 +50,7 @@ function BlastEditPanel({ blast, onSave, onClose }: { blast: Blast; onSave: (u: 
     <div className="col-span-full rounded-lg border border-border bg-muted/40 p-2.5 my-1 flex flex-col gap-2">
       <div className="flex flex-wrap gap-2">
         <label className="flex flex-col gap-0.5">
-          <span className="text-[10px] text-muted-foreground">Date/time (ET)</span>
+          <span className="text-[11px] text-muted-foreground">Date/time (ET)</span>
           <input
             type="datetime-local"
             defaultValue={toLocalInput(blast.blast_at)}
@@ -59,7 +59,7 @@ function BlastEditPanel({ blast, onSave, onClose }: { blast: Blast; onSave: (u: 
           />
         </label>
         <label className="flex flex-col gap-0.5 w-20">
-          <span className="text-[10px] text-muted-foreground"># people</span>
+          <span className="text-[11px] text-muted-foreground"># people</span>
           <input
             type="number" min="0" defaultValue={blast.people ?? 0}
             onBlur={(e) => { const v = parseInt(e.target.value, 10); if (!isNaN(v) && v >= 0 && v !== (blast.people ?? 0)) onSave({ people: v }) }}
@@ -67,7 +67,7 @@ function BlastEditPanel({ blast, onSave, onClose }: { blast: Blast; onSave: (u: 
           />
         </label>
         <label className="flex flex-col gap-0.5 w-20">
-          <span className="text-[10px] text-muted-foreground"># completes</span>
+          <span className="text-[11px] text-muted-foreground"># completes</span>
           <input
             type="number" min="0" defaultValue={blast.completes ?? 0}
             onBlur={(e) => { const v = parseInt(e.target.value, 10); if (!isNaN(v) && v >= 0 && v !== (blast.completes ?? 0)) onSave({ completes: v }) }}
@@ -75,7 +75,7 @@ function BlastEditPanel({ blast, onSave, onClose }: { blast: Blast; onSave: (u: 
           />
         </label>
         <label className="flex flex-col gap-0.5 w-20">
-          <span className="text-[10px] text-muted-foreground">$/bid</span>
+          <span className="text-[11px] text-muted-foreground">$/bid</span>
           <input
             type="number" step="0.01" min="0" defaultValue={blast.bid ?? 0}
             onBlur={(e) => { const v = parseFloat(e.target.value); if (!isNaN(v) && v >= 0 && v !== (blast.bid ?? 0)) onSave({ bid: v }) }}
@@ -84,7 +84,7 @@ function BlastEditPanel({ blast, onSave, onClose }: { blast: Blast; onSave: (u: 
         </label>
       </div>
       <label className="flex flex-col gap-0.5">
-        <span className="text-[10px] text-muted-foreground">Description</span>
+        <span className="text-[11px] text-muted-foreground">Description</span>
         <textarea
           defaultValue={blast.note ?? ''}
           rows={2}
@@ -188,21 +188,21 @@ export function BlastConfigWidget({ projectId }: { projectId: string }) {
         <div className="rounded-lg border border-border bg-muted/40 p-2 flex flex-col gap-1.5" onKeyDown={(e) => { if (e.key === 'Enter') create() }}>
           <div className="flex gap-1.5">
             <label className="flex-1 min-w-0 flex flex-col gap-0.5">
-              <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+              <span className="text-[11px] text-muted-foreground flex items-center gap-1">
                 $/bid
                 <InfoTooltip text="The per-completion reward — the dollars paid for each completed response. Combined with the # of completes, it sets the blast's cost ($/bid × # of completes), which counts toward the project's spend." />
               </span>
               <input type="number" step="0.01" min="0" value={bid} onChange={(e) => setBid(e.target.value)} placeholder="0.00" className={inputCls} />
             </label>
             <label className="flex-1 min-w-0 flex flex-col gap-0.5">
-              <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+              <span className="text-[11px] text-muted-foreground flex items-center gap-1">
                 # of people
                 <InfoTooltip text="How many people this blast went out to (the audience reached). Informational — it does not drive the cost." />
               </span>
               <input type="number" min="0" value={people} onChange={(e) => setPeople(e.target.value)} placeholder="0" className={inputCls} />
             </label>
             <label className="flex-1 min-w-0 flex flex-col gap-0.5">
-              <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+              <span className="text-[11px] text-muted-foreground flex items-center gap-1">
                 # of completes
                 <InfoTooltip text="How many of those people completed the survey. This × $/bid is the blast's cost — we don't pay people who didn't take the survey or terminated. Can be 0 now and filled in later (it's editable in the list)." />
               </span>
@@ -210,14 +210,14 @@ export function BlastConfigWidget({ projectId }: { projectId: string }) {
             </label>
           </div>
           <label className="flex flex-col gap-0.5">
-            <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+            <span className="text-[11px] text-muted-foreground flex items-center gap-1">
               Date/time of the blast (ET)
               <InfoTooltip text="When the blast actually went out. Pick the date and time (AM/PM). The full date + time is stored; the list shows the year only when it's not the current year." />
             </span>
             <input type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} className={inputCls} />
           </label>
           <label className="flex flex-col gap-0.5">
-            <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+            <span className="text-[11px] text-muted-foreground flex items-center gap-1">
               Description (optional)
               <InfoTooltip text="Optional note on who this blast targeted — e.g. '3PL companies + retailers'. For your reference; it doesn't affect the cost." />
             </span>
@@ -238,14 +238,14 @@ export function BlastConfigWidget({ projectId }: { projectId: string }) {
           <div className="flex flex-col gap-1">
             <div className="grid grid-cols-[auto_1fr_auto_auto_auto_auto] gap-x-3 gap-y-1 items-center">
               {/* Header */}
-              <span className="text-[11px] text-muted-foreground">when</span>
-              <span className="text-[11px] text-muted-foreground"># people · description</span>
-              <span className="text-[11px] text-muted-foreground text-right flex items-center gap-1 justify-end whitespace-nowrap">
+              <span className="text-[12px] text-muted-foreground">when</span>
+              <span className="text-[12px] text-muted-foreground"># people · description</span>
+              <span className="text-[12px] text-muted-foreground text-right flex items-center gap-1 justify-end whitespace-nowrap">
                 completes
                 <InfoTooltip text="Number who completed the survey. Editable — click to update as completes come in. Cost = $/bid × completes." />
               </span>
-              <span className="text-[11px] text-muted-foreground text-right">$/bid</span>
-              <span className="text-[11px] text-muted-foreground text-right">cost</span>
+              <span className="text-[12px] text-muted-foreground text-right">$/bid</span>
+              <span className="text-[12px] text-muted-foreground text-right">cost</span>
               <span></span>
               {/* Rows */}
               {list.map((b: Blast) => (
@@ -272,7 +272,7 @@ export function BlastConfigWidget({ projectId }: { projectId: string }) {
                 </Fragment>
               ))}
             </div>
-            <div className="flex justify-between text-[11px] text-muted-foreground mt-1 pt-1 border-t border-border">
+            <div className="flex justify-between text-[12px] text-muted-foreground mt-1 pt-1 border-t border-border">
               <span>Total spend <span className="text-foreground font-medium">{money(totalBidDollars(list))}</span></span>
               <span>{fmtNum(totalCompletes(list))} completes · {fmtNum(totalPeople(list))} people · blended {rate(blendedBid(list))}/bid</span>
             </div>

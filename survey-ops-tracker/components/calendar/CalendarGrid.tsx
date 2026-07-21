@@ -54,7 +54,7 @@ function EventChip({
         if (clickable) onNavigate(event)
       }}
       title={`${meta.short} · ${event.title}${clickable ? '' : ' (no linked project)'}`}
-      className={`w-full flex items-center gap-1 rounded px-1.5 py-0.5 text-left text-[11px] leading-tight truncate transition-colors ${meta.chip} ${ring} ${
+      className={`w-full flex items-center gap-1 rounded px-1.5 py-0.5 text-left text-[12px] leading-tight truncate transition-colors ${meta.chip} ${ring} ${
         clickable ? 'hover:brightness-95 cursor-pointer' : 'cursor-default'
       }`}
     >
@@ -180,7 +180,7 @@ export function CalendarGrid({ byDate, viewMonth, onMonthChange }: CalendarGridP
       </div>
 
       {/* Weekday header */}
-      <div className="grid grid-cols-7 gap-px text-[11px] uppercase tracking-wider text-muted-foreground">
+      <div className="grid grid-cols-7 gap-px text-[12px] uppercase tracking-wider text-muted-foreground">
         {WEEKDAYS.map(w => (
           <div key={w} className="px-2 py-1 text-center">
             {w}
@@ -229,7 +229,7 @@ export function CalendarGrid({ byDate, viewMonth, onMonthChange }: CalendarGridP
                       ev.stopPropagation()
                       setPopoverDay(day)
                     }}
-                    className="text-[11px] text-muted-foreground hover:text-foreground text-left px-1.5"
+                    className="text-[12px] text-muted-foreground hover:text-foreground text-left px-1.5"
                   >
                     ＋{overflow} more
                   </button>

@@ -159,7 +159,7 @@ export function NewProjectModal({ teamMembers, initialClient, onClose }: NewProj
               {Object.entries(extras).map(([k, v]) => (
                 <span
                   key={k}
-                  className="text-[11px] bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 px-2 py-0.5 rounded-full"
+                  className="text-[12px] bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 px-2 py-0.5 rounded-full"
                 >
                   {FIELD_LABELS[k] ?? k}: {formatFieldValue(k, v)}
                 </span>

@@ -138,13 +138,13 @@ export function AiUsagePanel() {
           {/* Usage detail — who is spending + on what, over a chosen range */}
           <div className="border-t border-border/50 pt-3">
             <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
-              <span className="text-[11px] text-muted-foreground uppercase tracking-wide">Breakdown</span>
+              <span className="text-[12px] text-muted-foreground uppercase tracking-wide">Breakdown</span>
               <div className="flex bg-muted border border-border rounded-lg p-0.5 gap-0.5">
                 {USAGE_RANGES.map(r => (
                   <button
                     key={r.key}
                     onClick={() => setRange(r.key)}
-                    className={`text-[11px] px-2 py-0.5 rounded transition-colors ${
+                    className={`text-[12px] px-2 py-0.5 rounded transition-colors ${
                       range === r.key ? 'bg-background text-foreground' : 'text-muted-foreground hover:text-foreground'
                     }`}
                   >
@@ -160,7 +160,7 @@ export function AiUsagePanel() {
               <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
                   <div>
-                    <p className="text-[11px] text-muted-foreground mb-1">By person</p>
+                    <p className="text-[12px] text-muted-foreground mb-1">By person</p>
                     {breakdown.byUser.map(u => (
                       <div key={u.user} className="flex items-center justify-between py-0.5 text-xs gap-2">
                         <span className="text-muted-foreground truncate" title={u.user}>{shortUser(u.user)}</span>
@@ -171,7 +171,7 @@ export function AiUsagePanel() {
                     ))}
                   </div>
                   <div>
-                    <p className="text-[11px] text-muted-foreground mb-1">By feature</p>
+                    <p className="text-[12px] text-muted-foreground mb-1">By feature</p>
                     {breakdown.byEndpoint.map(e => (
                       <div key={e.endpoint} className="flex items-center justify-between py-0.5 text-xs gap-2">
                         <span className="text-muted-foreground truncate">{ENDPOINT_LABELS[e.endpoint] ?? e.endpoint}</span>
@@ -182,7 +182,7 @@ export function AiUsagePanel() {
                     ))}
                   </div>
                 </div>
-                <p className="text-[11px] text-muted-foreground/70 mt-2">
+                <p className="text-[12px] text-muted-foreground/70 mt-2">
                   {formatUsd(breakdown.total)} · {breakdown.count} call{breakdown.count === 1 ? '' : 's'} in this period
                 </p>
               </>

@@ -26,7 +26,7 @@ function DeliveredActualBadge({ project }: { project: SurveyProject }) {
   if (!project.delivered_at || project.n_actual == null) return null
   return (
     <span
-      className="absolute top-2 right-2 inline-flex items-center gap-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 text-[10px] font-medium px-1.5 py-0.5"
+      className="absolute top-2 right-2 inline-flex items-center gap-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 text-[11px] font-medium px-1.5 py-0.5"
       title="Final N Actual (project delivered)"
     >
       ✓ Actual {fmtNum(project.n_actual)}
@@ -99,7 +99,7 @@ export function SegmentedNTile({
             onClick={() => {
               if (window.confirm('Merge the segments back into a single N? The breakdown is removed; the total stays.')) unsplit.mutate()
             }}
-            className="text-[11px] text-muted-foreground/60 hover:text-foreground transition-colors"
+            className="text-[12px] text-muted-foreground/60 hover:text-foreground transition-colors"
             title="Merge segments back into one N"
           >
             merge
@@ -121,13 +121,13 @@ export function SegmentedNTile({
               {/* No cap — a project can be split into as many segments as needed. */}
               <button
                 onClick={() => addSeg.mutate(segments.length)}
-                className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline"
+                className="text-[12px] text-blue-600 dark:text-blue-400 hover:underline"
               >
                 + Add segment
               </button>
               <button
                 onClick={() => setExpanded(false)}
-                className="text-[11px] text-muted-foreground hover:text-foreground ml-auto"
+                className="text-[12px] text-muted-foreground hover:text-foreground ml-auto"
               >
                 ▾ collapse
               </button>
@@ -139,10 +139,10 @@ export function SegmentedNTile({
             className="flex items-baseline gap-1.5 text-left group min-w-0"
             title="Show and edit the segment breakdown"
           >
-            <span className="text-[11px] text-blue-600 dark:text-blue-400 group-hover:underline shrink-0">
+            <span className="text-[12px] text-blue-600 dark:text-blue-400 group-hover:underline shrink-0">
               ▸ {segments.length} segment{segments.length === 1 ? '' : 's'}
             </span>
-            {segPreview && <span className="text-[11px] text-muted-foreground truncate">— {segPreview}</span>}
+            {segPreview && <span className="text-[12px] text-muted-foreground truncate">— {segPreview}</span>}
           </button>
         )}
       </div>
@@ -195,7 +195,7 @@ export function SegmentedNTile({
       </div>
       <button
         onClick={() => split.mutate({ n_target: project.n_target, n_collected: project.n_collected, n_actual: project.n_actual ?? null })}
-        className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline mt-1 self-start"
+        className="text-[12px] text-blue-600 dark:text-blue-400 hover:underline mt-1 self-start"
         title="Track separate collections (e.g. Buyers / Sellers) under this project — add as many segments as you need"
       >
         ＋ Split into segments

@@ -90,7 +90,7 @@ export function TopNav() {
   }
 
   return (
-    <nav className="border-b border-border px-6 py-1.5 flex items-center gap-2 flex-wrap">
+    <nav className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b border-border px-6 py-1.5 flex items-center gap-2 flex-wrap">
       <Link
         href="/"
         title="Board — the kanban home"
@@ -107,7 +107,7 @@ export function TopNav() {
             <span aria-hidden="true">{t.icon}</span> {t.label}
             {!!t.badge && t.badge > 0 && (
               <span
-                className={`ml-0.5 text-[11px] font-medium px-1.5 py-0.5 rounded-full ${
+                className={`ml-0.5 text-[12px] font-medium px-1.5 py-0.5 rounded-full ${
                   t.href === '/reruns'
                     ? 'bg-red-500/15 text-red-600 dark:text-red-400'
                     : 'bg-primary/15 text-primary'
@@ -155,7 +155,7 @@ export function TopNav() {
       <div className="ml-auto flex items-center gap-3">
         <span
           title="Ctrl+K opens the ✦ Assistant · Ctrl+Shift+K opens the command palette (jump to any project)"
-          className="hidden md:inline-flex text-[11px] border border-border rounded px-1.5 py-0.5 text-muted-foreground"
+          className="hidden md:inline-flex text-[12px] border border-border rounded px-1.5 py-0.5 text-muted-foreground"
         >
           ✦ Ctrl+K
         </span>
