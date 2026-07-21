@@ -1353,7 +1353,7 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'create_project',
     description:
-      'Create a new survey project (preview first; confirm to apply). Warns about possible duplicate projects before creating.',
+      "Create a new survey project (preview first; confirm to apply). Set ALL provided fields in THIS one call — it accepts the dates (launch/due/deliver/submitted), N target + internal target, audience + audience size, budget, row-level flag, the Y/N flags, and latest-next-steps directly, so no follow-up update is needed. budget is the TOTAL planned $ — if the user gives a per-N rate (e.g. \"$37.5/N\"), multiply by the N being collected (usually the internal target) and note the assumption. Warns about possible duplicate projects before creating.",
     kind: 'write',
     schema: {
       project_name: z.string(),
@@ -1363,6 +1363,19 @@ export const TOOLS: AssistantTool[] = [
       salesperson: z.string().optional(),
       due_date: z.string().optional(),
       n_target: z.number().int().positive().optional(),
+      n_internal_target: z.number().int().optional(),
+      audience_size: z.number().int().optional(),
+      audience: z.string().optional(),
+      budget: z.number().optional(),
+      launch_date: z.string().optional(),
+      deliver_date: z.string().optional(),
+      submitted_date: z.string().optional(),
+      row_level_data: z.boolean().optional(),
+      longitudinal: z.boolean().optional(),
+      voter_survey_qa: z.boolean().optional(),
+      citation_language_needed: z.boolean().optional(),
+      terminations: z.boolean().optional(),
+      latest_next_steps: z.string().optional(),
       skip_scoping: z.boolean().optional(),
       confirm: z.boolean().optional(),
       proceed_despite_duplicate: z.boolean().optional(),
@@ -1371,6 +1384,10 @@ export const TOOLS: AssistantTool[] = [
       const args = rawArgs as {
         project_name: string; client: string; project_type?: 'PS' | 'B2B' | 'Rerun'
         captain?: string; salesperson?: string; due_date?: string; n_target?: number
+        n_internal_target?: number; audience_size?: number; audience?: string; budget?: number
+        launch_date?: string; deliver_date?: string; submitted_date?: string
+        row_level_data?: boolean; longitudinal?: boolean; voter_survey_qa?: boolean
+        citation_language_needed?: boolean; terminations?: boolean; latest_next_steps?: string
         skip_scoping?: boolean; confirm?: boolean; proceed_despite_duplicate?: boolean
       }
       const { userEmail } = ctx
@@ -1380,6 +1397,9 @@ export const TOOLS: AssistantTool[] = [
       if (!projectName || !clientText) return { error: 'project_name and client are both required.' }
       if (args.due_date && !DUE_DATE_RE.test(args.due_date)) {
         return { error: 'due_date must be in YYYY-MM-DD format.' }
+      }
+      for (const [name, v] of [['launch_date', args.launch_date], ['deliver_date', args.deliver_date], ['submitted_date', args.submitted_date]] as const) {
+        if (v && !DUE_DATE_RE.test(v)) return { error: `${name} must be in YYYY-MM-DD format.` }
       }
 
       // Canonicalize the client to an EXISTING one when it matches, so e.g. "A4A"
@@ -1452,23 +1472,45 @@ export const TOOLS: AssistantTool[] = [
       if (args.skip_scoping) {
         patch.phase = 'Active'
         patch.board_column = 'Submitted'
-        patch.submitted_date = todayEastern()
       }
+      // Submitted date: use the given one, else stamp today only when skipping scoping.
+      if (args.submitted_date) patch.submitted_date = args.submitted_date
+      else if (args.skip_scoping) patch.submitted_date = todayEastern()
+
+      // The rest of the intake — mcp_create_project doesn't insert these columns,
+      // so apply them as ONE follow-up write right after create. This lets a single
+      // create_project call land the whole intake (no separate update needed).
+      const extras: Record<string, unknown> = {}
+      if (args.n_internal_target != null) extras.n_internal_target = args.n_internal_target
+      if (args.audience_size != null) extras.audience_size = args.audience_size
+      if (args.audience != null) extras.audience = args.audience
+      if (args.budget != null) extras.budget = args.budget
+      if (args.launch_date) extras.launch_date = args.launch_date
+      if (args.deliver_date) extras.deliver_date = args.deliver_date
+      if (args.row_level_data != null) extras.row_level_data = args.row_level_data
+      if (args.longitudinal != null) extras.longitudinal = args.longitudinal
+      if (args.voter_survey_qa != null) extras.voter_survey_qa = args.voter_survey_qa
+      if (args.citation_language_needed != null) extras.citation_language_needed = args.citation_language_needed
+      if (args.terminations != null) extras.terminations = args.terminations
+      if (args.latest_next_steps) extras.latest_next_steps = args.latest_next_steps
 
       return confirmable(
         args,
         async () => ({
           summary: `Create "${projectName}" for ${normalizeClientText(effectiveClient)}${args.skip_scoping ? ' (skip scoping — Active/Submitted)' : ''}`,
-          fields: patch,
+          fields: { ...patch, ...extras },
           duplicate_warning: dupRows && dupRows.length > 0
             ? `${dupRows.length} similar project(s) already exist for this client/name — proceeding anyway.`
             : null,
         }),
         async () => {
           const row = await runCreateProject(patch, `${userEmail} via Claude`)
+          if (Object.keys(extras).length > 0) {
+            await runProjectWrite(supabase, { id: row.id as string, patch: extras, actor: `${userEmail} via Claude` })
+          }
           meta.project_id = row.id
           if (row.client_id) meta.client_id = row.client_id
-          meta.detail = { created: { project_code: row.project_code, project_name: row.project_name, client: row.client } }
+          meta.detail = { created: { project_code: row.project_code, project_name: row.project_name, client: row.client }, extras }
           return {
             ok: true, project_code: row.project_code, id: row.id,
             client: row.client, client_id: row.client_id, phase: row.phase, board_column: row.board_column,
