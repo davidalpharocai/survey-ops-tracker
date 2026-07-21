@@ -517,6 +517,44 @@ export const TOOLS: AssistantTool[] = [
           error: `These fields can't be set here: ${rejected.join(', ')}. Use the dedicated tools for status, stage, compliance override, requested-by, or linked documents.`,
         }
       }
+
+      // Resolve captain_id / co_captain_ids from a name or initials (not just a
+      // raw UUID) — like create_project does for the primary captain — so "set
+      // captain to Bryan" / "add co-captain Julia" work. Unmatched → ask.
+      if ('captain_id' in patch || 'co_captain_ids' in patch) {
+        const supabase = createAdminClient()
+        const { data: members } = await supabase.from('team_members').select('id, name, initials')
+        const mm = members ?? []
+        const validList = () => mm.map((m) => ({ name: m.name, initials: m.initials }))
+        const resolveRef = (ref: unknown): string | null | undefined => {
+          if (ref == null || String(ref).trim() === '') return null // clear
+          const s = String(ref).trim()
+          if (mm.some((m) => m.id === s)) return s // already a valid id
+          const low = s.toLowerCase()
+          const hit =
+            mm.find((m) => m.initials.toLowerCase() === low) ??
+            mm.find((m) => m.name.toLowerCase() === low) ??
+            mm.find((m) => m.name.toLowerCase().includes(low))
+          return hit ? hit.id : undefined // undefined = unmatched
+        }
+        if ('captain_id' in patch) {
+          const r = resolveRef(patch.captain_id)
+          if (r === undefined)
+            return { needs: 'captain', message: `Couldn't match "${String(patch.captain_id)}" to a team member.`, valid_captains: validList() }
+          patch.captain_id = r
+        }
+        if ('co_captain_ids' in patch) {
+          const refs = Array.isArray(patch.co_captain_ids) ? patch.co_captain_ids : []
+          const out: string[] = []
+          for (const ref of refs) {
+            const r = resolveRef(ref)
+            if (r === undefined)
+              return { needs: 'co_captains', message: `Couldn't match "${String(ref)}" to a team member.`, valid_captains: validList() }
+            if (r) out.push(r)
+          }
+          patch.co_captain_ids = out
+        }
+      }
       if (
         ('n_target' in patch || 'n_collected' in patch || 'n_actual' in patch) &&
         ((p.segment_count as number | null) ?? 0) > 0
@@ -1005,7 +1043,7 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'update_client',
     description:
-      "Update a client's compliance settings (preview first; confirm to apply). Use rename_client to change the name.",
+      "Update a client's compliance settings, or assign/fix its Cl##### code on a code-less client (preview first; confirm to apply). Use rename_client to change the name.",
     kind: 'write',
     schema: { client: z.string(), fields: z.record(z.unknown()), confirm: z.boolean().optional() },
     handler: async (rawArgs, _ctx, meta) => {
@@ -1028,6 +1066,17 @@ export const TOOLS: AssistantTool[] = [
       }
       if (rejected.length) {
         return { error: `These fields can't be set here: ${rejected.join(', ')}.` }
+      }
+
+      // Validate + normalize a manually-assigned client code (must look like
+      // Cl00042 and not already be taken by another client).
+      if ('code' in patch) {
+        const code = String(patch.code ?? '').trim().toUpperCase().replace(/^CL/, 'Cl')
+        if (!/^Cl\d+$/.test(code)) return { error: 'Client code must look like "Cl00042".' }
+        const admin = createAdminClient()
+        const { data: dup } = await admin.from('clients').select('id, name').ilike('code', code).neq('id', c.id as string).maybeSingle()
+        if (dup) return { error: `Code ${code} is already used by ${dup.name}.` }
+        patch.code = code
       }
 
       const changed = diffSummary(c, patch)
@@ -1333,6 +1382,19 @@ export const TOOLS: AssistantTool[] = [
         return { error: 'due_date must be in YYYY-MM-DD format.' }
       }
 
+      // Canonicalize the client to an EXISTING one when it matches, so e.g. "A4A"
+      // links to "Airlines 4 America (A4A)" instead of spawning a duplicate thin
+      // client (the client-link trigger exact-matches the firm name). Ambiguous or
+      // no match → keep what was given (a genuinely new client is fine).
+      let effectiveClient = clientText
+      {
+        const resolvedClient = await data.resolveClient(firmNameFrom(clientText))
+        if (resolvedClient && !('ambiguous' in resolvedClient)) {
+          const suffix = clientText.includes(' - ') ? clientText.slice(clientText.indexOf(' - ')) : ''
+          effectiveClient = String((resolvedClient as { name: string }).name) + suffix
+        }
+      }
+
       const supabase = createAdminClient()
 
       // Captain is REQUIRED for connector-created projects. Resolve the name/
@@ -1361,7 +1423,7 @@ export const TOOLS: AssistantTool[] = [
       }
 
       // Duplicate check: same client firm, or a similarly-named project already on file.
-      const firm = firmNameFrom(clientText)
+      const firm = firmNameFrom(effectiveClient)
       const sFirm = data.sanitizeQuery(firm)
       const sName = data.sanitizeQuery(projectName)
       const { data: dupRows, error: dupErr } = await supabase.from('survey_projects')
@@ -1380,7 +1442,7 @@ export const TOOLS: AssistantTool[] = [
 
       const patch: Record<string, unknown> = {
         project_name: projectName,
-        client: normalizeClientText(clientText),
+        client: normalizeClientText(effectiveClient),
       }
       if (args.project_type) patch.project_type = args.project_type
       if (captainId) patch.captain_id = captainId
@@ -1396,7 +1458,7 @@ export const TOOLS: AssistantTool[] = [
       return confirmable(
         args,
         async () => ({
-          summary: `Create "${projectName}" for ${normalizeClientText(clientText)}${args.skip_scoping ? ' (skip scoping — Active/Submitted)' : ''}`,
+          summary: `Create "${projectName}" for ${normalizeClientText(effectiveClient)}${args.skip_scoping ? ' (skip scoping — Active/Submitted)' : ''}`,
           fields: patch,
           duplicate_warning: dupRows && dupRows.length > 0
             ? `${dupRows.length} similar project(s) already exist for this client/name — proceeding anyway.`

@@ -60,7 +60,7 @@ export async function fetchDocTitle(url: string): Promise<string | null> {
 export const DUE_DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 
 export const CLIENT_WRITE_FIELDS = [
-  'compliance_before_fielding', 'compliance_after_fielding', 'compliance_contact', 'compliance_notes',
+  'compliance_before_fielding', 'compliance_after_fielding', 'compliance_contact', 'compliance_notes', 'code',
 ] as const
 
 export const CONTACT_WRITE_FIELDS = ['first_name', 'last_name', 'email', 'title', 'phone'] as const
