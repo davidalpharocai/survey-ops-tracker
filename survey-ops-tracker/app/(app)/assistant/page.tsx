@@ -16,7 +16,7 @@ const SUGGESTIONS = [
 export default function AssistantPage() {
   const [input, setInput] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
   const { messages, busy, send, confirm, cancel } = useAssistantChat()
 
   useEffect(() => {
@@ -30,6 +30,7 @@ export default function AssistantPage() {
   function submit(text: string) {
     if (!text.trim() || busy) return
     setInput('')
+    if (inputRef.current) inputRef.current.style.height = 'auto' // collapse back to one line
     void send(text)
   }
 
@@ -66,16 +67,26 @@ export default function AssistantPage() {
         <AssistantThread messages={messages} busy={busy} onConfirm={confirm} onCancel={cancel} />
       </div>
 
-      <div className="mt-3 flex gap-2">
-        <input
+      <div className="mt-3 flex gap-2 items-end">
+        <textarea
           ref={inputRef}
           value={input}
-          onChange={e => setInput(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && submit(input)}
-          placeholder={busy ? 'Thinking…' : 'Ask or tell me to change something…'}
+          rows={1}
+          onChange={e => {
+            setInput(e.target.value)
+            e.target.style.height = 'auto'
+            e.target.style.height = Math.min(e.target.scrollHeight, 200) + 'px'
+          }}
+          onKeyDown={e => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault()
+              submit(input)
+            }
+          }}
+          placeholder={busy ? 'Thinking…' : 'Ask or tell me to change something… (Shift+Enter = new line)'}
           disabled={busy}
           aria-label="Message the assistant"
-          className="flex-1 bg-muted border border-border rounded-lg px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring disabled:opacity-60"
+          className="flex-1 resize-none overflow-y-auto max-h-52 bg-muted border border-border rounded-lg px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring disabled:opacity-60"
         />
         <button
           onClick={() => submit(input)}
