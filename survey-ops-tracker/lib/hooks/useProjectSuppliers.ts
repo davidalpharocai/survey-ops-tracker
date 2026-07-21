@@ -34,7 +34,7 @@ export function useAddProjectSupplier(projectId: string) {
   const supabase = createClient()
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (row: { supplier_id: string; cpi: number; completes_cap: number; created_by: string }) => {
+    mutationFn: async (row: { supplier_id: string; launch_id: string; cpi: number; completes_cap: number; created_by: string }) => {
       const { error } = await supabase.from('project_suppliers').insert({ ...row, project_id: projectId })
       if (error) throw error
     },

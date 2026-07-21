@@ -802,11 +802,42 @@ export type Database = {
         Update: { id?: string; name?: string; active?: boolean; created_by?: string | null; created_at?: string }
         Relationships: []
       }
+      project_launches: {
+        Row: {
+          id: string
+          project_id: string
+          label: string | null
+          launch_date: string | null
+          target: number | null
+          created_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          project_id: string
+          label?: string | null
+          launch_date?: string | null
+          target?: number | null
+          created_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          project_id?: string
+          label?: string | null
+          launch_date?: string | null
+          target?: number | null
+          created_by?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
       project_suppliers: {
         Row: {
           id: string
           project_id: string
           supplier_id: string
+          launch_id: string | null
           cpi: number
           completes_cap: number
           n_collected: number
@@ -817,6 +848,7 @@ export type Database = {
           id?: string
           project_id: string
           supplier_id: string
+          launch_id?: string | null
           cpi?: number
           completes_cap?: number
           n_collected?: number
@@ -827,6 +859,7 @@ export type Database = {
           id?: string
           project_id?: string
           supplier_id?: string
+          launch_id?: string | null
           cpi?: number
           completes_cap?: number
           n_collected?: number

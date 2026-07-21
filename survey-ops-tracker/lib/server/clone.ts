@@ -76,23 +76,50 @@ export async function cloneProject(opts: {
     await runProjectWrite(admin, { id: created.id, patch, actor: opts.actor })
   }
 
-  // 3) Copy PS suppliers (CPIs + caps), resetting N collected.
+  // 3) Copy the PS launch structure: recreate each launch (label + target; launch_date
+  //    resets — it's a fresh plan) then copy its supplier rows (CPIs + caps), N collected
+  //    reset to 0.
   if (on(c.suppliers)) {
-    const { data: sup } = await admin
-      .from('project_suppliers')
-      .select('supplier_id, cpi, completes_cap')
+    const { data: srcLaunches } = await admin
+      .from('project_launches')
+      .select('id, label, target, created_at')
       .eq('project_id', opts.sourceId)
-    if (sup && sup.length > 0) {
-      await admin.from('project_suppliers').insert(
-        sup.map((s) => ({
-          project_id: created.id,
-          supplier_id: s.supplier_id,
-          cpi: s.cpi,
-          completes_cap: s.completes_cap,
-          n_collected: 0,
-          created_by: opts.actor.split(/[@ ]/)[0],
-        }))
-      )
+      .order('created_at', { ascending: true })
+    if (srcLaunches && srcLaunches.length > 0) {
+      const { data: srcSuppliers } = await admin
+        .from('project_suppliers')
+        .select('launch_id, supplier_id, cpi, completes_cap')
+        .eq('project_id', opts.sourceId)
+      const byLaunch = new Map<string, { supplier_id: string; cpi: number; completes_cap: number }[]>()
+      for (const s of srcSuppliers ?? []) {
+        if (!s.launch_id) continue
+        const arr = byLaunch.get(s.launch_id) ?? []
+        arr.push({ supplier_id: s.supplier_id, cpi: s.cpi, completes_cap: s.completes_cap })
+        byLaunch.set(s.launch_id, arr)
+      }
+      const creator = opts.actor.split(/[@ ]/)[0]
+      for (const l of srcLaunches) {
+        const { data: newLaunch } = await admin
+          .from('project_launches')
+          .insert({ project_id: created.id, label: l.label, target: l.target, created_by: creator })
+          .select('id')
+          .single()
+        if (!newLaunch) continue
+        const supRows = byLaunch.get(l.id) ?? []
+        if (supRows.length > 0) {
+          await admin.from('project_suppliers').insert(
+            supRows.map((s) => ({
+              project_id: created.id,
+              launch_id: newLaunch.id,
+              supplier_id: s.supplier_id,
+              cpi: s.cpi,
+              completes_cap: s.completes_cap,
+              n_collected: 0,
+              created_by: creator,
+            }))
+          )
+        }
+      }
     }
   }
 

@@ -39,3 +39,56 @@ export function estimateRange(target: number | null, rows: SupplierLine[]): { lo
 export function totalCappedCompletes(rows: SupplierLine[]): number {
   return rows.reduce((s, r) => s + (r.completes_cap || 0), 0)
 }
+
+// ---- Launch-level ----
+// A PS project has 1..N launches (fielding waves). Each launch is a target + its own
+// supplier lines. Actual cost is just Σ over all lines (launches don't change it); the
+// ESTIMATE is per-launch (target × min..max CPI) and the project estimate is their sum.
+
+export interface LaunchLite {
+  target?: number | null
+  lines: SupplierLine[]
+}
+
+/** One launch's estimate range = its target × [cheapest CPI … priciest CPI in the launch]. */
+export function launchRange(launch: LaunchLite): { low: number; high: number } | null {
+  return estimateRange(launch.target ?? null, launch.lines)
+}
+
+/** Project estimate range = the SUM of each launch's range. Launches with no target or
+ *  no priced suppliers contribute nothing; null if none contribute. */
+export function projectEstimateRange(launches: LaunchLite[]): { low: number; high: number } | null {
+  let low = 0
+  let high = 0
+  let any = false
+  for (const l of launches) {
+    const r = launchRange(l)
+    if (r) {
+      low += r.low
+      high += r.high
+      any = true
+    }
+  }
+  return any ? { low, high } : null
+}
+
+/** Project actual cost = Σ(CPI × N collected) across every launch's lines. */
+export function projectActualCost(launches: LaunchLite[]): number {
+  return launches.reduce((s, l) => s + actualCost(l.lines), 0)
+}
+
+/** Σ N collected across all launches. */
+export function projectCollected(launches: LaunchLite[]): number {
+  return launches.reduce((s, l) => s + totalCollected(l.lines), 0)
+}
+
+/** Σ of the launch targets — the project's planned completes across all launches. */
+export function projectTarget(launches: LaunchLite[]): number {
+  return launches.reduce((s, l) => s + (l.target || 0), 0)
+}
+
+/** Blended actual CPI across launches = project actual ÷ project collected; null if none collected. */
+export function projectBlendedCpi(launches: LaunchLite[]): number | null {
+  const c = projectCollected(launches)
+  return c > 0 ? projectActualCost(launches) / c : null
+}

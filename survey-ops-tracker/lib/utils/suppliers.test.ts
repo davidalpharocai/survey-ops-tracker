@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest'
-import { actualCost, totalCollected, blendedActualCpi, estimateRange, totalCappedCompletes } from './suppliers'
+import {
+  actualCost, totalCollected, blendedActualCpi, estimateRange, totalCappedCompletes,
+  launchRange, projectEstimateRange, projectActualCost, projectCollected, projectTarget, projectBlendedCpi,
+} from './suppliers'
 
 describe('suppliers math', () => {
   const rows = [
@@ -32,5 +35,46 @@ describe('suppliers math', () => {
   })
   it('totalCappedCompletes = Σ cap', () => {
     expect(totalCappedCompletes(rows)).toBe(8000)
+  })
+})
+
+describe('launch-level math', () => {
+  // Launch 1: target 400, suppliers $4.50 & $5.20, 240 & 100 collected.
+  // Launch 2: target 250, one supplier $4.50, 0 collected (pre-fielding).
+  const launch1 = {
+    target: 400,
+    lines: [
+      { cpi: 4.5, completes_cap: 500, n_collected: 240 },
+      { cpi: 5.2, completes_cap: 300, n_collected: 100 },
+    ],
+  }
+  const launch2 = {
+    target: 250,
+    lines: [{ cpi: 4.5, completes_cap: 300, n_collected: 0 }],
+  }
+  const launches = [launch1, launch2]
+
+  it('launchRange = target × [min, max CPI]', () => {
+    expect(launchRange(launch1)).toEqual({ low: 400 * 4.5, high: 400 * 5.2 }) // 1800..2080
+    expect(launchRange(launch2)).toEqual({ low: 1125, high: 1125 }) // single CPI
+  })
+  it('projectEstimateRange = sum of each launch range', () => {
+    expect(projectEstimateRange(launches)).toEqual({ low: 1800 + 1125, high: 2080 + 1125 }) // 2925..3205
+  })
+  it('projectEstimateRange is null when nothing is priced/targeted', () => {
+    expect(projectEstimateRange([])).toBeNull()
+    expect(projectEstimateRange([{ target: null, lines: [] }])).toBeNull()
+    expect(projectEstimateRange([{ target: 100, lines: [{ cpi: 0, completes_cap: 10, n_collected: 0 }] }])).toBeNull()
+  })
+  it('projectActualCost = Σ(CPI × N collected) across launches', () => {
+    expect(projectActualCost(launches)).toBeCloseTo(4.5 * 240 + 5.2 * 100) // 1080 + 520 = 1600
+  })
+  it('projectCollected + projectTarget sum across launches', () => {
+    expect(projectCollected(launches)).toBe(340)
+    expect(projectTarget(launches)).toBe(650)
+  })
+  it('projectBlendedCpi = project actual ÷ project collected', () => {
+    expect(projectBlendedCpi(launches)).toBeCloseTo(1600 / 340)
+    expect(projectBlendedCpi([launch2])).toBeNull() // nothing collected
   })
 })
