@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
@@ -164,35 +164,38 @@ export function BlastConfigWidget({ projectId }: { projectId: string }) {
           </button>
         </div>
 
-        {/* Blast list */}
+        {/* Blast list — header + all rows share ONE grid so columns line up.
+            Each row is a Fragment (display: contents) contributing 6 grid cells. */}
         {list.length > 0 && (
-          <div className="flex flex-col gap-0.5">
-            <div className="grid grid-cols-[auto_1fr_auto_auto_auto_auto] gap-x-2 text-[11px] text-muted-foreground items-center">
-              <span>when</span>
-              <span># people · description</span>
-              <span className="text-right flex items-center gap-1 justify-end">
+          <div className="flex flex-col gap-1">
+            <div className="grid grid-cols-[auto_1fr_auto_auto_auto_auto] gap-x-3 gap-y-1 items-center">
+              {/* Header */}
+              <span className="text-[11px] text-muted-foreground">when</span>
+              <span className="text-[11px] text-muted-foreground"># people · description</span>
+              <span className="text-[11px] text-muted-foreground text-right flex items-center gap-1 justify-end whitespace-nowrap">
                 completes
                 <InfoTooltip text="Number who completed the survey. Editable — click to update as completes come in. Cost = $/bid × completes." />
               </span>
-              <span className="text-right">$/bid</span>
-              <span className="text-right">cost</span>
+              <span className="text-[11px] text-muted-foreground text-right">$/bid</span>
+              <span className="text-[11px] text-muted-foreground text-right">cost</span>
               <span></span>
+              {/* Rows */}
+              {list.map((b: Blast) => (
+                <Fragment key={b.id}>
+                  <span className="text-muted-foreground whitespace-nowrap">{fmtWhen(b.blast_at)}</span>
+                  <span className="truncate min-w-0 text-foreground">
+                    {fmtNum(b.people ?? 0)}
+                    {b.note ? ` · ${b.note}` : ''}
+                  </span>
+                  <span className="text-right">
+                    <CompletesCell blast={b} onSave={(c) => upd.mutate({ id: b.id, updates: { completes: c } })} />
+                  </span>
+                  <span className="text-right text-foreground tabular-nums">{rate(b.bid)}</span>
+                  <span className="text-right font-medium text-foreground tabular-nums">{money(blastTotal(b))}</span>
+                  <button onClick={() => del.mutate(b.id)} title="Delete" className="justify-self-end text-muted-foreground/50 hover:text-red-600 dark:hover:text-red-400 px-0.5">✕</button>
+                </Fragment>
+              ))}
             </div>
-            {list.map((b: Blast) => (
-              <div key={b.id} className="grid grid-cols-[auto_1fr_auto_auto_auto_auto] gap-x-2 items-center group text-foreground">
-                <span className="text-muted-foreground whitespace-nowrap">{fmtWhen(b.blast_at)}</span>
-                <span className="truncate">
-                  {fmtNum(b.people ?? 0)}
-                  {b.note ? ` · ${b.note}` : ''}
-                </span>
-                <span className="text-right">
-                  <CompletesCell blast={b} onSave={(c) => upd.mutate({ id: b.id, updates: { completes: c } })} />
-                </span>
-                <span className="text-right">{rate(b.bid)}</span>
-                <span className="text-right font-medium">{money(blastTotal(b))}</span>
-                <button onClick={() => del.mutate(b.id)} title="Delete" className="text-muted-foreground/50 hover:text-red-600 dark:hover:text-red-400 px-0.5">✕</button>
-              </div>
-            ))}
             <div className="flex justify-between text-[11px] text-muted-foreground mt-1 pt-1 border-t border-border">
               <span>Total spend <span className="text-foreground font-medium">{money(totalBidDollars(list))}</span></span>
               <span>{fmtNum(totalCompletes(list))} completes · {fmtNum(totalPeople(list))} people · blended {rate(blendedBid(list))}/bid</span>
