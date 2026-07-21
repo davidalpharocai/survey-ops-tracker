@@ -26,6 +26,7 @@ import { differenceInCalendarDays, parseISO, startOfDay } from 'date-fns'
 import { deriveWaitingOn } from '@/lib/utils/waitingOn'
 import { BudgetWidget } from '@/components/project/BudgetWidget'
 import { SuppliersWidget } from '@/components/project/SuppliersWidget'
+import { ProjectInsights } from '@/components/project/ProjectInsights'
 import { BlastConfigWidget } from '@/components/project/BlastConfigWidget'
 import { CompliancePanel } from '@/components/compliance/CompliancePanel'
 import { ComplianceBanner } from '@/components/project/ComplianceBanner'
@@ -79,7 +80,7 @@ export default function ProjectDetailPage() {
   const deleteProject = useDeleteProject()
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [cloning, setCloning] = useState(false)
-  const [activeTab, setActiveTab] = useState<'overview' | 'activity' | 'deliverables' | 'links' | 'logs'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'insights' | 'activity' | 'deliverables' | 'links' | 'logs'>('overview')
   // Where to return on "← Back": the board or list, whichever the user came from
   const [backTo, setBackTo] = useState<{ href: string; label: string }>({ href: '/', label: 'Board' })
   useEffect(() => {
@@ -343,6 +344,17 @@ export default function ProjectDetailPage() {
           Overview
         </button>
         <button
+          onClick={() => setActiveTab('insights')}
+          title="Performance stats — completion/fill rates, cost per complete, pace, supplier mix"
+          className={`text-sm px-3 py-1.5 rounded font-medium transition-colors ${
+            activeTab === 'insights'
+              ? 'bg-background text-foreground'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          Insights
+        </button>
+        <button
           onClick={() => setActiveTab('activity')}
           title="Logged emails and events for this project"
           className={`text-sm px-3 py-1.5 rounded font-medium transition-colors ${
@@ -422,6 +434,8 @@ export default function ProjectDetailPage() {
         )}
       </div>
       </div>
+
+      {activeTab === 'insights' && <ProjectInsights project={project} />}
 
       {activeTab === 'activity' && (
         <div className="max-w-3xl">
