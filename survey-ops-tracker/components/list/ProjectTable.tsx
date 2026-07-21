@@ -251,8 +251,9 @@ export function ProjectTable({
             </tr>
           )}
           {sorted.map((p, i) => {
-            // Closed/Hold projects drop the due urgency treatment
-            const openDue = p.status === 'Open'
+            // Closed/Hold/Delivered projects drop the due urgency treatment (a
+            // delivered project stays status 'Open' until closed, so check the column too)
+            const openDue = p.status === 'Open' && p.board_column !== 'Delivery'
             const urgency = openDue ? getDueUrgency(p.due_date) : null
             const nMet = p.n_target != null && p.n_collected >= p.n_target
             const complianceStatus = complianceStatuses?.get(p.id)

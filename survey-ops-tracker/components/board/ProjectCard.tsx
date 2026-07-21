@@ -60,12 +60,14 @@ interface ProjectCardProps {
 export function ProjectCard({ project, onClick, isNew }: ProjectCardProps) {
   const onHold = project.status === 'Hold'
   const closed = project.status === 'Closed'
+  // Delivered (in the Delivery column) counts as done for due-date purposes.
+  const delivered = project.board_column === 'Delivery'
   // Hold takes precedence over NEW if both somehow apply
   const showNew = !!isNew && !onHold
   const dueDateStatus = getDueDateStatus(project.due_date)
-  // Closed and Hold projects drop the due-date urgency treatment — they're
-  // done or paused, so red/orange/amber would be misleading.
-  const urgency = onHold || closed ? null : getDueUrgency(project.due_date)
+  // Closed, Hold, and Delivered projects drop the due-date urgency treatment —
+  // they're done or paused, so red/orange/amber (and "overdue") would be misleading.
+  const urgency = onHold || closed || delivered ? null : getDueUrgency(project.due_date)
   const badlyOverdue = urgency === 'overdue' && daysOverdue(project.due_date) > BADLY_OVERDUE_DAYS
   const urgencyBorder = urgency
     ? badlyOverdue
@@ -224,7 +226,7 @@ export function ProjectCard({ project, onClick, isNew }: ProjectCardProps) {
         {project.due_date && (
           <span
             className={`text-xs ${
-              onHold || closed
+              onHold || closed || delivered
                 ? 'text-muted-foreground'
                 : dueDateStatus === 'overdue'
                 ? 'text-red-600 dark:text-red-400'

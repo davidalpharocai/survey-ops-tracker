@@ -26,7 +26,7 @@ export function BoardColumn({ id, title, projects, onCardClick, isNewFor, bodyCl
   // Overdue count so a column's trouble is visible in its header, not only by
   // scanning cards. Mirrors the card: Closed/Hold drop their urgency treatment.
   const overdue = projects.filter(
-    p => p.status !== 'Closed' && p.status !== 'Hold' && getDueUrgency(p.due_date) === 'overdue'
+    p => p.status !== 'Closed' && p.status !== 'Hold' && p.board_column !== 'Delivery' && getDueUrgency(p.due_date) === 'overdue'
   ).length
   return (
     <div

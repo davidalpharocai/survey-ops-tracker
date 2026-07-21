@@ -352,7 +352,7 @@ export default function ProjectDetailPage() {
               : 'text-muted-foreground hover:text-foreground'
           }`}
         >
-          Insights
+          Insights (Beta)
         </button>
         <button
           onClick={() => setActiveTab('activity')}
