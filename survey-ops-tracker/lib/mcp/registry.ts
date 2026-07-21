@@ -1353,7 +1353,7 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'create_project',
     description:
-      "Create a new survey project (preview first; confirm to apply). Set ALL provided fields in THIS one call — it accepts the dates (launch/due/deliver/submitted), N target + internal target, audience + audience size, budget, row-level flag, the Y/N flags, and latest-next-steps directly, so no follow-up update is needed. budget is the TOTAL planned $ — if the user gives a per-N rate (e.g. \"$37.5/N\"), multiply by the N being collected (usually the internal target) and note the assumption. Warns about possible duplicate projects before creating.",
+      "Create a new survey project (preview first; confirm to apply). Set ALL provided fields in THIS one call — it accepts the dates (launch/due/deliver/submitted), N target + internal target, audience + audience size, budget, row-level flag, the Y/N flags, latest-next-steps, and requested_by (the client contact who requested it — pass their name or email; it resolves an existing contact of that client and tags them) directly, so no follow-up update or set_requested_by is needed. budget is the TOTAL planned $ — if the user gives a per-N rate (e.g. \"$37.5/N\"), multiply by the N being collected (usually the internal target) and note the assumption. Warns about possible duplicate projects before creating.",
     kind: 'write',
     schema: {
       project_name: z.string(),
@@ -1361,6 +1361,7 @@ export const TOOLS: AssistantTool[] = [
       project_type: z.enum(['PS', 'B2B', 'Rerun']).optional(),
       captain: z.string().optional(),
       salesperson: z.string().optional(),
+      requested_by: z.string().optional(),
       due_date: z.string().optional(),
       n_target: z.number().int().positive().optional(),
       n_internal_target: z.number().int().optional(),
@@ -1383,7 +1384,7 @@ export const TOOLS: AssistantTool[] = [
     handler: async (rawArgs, ctx, meta) => {
       const args = rawArgs as {
         project_name: string; client: string; project_type?: 'PS' | 'B2B' | 'Rerun'
-        captain?: string; salesperson?: string; due_date?: string; n_target?: number
+        captain?: string; salesperson?: string; requested_by?: string; due_date?: string; n_target?: number
         n_internal_target?: number; audience_size?: number; audience?: string; budget?: number
         launch_date?: string; deliver_date?: string; submitted_date?: string
         row_level_data?: boolean; longitudinal?: boolean; voter_survey_qa?: boolean
@@ -1407,11 +1408,13 @@ export const TOOLS: AssistantTool[] = [
       // client (the client-link trigger exact-matches the firm name). Ambiguous or
       // no match → keep what was given (a genuinely new client is fine).
       let effectiveClient = clientText
+      let effectiveClientId: string | null = null
       {
         const resolvedClient = await data.resolveClient(firmNameFrom(clientText))
         if (resolvedClient && !('ambiguous' in resolvedClient)) {
           const suffix = clientText.includes(' - ') ? clientText.slice(clientText.indexOf(' - ')) : ''
           effectiveClient = String((resolvedClient as { name: string }).name) + suffix
+          effectiveClientId = String((resolvedClient as { id: string }).id)
         }
       }
 
@@ -1494,11 +1497,34 @@ export const TOOLS: AssistantTool[] = [
       if (args.terminations != null) extras.terminations = args.terminations
       if (args.latest_next_steps) extras.latest_next_steps = args.latest_next_steps
 
+      // Requested-by: resolve the named person against the (existing) client's
+      // contacts and tag them right here, so create_project lands requested-by in
+      // one call instead of relying on a follow-up set_requested_by (which the model
+      // kept skipping). New client / no match → note it, don't block the create.
+      let requestedByNote: string | null = null
+      if (args.requested_by) {
+        if (!effectiveClientId) {
+          requestedByNote = `Requested-by "${args.requested_by}" not set — "${normalizeClientText(effectiveClient)}" is a new client with no contacts yet. Add the contact, then set requested-by.`
+        } else {
+          const contact = await resolveContact(effectiveClientId, args.requested_by)
+          if (contact && 'ambiguous' in contact) {
+            return { note: `Multiple contacts match "${args.requested_by}" for this client — say which one and I'll retry.`, candidates: contact.ambiguous }
+          } else if (contact) {
+            const name = `${String(contact.first_name)} ${String(contact.last_name)}`.trim()
+            extras.requested_by_contact_id = contact.id as string
+            extras.requested_by_name = name
+          } else {
+            requestedByNote = `Requested-by "${args.requested_by}" not set — no matching contact on file for ${normalizeClientText(effectiveClient)}. Add them via add_contact, then set requested-by.`
+          }
+        }
+      }
+
       return confirmable(
         args,
         async () => ({
           summary: `Create "${projectName}" for ${normalizeClientText(effectiveClient)}${args.skip_scoping ? ' (skip scoping — Active/Submitted)' : ''}`,
           fields: { ...patch, ...extras },
+          requested_by_note: requestedByNote,
           duplicate_warning: dupRows && dupRows.length > 0
             ? `${dupRows.length} similar project(s) already exist for this client/name — proceeding anyway.`
             : null,
