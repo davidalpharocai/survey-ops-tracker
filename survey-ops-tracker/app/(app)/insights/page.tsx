@@ -163,22 +163,22 @@ export default function InsightsPage() {
         <Link href="/list" title="Open the active projects list" className={`${tile} hover:border-ring transition-colors`}>
           <span className="text-xs text-muted-foreground">Active projects</span>
           <span className="text-2xl font-semibold text-foreground leading-tight">{m.openCount}</span>
-          <span className="text-xs text-muted-foreground">{m.scopingCount} scoping · {m.closedCount} closed</span>
+          <span className="text-xs text-muted-foreground">{m.scopingCount} scoping · {m.closedCount} archived</span>
         </Link>
         <Link href="/list?due=overdue" title="Open the overdue list" className={`${tile} hover:border-ring transition-colors`}>
           <span className="text-xs text-muted-foreground flex items-center">Overdue<InfoTooltip text="Active projects past their internal due date." /></span>
           <span className={`text-2xl font-semibold leading-tight ${m.overdue > 0 ? 'text-red-600 dark:text-red-400' : 'text-foreground'}`}>{m.overdue}</span>
           <span className="text-xs text-muted-foreground">{m.dueThisWeek} due within 7 days →</span>
         </Link>
-        <Link href="/list?view=full&stage=Closed" title="Open the closed projects list" className={`${tile} hover:border-ring transition-colors`}>
-          <span className="text-xs text-muted-foreground flex items-center">On-time delivery<InfoTooltip text="Of closed projects with both a due and deliver date, the share delivered on or before the due date." /></span>
+        <Link href="/list?view=full&stage=Closed" title="Open the archived projects list" className={`${tile} hover:border-ring transition-colors`}>
+          <span className="text-xs text-muted-foreground flex items-center">On-time delivery<InfoTooltip text="Of archived projects with both a due and deliver date, the share delivered on or before the due date." /></span>
           <span className="text-2xl font-semibold text-foreground leading-tight">{m.onTimePct == null ? '—' : `${m.onTimePct}%`}</span>
           <span className="text-xs text-muted-foreground">{m.onTimeDenom} delivered w/ dates →</span>
         </Link>
-        <Link href="/list?view=full&stage=Closed" title="Open the closed projects list" className={`${tile} hover:border-ring transition-colors`}>
-          <span className="text-xs text-muted-foreground flex items-center">Avg cycle time<InfoTooltip text="Average days from submitted to delivered across closed projects that have both dates." /></span>
+        <Link href="/list?view=full&stage=Closed" title="Open the archived projects list" className={`${tile} hover:border-ring transition-colors`}>
+          <span className="text-xs text-muted-foreground flex items-center">Avg cycle time<InfoTooltip text="Average days from submitted to delivered across archived projects that have both dates." /></span>
           <span className="text-2xl font-semibold text-foreground leading-tight">{m.avgCycle == null ? '—' : `${m.avgCycle}d`}</span>
-          <span className="text-xs text-muted-foreground">{m.cycleDenom} closed w/ dates</span>
+          <span className="text-xs text-muted-foreground">{m.cycleDenom} archived w/ dates</span>
         </Link>
       </div>
 

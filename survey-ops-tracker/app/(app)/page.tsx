@@ -291,7 +291,7 @@ export default function BoardPage() {
         />
       )}
 
-      {/* Closed section (Full View only) */}
+      {/* Archived section (Full View only) */}
       {mode === 'full' && (
         <div className="flex flex-col gap-3">
           <button
@@ -299,14 +299,14 @@ export default function BoardPage() {
             className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground uppercase tracking-widest font-semibold transition-colors self-start"
           >
             <span>{showClosed ? '▾' : '▸'}</span>
-            Closed
+            Archived
             <span className="bg-muted text-muted-foreground px-2 py-0.5 rounded-full normal-case tracking-normal">
               {closedProjects.length}
             </span>
           </button>
           {showClosed && (
             closedProjects.length === 0 ? (
-              <p className="text-muted-foreground/50 text-xs">No closed projects</p>
+              <p className="text-muted-foreground/50 text-xs">No archived projects</p>
             ) : (
               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2">
                 {closedProjects.map(p => (

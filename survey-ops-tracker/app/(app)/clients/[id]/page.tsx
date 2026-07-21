@@ -399,7 +399,7 @@ export default function ClientPage() {
                         {(
                           [
                             ['project_name', 'Project', 'Click any row to open the project'],
-                            ['status', 'Status', 'Open / Hold / Closed, with the pipeline stage for open projects'],
+                            ['status', 'Status', 'Open / Hold / Archived, with the pipeline stage for open projects'],
                             ['submitted_date', 'Submitted', 'When the project entered the pipeline'],
                             ['n', 'N', 'Responses collected vs target'],
                             ['due_date', 'Due', 'Internal deadline'],
@@ -452,7 +452,7 @@ export default function ClientPage() {
                                 </span>
                               ) : (
                                 <span className="text-xs px-2 py-1 rounded bg-muted text-muted-foreground">
-                                  {p.status === 'Hold' ? 'On hold' : 'Closed'}
+                                  {p.status === 'Hold' ? 'On hold' : 'Archived'}
                                 </span>
                               )}
                             </td>

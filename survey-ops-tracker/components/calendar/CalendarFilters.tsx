@@ -179,9 +179,9 @@ export function CalendarFilters({ filters, onChange }: CalendarFiltersProps) {
               onClick={() =>
                 patch({ statusScope: { ...scope, includeClosed: !scope.includeClosed } })
               }
-              title="Also include Closed (finished) projects"
+              title="Also include Archived projects"
             >
-              Closed
+              Archived
             </Toggle>
             <Toggle
               active={scope.includeScoping}

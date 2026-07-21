@@ -69,7 +69,7 @@ export function InternalProjectView({ project }: { project: SurveyProject }) {
             <button onClick={() => set({ status: 'Open' })} className="text-sm border border-border text-muted-foreground hover:text-foreground hover:border-ring px-3 py-1.5 rounded-lg transition-colors">▶ Resume</button>
           ) : null}
           {project.status !== 'Closed' ? (
-            <button onClick={() => set({ status: 'Closed' })} className="text-sm border border-border text-muted-foreground hover:text-foreground hover:border-ring px-3 py-1.5 rounded-lg transition-colors">✕ Close</button>
+            <button onClick={() => set({ status: 'Closed' })} className="text-sm border border-border text-muted-foreground hover:text-foreground hover:border-ring px-3 py-1.5 rounded-lg transition-colors">✕ Archive</button>
           ) : (
             <button onClick={() => set({ status: 'Open' })} className="text-sm border border-border text-muted-foreground hover:text-foreground hover:border-ring px-3 py-1.5 rounded-lg transition-colors">↺ Reopen</button>
           )}

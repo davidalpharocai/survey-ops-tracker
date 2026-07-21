@@ -242,7 +242,7 @@ export default function ProjectDetailPage() {
           />
           {project.status === 'Closed' && (
             <span className="text-xs text-muted-foreground">
-              Closed projects are hidden from Operations view — switch to Full View to find them.
+              Archived projects are hidden from Operations view — switch to Full View to find them.
             </span>
           )}
           {project.status === 'Open' && (
@@ -266,16 +266,16 @@ export default function ProjectDetailPage() {
             </HelpTip>
           )}
           {project.status !== 'Closed' ? (
-            <HelpTip text="Marks the project done (or archived). It leaves Operations view but stays in Full View's Closed section, and can be reopened anytime.">
+            <HelpTip text="Archives the project — kept for history but removed from the active board. It leaves Operations view but stays in Full View's Archived section, and can be reopened anytime.">
               <button
                 onClick={() => setStatus('Closed')}
                 className="text-sm border border-border text-muted-foreground hover:text-foreground hover:border-ring px-3 py-1.5 rounded-lg transition-colors shrink-0"
               >
-                ✕ Close
+                ✕ Archive
               </button>
             </HelpTip>
           ) : (
-            <HelpTip text="Brings this closed project back to the open board.">
+            <HelpTip text="Brings this archived project back to the open board.">
               <button
                 onClick={() => setStatus('Open')}
                 className="text-sm border border-border text-muted-foreground hover:text-foreground hover:border-ring px-3 py-1.5 rounded-lg transition-colors shrink-0"

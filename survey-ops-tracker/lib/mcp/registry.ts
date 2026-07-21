@@ -57,11 +57,11 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'search_projects',
     description:
-      'Search survey projects by name/code/client with optional filters. Returns only in-flight active projects by default (excludes Closed, On-Hold, Delivered, and pre-sale Scoping); pass active_only:false to search ALL projects regardless of status — e.g. to find a specific past or closed project. Pass mine:true to scope to your own captained projects.',
+      'Search survey projects by name/code/client with optional filters. Returns only in-flight active projects by default (excludes Archived, On-Hold, Delivered, and pre-sale Scoping); pass active_only:false to search ALL projects regardless of status — e.g. to find a specific past or archived project. Pass mine:true to scope to your own captained projects. ("Archived" is the status for finished/legacy projects kept for history.)',
     kind: 'read',
     schema: {
       query: z.string().optional(),
-      status: z.enum(['Open', 'Hold', 'Closed']).optional(),
+      status: z.enum(['Open', 'Hold', 'Archived', 'Closed']).optional(),
       phase: z.enum(['Scoping', 'Active']).optional(),
       captain: z.string().optional(),
       due_before: z.string().optional(),
@@ -72,12 +72,14 @@ export const TOOLS: AssistantTool[] = [
     },
     handler: async (rawArgs, ctx) => {
       const args = rawArgs as {
-        query?: string; status?: 'Open' | 'Hold' | 'Closed'; phase?: 'Scoping' | 'Active'
+        query?: string; status?: 'Open' | 'Hold' | 'Archived' | 'Closed'; phase?: 'Scoping' | 'Active'
         captain?: string; due_before?: string; due_after?: string; limit?: number
         mine?: boolean; active_only?: boolean
       }
       const { userId } = ctx
-      return data.searchProjects({ ...args, userId })
+      // "Archived" is the user-facing label for the stored 'Closed' status.
+      const status = args.status === 'Archived' ? 'Closed' : args.status
+      return data.searchProjects({ ...args, status, userId })
     },
   },
   {
@@ -100,7 +102,7 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'pipeline_summary',
     description:
-      'Digest of the active pipeline — overdue, due within 3 days, and fielding behind pace, all limited to in-flight work (Closed, On-Hold, and Delivered projects are excluded) — plus counts by stage/status/phase. Pass mine:true to scope to your own captained projects.',
+      'Digest of the active pipeline — overdue, due within 3 days, and fielding behind pace, all limited to in-flight work (Archived, On-Hold, and Delivered projects are excluded) — plus counts by stage/status/phase. Pass mine:true to scope to your own captained projects.',
     kind: 'read',
     schema: { mine: z.boolean().optional() },
     handler: async (rawArgs, ctx) => {
@@ -902,11 +904,11 @@ export const TOOLS: AssistantTool[] = [
   },
   {
     name: 'set_project_status',
-    description: "Set a project's status — Open, Hold, or Closed (preview first; confirm to apply).",
+    description: "Set a project's status — Open, Hold, or Archived (Archived = removed from the active board but kept for history; the deliverable itself being sent is the Delivered pipeline stage, not a status). Preview first; confirm to apply.",
     kind: 'write',
-    schema: { project: z.string(), status: z.enum(['Open', 'Hold', 'Closed']), confirm: z.boolean().optional() },
+    schema: { project: z.string(), status: z.enum(['Open', 'Hold', 'Archived', 'Closed']), confirm: z.boolean().optional() },
     handler: async (rawArgs, ctx, meta) => {
-      const args = rawArgs as { project: string; status: 'Open' | 'Hold' | 'Closed'; confirm?: boolean }
+      const args = rawArgs as { project: string; status: 'Open' | 'Hold' | 'Archived' | 'Closed'; confirm?: boolean }
       const { userEmail } = ctx
       const p = await resolveProjectWritable(args.project)
       if (!p) return { error: 'Project not found.' }
@@ -914,15 +916,18 @@ export const TOOLS: AssistantTool[] = [
       if ('ambiguous' in p) return p
       meta.project_id = p.id as string
 
+      // "Archived" is the user-facing label for the stored 'Closed' status.
+      const dbStatus = args.status === 'Archived' ? 'Closed' : args.status
+      const label = (s: unknown) => (s === 'Closed' ? 'Archived' : s)
       return confirmable(
         args,
-        async () => ({ summary: `Status ${fmtChangeVal(p.status)} → ${args.status}`, from: p.status, to: args.status, updated_at: p.updated_at }),
+        async () => ({ summary: `Status ${fmtChangeVal(label(p.status))} → ${label(dbStatus)}`, from: label(p.status), to: label(dbStatus), updated_at: p.updated_at }),
         async () => {
           const supabase = createAdminClient()
-          const result = await runProjectWrite(supabase, { id: p.id as string, patch: { status: args.status }, actor: `${userEmail} via Claude` })
+          const result = await runProjectWrite(supabase, { id: p.id as string, patch: { status: dbStatus }, actor: `${userEmail} via Claude` })
           if ('error' in result) return result
-          meta.detail = { changed: { status: [p.status, result.status] } }
-          return { ok: true, project_code: result.project_code, status: result.status }
+          meta.detail = { changed: { status: [label(p.status), label(result.status)] } }
+          return { ok: true, project_code: result.project_code, status: label(result.status) }
         }
       )
     },

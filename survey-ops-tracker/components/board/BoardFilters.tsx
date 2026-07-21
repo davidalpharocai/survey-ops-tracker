@@ -252,7 +252,7 @@ export function BoardFilters({
                   </Field>
                 </div>
               )}
-              <Field label="Stage" tooltip="Filter by pipeline stage, from Submitted through Delivery (or Closed).">
+              <Field label="Stage" tooltip="Filter by pipeline stage, from Submitted through Delivery (or Archived).">
                 <select
                   value={stageFilter ?? ''}
                   onChange={e => onStageChange(e.target.value || null)}
@@ -264,7 +264,7 @@ export function BoardFilters({
                       {stage}
                     </option>
                   ))}
-                  <option value="Closed">Closed</option>
+                  <option value="Closed">Archived</option>
                 </select>
               </Field>
             </div>
