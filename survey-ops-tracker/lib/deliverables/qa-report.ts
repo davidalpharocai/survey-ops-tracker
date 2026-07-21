@@ -29,8 +29,8 @@ export type QaProject = {
   deleted_at: string | null
 }
 
-export type QaConfig = { agingDays: number; lowConfidence: number; coverageLookbackDays: number; listCap: number; now: Date }
-export const DEFAULT_QA_CONFIG: Omit<QaConfig, 'now'> = { agingDays: 7, lowConfidence: 0.9, coverageLookbackDays: 30, listCap: 10 }
+export type QaConfig = { agingDays: number; lowConfidence: number; coverageLookbackDays: number; staleIngestDays: number; listCap: number; now: Date }
+export const DEFAULT_QA_CONFIG: Omit<QaConfig, 'now'> = { agingDays: 7, lowConfidence: 0.9, coverageLookbackDays: 30, staleIngestDays: 14, listCap: 10 }
 
 type AgingItem = { file: string; guess: string | null; ageDays: number; forwardedBy: string | null }
 type SpotItem = { file: string; project: string | null; method: string | null; confidence: number | null }
@@ -43,6 +43,7 @@ export type QaReport = {
   unsorted: { total: number; items: { file: string }[] }
   coverageGap: { total: number; examples: string[] }
   tally: { filed: number; bySourceMethod: { key: string; count: number }[] }
+  pipelineHealth: { lastEmailIngestAt: string | null; daysSince: number | null; authRejections7d: number; healthy: boolean }
   clean: boolean
 }
 
@@ -57,8 +58,8 @@ function topGuess(d: QaDeliverable): string | null {
   return typeof label === 'string' ? label : null
 }
 
-export function buildQaReport(input: { deliverables: QaDeliverable[]; projects: QaProject[] }, config: QaConfig): QaReport {
-  const { now, agingDays, lowConfidence, coverageLookbackDays, listCap } = config
+export function buildQaReport(input: { deliverables: QaDeliverable[]; projects: QaProject[]; authRejections7d?: number }, config: QaConfig): QaReport {
+  const { now, agingDays, lowConfidence, coverageLookbackDays, staleIngestDays, listCap } = config
   const live = input.deliverables.filter((d) => !d.deleted_at)
   const agingCutoff = now.getTime() - agingDays * DAY
   const recentCutoff = now.getTime() - agingDays * DAY
@@ -122,9 +123,19 @@ export function buildQaReport(input: { deliverables: QaDeliverable[]; projects: 
   }
   const tally = { filed: filedRecent.length, bySourceMethod: [...tallyMap.entries()].map(([key, count]) => ({ key, count })).sort((a, b) => b.count - a.count) }
 
-  const clean = !agingReview.total && !autoFileSpotCheck.total && !duplicates.total && !unsorted.total && !coverageGap.total
+  // Pipeline health — the silent-outage detector. authRejections7d (rejected forwards, logged by the
+  // ingest route) is the strong signal; a long gap since the last email ingest is a softer staleness warning.
+  const emailLive = live.filter((d) => d.source === 'email')
+  const lastEmailIngestAt = emailLive.length ? emailLive.reduce((m, d) => (d.created_at > m ? d.created_at : m), emailLive[0].created_at) : null
+  const daysSince = lastEmailIngestAt ? daysBetween(now, lastEmailIngestAt) : null
+  const authRejections7d = input.authRejections7d ?? 0
+  const stale = daysSince != null && daysSince > staleIngestDays
+  const pipelineHealth = { lastEmailIngestAt, daysSince, authRejections7d, healthy: authRejections7d === 0 && !stale }
 
-  return { generatedAt: now.toISOString(), agingReview, autoFileSpotCheck, duplicates, unsorted, coverageGap, tally, clean }
+  const clean =
+    !agingReview.total && !autoFileSpotCheck.total && !duplicates.total && !unsorted.total && !coverageGap.total && pipelineHealth.healthy
+
+  return { generatedAt: now.toISOString(), agingReview, autoFileSpotCheck, duplicates, unsorted, coverageGap, tally, pipelineHealth, clean }
 }
 
 const APP_URL = 'https://survey-ops-tracker.vercel.app'
@@ -138,6 +149,12 @@ const overflow = (shown: number, total: number) => (total > shown ? `\n_…and $
 export function renderQaReportText(r: QaReport): string {
   const date = r.generatedAt.slice(0, 10)
   const sections: string[] = [`📋 *Deliverables QA — ${date}*`]
+
+  // Pipeline health — always shown; it's the whole point of the report to catch a silent forwarding outage.
+  const ph = r.pipelineHealth
+  const ingestLine = ph.lastEmailIngestAt ? `last email ingest ${ph.lastEmailIngestAt.slice(0, 10)} (${ph.daysSince}d ago)` : 'no email deliverable ingested yet'
+  const rejLine = ph.authRejections7d > 0 ? ` · ⚠️ ${ph.authRejections7d} rejected forward(s) this week — the forwarder's WEBHOOK_SECRET is stale, re-sync it` : ''
+  sections.push(`${ph.healthy ? '🟢' : '🔴'} *Email pipeline* — ${ingestLine}${rejLine}`)
 
   if (r.agingReview.total) {
     const lines = r.agingReview.items.map((i) => `• *${esc(i.file)}* — ${i.ageDays}d in queue${i.guess ? `, guess ${esc(i.guess)}` : ''}${i.forwardedBy ? `, from ${esc(i.forwardedBy)}` : ''}`)
@@ -165,7 +182,7 @@ export function renderQaReportText(r: QaReport): string {
     sections.push(`📈 *Filed this week: ${r.tally.filed}* — ${r.tally.bySourceMethod.map((x) => `${esc(x.key)}: ${x.count}`).join(' · ')}`)
   }
 
-  if (sections.length === 1) sections.push('✅ Depository is clean — nothing aging, no dupes, no gaps.')
+  if (r.clean) sections.push('✅ Depository is clean — nothing aging, no dupes, no gaps.')
   sections.push(`<${APP_URL}/deliverables|Open the review queue>`)
   return sections.join('\n\n')
 }

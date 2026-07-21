@@ -31,6 +31,7 @@ function processInbox() {
   var label = GmailApp.getUserLabelByName(PROCESSED_LABEL) || GmailApp.createLabel(PROCESSED_LABEL);
   // Unprocessed Deliverables-labeled threads from the last week (the trigger runs often; the window is a safety bound).
   var threads = GmailApp.search('label:' + SOURCE_LABEL + ' -label:' + PROCESSED_LABEL + ' newer_than:7d', 0, 50);
+  var failures = []; // non-2xx ingest responses this run — surfaced via a throttled alert email below
 
   for (var t = 0; t < threads.length; t++) {
     var thread = threads[t];
@@ -79,12 +80,32 @@ function processInbox() {
       var code = res.getResponseCode();
       if (code < 200 || code >= 300) {
         allOk = false;
+        failures.push('HTTP ' + code + ' — ' + msg.getSubject());
         Logger.log('Ingest failed (' + code + ') for message ' + msg.getId() + ': ' + res.getContentText());
       }
     }
 
     // Only label the thread done if every message posted OK; otherwise retry next run (server is idempotent).
     if (allOk) thread.addLabel(label);
+  }
+
+  // Silent-outage guard: if any forward got a non-2xx (e.g. a 401 from a stale WEBHOOK_SECRET), email the
+  // owner. This runs in Gmail — independent of the app / Vercel / Slack — so it still fires during an env
+  // outage, which is exactly when the in-app monitors go dark. Throttled to at most one alert every 2h.
+  if (failures.length) {
+    var lastAlert = Number(props.getProperty('LAST_ALERT_MS') || 0);
+    if (Date.now() - lastAlert > 2 * 60 * 60 * 1000) {
+      MailApp.sendEmail(
+        Session.getEffectiveUser().getEmail(),
+        '⚠️ Deliverables forwarder: ' + failures.length + ' forward(s) NOT filed',
+        'The deliverables forwarder got non-2xx responses from the ingest endpoint, so these forwards were ' +
+          'NOT filed and no reply was sent:\n\n' + failures.join('\n') + '\n\n' +
+          'A 401 almost always means this script\'s WEBHOOK_SECRET no longer matches Vercel. Fix it in ' +
+          'Project Settings -> Script properties (WEBHOOK_SECRET); the failed forwards retry automatically ' +
+          'on the next run.'
+      );
+      props.setProperty('LAST_ALERT_MS', String(Date.now()));
+    }
   }
 }
 

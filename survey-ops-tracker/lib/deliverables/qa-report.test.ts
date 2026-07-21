@@ -86,6 +86,25 @@ describe('buildQaReport', () => {
     expect(empty.agingReview.total).toBe(0)
     expect(empty.coverageGap.total).toBe(0)
   })
+
+  it('reports the last email-ingest timestamp; healthy with 0 rejections + recent ingest', () => {
+    expect(r.pipelineHealth.lastEmailIngestAt).toBe('2026-07-14T00:00:00Z') // newest source=email created_at
+    expect(r.pipelineHealth.authRejections7d).toBe(0)
+    expect(r.pipelineHealth.healthy).toBe(true)
+  })
+
+  it('flags forwarder auth-rejections as unhealthy → report not clean', () => {
+    const rr = buildQaReport({ deliverables, projects, authRejections7d: 3 }, cfg)
+    expect(rr.pipelineHealth.authRejections7d).toBe(3)
+    expect(rr.pipelineHealth.healthy).toBe(false)
+    expect(rr.clean).toBe(false)
+  })
+
+  it('flags a stale pipeline (no email ingest in >14 days) as unhealthy', () => {
+    const stale = buildQaReport({ deliverables: [deliv({ id: 'old', source: 'email', created_at: '2026-06-01T00:00:00Z' })], projects: [], authRejections7d: 0 }, cfg)
+    expect(stale.pipelineHealth.daysSince).toBeGreaterThan(14)
+    expect(stale.pipelineHealth.healthy).toBe(false)
+  })
 })
 
 describe('renderQaReportText', () => {
@@ -99,5 +118,13 @@ describe('renderQaReportText', () => {
   it('renders a clean line for an empty depository', () => {
     const txt = renderQaReportText(buildQaReport({ deliverables: [], projects: [] }, cfg))
     expect(txt).toMatch(/clean/i)
+    expect(txt).toMatch(/pipeline/i) // health line shows even when clean
+  })
+
+  it('surfaces forwarder auth-rejections prominently in the pipeline line', () => {
+    const txt = renderQaReportText(buildQaReport({ deliverables, projects, authRejections7d: 2 }, cfg))
+    expect(txt).toMatch(/pipeline/i)
+    expect(txt).toContain('rejected forward')
+    expect(txt).toContain('🔴')
   })
 })
