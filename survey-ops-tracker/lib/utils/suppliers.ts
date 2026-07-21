@@ -40,6 +40,20 @@ export function totalCappedCompletes(rows: SupplierLine[]): number {
   return rows.reduce((s, r) => s + (r.completes_cap || 0), 0)
 }
 
+/** The most common completes_cap among a launch's priced/capped suppliers (the mode;
+ *  ties break to the larger cap). null if none. Used as the default launch target —
+ *  in practice a launch's target and its per-supplier caps are the same number. */
+export function modalCap(rows: SupplierLine[]): number | null {
+  const caps = rows.map((r) => r.completes_cap || 0).filter((c) => c > 0)
+  if (caps.length === 0) return null
+  const counts = new Map<number, number>()
+  for (const c of caps) counts.set(c, (counts.get(c) || 0) + 1)
+  let best = caps[0]
+  let bestN = 0
+  for (const [c, n] of counts) if (n > bestN || (n === bestN && c > best)) { best = c; bestN = n }
+  return best
+}
+
 // ---- Launch-level ----
 // A PS project has 1..N launches (fielding waves). Each launch is a target + its own
 // supplier lines. Actual cost is just Σ over all lines (launches don't change it); the

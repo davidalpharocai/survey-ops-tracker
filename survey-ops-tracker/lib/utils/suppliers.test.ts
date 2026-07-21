@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  actualCost, totalCollected, blendedActualCpi, estimateRange, totalCappedCompletes,
+  actualCost, totalCollected, blendedActualCpi, estimateRange, totalCappedCompletes, modalCap,
   launchRange, projectEstimateRange, projectActualCost, projectCollected, projectTarget, projectBlendedCpi,
 } from './suppliers'
 
@@ -35,6 +35,26 @@ describe('suppliers math', () => {
   })
   it('totalCappedCompletes = Σ cap', () => {
     expect(totalCappedCompletes(rows)).toBe(8000)
+  })
+})
+
+describe('modalCap', () => {
+  it('is the most common cap', () => {
+    expect(modalCap([
+      { cpi: 1, completes_cap: 450, n_collected: 0 },
+      { cpi: 1, completes_cap: 450, n_collected: 0 },
+      { cpi: 1, completes_cap: 1000, n_collected: 0 },
+    ])).toBe(450)
+  })
+  it('breaks ties to the larger cap', () => {
+    expect(modalCap([
+      { cpi: 1, completes_cap: 500, n_collected: 0 },
+      { cpi: 1, completes_cap: 1500, n_collected: 0 },
+    ])).toBe(1500)
+  })
+  it('is null with no positive caps', () => {
+    expect(modalCap([])).toBeNull()
+    expect(modalCap([{ cpi: 1, completes_cap: 0, n_collected: 0 }])).toBeNull()
   })
 })
 
