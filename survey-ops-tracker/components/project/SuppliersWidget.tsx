@@ -329,7 +329,18 @@ export function SuppliersWidget({
 
   const launchList = launches ?? []
   const allRows = rows ?? []
-  const rowsFor = (launchId: string) => allRows.filter((r) => r.launch_id === launchId)
+  // Show every launch's suppliers in the SAME order — the order they appear in the
+  // first launch (Launch 1) — so you can read the launches line-by-line. Suppliers not
+  // present in the first launch sort to the end, keeping their own order.
+  const canonicalOrder = launchList.length
+    ? allRows.filter((r) => r.launch_id === launchList[0].id).map((r) => r.supplier_id)
+    : []
+  const rank = (supplierId: string) => {
+    const i = canonicalOrder.indexOf(supplierId)
+    return i === -1 ? Number.MAX_SAFE_INTEGER : i
+  }
+  const rowsFor = (launchId: string) =>
+    allRows.filter((r) => r.launch_id === launchId).sort((a, b) => rank(a.supplier_id) - rank(b.supplier_id))
 
   // Project rollup across launches — target defaults to each launch's modal cap.
   const launchesLite = launchList.map((l) => {
