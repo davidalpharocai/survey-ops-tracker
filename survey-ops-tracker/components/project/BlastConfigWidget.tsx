@@ -28,8 +28,75 @@ function fmtWhen(iso: string | null): string {
     minute: '2-digit',
   })
 }
+/** Stored ISO (UTC) → the local "YYYY-MM-DDTHH:mm" a datetime-local input expects. */
+function toLocalInput(iso: string | null): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
+}
+
 const inputCls =
   'w-full min-w-0 bg-muted border border-border rounded px-1.5 py-1 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring'
+
+type BlastPatch = { bid?: number; people?: number; completes?: number; blast_at?: string | null; note?: string | null }
+
+/**
+ * Expanded edit panel for one blast — the whole line is editable post-save. Each
+ * field commits on blur via the update hook (only when it actually changed). The
+ * description is a full-width textarea so long notes are fully visible/editable.
+ */
+function BlastEditPanel({ blast, onSave, onClose }: { blast: Blast; onSave: (u: BlastPatch) => void; onClose: () => void }) {
+  return (
+    <div className="col-span-full rounded-lg border border-border bg-muted/40 p-2.5 my-1 flex flex-col gap-2">
+      <div className="flex flex-wrap gap-2">
+        <label className="flex flex-col gap-0.5">
+          <span className="text-[10px] text-muted-foreground">Date/time (ET)</span>
+          <input
+            type="datetime-local"
+            defaultValue={toLocalInput(blast.blast_at)}
+            onBlur={(e) => { const v = e.target.value ? new Date(e.target.value).toISOString() : null; if (v !== (blast.blast_at ?? null)) onSave({ blast_at: v }) }}
+            className={`${inputCls} w-auto`}
+          />
+        </label>
+        <label className="flex flex-col gap-0.5 w-20">
+          <span className="text-[10px] text-muted-foreground"># people</span>
+          <input
+            type="number" min="0" defaultValue={blast.people ?? 0}
+            onBlur={(e) => { const v = parseInt(e.target.value, 10); if (!isNaN(v) && v >= 0 && v !== (blast.people ?? 0)) onSave({ people: v }) }}
+            className={inputCls}
+          />
+        </label>
+        <label className="flex flex-col gap-0.5 w-20">
+          <span className="text-[10px] text-muted-foreground"># completes</span>
+          <input
+            type="number" min="0" defaultValue={blast.completes ?? 0}
+            onBlur={(e) => { const v = parseInt(e.target.value, 10); if (!isNaN(v) && v >= 0 && v !== (blast.completes ?? 0)) onSave({ completes: v }) }}
+            className={inputCls}
+          />
+        </label>
+        <label className="flex flex-col gap-0.5 w-20">
+          <span className="text-[10px] text-muted-foreground">$/bid</span>
+          <input
+            type="number" step="0.01" min="0" defaultValue={blast.bid ?? 0}
+            onBlur={(e) => { const v = parseFloat(e.target.value); if (!isNaN(v) && v >= 0 && v !== (blast.bid ?? 0)) onSave({ bid: v }) }}
+            className={inputCls}
+          />
+        </label>
+      </div>
+      <label className="flex flex-col gap-0.5">
+        <span className="text-[10px] text-muted-foreground">Description</span>
+        <textarea
+          defaultValue={blast.note ?? ''}
+          rows={2}
+          placeholder="e.g. 3PL companies + retailers"
+          onBlur={(e) => { const v = e.target.value.trim() || null; if (v !== (blast.note ?? null)) onSave({ note: v }) }}
+          className={`${inputCls} resize-y`}
+        />
+      </label>
+      <button onClick={onClose} className="self-end text-xs bg-muted hover:bg-accent px-2.5 py-1 rounded-lg">Done</button>
+    </div>
+  )
+}
 
 /**
  * The completes count trickles in AFTER a blast is sent, so it's editable in
@@ -71,6 +138,7 @@ export function BlastConfigWidget({ projectId }: { projectId: string }) {
     staleTime: Infinity,
   })
   const userName = user?.email?.split('@')[0] ?? 'Unknown'
+  const [editingId, setEditingId] = useState<string | null>(null)
 
   // Create form: $/bid · # of people · # of completes · date/time · description.
   const [bid, setBid] = useState('')
@@ -183,16 +251,24 @@ export function BlastConfigWidget({ projectId }: { projectId: string }) {
               {list.map((b: Blast) => (
                 <Fragment key={b.id}>
                   <span className="text-muted-foreground whitespace-nowrap">{fmtWhen(b.blast_at)}</span>
-                  <span className="truncate min-w-0 text-foreground">
+                  <button
+                    type="button"
+                    onClick={() => setEditingId(editingId === b.id ? null : b.id)}
+                    title={b.note ? `${b.note} — click to edit` : 'Click to edit this blast'}
+                    className="truncate min-w-0 text-left text-foreground hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer"
+                  >
                     {fmtNum(b.people ?? 0)}
                     {b.note ? ` · ${b.note}` : ''}
-                  </span>
+                  </button>
                   <span className="text-right">
                     <CompletesCell blast={b} onSave={(c) => upd.mutate({ id: b.id, updates: { completes: c } })} />
                   </span>
                   <span className="text-right text-foreground tabular-nums">{rate(b.bid)}</span>
                   <span className="text-right font-medium text-foreground tabular-nums">{money(blastTotal(b))}</span>
                   <button onClick={() => del.mutate(b.id)} title="Delete" className="justify-self-end text-muted-foreground/50 hover:text-red-600 dark:hover:text-red-400 px-0.5">✕</button>
+                  {editingId === b.id && (
+                    <BlastEditPanel blast={b} onSave={(u) => upd.mutate({ id: b.id, updates: u })} onClose={() => setEditingId(null)} />
+                  )}
                 </Fragment>
               ))}
             </div>
