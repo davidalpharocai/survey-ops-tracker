@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { safeEqual } from '@/lib/utils/secureCompare'
 import { logSystemEvent } from '@/lib/server/observability'
-import { mappedCells, fullRow, rowHash, updateData, headerGuardOk, type SurveyProject } from '@/lib/sheets/surveysMap'
+import { mappedCells, fullRow, rowHash, updateData, headerGuardOk, isWritebackEligible, WRITEBACK_MIN_DATE, type SurveyProject } from '@/lib/sheets/surveysMap'
 import { readHeader, readPrCodeRows, appendRow, updateCells } from '@/lib/sheets/client'
 
 export const dynamic = 'force-dynamic'
@@ -62,6 +62,14 @@ export async function GET(req: NextRequest) {
     return Response.json({ mode: m, appended: 0, updated: 0, skipped: 0, failed: 0 })
   }
 
+  // LEGACY GUARD (David's standing rule): never touch pre-WRITEBACK_MIN_DATE rows.
+  // Those projects predate David and the sheet is their authoritative history —
+  // overwriting them with SOCC's values would degrade the record. Drop them here
+  // so the whole sync (append + update) structurally cannot reach a legacy row.
+  const all = (projects ?? []) as SurveyProject[]
+  const eligible = all.filter((p) => isWritebackEligible(p))
+  const skippedLegacy = all.length - eligible.length
+
   // team_members -> initials, to resolve captain + co-captains (col S is comma-joined).
   const { data: members } = await supabase.from('team_members').select('id, initials')
   const initialsById = new Map((members ?? []).map((mm) => [mm.id, mm.initials]))
@@ -99,7 +107,7 @@ export async function GET(req: NextRequest) {
   let failed = 0
   let stampErrors = 0
 
-  for (const p of (projects ?? []) as SurveyProject[]) {
+  for (const p of eligible) {
     try {
       // No PR code = can't be located in the sheet for update; skip loudly rather
       // than append an unlocatable row that would re-append on every later edit.
@@ -161,9 +169,11 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const result = { mode: m, appended, updated, skipped, failed, stampErrors }
-  if (!dry && failed === 0 && (appended || updated)) {
-    await logSystemEvent({ source: 'sheet-writeback', status: 'ok', detail: `Appended ${appended}, updated ${updated}${stampErrors ? ` (${stampErrors} stamp errors)` : ''}.` })
+  const result = { mode: m, appended, updated, skipped, failed, stampErrors, skippedLegacy, minDate: WRITEBACK_MIN_DATE }
+  if (dry) {
+    await logSystemEvent({ source: 'sheet-writeback', status: 'ok', detail: `[dry-run] would append ${appended}, update ${updated}; ${skipped} unchanged, ${skippedLegacy} legacy (pre-${WRITEBACK_MIN_DATE}) skipped, ${failed} failed.` })
+  } else if (failed === 0 && (appended || updated)) {
+    await logSystemEvent({ source: 'sheet-writeback', status: 'ok', detail: `Appended ${appended}, updated ${updated} (${skippedLegacy} legacy skipped)${stampErrors ? `; ${stampErrors} stamp errors` : ''}.` })
   }
   return Response.json(result)
 }

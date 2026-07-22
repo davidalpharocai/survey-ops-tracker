@@ -6,6 +6,8 @@ import {
   updateData,
   classifyLinkedDocs,
   headerGuardOk,
+  isWritebackEligible,
+  WRITEBACK_MIN_DATE,
   EXPECTED_HEADERS,
   SHEET_WIDTH,
 } from './surveysMap'
@@ -123,6 +125,29 @@ describe('updateData', () => {
   it('emits only SOCC-owned ranges for the target row, never the gap/comment columns', () => {
     const ranges = updateData(mappedCells(base, 'CT'), 57).map((r) => r.range)
     expect(ranges).toEqual(['Surveys!A57:T57', 'Surveys!X57:AC57', 'Surveys!AG57:AG57', 'Surveys!AI57:AI57', 'Surveys!AL57:AM57'])
+  })
+})
+
+describe('isWritebackEligible — legacy guard', () => {
+  const legacy = { submitted_date: null, launch_date: null, due_date: null, deliver_date: null }
+  it('eligible when any timeline date is on/after the cutoff', () => {
+    expect(isWritebackEligible({ ...base } as never)).toBe(true) // submitted 2026-07-01
+    expect(isWritebackEligible({ ...base, ...legacy, deliver_date: '2026-06-15' } as never)).toBe(true)
+  })
+  it('the cutoff date itself is eligible (>=)', () => {
+    expect(isWritebackEligible({ ...base, ...legacy, submitted_date: WRITEBACK_MIN_DATE } as never)).toBe(true)
+  })
+  it('legacy: all timeline dates before the cutoff → NOT eligible', () => {
+    expect(
+      isWritebackEligible({ ...base, submitted_date: '2026-01-10', launch_date: '2026-02-01', due_date: '2026-03-01', deliver_date: '2026-05-25' } as never)
+    ).toBe(false)
+  })
+  it('all timeline dates null → NOT eligible (no data to mirror; protects legacy)', () => {
+    expect(isWritebackEligible({ ...base, ...legacy } as never)).toBe(false)
+  })
+  it('ignores created_at (imported legacy rows have recent created_at)', () => {
+    // A pre-David project whose row was created at 2026-06 import time must still be skipped.
+    expect(isWritebackEligible({ ...base, ...legacy, created_at: '2026-06-11T00:00:00Z' } as never)).toBe(false)
   })
 })
 

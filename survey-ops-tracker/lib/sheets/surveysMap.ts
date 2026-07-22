@@ -46,6 +46,32 @@ export function classifyLinkedDocs(links: string[] | null): { doc: string; sheet
 }
 
 /**
+ * Earliest timeline date on/after which a project is "David-era" and eligible
+ * for write-back. Projects whose whole timeline predates this are legacy — they
+ * belong to the team's authoritative sheet history and the sync must NEVER
+ * touch them (David's standing rule). Keep in sync with the reconciliation cutoff.
+ */
+export const WRITEBACK_MIN_DATE = '2026-05-26'
+
+/**
+ * Eligible for SOCC→sheet write-back only if RECENT: at least one timeline date
+ * (submitted / launch / due / deliver) is on or after WRITEBACK_MIN_DATE. A
+ * project with all four null or earlier is legacy → skipped, so the sync can't
+ * overwrite a pre-David sheet row.
+ *
+ * `created_at` is deliberately NOT considered: the ~186 legacy projects were all
+ * imported in 2026-06, so their created_at is "recent" and would wrongly mark
+ * every legacy row eligible. Timeline dates reflect the real project era.
+ * Consequence: a brand-new project with no dates set yet won't sync until it
+ * gets one — acceptable (nothing meaningful to mirror yet) and safe for legacy.
+ */
+export function isWritebackEligible(p: SurveyProject, minDate: string = WRITEBACK_MIN_DATE): boolean {
+  return [p.submitted_date, p.launch_date, p.due_date, p.deliver_date].some(
+    (d) => d != null && String(d).slice(0, 10) >= minDate
+  )
+}
+
+/**
  * The sparse {colIndex -> string} cells SOCC owns for a project. `captainInitials`
  * is pre-resolved by the caller (primary + co-captains, comma-joined) since it
  * needs a team_members lookup — kept out of here so this module stays pure.
