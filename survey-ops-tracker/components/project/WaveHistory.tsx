@@ -125,7 +125,7 @@ function ParentPicker({
 
   return (
     <div className="rounded-lg border border-border bg-muted/40 p-2 flex flex-col gap-1">
-      <p className="text-[12px] text-muted-foreground">Pick the original survey this is a rerun of:</p>
+      <p className="text-[12px] text-muted-foreground">Pick any prior wave to link this into its full history:</p>
       {isLoading ? (
         <p className="text-xs text-muted-foreground/50">Loading…</p>
       ) : candidates.length === 0 ? (
@@ -142,6 +142,7 @@ function ParentPicker({
               <span className="block text-sm text-foreground truncate">
                 {c.project_code ? `${c.project_code} · ` : ''}
                 {c.project_name}
+                {c.rerun_number && c.rerun_number > 1 ? <span className="text-[11px] text-muted-foreground font-mono"> · Wave {c.rerun_number}</span> : null}
               </span>
               <span className="block text-[12px] text-muted-foreground truncate">{c.client}</span>
             </button>

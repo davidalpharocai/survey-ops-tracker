@@ -21,6 +21,26 @@ async function requireAnalyst() {
 
 type Row = { id: string; rerun_series_id: string | null; rerun_number: number | null }
 
+// Renumber a whole series by chronological POSITION so wave numbers always reflect
+// the real history and self-heal on link/unlink: the root (original) is Wave 1, the
+// rest are numbered by date (submitted → launch → created) → Wave 2, 3, … Called
+// after every link/unlink so numbers never go stale or leave gaps.
+async function renumberSeries(admin: ReturnType<typeof createAdminClient>, root: string) {
+  const { data: waves } = await admin
+    .from('survey_projects')
+    .select('id, submitted_date, launch_date, created_at')
+    .or(`id.eq.${root},rerun_series_id.eq.${root}`)
+    .is('deleted_at', null)
+  if (!waves) return
+  const key = (w: { submitted_date: string | null; launch_date: string | null; created_at: string | null }) =>
+    String(w.submitted_date ?? w.launch_date ?? w.created_at ?? '')
+  const rest = waves.filter((w) => w.id !== root).sort((a, b) => key(a).localeCompare(key(b)))
+  const targets: { id: string; num: number }[] = [{ id: root, num: 1 }, ...rest.map((w, i) => ({ id: w.id, num: i + 2 }))]
+  for (const t of targets) {
+    await admin.from('survey_projects').update({ rerun_number: t.num }).eq('id', t.id)
+  }
+}
+
 export async function POST(req: Request) {
   const user = await requireAnalyst()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -59,11 +79,13 @@ export async function POST(req: Request) {
 
   // ---- Unlink: make it a standalone survey again ----
   if (!parentId) {
+    const oldRoot = (child as Row).rerun_series_id
     const { error } = await admin
       .from('survey_projects')
       .update({ rerun_series_id: null, rerun_number: 1 })
       .eq('id', childId)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (oldRoot) await renumberSeries(admin, oldRoot) // heal the waves left behind
     return NextResponse.json({ ok: true, unlinked: true })
   }
 
@@ -85,18 +107,14 @@ export async function POST(req: Request) {
       { status: 400 }
     )
 
-  // Next wave number = one past the current max in the target series.
-  const { data: series } = await admin
-    .from('survey_projects')
-    .select('rerun_number')
-    .or(`id.eq.${root},rerun_series_id.eq.${root}`)
-    .is('deleted_at', null)
-  const maxNum = (series ?? []).reduce((m, r) => Math.max(m, Number(r.rerun_number ?? 1)), 1)
-
+  // Attach to the target series, then renumber the whole series by chronological
+  // position so this wave lands at its correct # (not just max+1) and any existing
+  // waves re-order too.
   const { error } = await admin
     .from('survey_projects')
-    .update({ rerun_series_id: root, rerun_number: maxNum + 1 })
+    .update({ rerun_series_id: root })
     .eq('id', childId)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ ok: true, seriesId: root, waveNumber: maxNum + 1 })
+  await renumberSeries(admin, root)
+  return NextResponse.json({ ok: true, seriesId: root })
 }
