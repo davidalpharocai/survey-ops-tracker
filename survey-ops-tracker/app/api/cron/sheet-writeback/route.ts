@@ -17,6 +17,12 @@ export const maxDuration = 60
 //   unset/off/false -> OFF: return immediately, touch nothing (no sheet reads).
 //   dryrun/dry       -> log what it WOULD write, write nothing.
 //   live/true/1/yes  -> write.
+// A manual trigger may add ?dry=1 (or ?preview=1) to FORCE a no-write PREVIEW
+// regardless of the flag — this backs the on-demand "refresh when I say so" flow:
+// preview the diff, get the OK, then trigger again without ?dry to write.
+// NOTE (2026-07-22): there is deliberately NO scheduled cron entry for this route
+// in vercel.json — it runs ONLY on a manual authorized GET (on-demand only, per
+// David). To resume automatic daily sync, re-add it to vercel.json's crons.
 // Always returns 200 so Vercel Cron never retries (a retry could duplicate).
 // A header-guard aborts on column drift; a preflight aborts live if migration 053
 // (the sync-state columns) isn't applied.
@@ -26,17 +32,27 @@ function authorized(req: NextRequest): boolean {
   return safeEqual(req.headers.get('x-webhook-secret'), process.env.WEBHOOK_SECRET)
 }
 
-function mode(): 'off' | 'dryrun' | 'live' {
+function envMode(): 'off' | 'dryrun' | 'live' {
   const v = (process.env.SHEET_WRITEBACK_ENABLED ?? '').trim().toLowerCase()
   if (v === 'live' || v === 'true' || v === '1' || v === 'yes') return 'live'
   if (v === 'dryrun' || v === 'dry' || v === 'validate') return 'dryrun'
   return 'off'
 }
 
+// Effective mode. A manual ?dry=1 / ?preview=1 forces a read-only preview so an
+// on-demand refresh can always be inspected before it writes; a preview can never
+// escalate to a write, only the reverse (a plain trigger uses the env flag).
+function mode(req: NextRequest): 'off' | 'dryrun' | 'live' {
+  const qp = new URL(req.url).searchParams
+  const forceDry = ['1', 'true', 'yes'].includes((qp.get('dry') ?? qp.get('preview') ?? '').toLowerCase())
+  if (forceDry) return 'dryrun'
+  return envMode()
+}
+
 export async function GET(req: NextRequest) {
   if (!authorized(req)) return new Response('Unauthorized', { status: 401 })
 
-  const m = mode()
+  const m = mode(req)
   if (m === 'off') return Response.json({ mode: 'off' })
   const dry = m === 'dryrun'
   const supabase = createAdminClient()
