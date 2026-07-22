@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildQaReport, renderQaReportText, DEFAULT_QA_CONFIG, type QaDeliverable, type QaProject } from './qa-report'
+import { buildQaReport, renderQaReportText, renderQaReportHtml, DEFAULT_QA_CONFIG, type QaDeliverable, type QaProject } from './qa-report'
 
 const NOW = new Date('2026-07-15T12:00:00Z')
 const cfg = { ...DEFAULT_QA_CONFIG, now: NOW }
@@ -126,5 +126,13 @@ describe('renderQaReportText', () => {
     expect(txt).toMatch(/pipeline/i)
     expect(txt).toContain('rejected forward')
     expect(txt).toContain('🔴')
+  })
+
+  it('renders an HTML email with the pipeline line + a queue link', () => {
+    const html = renderQaReportHtml(buildQaReport({ deliverables, projects, authRejections7d: 2 }, cfg))
+    expect(html).toContain('<h2')
+    expect(html).toMatch(/Email pipeline/)
+    expect(html).toContain('rejected forward')
+    expect(html).toContain('/deliverables')
   })
 })

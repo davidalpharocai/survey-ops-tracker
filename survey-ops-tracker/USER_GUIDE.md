@@ -190,7 +190,7 @@ project the same way.
 
 ### Weekly QA digest
 
-Every **Monday morning** a deliverables QA digest posts to Slack (its own QA channel) so nothing slips through the cracks. It flags:
+Every **Monday morning** a deliverables QA digest is **emailed to you** (and also posts to Slack if a QA webhook is configured) so nothing slips through the cracks. It opens with an **email-pipeline health check** — when the last forward was ingested, and a ⚠️ if any forwards were rejected that week (e.g. a stale secret) — then flags:
 - **Aging in review** — items sitting in the queue over a week without being filed or dismissed.
 - **Auto-files to spot-check** — the week's AI-matched and lower-confidence filings, so someone can eyeball that they landed on the right survey.
 - **Possible duplicates** and **unsorted** items (filed with no project).
