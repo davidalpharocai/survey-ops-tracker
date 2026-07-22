@@ -186,3 +186,28 @@ export function renderQaReportText(r: QaReport): string {
   sections.push(`<${APP_URL}/deliverables|Open the review queue>`)
   return sections.join('\n\n')
 }
+
+/** Email (HTML) render of the same report — used when the digest is delivered by email rather than Slack. */
+export function renderQaReportHtml(r: QaReport): string {
+  const date = r.generatedAt.slice(0, 10)
+  const ph = r.pipelineHealth
+  const ingest = ph.lastEmailIngestAt ? `last email ingest ${ph.lastEmailIngestAt.slice(0, 10)} (${ph.daysSince}d ago)` : 'no email deliverable ingested yet'
+  const rej = ph.authRejections7d > 0 ? ` — ⚠️ ${ph.authRejections7d} rejected forward(s) this week; the forwarder's WEBHOOK_SECRET is stale, re-sync it` : ''
+  const section = (title: string, lis: string[], shown: number, total: number) =>
+    `<h3 style="margin:16px 0 4px;font-size:15px">${title}</h3><ul style="margin:0;padding-left:20px;line-height:1.5">${lis.map((l) => `<li>${l}</li>`).join('')}</ul>` +
+    (total > shown ? `<p style="margin:4px 0;color:#666;font-size:13px">…and ${total - shown} more</p>` : '')
+
+  const b: string[] = [
+    `<h2 style="margin:0 0 4px">📋 Deliverables QA — ${date}</h2>`,
+    `<p style="margin:0 0 12px;font-size:15px"><strong>${ph.healthy ? '🟢' : '🔴'} Email pipeline</strong> — ${esc(ingest)}${esc(rej)}</p>`,
+  ]
+  if (r.agingReview.total) b.push(section(`🕓 Aging in review (${r.agingReview.total})`, r.agingReview.items.map((i) => `<strong>${esc(i.file)}</strong> — ${i.ageDays}d in queue${i.guess ? `, guess ${esc(i.guess)}` : ''}${i.forwardedBy ? `, from ${esc(i.forwardedBy)}` : ''}`), r.agingReview.items.length, r.agingReview.total))
+  if (r.autoFileSpotCheck.total) b.push(section(`🔎 Auto-files to spot-check (${r.autoFileSpotCheck.total})`, r.autoFileSpotCheck.items.map((i) => `<strong>${esc(i.file)}</strong> → ${esc(i.project) || '(no project)'} <em>(${esc(i.method)}, ${i.confidence ?? '—'})</em>`), r.autoFileSpotCheck.items.length, r.autoFileSpotCheck.total))
+  if (r.duplicates.total) b.push(section(`♻️ Possible duplicates (${r.duplicates.total})`, r.duplicates.items.map((i) => `<strong>${esc(i.file)}</strong> ×${i.count}`), r.duplicates.items.length, r.duplicates.total))
+  if (r.unsorted.total) b.push(section(`📥 Unsorted, no project (${r.unsorted.total})`, r.unsorted.items.map((i) => `<strong>${esc(i.file)}</strong>`), r.unsorted.items.length, r.unsorted.total))
+  if (r.coverageGap.total) b.push(section(`📭 Recently delivered, nothing filed (${r.coverageGap.total})`, r.coverageGap.examples.map((e) => esc(e)), r.coverageGap.examples.length, r.coverageGap.total))
+  if (r.tally.filed) b.push(`<p style="margin:16px 0 4px;font-size:15px"><strong>📈 Filed this week: ${r.tally.filed}</strong> — ${r.tally.bySourceMethod.map((x) => `${esc(x.key)}: ${x.count}`).join(' · ')}</p>`)
+  if (r.clean) b.push(`<p style="margin:16px 0;font-size:15px">✅ Depository is clean — nothing aging, no dupes, no gaps.</p>`)
+  b.push(`<p style="margin:16px 0 0"><a href="${APP_URL}/deliverables">Open the review queue</a></p>`)
+  return `<div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#111;max-width:640px">${b.join('')}</div>`
+}
