@@ -28,6 +28,7 @@ function project(overrides: Partial<CalendarProject> = {}): CalendarProject {
     project_type: 'PS',
     phase: 'Active',
     status: 'Open',
+    board_column: 'Fielding',
     priority: 'normal',
     longitudinal: false,
     due_date: null,
@@ -83,6 +84,22 @@ describe('deriveEvents — date → event mapping', () => {
       filters()
     )
     expect(both.filter(e => e.type === 'rerun')).toHaveLength(1)
+  })
+
+  it('a delivered project drops the overdue tint on its due/deliver chips', () => {
+    const past = '2000-01-01'
+    // Delivered = board_column 'Delivery' but status still 'Open' — the chips
+    // still render, but with no red/overdue urgency (the work is done).
+    const delivered = deriveEvents(
+      [project({ board_column: 'Delivery', due_date: past, deliver_date: past })],
+      [],
+      filters()
+    )
+    expect(delivered.length).toBeGreaterThan(0)
+    expect(delivered.every(e => e.urgency === null)).toBe(true)
+    // A non-delivered open project with the same past date IS overdue.
+    const active = deriveEvents([project({ board_column: 'Fielding', due_date: past })], [], filters())
+    expect(active.find(e => e.type === 'due')?.urgency).toBe('overdue')
   })
 
   it("includes the caller's reminders as reminder events", () => {

@@ -86,6 +86,7 @@ export interface CalendarProject {
   project_type: 'PS' | 'B2B' | 'Rerun' | 'Internal' | null
   phase: 'Scoping' | 'Active'
   status: 'Open' | 'Closed' | 'Hold'
+  board_column: string | null
   priority: string | null
   longitudinal: boolean
   due_date: string | null
@@ -224,8 +225,11 @@ export function deriveEvents(
     if (!passesProjectFilters(p, filters, currentMemberId)) continue
 
     const label = projectLabel(p)
-    // Closed / Hold projects drop the urgency tint (mirrors the board card).
-    const tintable = !(p.status === 'Closed' || p.status === 'Hold')
+    // Closed / Hold / Delivered projects drop the urgency tint (mirrors the
+    // board card). A delivered project keeps status 'Open' with board_column
+    // 'Delivery', so guard on the column too — otherwise its due/deliver chips
+    // still read red/overdue even though the work is done.
+    const tintable = !(p.status === 'Closed' || p.status === 'Hold' || p.board_column === 'Delivery')
 
     const add = (type: CalendarEventType, date: string | null) => {
       if (!date || !filters.types[type]) return

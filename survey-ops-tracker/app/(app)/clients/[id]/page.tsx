@@ -14,6 +14,7 @@ import { MergeButton } from '@/components/merge/MergeButton'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
 import { Skeleton } from '@/components/shared/Skeleton'
 import { formatDate, getDueUrgency, urgencyPrefix } from '@/lib/utils/date'
+import { stageLabel } from '@/lib/utils/stage'
 import { fmtNum } from '@/lib/utils/number'
 import type { Tables } from '@/lib/supabase/types'
 
@@ -32,6 +33,7 @@ type ClientProject = {
   submitted_date: string | null
   due_date: string | null
   deliver_date: string | null
+  delivered_at: string | null
   created_at: string
   updated_at: string
   budget: number | null
@@ -42,7 +44,7 @@ type ClientProject = {
 }
 
 const PROJECT_COLS =
-  'id, project_code, project_name, client, status, phase, board_column, project_type, submitted_date, due_date, deliver_date, created_at, updated_at, budget, actual_spend, n_target, n_collected, n_actual'
+  'id, project_code, project_name, client, status, phase, board_column, project_type, submitted_date, due_date, deliver_date, delivered_at, created_at, updated_at, budget, actual_spend, n_target, n_collected, n_actual'
 
 function useClientPage(clientId: string) {
   const supabase = createClient()
@@ -225,7 +227,9 @@ export default function ClientPage() {
     const today = new Date().toISOString().slice(0, 10)
     const dates = rows.map(projectDate).sort()
     const open = rows.filter(p => p.status === 'Open')
-    const overdue = open.filter(p => p.due_date && p.due_date <= today).length
+    // A delivered project keeps status 'Open' (board_column 'Delivery') until
+    // archived, so exclude it from the overdue count — it's done.
+    const overdue = open.filter(p => p.board_column !== 'Delivery' && p.due_date && p.due_date <= today).length
     const withSpend = rows.filter(p => p.actual_spend != null && p.actual_spend > 0)
     const totalSpend = withSpend.reduce((s, p) => s + (p.actual_spend ?? 0), 0)
     const totalBudget = rows.reduce((s, p) => s + (p.budget ?? 0), 0)
@@ -420,9 +424,14 @@ export default function ClientPage() {
                     </thead>
                     <tbody>
                       {sortedRows.map((p, i) => {
-                        const urgency = p.status === 'Open' ? getDueUrgency(p.due_date) : null
-                        const dueColor =
-                          urgency === 'overdue'
+                        // Delivered = board_column 'Delivery' (status stays 'Open'). Show it
+                        // as done with its delivery date instead of an overdue warning.
+                        const delivered = p.board_column === 'Delivery'
+                        const urgency = p.status === 'Open' && !delivered ? getDueUrgency(p.due_date) : null
+                        const deliveredDate = p.deliver_date ?? p.delivered_at ?? p.due_date
+                        const dueColor = delivered
+                          ? 'text-emerald-600 dark:text-emerald-400'
+                          : urgency === 'overdue'
                             ? 'text-red-600 dark:text-red-400'
                             : urgency === 'tomorrow' || urgency === 'twodays'
                             ? 'text-amber-600 dark:text-amber-400'
@@ -448,7 +457,7 @@ export default function ClientPage() {
                             <td className="px-4 py-3 text-sm">
                               {p.status === 'Open' ? (
                                 <span className="text-xs px-2 py-1 rounded bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
-                                  {p.phase === 'Scoping' ? 'Scoping' : p.board_column}
+                                  {p.phase === 'Scoping' ? 'Scoping' : stageLabel(p.board_column)}
                                 </span>
                               ) : (
                                 <span className="text-xs px-2 py-1 rounded bg-muted text-muted-foreground">
@@ -463,7 +472,9 @@ export default function ClientPage() {
                               {fmtNum(p.n_collected)}{p.n_target != null ? ` / ${fmtNum(p.n_target)}` : ''}
                             </td>
                             <td className={`px-4 py-3 text-xs whitespace-nowrap ${dueColor}`}>
-                              {p.due_date ? (
+                              {delivered ? (
+                                <>✓ Delivered{deliveredDate ? ` · ${formatDate(deliveredDate)}` : ''}</>
+                              ) : p.due_date ? (
                                 <>
                                   {urgencyPrefix(urgency, p.due_date)}
                                   {formatDate(p.due_date)}

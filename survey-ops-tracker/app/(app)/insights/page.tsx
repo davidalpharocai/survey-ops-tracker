@@ -65,8 +65,10 @@ export default function InsightsPage() {
     const scoping = projects.filter(p => p.status === 'Open' && p.phase === 'Scoping')
     const closed = projects.filter(p => p.status === 'Closed')
 
-    const overdue = open.filter(p => p.due_date && p.due_date <= today)
-    const dueThisWeek = open.filter(p => p.due_date && p.due_date > today && p.due_date <= weekOut)
+    // Delivered projects keep status 'Open' (board_column 'Delivery'), so guard
+    // on the column — a delivered project past its due date isn't overdue.
+    const overdue = open.filter(p => p.board_column !== 'Delivery' && p.due_date && p.due_date <= today)
+    const dueThisWeek = open.filter(p => p.board_column !== 'Delivery' && p.due_date && p.due_date > today && p.due_date <= weekOut)
     const behind = open.filter(
       p => p.board_column === 'Fielding' && p.n_target != null && p.n_collected < p.n_target
     )
@@ -94,7 +96,7 @@ export default function InsightsPage() {
       const name = p.captain?.name ?? 'Unassigned'
       const c = capMap.get(name) ?? { id: p.captain?.id ?? 'unassigned', open: 0, overdue: 0 }
       c.open++
-      if (p.due_date && p.due_date <= today) c.overdue++
+      if (p.board_column !== 'Delivery' && p.due_date && p.due_date <= today) c.overdue++
       capMap.set(name, c)
     }
     const workload = [...capMap.entries()]

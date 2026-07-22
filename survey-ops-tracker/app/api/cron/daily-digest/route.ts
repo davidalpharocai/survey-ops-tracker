@@ -50,8 +50,10 @@ export async function GET(req: NextRequest) {
   const line = (p: Row) =>
     `• *${escSlack(p.project_name)}* (${escSlack(p.client)}) — ${escSlack(p.board_column)}, due ${fmt(p.due_date)}, ${p.n_collected}/${p.n_target ?? '—'} collected, ${escSlack(cap(p))}`
 
-  const overdue = (projects ?? []).filter(p => p.due_date && p.due_date <= today)
-  const dueSoon = (projects ?? []).filter(p => p.due_date && p.due_date > today && p.due_date <= soon)
+  // Delivered projects (board_column 'Delivery') keep status 'Open', so exclude
+  // them — a delivered project past its due date isn't overdue.
+  const overdue = (projects ?? []).filter(p => p.board_column !== 'Delivery' && p.due_date && p.due_date <= today)
+  const dueSoon = (projects ?? []).filter(p => p.board_column !== 'Delivery' && p.due_date && p.due_date > today && p.due_date <= soon)
   const behind = (projects ?? []).filter(
     p =>
       p.board_column === 'Fielding' &&
