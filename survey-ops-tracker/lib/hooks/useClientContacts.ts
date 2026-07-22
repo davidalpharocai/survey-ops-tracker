@@ -27,6 +27,32 @@ export function useClientContacts(clientId: string | null | undefined) {
   })
 }
 
+export type AllContact = {
+  id: string
+  first_name: string | null
+  last_name: string | null
+  title: string | null
+  client_id: string
+  clients: { name: string } | null
+}
+
+/** Every active contact across all clients (+ its client's name) — for the nav search. */
+export function useAllContacts() {
+  const supabase = createClient()
+  return useQuery({
+    queryKey: ['all-contacts'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('client_contacts')
+        .select('id, first_name, last_name, title, client_id, archived, clients(name)')
+        .eq('archived', false)
+      if (error) throw error
+      return (data ?? []) as unknown as AllContact[]
+    },
+    staleTime: 60_000,
+  })
+}
+
 export function useCreateClientContact(clientId: string) {
   const supabase = createClient()
   const qc = useQueryClient()

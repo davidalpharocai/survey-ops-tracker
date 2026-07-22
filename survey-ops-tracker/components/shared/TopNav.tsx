@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { ThemeToggle } from '@/components/shared/ThemeToggle'
+import { NavSearch } from '@/components/shared/NavSearch'
 
 const USER_GUIDE_URL =
   'https://docs.google.com/document/d/1FtnUeytOj1OI54dEhB5ogmoIcVKK18c9E1FztwKpQXE/edit'
@@ -151,6 +152,8 @@ export function TopNav() {
           )}
         </div>
       </div>
+
+      <NavSearch />
 
       <div className="ml-auto flex items-center gap-3">
         <span
