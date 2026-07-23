@@ -113,7 +113,7 @@ export function DeliverablesPanel({ projectId }: { projectId: string }) {
           }
 
           return (
-            <li key={d.id} className="group flex items-center gap-2 text-sm">
+            <li key={d.id} className="flex items-center gap-2 text-sm">
               <span>{d.kind === 'link' ? '🔗' : '📄'}</span>
               <a
                 className="flex-1 truncate hover:underline"
@@ -128,7 +128,7 @@ export function DeliverablesPanel({ projectId }: { projectId: string }) {
               <button
                 aria-label="Remove deliverable"
                 onClick={() => setConfirmingId(d.id)}
-                className="text-xs px-1.5 py-1 rounded hover:bg-muted opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
+                className="text-xs px-1.5 py-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
               >
                 ✕
               </button>
