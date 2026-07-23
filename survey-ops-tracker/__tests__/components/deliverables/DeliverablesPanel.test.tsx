@@ -91,4 +91,34 @@ describe('DeliverablesPanel rename & remove', () => {
     render(wrap(<DeliverablesPanel projectId="p1" />))
     expect(screen.getAllByText(/reset to auto name/i)).toHaveLength(1)
   })
+
+  it('Enter saves the rename with the typed value', () => {
+    render(wrap(<DeliverablesPanel projectId="p1" />))
+    fireEvent.click(screen.getAllByLabelText('Rename')[0])
+    const input = screen.getByDisplayValue('2026.06.10 — Topline.pdf')
+    fireEvent.change(input, { target: { value: 'Final topline' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(rename).toHaveBeenCalledWith(
+      { id: '1', displayName: 'Final topline' },
+      expect.anything(),
+    )
+  })
+
+  it('reset link fires rename with an empty string', () => {
+    render(wrap(<DeliverablesPanel projectId="p1" />))
+    fireEvent.click(screen.getByText(/reset to auto name/i))
+    expect(rename).toHaveBeenCalledWith(
+      { id: '2', displayName: '' },
+      expect.anything(),
+    )
+  })
+
+  it('Keep cancels the remove without firing the mutation', () => {
+    render(wrap(<DeliverablesPanel projectId="p1" />))
+    fireEvent.click(screen.getAllByLabelText('Remove deliverable')[0])
+    expect(screen.getByText(/stays in the client/i)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Keep' }))
+    expect(remove).not.toHaveBeenCalled()
+    expect(screen.queryByText(/stays in the client/i)).not.toBeInTheDocument()
+  })
 })

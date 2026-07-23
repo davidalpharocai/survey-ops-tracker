@@ -59,6 +59,11 @@ export function DeliverablesPanel({ projectId }: { projectId: string }) {
     setEditValue(shownName(d))
   }
 
+  function startConfirm(id: string) {
+    setEditingId(null)
+    setConfirmingId(id)
+  }
+
   function saveEdit(id: string, value: string) {
     setEditingId(null)
     rename.mutate(
@@ -188,7 +193,7 @@ export function DeliverablesPanel({ projectId }: { projectId: string }) {
               )}
               <Badge variant="secondary">{d.source}</Badge>
               {d.status !== 'filed' && <Badge variant="outline">{d.status}</Badge>}
-              <span className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <span className="flex items-center gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
                 <button
                   aria-label="Rename"
                   onClick={() => startEdit(d)}
@@ -198,7 +203,7 @@ export function DeliverablesPanel({ projectId }: { projectId: string }) {
                 </button>
                 <button
                   aria-label="Remove deliverable"
-                  onClick={() => setConfirmingId(d.id)}
+                  onClick={() => startConfirm(d.id)}
                   className="text-xs px-1.5 py-1 rounded hover:bg-muted"
                 >
                   ✕
