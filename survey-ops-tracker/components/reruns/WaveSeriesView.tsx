@@ -167,7 +167,12 @@ export function WaveSeriesView({
             <span title="Permanent project ID">ID</span>
             <span />
           </div>
-          <div className={showingAll && collapsible ? 'max-h-72 overflow-y-auto thin-scroll' : ''}>
+          <div
+            className={showingAll && collapsible ? 'max-h-72 overflow-y-auto thin-scroll' : ''}
+            tabIndex={showingAll && collapsible ? 0 : undefined}
+            role={showingAll && collapsible ? 'region' : undefined}
+            aria-label={showingAll && collapsible ? `All ${ordered.length} waves (scrollable)` : undefined}
+          >
             {display.map(rowFor)}
           </div>
         </div>
