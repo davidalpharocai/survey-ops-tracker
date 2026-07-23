@@ -9,7 +9,7 @@ import { useTeamMembers, assignableMembers, type TeamMember } from '@/lib/hooks/
 import { PipelineProgress } from '@/components/project/PipelineProgress'
 import { WaveHistory } from '@/components/project/WaveHistory'
 import { CloneProjectModal } from '@/components/project/CloneProjectModal'
-import { GenPopNWarning } from '@/components/project/GenPopNWarning'
+import { OverviewFieldGrid } from '@/components/project/OverviewFieldGrid'
 import { ScopingProgress } from '@/components/project/ScopingProgress'
 import { ActivityLog } from '@/components/project/ActivityLog'
 import { DataChangeLog } from '@/components/project/DataChangeLog'
@@ -18,27 +18,18 @@ import { InternalProjectView } from '@/components/internal/InternalProjectView'
 import { LatestNextSteps } from '@/components/project/LatestNextSteps'
 import { LinkedDocuments } from '@/components/project/LinkedDocuments'
 import { SlackChannel } from '@/components/project/SlackChannel'
-import { NProgressBar } from '@/components/shared/NProgressBar'
 import { InfoTooltip, HelpTip } from '@/components/shared/InfoTooltip'
 import { Skeleton } from '@/components/shared/Skeleton'
-import { formatDate, getDueUrgency } from '@/lib/utils/date'
-import { differenceInCalendarDays, parseISO, startOfDay } from 'date-fns'
-import { deriveWaitingOn } from '@/lib/utils/waitingOn'
-import { BudgetWidget } from '@/components/project/BudgetWidget'
-import { SuppliersWidget } from '@/components/project/SuppliersWidget'
 import { ProjectInsights } from '@/components/project/ProjectInsights'
-import { BlastConfigWidget } from '@/components/project/BlastConfigWidget'
 import { CompliancePanel } from '@/components/compliance/CompliancePanel'
 import { ComplianceBanner } from '@/components/project/ComplianceBanner'
 import { useComplianceState } from '@/lib/hooks/useComplianceState'
 import { beforeFieldingRequired, afterFieldingRequired } from '@/lib/utils/compliance'
-import { SegmentedNTile } from '@/components/project/SegmentedNTile'
 import { RequestedByRow } from '@/components/project/RequestedByRow'
-import { ordinal } from '@/lib/utils/rerun'
 import { DeliverablesPanel } from '@/components/deliverables/DeliverablesPanel'
 import { salespersonOptions } from '@/lib/utils/salespeople'
 import { MergeButton } from '@/components/merge/MergeButton'
-import { fmtNum } from '@/lib/utils/number'
+import { ProjectSummaryStrip } from '@/components/project/summary/ProjectSummaryStrip'
 
 const TOOLTIPS: Record<string, string> = {
   'Client': 'The client this project is for.',
@@ -68,6 +59,27 @@ const TYPE_BADGE: Record<string, string> = {
   'PS': 'bg-blue-500/20 text-blue-600 dark:text-blue-400',
   'B2B': 'bg-violet-500/20 text-violet-600 dark:text-violet-400',
   'Rerun': 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400',
+}
+
+// Rewrite a web ".../archives/<CHANNEL>" Slack link into a slack:// deep link so
+// the People row opens the desktop app instead of the browser. The team id can
+// ride in the query (?team=<TEAM>) or an earlier path segment (/client/<TEAM>/
+// or /team/<TEAM>/); when it's absent we deep-link by channel id alone. Anything
+// that isn't a recognizable Slack archives URL is returned unchanged.
+function slackDeepLink(url: string): string {
+  const channel = url.match(/\/archives\/([A-Z0-9]+)/i)?.[1]
+  if (!/slack\.com/i.test(url) || !channel) return url
+  const team =
+    url.match(/[?&]team=([A-Z0-9]+)/i)?.[1] ??
+    url.match(/\/(?:client|team)\/([A-Z0-9]+)/i)?.[1]
+  return team ? `slack://channel?team=${team}&id=${channel}` : `slack://channel?id=${channel}`
+}
+
+// Short label for the Slack link — the channel id from the archives URL, or a
+// generic fallback when we can't parse one out.
+function slackChannelLabel(url: string): string {
+  const channel = url.match(/\/archives\/([A-Z0-9]+)/i)?.[1]
+  return channel ? `#${channel}` : 'Slack channel'
 }
 
 export default function ProjectDetailPage() {
@@ -375,9 +387,8 @@ export default function ProjectDetailPage() {
         />
       )}
 
-      {/* Tabs + Survey IDs surfaced top-right (was buried in Links & Setup) */}
-      <div className="flex items-start justify-between gap-3 mb-4 flex-wrap">
-      <div className="flex flex-wrap bg-muted border border-border rounded-lg p-1 gap-1 w-fit">
+      {/* Tabs */}
+      <div className="flex flex-wrap bg-muted border border-border rounded-lg p-1 gap-1 w-fit mb-4">
         <button
           onClick={() => setActiveTab('overview')}
           title='The full project view — stats, pipeline, next steps, documents, and details'
@@ -445,41 +456,6 @@ export default function ProjectDetailPage() {
           Logs
         </button>
       </div>
-      <div className="bg-card border border-border shadow-sm rounded-xl px-3 py-2 w-full sm:w-auto sm:min-w-[260px] sm:max-w-sm flex flex-col gap-2">
-        <EditableRow
-          label="Survey IDs"
-          value={project.survey_tool_id ?? ''}
-          placeholder="e.g. SV-1042, SV-1043"
-          tooltip={TOOLTIPS['Survey IDs']}
-          onSave={v => updateProject.mutate({ id, updates: { survey_tool_id: v || null } })}
-        />
-        {project.survey_id_discrepancy && (
-          <div className="bg-amber-500/10 border border-amber-500/40 rounded-lg p-2 flex flex-col gap-1.5">
-            <p className="text-sm text-amber-700 dark:text-amber-400">⚠ {project.survey_id_discrepancy}</p>
-            <div className="flex gap-2">
-              <button
-                onClick={() => {
-                  const m = project.survey_id_discrepancy?.match(/"([^"]+)"/)
-                  updateProject.mutate({
-                    id,
-                    updates: { survey_tool_id: m?.[1] ?? project.survey_tool_id, survey_id_discrepancy: null },
-                  })
-                }}
-                className="text-[12px] bg-amber-500/20 hover:bg-amber-500/30 text-amber-700 dark:text-amber-300 px-2 py-1 rounded transition-colors"
-              >
-                Use Edwin ID
-              </button>
-              <button
-                onClick={() => updateProject.mutate({ id, updates: { survey_id_discrepancy: null } })}
-                className="text-[12px] text-muted-foreground hover:text-foreground px-2 py-1 transition-colors"
-              >
-                Keep current — dismiss
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-      </div>
 
       {activeTab === 'insights' && <ProjectInsights project={project} />}
 
@@ -517,26 +493,14 @@ export default function ProjectDetailPage() {
 
       {/* Overview tab — kept mounted (hidden) so in-progress edits survive tab switches */}
       <div className={activeTab === 'overview' ? '' : 'hidden'}>
+        <div className="mb-4">
+          <ProjectSummaryStrip projectId={project.id} />
+        </div>
         <NewProjectSetupBanner project={project} />
         <ComplianceBanner project={project} />
-        {/* Hero stat strip */}
-        <div className="grid grid-cols-1 md:grid-cols-[minmax(150px,0.9fr)_minmax(0,2.4fr)] gap-3 mb-4 items-stretch">
-          <SegmentedNTile
-            project={project}
-            tooltip={TOOLTIPS['N Collected']}
-            onSaveCollected={v => updateProject.mutate({ id, updates: { n_collected: v ?? 0 } })}
-            accent
-          />
-          <HeroDates
-            project={project}
-            closed={project.status === 'Closed'}
-            onSaveField={updates => updateProject.mutate({ id, updates })}
-          />
-        </div>
-
-        {/* Two-column layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_440px] gap-6">
-          {/* Left column */}
+        {/* Overview body — wide main column + slim rail */}
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_360px] gap-6">
+          {/* MAIN column: pipeline → field-grid body → linked documents */}
           <div className="flex flex-col gap-4">
             <div className="bg-card border border-border shadow-sm rounded-xl p-4">
               <div className="flex items-center justify-between mb-4">
@@ -568,21 +532,47 @@ export default function ProjectDetailPage() {
                 <PipelineProgress project={project} />
               )}
             </div>
+
+            {/* Edwin survey-ID discrepancy — Survey IDs now edit in the Details
+                grid below, so the resolver rides above it as an inline banner. */}
+            {project.survey_id_discrepancy && (
+              <div className="bg-amber-500/10 border border-amber-500/40 rounded-xl p-3 flex flex-col gap-1.5">
+                <p className="text-sm text-amber-700 dark:text-amber-400">⚠ {project.survey_id_discrepancy}</p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      const m = project.survey_id_discrepancy?.match(/"([^"]+)"/)
+                      updateProject.mutate({
+                        id,
+                        updates: { survey_tool_id: m?.[1] ?? project.survey_tool_id, survey_id_discrepancy: null },
+                      })
+                    }}
+                    className="text-[12px] bg-amber-500/20 hover:bg-amber-500/30 text-amber-700 dark:text-amber-300 px-2 py-1 rounded transition-colors"
+                  >
+                    Use Edwin ID
+                  </button>
+                  <button
+                    onClick={() => updateProject.mutate({ id, updates: { survey_id_discrepancy: null } })}
+                    className="text-[12px] text-muted-foreground hover:text-foreground px-2 py-1 transition-colors"
+                  >
+                    Keep current — dismiss
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <OverviewFieldGrid project={project} />
+
             <LinkedDocuments
               projectId={project.id}
               documents={project.linked_documents ?? []}
             />
-            <LatestNextSteps projectId={project.id} notes={project.latest_next_steps} />
-            {showCompliance && <CompliancePanel projectId={project.id} project={project} />}
           </div>
 
-          {/* Right sidebar — packs into 2 columns on wide screens to cut scrolling;
-              single column on narrower ones. Money spans both (it's the tallest). */}
-          <div className="flex flex-col gap-4 self-start xl:grid xl:grid-cols-2 xl:items-start xl:content-start xl:gap-4">
-            <SidebarCard title="People" className="xl:col-span-2">
-              {/* Full-width People card so long names aren't clipped; fields flow
-                  into two columns once the sidebar is wide enough (xl+). */}
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-x-8 gap-y-3 items-start">
+          {/* RAIL: people → rerun series → compliance glance → next steps */}
+          <div className="flex flex-col gap-4 self-start">
+            <SidebarCard title="People">
+              <div className="flex flex-col gap-3">
                 {project.client_id ? (
                   <div className="flex justify-between items-center text-sm gap-2">
                     <span className="text-muted-foreground flex items-center text-xs shrink-0">
@@ -622,118 +612,34 @@ export default function ProjectDetailPage() {
                   tooltip={TOOLTIPS['Salesperson']}
                   onSave={v => updateProject.mutate({ id, updates: { salesperson: v } })}
                 />
+                {/* Slack — B2B projects coordinate in a shared channel; the link
+                    opens the desktop app via a slack:// deep link. */}
+                {project.project_type === 'B2B' && project.slack_channel_url && (
+                  <div className="flex justify-between items-center text-sm gap-2">
+                    <span className="text-muted-foreground flex items-center text-xs shrink-0">
+                      Slack
+                      <InfoTooltip text="Opens this project's Slack channel in the desktop app." />
+                    </span>
+                    <a
+                      href={slackDeepLink(project.slack_channel_url)}
+                      className="text-sm text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1 min-w-0"
+                      title="Open this channel in the Slack app"
+                    >
+                      <span aria-hidden="true">💬</span>
+                      <span className="truncate">{slackChannelLabel(project.slack_channel_url)}</span>
+                    </a>
+                  </div>
+                )}
               </div>
             </SidebarCard>
 
-            <SidebarCard title="Sample N & Audience" className="xl:col-span-2" dense>
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-x-8 gap-y-2 items-start">
-                <EditableNumberRow
-                  label="N Target"
-                  value={project.n_target}
-                  tooltip={TOOLTIPS['N Target']}
-                  onSave={v => updateProject.mutate({ id, updates: { n_target: v } })}
-                />
-                <EditableNumberRow
-                  label="N Internal Target"
-                  value={project.n_internal_target ?? null}
-                  tooltip={TOOLTIPS['N Internal Target']}
-                  onSave={v => updateProject.mutate({ id, updates: { n_internal_target: v } })}
-                />
-                <DetailRow
-                  label="N Collected"
-                  value={(project.n_collected ?? 0).toLocaleString()}
-                  tooltip="Live count — edit it in the N tile at the top so it lives in one place (and syncs cleanly to the sheet)."
-                />
-                <EditableNumberRow
-                  label="N Actual"
-                  value={project.n_actual}
-                  tooltip={TOOLTIPS['N Actual']}
-                  onSave={v => updateProject.mutate({ id, updates: { n_actual: v } })}
-                />
-                <EditableNumberRow
-                  label="Audience Size"
-                  value={project.audience_size}
-                  tooltip={TOOLTIPS['Audience Size']}
-                  onSave={v => updateProject.mutate({ id, updates: { audience_size: v } })}
-                />
-                <EditableRow
-                  label="Audience"
-                  value={project.audience ?? ''}
-                  placeholder="e.g. US adults 18+, likely voters"
-                  tooltip={TOOLTIPS['Audience']}
-                  onSave={v => updateProject.mutate({ id, updates: { audience: v || null } })}
-                />
-              </div>
-              <GenPopNWarning project={project} />
-            </SidebarCard>
-
-            <SidebarCard title="Flags" className="xl:col-span-2" dense>
-              <div className="flex flex-wrap gap-1">
-                <FlagChip
-                  label="Longitudinal"
-                  value={project.longitudinal ?? false}
-                  tone="emerald"
-                  tooltip={TOOLTIPS['Longitudinal']}
-                  onToggle={v => updateProject.mutate({ id, updates: { longitudinal: v } })}
-                />
-                <FlagChip
-                  label="Voter Survey QA"
-                  value={project.voter_survey_qa ?? false}
-                  tone="amber"
-                  tooltip={TOOLTIPS['Voter Survey QA']}
-                  onToggle={v => updateProject.mutate({ id, updates: { voter_survey_qa: v } })}
-                />
-                <FlagChip
-                  label="Citation Language"
-                  value={project.citation_language_needed ?? false}
-                  tone="amber"
-                  tooltip={TOOLTIPS['Citation Language']}
-                  onToggle={v => updateProject.mutate({ id, updates: { citation_language_needed: v } })}
-                />
-                <FlagChip
-                  label="Row-Level Data"
-                  value={project.row_level_data}
-                  tone="emerald"
-                  tooltip={TOOLTIPS['Row-Level Data']}
-                  onToggle={v => updateProject.mutate({ id, updates: { row_level_data: v } })}
-                />
-                <FlagChip
-                  label="Terminations"
-                  value={project.terminations}
-                  tone="red"
-                  tooltip={TOOLTIPS['Terminations']}
-                  onToggle={v => updateProject.mutate({ id, updates: { terminations: v } })}
-                />
-              </div>
-            </SidebarCard>
-
-            <SidebarCard title="Money" className="xl:col-span-2">
-              {/* PS → Suppliers (PureSpectrum), B2B → Blast Configuration.
-                  Rerun/untyped show both (they don't map cleanly to one). */}
-              {project.project_type === 'PS' && (
-                <SuppliersWidget projectId={project.id} nTarget={project.n_target} nInternalTarget={project.n_internal_target} nActual={project.n_actual} />
-              )}
-              {project.project_type === 'B2B' && <BlastConfigWidget projectId={project.id} />}
-              {(project.project_type === 'Rerun' || project.project_type == null) && (
-                <>
-                  <SuppliersWidget projectId={project.id} nTarget={project.n_target} nInternalTarget={project.n_internal_target} nActual={project.n_actual} />
-                  <BlastConfigWidget projectId={project.id} />
-                </>
-              )}
-              {/* Budgets sit under the supplier/blast config now (David's ordering). */}
-              <div className="border-t border-border pt-3 mt-1">
-                <BudgetWidget
-                  projectId={project.id}
-                  budget={project.budget ?? null}
-                  nCollected={project.n_collected}
-                  actualSpend={project.actual_spend ?? null}
-                />
-              </div>
-            </SidebarCard>
-
-            <SidebarCard title="Rerun history" className="xl:col-span-2" dense>
+            <SidebarCard title="Rerun history" dense>
               <WaveHistory project={project} />
             </SidebarCard>
+
+            {showCompliance && <CompliancePanel projectId={project.id} project={project} />}
+
+            <LatestNextSteps projectId={project.id} notes={project.latest_next_steps} />
           </div>
         </div>
       </div>
@@ -748,234 +654,6 @@ function SidebarCard({ title, children, className = '', dense = false }: { title
         {title}
       </h3>
       <div className={`flex flex-col ${dense ? 'gap-2' : 'gap-3'}`}>{children}</div>
-    </div>
-  )
-}
-
-/* ---------- Hero stat strip cards ---------- */
-
-function HeroDates({
-  project,
-  closed,
-  onSaveField,
-}: {
-  project: SurveyProject
-  closed: boolean
-  onSaveField: (updates: Partial<SurveyProject>) => void
-}) {
-  const due = project.due_date
-  const deliver = project.deliver_date
-
-  // Closed projects are done — drop the red/orange/amber urgency treatment
-  const urgency = closed ? null : getDueUrgency(due)
-  const dueColor =
-    urgency === 'overdue'
-      ? 'text-red-600 dark:text-red-400'
-      : urgency === 'tomorrow'
-      ? 'text-orange-600 dark:text-orange-400'
-      : urgency === 'twodays'
-      ? 'text-amber-600 dark:text-amber-400'
-      : 'text-foreground'
-
-  let duePhrase = ' '
-  if (due && !closed) {
-    const days = differenceInCalendarDays(startOfDay(parseISO(due)), startOfDay(new Date()))
-    duePhrase =
-      days < 0 ? 'overdue' : days === 0 ? 'today' : days === 1 ? 'tomorrow' : `in ${days} days`
-  }
-
-  // The useful number: how much buffer between internally-done and client delivery
-  let deliverPhrase = ' '
-  let deliverWarn = false
-  if (deliver && due) {
-    const gap = differenceInCalendarDays(startOfDay(parseISO(deliver)), startOfDay(parseISO(due)))
-    if (gap === 0) deliverPhrase = 'same day as due'
-    else if (gap > 0) deliverPhrase = `${gap}d buffer after due`
-    else {
-      deliverPhrase = `⚠ ${-gap}d before due`
-      deliverWarn = true
-    }
-  } else if (deliver) {
-    deliverPhrase = 'no internal due set'
-  }
-
-  const longitudinal = !!project.longitudinal
-
-  return (
-    <div className="bg-card border border-border shadow-sm rounded-xl p-2.5 flex flex-col justify-center gap-1.5">
-      <div className={`grid grid-cols-2 ${longitudinal ? 'sm:grid-cols-5' : 'sm:grid-cols-4'} gap-x-3 gap-y-2`}>
-        <HeroDateCell
-          label="Submitted"
-          tooltip={TOOLTIPS['Submitted']}
-          value={project.submitted_date}
-          onSave={v => onSaveField({ submitted_date: v })}
-        />
-        <HeroDateCell
-          label="Launch"
-          tooltip={TOOLTIPS['Launch Date']}
-          value={project.launch_date}
-          onSave={v => onSaveField({ launch_date: v })}
-        />
-        <HeroDateCell
-          label="Due"
-          hint="internal"
-          tooltip={TOOLTIPS['Due Date']}
-          value={due}
-          valueColor={dueColor}
-          subtitle={duePhrase}
-          onSave={v => onSaveField({ due_date: v })}
-        />
-        <HeroDateCell
-          label="Deliver"
-          hint="client"
-          tooltip={TOOLTIPS['Deliver Date']}
-          value={deliver}
-          valueColor={deliverWarn ? 'text-amber-600 dark:text-amber-400' : 'text-foreground'}
-          subtitle={deliverPhrase}
-          onSave={v => onSaveField({ deliver_date: v })}
-        />
-        {longitudinal && (
-          <HeroDateCell
-            label="Rerun"
-            tooltip="When the next wave of this longitudinal survey should run. A week before this date the system auto-creates the next wave, setup carried over and run-data reset."
-            value={project.rerun_date ?? null}
-            onSave={v => onSaveField({ rerun_date: v, rerun_spawned_at: null })}
-          />
-        )}
-      </div>
-      {longitudinal && ((project.rerun_number ?? 1) > 1 || project.rerun_spawned_at) && (
-        <p className="text-[11px] text-muted-foreground/70 truncate">
-          {(project.rerun_number ?? 1) > 1 ? `${ordinal(project.rerun_number)} wave` : ''}
-          {(project.rerun_number ?? 1) > 1 && project.rerun_spawned_at ? ' · ' : ''}
-          {project.rerun_spawned_at ? '↻ next wave created' : ''}
-        </p>
-      )}
-    </div>
-  )
-}
-
-function HeroDateCell({
-  label,
-  hint,
-  tooltip,
-  value,
-  valueColor = 'text-foreground',
-  subtitle,
-  onSave,
-}: {
-  label: string
-  hint?: string
-  tooltip: string
-  value: string | null
-  valueColor?: string
-  subtitle?: string
-  onSave: (next: string | null) => void
-}) {
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState('')
-
-  function save() {
-    onSave(draft || null)
-    setEditing(false)
-  }
-
-  return (
-    <div className="flex flex-col gap-0.5 min-w-0" title={tooltip}>
-      <span className="text-[11px] uppercase tracking-wide text-muted-foreground whitespace-nowrap">
-        {label}
-        {hint && <span className="text-muted-foreground/60 normal-case"> ({hint})</span>}
-      </span>
-      {editing ? (
-        <input
-          autoFocus
-          type="date"
-          value={draft}
-          onChange={e => setDraft(e.target.value)}
-          onBlur={save}
-          className="min-w-0 w-full bg-muted border border-border rounded px-1 py-0.5 text-sm text-foreground focus:outline-none focus:border-ring"
-          onKeyDown={e => {
-            if (e.key === 'Enter') save()
-            if (e.key === 'Escape') setEditing(false)
-          }}
-        />
-      ) : (
-        <button
-          onClick={() => {
-            setDraft(value ? value.slice(0, 10) : '')
-            setEditing(true)
-          }}
-          className={`text-sm font-medium leading-tight text-left cursor-pointer truncate hover:bg-accent rounded px-1 -ml-1 transition-colors ${valueColor}`}
-          title="Click to edit"
-        >
-          {formatDate(value)}
-        </button>
-      )}
-      {subtitle !== undefined && (
-        <span className="text-[11px] text-muted-foreground truncate">{subtitle}</span>
-      )}
-    </div>
-  )
-}
-
-function HeroWaitingOn({
-  project,
-  onSetBlockedBy,
-}: {
-  project: Parameters<typeof deriveWaitingOn>[0] & { blocked_by?: string | null }
-  onSetBlockedBy: (next: string) => void
-}) {
-  const derived = deriveWaitingOn(project)
-  const [main, sub] = derived.split(' — ')
-  const blocked = project.blocked_by === 'client' || project.blocked_by === 'internal'
-  const [picking, setPicking] = useState(false)
-  return (
-    <div className="bg-card border border-border shadow-sm rounded-xl p-2.5 flex flex-col gap-1">
-      <span className="text-xs text-muted-foreground flex items-center">
-        Waiting on
-        <InfoTooltip text="Auto-derived from status, phase, stage checkboxes, and fielding progress. Mark the project blocked to force it to Client or Us." />
-      </span>
-      <span
-        className={`text-lg font-semibold leading-tight truncate ${
-          main === 'Client' ? 'text-amber-600 dark:text-amber-400' : 'text-foreground'
-        }`}
-        title={derived}
-      >
-        {main}
-      </span>
-      <span className="text-xs text-muted-foreground">{sub ?? ' '}</span>
-      {/* The block override is rare, so it's a small ghost control by default. */}
-      {blocked ? (
-        <button
-          onClick={() => onSetBlockedBy('none')}
-          title="Clear the manual block"
-          className="mt-1 self-start text-[12px] inline-flex items-center gap-1 rounded-full px-2 py-0.5 bg-amber-500/15 text-amber-600 dark:text-amber-400 hover:bg-amber-500/25 transition-colors"
-        >
-          {project.blocked_by === 'client' ? 'Blocked — client' : 'Blocked — us'} ✕
-        </button>
-      ) : picking ? (
-        <select
-          autoFocus
-          value="none"
-          onChange={e => {
-            onSetBlockedBy(e.target.value)
-            setPicking(false)
-          }}
-          onBlur={() => setPicking(false)}
-          className="mt-1 self-start bg-muted border border-border rounded px-1 py-0.5 text-[12px] text-muted-foreground focus:outline-none focus:border-ring cursor-pointer"
-        >
-        <option value="none">None</option>
-        <option value="client">Blocked — client</option>
-        <option value="internal">Blocked — us</option>
-        </select>
-      ) : (
-        <button
-          onClick={() => setPicking(true)}
-          title="Mark this project blocked (forces Waiting On to Client or Us)"
-          className="mt-1 self-start text-[12px] text-muted-foreground/50 hover:text-foreground transition-colors"
-        >
-          + mark blocked
-        </button>
-      )}
     </div>
   )
 }
@@ -999,11 +677,10 @@ function NewProjectSetupBanner({ project }: { project: SurveyProject }) {
       <div className="flex-1 text-sm">
         <p className="font-medium text-foreground">New project — a few essentials to fill in</p>
         <p className="text-muted-foreground mt-0.5 leading-relaxed">
-          Set the <span className="text-foreground">Due date</span> and{' '}
-          <span className="text-foreground">N target</span> in the tiles below, add a{' '}
-          <span className="text-foreground">Captain</span> and{' '}
-          <span className="text-foreground">Budget</span> in the side cards — or use{' '}
-          <span className="text-foreground">✦ Edit by description</span> to fill several at once.
+          Fill in the <span className="text-foreground">Due date</span>,{' '}
+          <span className="text-foreground">N target</span>,{' '}
+          <span className="text-foreground">Captain</span>, and{' '}
+          <span className="text-foreground">Budget</span> to finish setting this project up.
         </p>
       </div>
       <button
@@ -1069,114 +746,6 @@ function PriorityButton({
         ⚑ Priority
       </button>
     </HelpTip>
-  )
-}
-
-function EditableRow({
-  label,
-  value,
-  placeholder,
-  tooltip,
-  onSave,
-}: {
-  label: string
-  value: string
-  placeholder?: string
-  tooltip?: string
-  onSave: (next: string) => void
-}) {
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState('')
-
-  function save() {
-    onSave(draft.trim())
-    setEditing(false)
-  }
-
-  if (editing) {
-    return (
-      <div className="flex flex-col gap-1.5 text-sm">
-        <span className="text-muted-foreground flex items-center text-xs">
-          {label}
-          {tooltip && <InfoTooltip text={tooltip} />}
-        </span>
-        <div className="flex gap-1.5">
-          <input
-            autoFocus
-            value={draft}
-            onChange={e => setDraft(e.target.value)}
-            placeholder={placeholder}
-            className="flex-1 min-w-0 bg-muted border border-border rounded px-2 py-1 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring"
-            onKeyDown={e => {
-              if (e.key === 'Enter') save()
-              if (e.key === 'Escape') setEditing(false)
-            }}
-          />
-          <button
-            onClick={save}
-            className="text-xs bg-muted hover:bg-accent text-foreground px-2 py-1 rounded transition-colors"
-          >
-            Save
-          </button>
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div className={`flex justify-between items-center text-sm gap-2 ${value ? '' : 'opacity-60'}`}>
-      <span className="text-muted-foreground flex items-center text-xs shrink-0">
-        {label}
-        {tooltip && <InfoTooltip text={tooltip} />}
-      </span>
-      <button
-        onClick={() => {
-          setDraft(value)
-          setEditing(true)
-        }}
-        className="text-[13px] text-foreground hover:bg-accent rounded px-1.5 transition-colors truncate cursor-pointer"
-        title="Click to edit"
-      >
-        {value || <span className="text-muted-foreground/50 whitespace-nowrap">— set</span>}
-      </button>
-    </div>
-  )
-}
-
-const CHIP_ON: Record<'red' | 'amber' | 'emerald', string> = {
-  red: 'bg-red-500/15 text-red-600 dark:text-red-400 hover:bg-red-500/25',
-  amber: 'bg-amber-500/15 text-amber-600 dark:text-amber-400 hover:bg-amber-500/25',
-  emerald: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/25',
-}
-
-function FlagChip({
-  label,
-  value,
-  tone,
-  tooltip,
-  onToggle,
-}: {
-  label: string
-  value: boolean
-  tone: 'red' | 'amber' | 'emerald'
-  tooltip?: string
-  onToggle: (next: boolean) => void
-}) {
-  return (
-    <button
-      onClick={() => onToggle(!value)}
-      title={tooltip}
-      aria-pressed={value}
-      className={`rounded-full px-2 py-0.5 text-xs cursor-pointer transition-colors ${
-        value
-          ? CHIP_ON[tone]
-          : 'border border-dashed border-border bg-transparent text-muted-foreground hover:bg-muted'
-      }`}
-    >
-      {/* On/off marker so state isn't conveyed by color alone, and the dashed
-          off-state reads as a pressable toggle rather than a disabled chip. */}
-      {value ? (tone === 'red' ? `⚠ ${label}` : `✓ ${label}`) : `○ ${label}`}
-    </button>
   )
 }
 
@@ -1273,78 +842,6 @@ function DetailRow({
         {tooltip && <InfoTooltip text={tooltip} />}
       </span>
       <span className={`text-[13px] px-1.5 ${valueClass}`}>{value}</span>
-    </div>
-  )
-}
-
-function EditableNumberRow({
-  label,
-  value,
-  tooltip,
-  valueClass = 'text-foreground hover:text-foreground/70',
-  onSave,
-}: {
-  label: string
-  value: number | null
-  tooltip?: string
-  valueClass?: string
-  onSave: (next: number | null) => void
-}) {
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState('')
-
-  function save() {
-    const parsed = parseInt(draft, 10)
-    onSave(isNaN(parsed) ? null : parsed)
-    setEditing(false)
-  }
-
-  if (editing) {
-    return (
-      <div className="flex justify-between items-center text-sm gap-2">
-        <span className="text-muted-foreground flex items-center text-xs shrink-0">
-          {label}
-          {tooltip && <InfoTooltip text={tooltip} />}
-        </span>
-        <div className="flex gap-1.5">
-          <input
-            autoFocus
-            type="number"
-            value={draft}
-            onChange={e => setDraft(e.target.value)}
-            className="w-20 bg-muted border border-border rounded px-2 py-1 text-sm text-foreground text-right focus:outline-none focus:border-ring"
-            onKeyDown={e => {
-              if (e.key === 'Enter') save()
-              if (e.key === 'Escape') setEditing(false)
-            }}
-          />
-          <button
-            onClick={save}
-            className="text-xs bg-muted hover:bg-accent text-foreground px-2 py-1 rounded transition-colors"
-          >
-            Save
-          </button>
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div className={`flex justify-between items-center text-sm gap-2 ${value != null ? '' : 'opacity-60'}`}>
-      <span className="text-muted-foreground flex items-center text-xs shrink-0">
-        {label}
-        {tooltip && <InfoTooltip text={tooltip} />}
-      </span>
-      <button
-        onClick={() => {
-          setDraft(value != null ? String(value) : '')
-          setEditing(true)
-        }}
-        className={`text-[13px] cursor-pointer hover:bg-accent rounded px-1.5 transition-colors ${valueClass}`}
-        title="Click to edit"
-      >
-        {value != null ? fmtNum(value) : <span className="text-muted-foreground/50 whitespace-nowrap">— set</span>}
-      </button>
     </div>
   )
 }
