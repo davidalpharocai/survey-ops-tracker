@@ -89,6 +89,58 @@ export function useRerunCandidates(
   })
 }
 
+export type RerunSeriesGroup = {
+  rootId: string
+  /** Client of the series' root/original wave. */
+  client: string
+  /** Root wave's project name (raw; the board strips a trailing "— week N"). */
+  name: string
+  waves: Wave[]
+}
+
+/** Every multi-wave rerun series (grouped by root), for the /reruns Series board.
+ *  A series = a root (its own id) plus the waves whose rerun_series_id points to it. */
+export function useAllRerunSeries() {
+  const supabase = createClient()
+  return useQuery({
+    queryKey: ['all-rerun-series'],
+    queryFn: async (): Promise<RerunSeriesGroup[]> => {
+      const { data: children, error } = await supabase
+        .from('survey_projects')
+        .select(WAVE_COLS)
+        .not('rerun_series_id', 'is', null)
+        .is('deleted_at', null)
+      if (error) throw error
+      const kids = (children ?? []) as Wave[]
+      const rootIds = Array.from(new Set(kids.map(c => c.rerun_series_id).filter(Boolean) as string[]))
+      let roots: Wave[] = []
+      if (rootIds.length) {
+        const { data, error: e2 } = await supabase
+          .from('survey_projects')
+          .select(WAVE_COLS)
+          .in('id', rootIds)
+          .is('deleted_at', null)
+        if (e2) throw e2
+        roots = (data ?? []) as Wave[]
+      }
+      const byRoot = new Map<string, Wave[]>()
+      for (const w of [...roots, ...kids]) {
+        const root = w.rerun_series_id ?? w.id
+        ;(byRoot.get(root) ?? byRoot.set(root, []).get(root)!).push(w)
+      }
+      return [...byRoot.entries()]
+        .map(([rootId, ws]) => {
+          const waves = [...ws].sort((a, b) => (a.rerun_number ?? 0) - (b.rerun_number ?? 0))
+          const root = waves.find(w => w.id === rootId) ?? waves[0]
+          return { rootId, client: root.client, name: root.project_name, waves }
+        })
+        .filter(s => s.waves.length > 1)
+        .sort((a, b) => a.client.localeCompare(b.client) || a.name.localeCompare(b.name))
+    },
+    staleTime: 30_000,
+  })
+}
+
 /** Link the current project as a rerun of a parent (parentId), or detach it (null). */
 export function useLinkRerun() {
   const queryClient = useQueryClient()

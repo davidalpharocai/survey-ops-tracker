@@ -598,6 +598,10 @@ export default function RerunsPage() {
 
   return (
     <div className="max-w-5xl mx-auto flex flex-col gap-4">
+      <div className="flex items-center gap-1 text-sm" role="tablist" aria-label="Reruns views">
+        <span className="px-3 py-1 rounded-lg bg-accent text-foreground font-medium" title="Sree’s rerun tracker, bucketed by overdue / upcoming / done">Radar</span>
+        <Link href="/reruns/series" className="px-3 py-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors" title="Every rerun series — see and reorganize waves">Series</Link>
+      </div>
       <div>
         <h1 className="text-2xl font-bold text-foreground">Rerun Radar</h1>
         <p className="text-sm text-muted-foreground mt-0.5">
