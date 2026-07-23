@@ -3,7 +3,6 @@ import { useRef, useState } from 'react'
 import {
   useDeliverables,
   useUploadDeliverable,
-  useRenameDeliverable,
   useRemoveDeliverable,
   type DeliverableRow,
 } from '@/lib/hooks/useDeliverables'
@@ -12,17 +11,14 @@ import { Badge } from '@/components/ui/badge'
 import { toast } from '@/lib/utils/toast'
 
 const driveUrl = (id: string) => `https://drive.google.com/file/d/${id}/view`
-const shownName = (d: DeliverableRow) => d.display_name ?? d.file_name ?? d.original_file_name ?? 'Untitled'
+const shownName = (d: DeliverableRow) => d.file_name ?? d.original_file_name ?? 'Untitled'
 
 export function DeliverablesPanel({ projectId }: { projectId: string }) {
   const { data, isLoading } = useDeliverables(projectId)
   const upload = useUploadDeliverable(projectId)
-  const rename = useRenameDeliverable(projectId)
   const remove = useRemoveDeliverable(projectId)
   const fileRef = useRef<HTMLInputElement>(null)
   const [link, setLink] = useState('')
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [editValue, setEditValue] = useState('')
   const [confirmingId, setConfirmingId] = useState<string | null>(null)
 
   function onFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -48,38 +44,6 @@ export function DeliverablesPanel({ projectId }: { projectId: string }) {
           setLink('')
           toast(r.status === 'duplicate' ? 'Already filed — skipped' : 'Filed ✓', 'success')
         },
-        onError: (err) => toast(String((err as Error).message)),
-      }
-    )
-  }
-
-  function startEdit(d: DeliverableRow) {
-    setConfirmingId(null)
-    setEditingId(d.id)
-    setEditValue(shownName(d))
-  }
-
-  function startConfirm(id: string) {
-    setEditingId(null)
-    setConfirmingId(id)
-  }
-
-  function saveEdit(id: string, value: string) {
-    setEditingId(null)
-    rename.mutate(
-      { id, displayName: value },
-      {
-        onSuccess: () => toast('Renamed ✓', 'success'),
-        onError: (err) => toast(String((err as Error).message)),
-      }
-    )
-  }
-
-  function resetName(id: string) {
-    rename.mutate(
-      { id, displayName: '' },
-      {
-        onSuccess: () => toast('Reset to auto name ✓', 'success'),
         onError: (err) => toast(String((err as Error).message)),
       }
     )
@@ -132,30 +96,6 @@ export function DeliverablesPanel({ projectId }: { projectId: string }) {
         {data?.map((d: DeliverableRow) => {
           const name = shownName(d)
 
-          if (editingId === d.id) {
-            return (
-              <li key={d.id} className="flex items-center gap-2 text-sm">
-                <span>{d.kind === 'link' ? '🔗' : '📄'}</span>
-                <input
-                  autoFocus
-                  value={editValue}
-                  onChange={(e) => setEditValue(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') saveEdit(d.id, editValue)
-                    if (e.key === 'Escape') setEditingId(null)
-                  }}
-                  className="flex-1 text-sm px-2 py-1 rounded-lg border border-border bg-background focus:outline-none focus:border-ring"
-                />
-                <button onClick={() => saveEdit(d.id, editValue)} className="text-xs px-2 py-1 rounded-lg border border-border hover:bg-muted">
-                  Save
-                </button>
-                <button onClick={() => setEditingId(null)} className="text-xs px-2 py-1 rounded-lg border border-border hover:bg-muted">
-                  Cancel
-                </button>
-              </li>
-            )
-          }
-
           if (confirmingId === d.id) {
             return (
               <li key={d.id} className="flex items-center gap-2 text-sm bg-destructive/10 rounded-lg px-2 py-1.5">
@@ -183,32 +123,15 @@ export function DeliverablesPanel({ projectId }: { projectId: string }) {
               >
                 {name}
               </a>
-              {d.display_name && (
-                <button
-                  onClick={() => resetName(d.id)}
-                  className="text-[11px] text-muted-foreground hover:underline"
-                >
-                  reset to auto name
-                </button>
-              )}
               <Badge variant="secondary">{d.source}</Badge>
               {d.status !== 'filed' && <Badge variant="outline">{d.status}</Badge>}
-              <span className="flex items-center gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
-                <button
-                  aria-label="Rename"
-                  onClick={() => startEdit(d)}
-                  className="text-xs px-1.5 py-1 rounded hover:bg-muted"
-                >
-                  ✎
-                </button>
-                <button
-                  aria-label="Remove deliverable"
-                  onClick={() => startConfirm(d.id)}
-                  className="text-xs px-1.5 py-1 rounded hover:bg-muted"
-                >
-                  ✕
-                </button>
-              </span>
+              <button
+                aria-label="Remove deliverable"
+                onClick={() => setConfirmingId(d.id)}
+                className="text-xs px-1.5 py-1 rounded hover:bg-muted opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
+              >
+                ✕
+              </button>
             </li>
           )
         })}
