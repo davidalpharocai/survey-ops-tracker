@@ -124,8 +124,8 @@ export function RerunSeriesBoard() {
               const d = read(e)
               if (d?.waveId) merge(d, s.rootId, s.client)
             }}
-            className={`bg-card border rounded-xl p-4 flex flex-col gap-2.5 transition-colors ${
-              isOver ? 'border-primary ring-1 ring-primary bg-primary/5' : 'border-border'
+            className={`bg-card border rounded-xl p-4 flex flex-col gap-2.5 transition ${
+              isOver ? 'border-primary ring-1 ring-primary bg-primary/5' : 'border-border hover:ring-2 hover:ring-primary/30'
             }`}
           >
             <div className="flex items-baseline justify-between gap-2 flex-wrap">

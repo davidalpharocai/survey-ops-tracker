@@ -110,7 +110,7 @@ export function WaveSeriesView({
         title={`${waveLabel(w.rerun_number)} · ${s.tip}${isCurrent ? ' (this project)' : ' — click to open'}${canDrag ? ' · drag onto another series to move it' : ''}`}
         className={`grid items-center gap-2 px-3 ${compact ? 'py-1.5' : 'py-2'} border-b border-border last:border-b-0 border-l-2 ${
           s.ring
-        } ${isCurrent ? 'bg-accent/60' : `${canDrag ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'} hover:bg-accent/50`} transition-colors`}
+        } ${isCurrent ? 'bg-accent/60' : `${canDrag ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'} hover:bg-accent/50 hover:ring-1 hover:ring-inset hover:ring-primary/30`} transition`}
         style={{ gridTemplateColumns: GRID }}
       >
         <span
