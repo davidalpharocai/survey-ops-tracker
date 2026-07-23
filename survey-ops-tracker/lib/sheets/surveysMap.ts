@@ -37,6 +37,13 @@ const statusFor = (p: SurveyProject) => (p.delivered_at ? 'Done' : 'In Progress'
 // columns (date/number/bool cells never start with these and must not be quoted).
 export const escapeText = (s: string) => (/^[=+\-@]/.test(s) ? `'${s}` : s)
 
+// A clickable Sheets hyperlink for a link cell (written under USER_ENTERED). The
+// bare-URL text the team saw isn't clickable, so wrap it in =HYPERLINK(). Empty
+// string when there's no URL. Double-quotes in the URL are doubled so they can't
+// break out of the formula's string literal (Google Docs URLs never contain them,
+// but we defend anyway); NOT run through escapeText (that would quote the '=').
+export const hyperlink = (url: string) => (url ? `=HYPERLINK("${url.replace(/"/g, '""')}")` : '')
+
 export function classifyLinkedDocs(links: string[] | null): { doc: string; sheet: string } {
   const arr = links ?? []
   return {
@@ -105,8 +112,8 @@ export function mappedCells(p: SurveyProject, captainInitials: string): Record<n
     26: fmtBool(p.stage_fielding),
     27: fmtBool(p.stage_data_qa),
     28: fmtBool(p.stage_delivery),
-    32: escapeText(doc),
-    34: escapeText(sheet),
+    32: hyperlink(doc),
+    34: hyperlink(sheet),
     37: escapeText(p.salesperson ?? ''),
     38: p.project_code ?? '',
   }

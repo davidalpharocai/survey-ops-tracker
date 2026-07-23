@@ -6,6 +6,7 @@ import {
   updateData,
   classifyLinkedDocs,
   headerGuardOk,
+  hyperlink,
   isWritebackEligible,
   WRITEBACK_MIN_DATE,
   EXPECTED_HEADERS,
@@ -67,10 +68,27 @@ describe('mappedCells', () => {
     expect(c[12]).toBe('FALSE')
     expect(c[11]).toBe('') // citation null -> blank (unknown)
   })
-  it('classifies linked docs into Doc (AG=32) and Sheet (AI=34)', () => {
+  it('writes linked docs as clickable HYPERLINK formulas (Doc=AG/32, Sheet=AI/34)', () => {
     const c = mappedCells(base, '')
-    expect(c[32]).toContain('/document/')
-    expect(c[34]).toContain('/spreadsheets/')
+    expect(c[32]).toBe('=HYPERLINK("https://docs.google.com/document/d/abc")')
+    expect(c[34]).toBe('=HYPERLINK("https://docs.google.com/spreadsheets/d/xyz")')
+  })
+  it('leaves link cells blank when there is no matching link', () => {
+    const c = mappedCells({ ...base, linked_documents: null } as never, '')
+    expect(c[32]).toBe('')
+    expect(c[34]).toBe('')
+  })
+})
+
+describe('hyperlink', () => {
+  it('wraps a URL in a HYPERLINK formula', () => {
+    expect(hyperlink('https://x.com/a')).toBe('=HYPERLINK("https://x.com/a")')
+  })
+  it('is blank for an empty URL (no formula, so the cell stays empty)', () => {
+    expect(hyperlink('')).toBe('')
+  })
+  it('doubles embedded quotes so they cannot break out of the formula literal', () => {
+    expect(hyperlink('https://x.com/"evil')).toBe('=HYPERLINK("https://x.com/""evil")')
   })
 })
 

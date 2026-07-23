@@ -2,8 +2,8 @@ import { NextRequest } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { safeEqual } from '@/lib/utils/secureCompare'
 import { logSystemEvent } from '@/lib/server/observability'
-import { mappedCells, fullRow, rowHash, updateData, headerGuardOk, isWritebackEligible, WRITEBACK_MIN_DATE, type SurveyProject } from '@/lib/sheets/surveysMap'
-import { readHeader, readPrCodeRows, appendRow, updateCells } from '@/lib/sheets/client'
+import { mappedCells, rowHash, updateData, headerGuardOk, isWritebackEligible, WRITEBACK_MIN_DATE, type SurveyProject } from '@/lib/sheets/surveysMap'
+import { readHeader, readPrCodeRows, updateCells, findScopingRow, insertRowsAbove, getSurveysSheetId, SCOPING_MARKER } from '@/lib/sheets/client'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -123,10 +123,28 @@ export async function GET(req: NextRequest) {
   let failed = 0
   let stampErrors = 0
 
+  // Stamp SOCC sync-state after a successful sheet write. If it fails, the sheet
+  // write already happened; the next run locates the row by PR code and UPDATEs
+  // (idempotent) — so log for visibility but don't count it as a write failure.
+  const stamp = async (p: SurveyProject, hash: string) => {
+    const { error: stampErr } = await supabase
+      .from('survey_projects')
+      .update({ sheet_synced_hash: hash, sheet_synced_at: new Date().toISOString() })
+      .eq('id', p.id)
+    if (stampErr) {
+      stampErrors++
+      await logSystemEvent({ source: 'sheet-writeback', status: 'error', detail: `Wrote sheet for ${p.project_code} but failed to stamp sync-state: ${stampErr.message}`.slice(0, 500) })
+    }
+  }
+
+  // New rows are deferred and inserted together (above the Scoping divider) AFTER
+  // the update pass, so an insert never shifts a row an update still targets.
+  const toInsert: { p: SurveyProject; cells: Record<number, string>; hash: string }[] = []
+
   for (const p of eligible) {
     try {
       // No PR code = can't be located in the sheet for update; skip loudly rather
-      // than append an unlocatable row that would re-append on every later edit.
+      // than add an unlocatable row that would re-add on every later edit.
       if (!p.project_code) {
         failed++
         await logSystemEvent({ source: 'sheet-writeback', status: 'error', detail: `Skipping ${p.id} (${p.client}/${p.project_name}): no project_code — cannot locate/sync.` })
@@ -141,12 +159,12 @@ export async function GET(req: NextRequest) {
       }
 
       // Decide by ROW PRESENCE, not sync-state: migrated projects already have a
-      // Surveys row (hash null but PR code present) — those must UPDATE, not append.
+      // Surveys row (hash null but PR code present) — those must UPDATE, not add.
       const rowNum = prRows.get(p.project_code)
       const isNew = !p.sheet_synced_hash
 
       if (dry) {
-        const action = rowNum ? `UPDATE row ${rowNum}` : isNew ? 'APPEND' : 'LOST-ROW (would flag)'
+        const action = rowNum ? `UPDATE row ${rowNum}` : isNew ? 'INSERT above Scoping' : 'LOST-ROW (would flag)'
         await logSystemEvent({ source: 'sheet-writeback', status: 'ok', detail: `[dry-run] would ${action}: ${p.project_code} ${p.client} / ${p.project_name}` })
         if (rowNum) updated++
         else if (isNew) appended++
@@ -156,32 +174,51 @@ export async function GET(req: NextRequest) {
 
       if (rowNum) {
         await updateCells(updateData(cells, rowNum))
+        await stamp(p, hash)
         updated++
       } else if (isNew) {
-        await appendRow(fullRow(cells))
-        appended++
+        toInsert.push({ p, cells, hash }) // inserted after the loop, above Scoping
       } else {
         // Synced before, but its row can no longer be located (PR cell edited/removed
-        // in the sheet). Do NOT append a duplicate — flag for a human.
+        // in the sheet). Do NOT add a duplicate — flag for a human.
         failed++
-        await logSystemEvent({ source: 'sheet-writeback', status: 'error', detail: `Lost Surveys row for ${p.project_code} — was synced but PR code not found; not re-appending.` })
+        await logSystemEvent({ source: 'sheet-writeback', status: 'error', detail: `Lost Surveys row for ${p.project_code} — was synced but PR code not found; not re-adding.` })
         continue
-      }
-
-      // Stamp sync-state. If this fails the SHEET write already happened; the next
-      // run will locate the row by PR code and UPDATE (idempotent) — no duplicate —
-      // so log it for visibility but don't double-count as a write failure.
-      const { error: stampErr } = await supabase
-        .from('survey_projects')
-        .update({ sheet_synced_hash: hash, sheet_synced_at: new Date().toISOString() })
-        .eq('id', p.id)
-      if (stampErr) {
-        stampErrors++
-        await logSystemEvent({ source: 'sheet-writeback', status: 'error', detail: `Wrote sheet for ${p.project_code} but failed to stamp sync-state: ${stampErr.message}`.slice(0, 500) })
       }
     } catch (e) {
       failed++
       await logSystemEvent({ source: 'sheet-writeback', status: 'error', detail: `Write failed for ${p.project_code ?? p.id}: ${(e as Error).message}`.slice(0, 500) })
+    }
+  }
+
+  // Add new rows by INSERTING them directly above the "SCOPING PHASE / ON HOLD"
+  // divider — never a bottom append (which dumped rows far below the working area
+  // and, when it couldn't match a PR code, created duplicates). If the divider is
+  // missing, refuse to add rather than guess a location.
+  if (!dry && toInsert.length > 0) {
+    const scopingRow = await findScopingRow()
+    if (scopingRow == null) {
+      failed += toInsert.length
+      await logSystemEvent({ source: 'sheet-writeback', status: 'error', detail: `Could not find the "${SCOPING_MARKER}" divider — did NOT add ${toInsert.length} new row(s): ${toInsert.map((t) => t.p.project_code).join(', ')}.` })
+    } else {
+      try {
+        const sheetId = await getSurveysSheetId()
+        await insertRowsAbove(sheetId, scopingRow, toInsert.length)
+        for (let k = 0; k < toInsert.length; k++) {
+          const t = toInsert[k]
+          try {
+            await updateCells(updateData(t.cells, scopingRow + k)) // freshly-inserted blank rows
+            await stamp(t.p, t.hash)
+            appended++
+          } catch (e) {
+            failed++
+            await logSystemEvent({ source: 'sheet-writeback', status: 'error', detail: `Inserted a row for ${t.p.project_code} but failed to fill it: ${(e as Error).message}`.slice(0, 500) })
+          }
+        }
+      } catch (e) {
+        failed += toInsert.length
+        await logSystemEvent({ source: 'sheet-writeback', status: 'error', detail: `Insert-above-Scoping failed for ${toInsert.length} row(s): ${(e as Error).message}`.slice(0, 500) })
+      }
     }
   }
 
