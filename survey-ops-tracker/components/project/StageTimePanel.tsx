@@ -45,10 +45,10 @@ export function StageTimePanel({ project }: { project: SurveyProject }) {
           </p>
 
           <div className="flex flex-col gap-1.5">
-            {durations.map((d) => {
+            {durations.map((d, i) => {
               const frac = Math.max(d.days / maxDays, 0.04)
               return (
-                <div key={d.stage} className="flex items-center gap-2 text-[12px]">
+                <div key={`${d.stage}-${i}`} className="flex items-center gap-2 text-[12px]">
                   <span className="w-32 shrink-0 truncate text-foreground" title={stageLabel(d.stage)}>
                     {stageLabel(d.stage)}
                   </span>

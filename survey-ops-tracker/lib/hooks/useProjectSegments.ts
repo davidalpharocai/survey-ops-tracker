@@ -17,8 +17,9 @@ export type SegmentInput = {
 
 /**
  * Arg for useAddSegment: either a bare `sort_order` (adds an empty segment —
- * SegmentedNTile's usage) or a partial payload + `sort_order` (used to restore
- * a just-removed segment via Undo, preserving its full N + audience).
+ * used by the "+ Add segment" control in NSegmentsEditor) or a partial payload
+ * + `sort_order` (used to restore a just-removed segment via Undo, preserving
+ * its full N + audience).
  */
 export type AddSegmentInput = number | (Partial<SegmentInput> & { sort_order: number })
 
@@ -55,10 +56,10 @@ export function useSplitProject(projectId: string) {
   const supabase = createClient()
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (seed: { n_target: number | null; n_collected: number; n_actual: number | null }) => {
+    mutationFn: async (seed: { n_target: number | null; n_internal_target: number | null; n_collected: number; n_actual: number | null; audience: string | null; audience_size: number | null }) => {
       const rows = [
-        { project_id: projectId, label: '', n_target: seed.n_target, n_collected: seed.n_collected ?? 0, n_actual: seed.n_actual, sort_order: 0 },
-        { project_id: projectId, label: '', n_target: null, n_collected: 0, n_actual: null, sort_order: 1 },
+        { project_id: projectId, label: '', n_target: seed.n_target, n_internal_target: seed.n_internal_target, n_collected: seed.n_collected ?? 0, n_actual: seed.n_actual, audience: seed.audience, audience_size: seed.audience_size, sort_order: 0 },
+        { project_id: projectId, label: '', n_target: null, n_internal_target: null, n_collected: 0, n_actual: null, audience: null, audience_size: null, sort_order: 1 },
       ]
       const { error } = await supabase.from('project_segments').insert(rows)
       if (error) throw error

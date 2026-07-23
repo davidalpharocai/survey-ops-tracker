@@ -158,8 +158,11 @@ export function NSegmentsEditor({ project }: { project: SurveyProject }) {
             onClick={() =>
               split.mutate({
                 n_target: project.n_target,
+                n_internal_target: project.n_internal_target,
                 n_collected: project.n_collected,
                 n_actual: project.n_actual ?? null,
+                audience: project.audience,
+                audience_size: project.audience_size,
               })
             }
             className="text-[12px] text-blue-600 hover:underline dark:text-blue-400"
