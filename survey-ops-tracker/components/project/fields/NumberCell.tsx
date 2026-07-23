@@ -1,6 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
+import { cn } from '@/lib/utils'
 import { commitNumber } from '@/lib/utils/formula'
 import { FieldCell, useSavedFlash } from './FieldCell'
 
@@ -29,18 +30,21 @@ export function NumberCell({
 }: NumberCellProps) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
+  const [error, setError] = useState<string | null>(null)
   const [saved, flash] = useSavedFlash()
   const escaped = useRef(false)
 
   function begin() {
     if (readOnly) return
     setDraft(value != null ? String(value) : '')
+    setError(null)
     setEditing(true)
   }
 
   function commit() {
     if (escaped.current) {
       escaped.current = false
+      setError(null)
       setEditing(false)
       return
     }
@@ -50,13 +54,15 @@ export function NumberCell({
     } else {
       const n = parseFloat(s.replace(/,/g, ''))
       if (Number.isNaN(n)) {
-        // Unparseable garbage — leave the stored value untouched.
-        setEditing(false)
+        // Unparseable garbage — keep the editor open, surface the hint, and
+        // leave the stored value untouched.
+        setError('Not a number')
         return
       }
       onSave(n)
     }
     flash()
+    setError(null)
     setEditing(false)
   }
 
@@ -69,7 +75,11 @@ export function NumberCell({
           inputMode="numeric"
           value={draft}
           placeholder={placeholder}
-          onChange={e => setDraft(e.target.value)}
+          aria-invalid={error != null}
+          onChange={e => {
+            setDraft(e.target.value)
+            if (error) setError(null)
+          }}
           onBlur={commit}
           onKeyDown={e => {
             if (e.key === 'Enter') {
@@ -81,8 +91,12 @@ export function NumberCell({
               e.currentTarget.blur()
             }
           }}
-          className="w-full rounded border border-border bg-muted px-2 py-1 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none"
+          className={cn(
+            'w-full rounded border bg-muted px-2 py-1 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none',
+            error ? 'border-red-500 focus:border-red-500' : 'border-border focus:border-ring',
+          )}
         />
+        {error && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{error}</p>}
       </FieldCell>
     )
   }

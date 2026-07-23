@@ -78,14 +78,22 @@ export function DateCell({
   const [error, setError] = useState<string | null>(null)
   const [saved, flash] = useSavedFlash()
   const escaped = useRef(false)
+  // Set true while the editor is programmatically closing so the text input's
+  // unmount blur (it still holds focus) can't fire a second, stale commit.
+  const closing = useRef(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const nativeRef = useRef<HTMLInputElement>(null)
 
   function begin() {
     setDraft(editableFor(value, mode))
     setError(null)
+    escaped.current = false
+    closing.current = false
     setEditing(true)
   }
 
   function finish(iso: string | null) {
+    closing.current = true
     onSave(iso)
     flash()
     setError(null)
@@ -93,8 +101,10 @@ export function DateCell({
   }
 
   function commitText() {
+    if (closing.current) return
     if (escaped.current) {
       escaped.current = false
+      closing.current = true
       setError(null)
       setEditing(false)
       return
@@ -113,6 +123,15 @@ export function DateCell({
     finish(mode === 'datetime' ? toISODateTime(raw) : toISODate(raw))
   }
 
+  // Only commit when focus truly leaves the cell. Focus moving to the calendar
+  // button or the native picker input (both inside containerRef) must NOT close
+  // the editor, or the picker would unmount before a date could be chosen.
+  function handleTextBlur(e: React.FocusEvent<HTMLInputElement>) {
+    const next = e.relatedTarget as Node | null
+    if (next && containerRef.current?.contains(next)) return
+    commitText()
+  }
+
   function commitNative(v: string) {
     finish(v === '' ? null : v)
   }
@@ -121,57 +140,62 @@ export function DateCell({
     const nativeValue = mode === 'datetime' ? (value ?? '').slice(0, 16) : (value ?? '').slice(0, 10)
     return (
       <FieldCell label={label} tooltip={tooltip} editing saved={saved}>
-        <div className="flex items-center gap-1">
-          <input
-            autoFocus
-            type="text"
-            value={draft}
-            placeholder={mode === 'datetime' ? 'e.g. Jul 6, 2026 2:00pm' : 'e.g. 7/6/2026'}
-            aria-invalid={error != null}
-            onChange={e => {
-              setDraft(e.target.value)
-              if (error) setError(null)
-            }}
-            onBlur={commitText}
-            onKeyDown={e => {
-              if (e.key === 'Enter') {
-                e.preventDefault()
-                e.currentTarget.blur()
-              } else if (e.key === 'Escape') {
-                e.preventDefault()
-                escaped.current = true
-                e.currentTarget.blur()
-              }
-            }}
-            className={cn(
-              'min-w-0 flex-1 rounded border bg-muted px-2 py-1 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none',
-              error ? 'border-red-500 focus:border-red-500' : 'border-border focus:border-ring',
-            )}
-          />
-          <span className="relative inline-flex shrink-0">
-            <button
-              type="button"
-              title="Pick from calendar"
-              aria-label="Pick from calendar"
-              className="rounded border border-border bg-muted px-1.5 py-1 text-sm text-muted-foreground hover:text-foreground"
-            >
-              📅
-            </button>
+        <div ref={containerRef}>
+          <div className="flex items-center gap-1">
             <input
-              type={mode === 'datetime' ? 'datetime-local' : 'date'}
-              value={nativeValue}
-              tabIndex={-1}
-              aria-hidden
-              onMouseDown={e => {
-                const el = e.currentTarget as HTMLInputElement & { showPicker?: () => void }
-                el.showPicker?.()
+              autoFocus
+              type="text"
+              value={draft}
+              placeholder={mode === 'datetime' ? 'e.g. Jul 6, 2026 2:00pm' : 'e.g. 7/6/2026'}
+              aria-invalid={error != null}
+              onChange={e => {
+                setDraft(e.target.value)
+                if (error) setError(null)
               }}
-              onChange={e => commitNative(e.target.value)}
-              className="absolute inset-0 cursor-pointer opacity-0"
+              onBlur={handleTextBlur}
+              onKeyDown={e => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  e.currentTarget.blur()
+                } else if (e.key === 'Escape') {
+                  e.preventDefault()
+                  escaped.current = true
+                  e.currentTarget.blur()
+                }
+              }}
+              className={cn(
+                'min-w-0 flex-1 rounded border bg-muted px-2 py-1 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none',
+                error ? 'border-red-500 focus:border-red-500' : 'border-border focus:border-ring',
+              )}
             />
-          </span>
+            <span className="relative inline-flex shrink-0">
+              <button
+                type="button"
+                title="Pick from calendar"
+                aria-label="Pick from calendar"
+                // Keep the text input focused so its blur can't prematurely
+                // close the editor; the click still fires and opens the picker.
+                onMouseDown={e => e.preventDefault()}
+                onClick={() => nativeRef.current?.showPicker?.()}
+                className="rounded border border-border bg-muted px-1.5 py-1 text-sm text-muted-foreground hover:text-foreground"
+              >
+                📅
+              </button>
+              <input
+                ref={nativeRef}
+                type={mode === 'datetime' ? 'datetime-local' : 'date'}
+                value={nativeValue}
+                aria-label={`${label} — pick from calendar`}
+                onChange={e => commitNative(e.target.value)}
+                // Overlaid on the button, transparent, and pointer-events-none so
+                // clicks hit the button (which drives showPicker); still present
+                // and keyboard-reachable, and its change commits.
+                className="pointer-events-none absolute inset-0 h-full w-full opacity-0"
+              />
+            </span>
+          </div>
+          {error && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{error}</p>}
         </div>
-        {error && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{error}</p>}
       </FieldCell>
     )
   }
