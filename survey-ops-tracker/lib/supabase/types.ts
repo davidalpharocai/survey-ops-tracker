@@ -991,6 +991,7 @@ export type Database = {
           drive_folder_id: string | null
           file_name: string | null
           original_file_name: string | null
+          display_name: string | null
           file_hash: string | null
           source_url: string | null
           mime_type: string | null
@@ -1020,6 +1021,7 @@ export type Database = {
           drive_folder_id?: string | null
           file_name?: string | null
           original_file_name?: string | null
+          display_name?: string | null
           file_hash?: string | null
           source_url?: string | null
           mime_type?: string | null
@@ -1049,6 +1051,7 @@ export type Database = {
           drive_folder_id?: string | null
           file_name?: string | null
           original_file_name?: string | null
+          display_name?: string | null
           file_hash?: string | null
           source_url?: string | null
           mime_type?: string | null
