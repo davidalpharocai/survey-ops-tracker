@@ -23,8 +23,7 @@ const TIP = {
   nTarget: "Total number of survey responses you're aiming to collect.",
   nInternal:
     'Your internal collection goal — usually a cushion above N Target to cover cleaning and terminations.',
-  nCollected:
-    'Live count — edit it in the N tile at the top so it lives in one place (and syncs cleanly to the sheet).',
+  nCollected: 'Completes collected so far — also auto-syncs from the sheet.',
   nActual: 'Final usable response count after cleaning N Collected.',
   audienceSize:
     'Total size of the panel or population being surveyed. Different from N (target responses).',
@@ -102,10 +101,10 @@ export function NSegmentsEditor({ project }: { project: SurveyProject }) {
       />
       <NumberCell
         label="N Collected"
-        tooltip={segmented ? sumNote('Sum of each segment') : TIP.nCollected}
+        tooltip={sumNote(TIP.nCollected)}
         value={project.n_collected}
-        readOnly
-        onSave={() => {}}
+        readOnly={segmented}
+        onSave={v => saveProject({ n_collected: v ?? 0 })}
       />
       <NumberCell
         label="N Actual"

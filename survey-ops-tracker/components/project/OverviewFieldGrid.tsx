@@ -25,6 +25,8 @@ const TIP = {
   due: 'Internal deadline — when everything needs to be finished on our side.',
   deliver:
     'Client-facing deadline — when the client needs the project in hand. Often the same day as the internal due date.',
+  rerun:
+    'Date the next wave auto-spawns (arms the rerun cron); changing it re-arms it.',
   type: 'PS (PureSpectrum sample), B2B (blast outreach), or Rerun. Drives which Money widget shows below.',
   surveyIds:
     "IDs of this project's surveys, comma separated. Auto-filled from the attached Google Sheet by the scheduled sync; manual edits stick unless the sheet changes.",
@@ -86,6 +88,15 @@ export function OverviewFieldGrid({ project }: { project: SurveyProject }) {
           value={project.deliver_date}
           onSave={v => save({ deliver_date: v })}
         />
+        {project.longitudinal && (
+          <DateCell
+            label="Rerun date"
+            tooltip={TIP.rerun}
+            mode="date"
+            value={project.rerun_date ?? null}
+            onSave={iso => updateProject.mutate({ id: project.id, updates: { rerun_date: iso, rerun_spawned_at: null } })}
+          />
+        )}
         <SelectCell
           label="Type"
           tooltip={TIP.type}
