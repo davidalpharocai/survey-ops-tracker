@@ -31,6 +31,20 @@ import { salespersonOptions } from '@/lib/utils/salespeople'
 import { MergeButton } from '@/components/merge/MergeButton'
 import { ProjectSummaryStrip } from '@/components/project/summary/ProjectSummaryStrip'
 
+type ActiveTab = 'overview' | 'insights' | 'activity' | 'compliance' | 'deliverables' | 'links' | 'logs'
+
+// Tab bar config — order here is the on-screen order. Compliance sits between
+// Activity and Deliverables.
+const PROJECT_TABS: { id: ActiveTab; label: string; title: string }[] = [
+  { id: 'overview', label: 'Overview', title: 'The full project view — stats, pipeline, next steps, documents, and details' },
+  { id: 'insights', label: 'Insights (Beta)', title: 'Performance stats — completion/fill rates, cost per complete, pace, supplier mix' },
+  { id: 'activity', label: 'Activity', title: 'Logged emails and events for this project' },
+  { id: 'compliance', label: 'Compliance', title: 'Compliance review — submit the question list for the client to approve before launch, and log the after-fielding results review' },
+  { id: 'deliverables', label: 'Deliverables', title: 'Files delivered to the client for this project' },
+  { id: 'links', label: 'Links', title: 'Slack channel link and notification settings' },
+  { id: 'logs', label: 'Logs', title: 'Manual data-change log and the automatic field-change audit trail' },
+]
+
 const TOOLTIPS: Record<string, string> = {
   'Client': 'The client this project is for.',
   'N Target': "Total number of survey responses you're aiming to collect.",
@@ -109,7 +123,7 @@ export default function ProjectDetailPage() {
       document.removeEventListener('keydown', onKey)
     }
   }, [actionsOpen])
-  const [activeTab, setActiveTab] = useState<'overview' | 'insights' | 'activity' | 'deliverables' | 'links' | 'logs'>('overview')
+  const [activeTab, setActiveTab] = useState<ActiveTab>('overview')
   // Where to return on "← Back": the board or list, whichever the user came from
   const [backTo, setBackTo] = useState<{ href: string; label: string }>({ href: '/', label: 'Board' })
   useEffect(() => {
@@ -396,72 +410,15 @@ export default function ProjectDetailPage() {
 
       {/* Tabs */}
       <div className="flex flex-wrap bg-muted border border-border rounded-lg p-1 gap-1 w-fit mb-4">
-        <button
-          onClick={() => setActiveTab('overview')}
-          title='The full project view — stats, pipeline, next steps, documents, and details'
-          className={`text-sm px-3 py-1.5 rounded font-medium transition-colors ${
-            activeTab === 'overview'
-              ? 'bg-background text-foreground'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          Overview
-        </button>
-        <button
-          onClick={() => setActiveTab('insights')}
-          title="Performance stats — completion/fill rates, cost per complete, pace, supplier mix"
-          className={`text-sm px-3 py-1.5 rounded font-medium transition-colors ${
-            activeTab === 'insights'
-              ? 'bg-background text-foreground'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          Insights (Beta)
-        </button>
-        <button
-          onClick={() => setActiveTab('activity')}
-          title="Logged emails and events for this project"
-          className={`text-sm px-3 py-1.5 rounded font-medium transition-colors ${
-            activeTab === 'activity'
-              ? 'bg-background text-foreground'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          Activity
-        </button>
-        <button
-          onClick={() => setActiveTab('deliverables')}
-          title="Files delivered to the client for this project"
-          className={`text-sm px-3 py-1.5 rounded font-medium transition-colors ${
-            activeTab === 'deliverables'
-              ? 'bg-background text-foreground'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          Deliverables
-        </button>
-        <button
-          onClick={() => setActiveTab('links')}
-          title="Slack channel link and notification settings"
-          className={`text-sm px-3 py-1.5 rounded font-medium transition-colors ${
-            activeTab === 'links'
-              ? 'bg-background text-foreground'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          Links
-        </button>
-        <button
-          onClick={() => setActiveTab('logs')}
-          title="Manual data-change log and the automatic field-change audit trail"
-          className={`text-sm px-3 py-1.5 rounded font-medium transition-colors ${
-            activeTab === 'logs'
-              ? 'bg-background text-foreground'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          Logs
-        </button>
+        {PROJECT_TABS.map(t => (
+          <TabButton
+            key={t.id}
+            label={t.label}
+            title={t.title}
+            active={activeTab === t.id}
+            onSelect={() => setActiveTab(t.id)}
+          />
+        ))}
       </div>
 
       {activeTab === 'insights' && <ProjectInsights project={project} />}
@@ -469,6 +426,14 @@ export default function ProjectDetailPage() {
       {activeTab === 'activity' && (
         <div className="max-w-3xl">
           <ActivityLog projectId={project.id} />
+        </div>
+      )}
+
+      {/* Compliance review — reuses the same CompliancePanel shown in the rail
+          glance, rendered full-width as its own tab. */}
+      {activeTab === 'compliance' && (
+        <div className="max-w-3xl">
+          <CompliancePanel projectId={project.id} project={project} />
         </div>
       )}
 
@@ -636,9 +601,39 @@ export default function ProjectDetailPage() {
   )
 }
 
+// One tab pill. Inactive pills get the iOS-26 "liquid glass" hover — a
+// translucent card surface, accent-tinted border, soft shadow, and backdrop
+// blur. The transparent base border keeps the active/inactive pills the same
+// size so nothing shifts on hover; the active pill keeps its solid surface.
+function TabButton({
+  label,
+  title,
+  active,
+  onSelect,
+}: {
+  label: string
+  title: string
+  active: boolean
+  onSelect: () => void
+}) {
+  return (
+    <button
+      onClick={onSelect}
+      title={title}
+      className={`text-sm px-3 py-1.5 rounded font-medium border border-transparent transition-all ${
+        active
+          ? 'bg-background text-foreground'
+          : 'text-muted-foreground hover:text-foreground hover:border-primary/40 hover:bg-card/70 hover:shadow-sm hover:backdrop-blur-sm'
+      }`}
+    >
+      {label}
+    </button>
+  )
+}
+
 function SidebarCard({ title, children, className = '', dense = false }: { title: string; children: React.ReactNode; className?: string; dense?: boolean }) {
   return (
-    <div className={`bg-card border border-border shadow-sm rounded-xl ${dense ? 'p-3' : 'p-4'} ${className}`}>
+    <div className={`bg-card border border-border shadow-sm rounded-xl transition-all hover:border-primary/40 hover:bg-card/70 hover:shadow-md hover:backdrop-blur-sm ${dense ? 'p-3' : 'p-4'} ${className}`}>
       <h3 className={`border-b border-border text-[11px] text-muted-foreground uppercase tracking-wide font-medium ${dense ? 'mb-2.5 pb-1.5' : 'mb-3 pb-2'}`}>
         {title}
       </h3>

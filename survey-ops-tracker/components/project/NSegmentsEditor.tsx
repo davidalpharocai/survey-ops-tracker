@@ -216,7 +216,7 @@ function SegmentBlock({
   const save = (updates: Partial<SegmentInput>) => update.mutate({ id: segment.id, updates })
 
   return (
-    <div className="rounded-lg border border-border bg-muted/30 p-2.5">
+    <div className="rounded-lg border border-border bg-background/60 p-2.5">
       <div className="mb-0.5 flex items-center justify-between gap-2">
         <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
           Segment {index + 1}

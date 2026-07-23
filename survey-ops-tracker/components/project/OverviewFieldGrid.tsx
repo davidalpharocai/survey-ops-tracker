@@ -56,7 +56,7 @@ export function OverviewFieldGrid({ project }: { project: SurveyProject }) {
   const dueWarn = !!project.due_date && !delivered && getDueUrgency(project.due_date) === 'overdue'
 
   return (
-    <div className="flex flex-col rounded-xl border border-border bg-card p-4 shadow-sm">
+    <div className="flex flex-col rounded-xl border border-border bg-card p-4 shadow-sm transition-all hover:border-primary/40 hover:bg-card/70 hover:shadow-md hover:backdrop-blur-sm">
       <FieldSection title="Details" first>
         <DateCell
           label="Submitted date"
@@ -158,6 +158,7 @@ export function OverviewFieldGrid({ project }: { project: SurveyProject }) {
         <div className="sm:col-span-2 flex flex-wrap gap-1.5">
           <FlagChip
             label="Longitudinal"
+            icon="🔁"
             value={project.longitudinal ?? false}
             tone="emerald"
             tooltip={TIP.longitudinal}
@@ -165,6 +166,7 @@ export function OverviewFieldGrid({ project }: { project: SurveyProject }) {
           />
           <FlagChip
             label="Voter Survey QA"
+            icon="🗳️"
             value={project.voter_survey_qa ?? false}
             tone="amber"
             tooltip={TIP.voterQa}
@@ -172,6 +174,7 @@ export function OverviewFieldGrid({ project }: { project: SurveyProject }) {
           />
           <FlagChip
             label="Citation Language"
+            icon="❝"
             value={project.citation_language_needed ?? false}
             tone="amber"
             tooltip={TIP.citation}
@@ -179,6 +182,7 @@ export function OverviewFieldGrid({ project }: { project: SurveyProject }) {
           />
           <FlagChip
             label="Row-Level Data"
+            icon="🔢"
             value={project.row_level_data}
             tone="emerald"
             tooltip={TIP.rowLevel}
@@ -186,6 +190,7 @@ export function OverviewFieldGrid({ project }: { project: SurveyProject }) {
           />
           <FlagChip
             label="Terminations"
+            icon="⛔"
             value={project.terminations}
             tone="red"
             tooltip={TIP.terminations}
@@ -215,15 +220,18 @@ function FlagChip({
   label,
   value,
   tone,
+  icon,
   tooltip,
   onToggle,
 }: {
   label: string
   value: boolean
   tone: 'red' | 'amber' | 'emerald'
+  icon: string
   tooltip?: string
   onToggle: (next: boolean) => void
 }) {
+  const mark = value ? (tone === 'red' ? '⚠' : '✓') : '○'
   return (
     <span
       className={cn(
@@ -235,9 +243,15 @@ function FlagChip({
         type="button"
         onClick={() => onToggle(!value)}
         aria-pressed={value}
-        className="cursor-pointer whitespace-nowrap hover:opacity-80 transition-opacity"
+        className="inline-flex items-center gap-1 cursor-pointer whitespace-nowrap hover:opacity-80 transition-opacity"
       >
-        {value ? (tone === 'red' ? `⚠ ${label}` : `✓ ${label}`) : `○ ${label}`}
+        {/* Leading meaning-glyph (emoji don't follow text color, so dim it
+            explicitly when the flag is OFF to match the muted chip). */}
+        <span aria-hidden="true" className={cn('text-[11px] leading-none', !value && 'opacity-50 grayscale')}>
+          {icon}
+        </span>
+        <span aria-hidden="true">{mark}</span>
+        {label}
       </button>
       {tooltip && <InfoTooltip text={tooltip} />}
     </span>
