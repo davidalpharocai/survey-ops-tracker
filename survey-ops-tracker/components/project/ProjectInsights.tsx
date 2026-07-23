@@ -1,6 +1,7 @@
 'use client'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
 import { NProgressBar } from '@/components/shared/NProgressBar'
+import { StageTimePanel } from '@/components/project/StageTimePanel'
 import { fmtNum } from '@/lib/utils/number'
 import type { SurveyProject } from '@/lib/hooks/useProjects'
 import { useProjectBlasts, type Blast } from '@/lib/hooks/useProjectBlasts'
@@ -159,6 +160,9 @@ export function ProjectInsights({ project }: { project: SurveyProject }) {
           ⚠ Spending is running ahead of collection ({pctStr(budgetUsed! * 100)} of budget for {pctStr(nProgress! * 100)} of N) — check cost per complete.
         </p>
       )}
+
+      {/* Zone 1b — time in each stage (Doc Programming onward) */}
+      <StageTimePanel project={project} />
 
       {/* Zone 2a — B2B blast performance */}
       {showB2B && blasts.length > 0 && <B2BPerformance blasts={blasts} target={target} />}
