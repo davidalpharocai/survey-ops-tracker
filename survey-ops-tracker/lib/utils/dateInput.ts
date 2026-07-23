@@ -121,8 +121,52 @@ export function formatDateTime(p: YMDT): string {
   return `${base} · ${h12}:${pad2(p.mm)} ${ampm}`
 }
 
-/** Typed date+time string -> "YYYY-MM-DDTHH:MM", or '' if invalid/empty. */
-export function toISODateTime(s: string): string {
+// ── timestamptz bridge (datetime fields only) ───────────────────────────────
+// Everything above is pure integer math with NO timezone assumptions — correct
+// for date-only fields, which carry no instant. A blast's `blast_at`, though, is
+// a true instant stored in a Postgres `timestamptz`. These helpers DELIBERATELY
+// use the JS Date object (and therefore the browser's local timezone) to bridge
+// a stored UTC instant and the local wall-clock a user reads and types: we store
+// UTC and render each viewer their own local time. Legacy rows written before
+// this bridge existed come in one of two shapes and both resolve correctly:
+// a true UTC instant (from the old blast widget) converts to local, and a naive
+// offset-less string (from the interim redesign) is parsed by JS as local
+// wall-clock — so it still displays at its intended time and is rewritten as a
+// proper UTC instant the next time it's saved.
+
+/** Typed date+time string (interpreted as browser-local) -> UTC instant ISO
+ *  (e.g. "2026-07-14T18:00:00.000Z"), or '' if invalid/empty. */
+export function toInstantISO(s: string): string {
   const p = parseDateTimeInput(s)
+  if (!p) return ''
+  return new Date(p.y, p.m - 1, p.d, p.hh, p.mm).toISOString()
+}
+
+/** UTC instant ISO -> local {y,m,d,hh,mm,hasTime:true}, or null if invalid/empty. */
+export function instantToLocalYMDT(iso: string | null): YMDT | null {
+  if (!iso || !iso.trim()) return null
+  const dt = new Date(iso)
+  if (Number.isNaN(dt.getTime())) return null
+  return {
+    y: dt.getFullYear(),
+    m: dt.getMonth() + 1,
+    d: dt.getDate(),
+    hh: dt.getHours(),
+    mm: dt.getMinutes(),
+    hasTime: true,
+  }
+}
+
+/** UTC instant ISO -> local "YYYY-MM-DDTHH:MM" for a datetime-local input, or ''. */
+export function instantToLocalWallClock(iso: string | null): string {
+  const p = instantToLocalYMDT(iso)
   return p ? `${p.y}-${pad2(p.m)}-${pad2(p.d)}T${pad2(p.hh)}:${pad2(p.mm)}` : ''
+}
+
+/** Local wall-clock "YYYY-MM-DDTHH:MM" (from a datetime-local input) -> UTC
+ *  instant ISO, or '' if malformed. */
+export function localWallClockToInstantISO(wall: string): string {
+  const m = (wall || '').trim().match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/)
+  if (!m) return ''
+  return new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]).toISOString()
 }

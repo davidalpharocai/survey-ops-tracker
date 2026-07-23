@@ -6,11 +6,13 @@ import {
   formatDate,
   formatDateTime,
   fromISODate,
+  instantToLocalWallClock,
+  instantToLocalYMDT,
+  localWallClockToInstantISO,
   parseDateInput,
   parseDateTimeInput,
+  toInstantISO,
   toISODate,
-  toISODateTime,
-  type YMDT,
 } from '@/lib/utils/dateInput'
 import { FieldCell, useSavedFlash } from './FieldCell'
 
@@ -27,24 +29,13 @@ export interface DateCellProps {
   suffix?: string
 }
 
-function parseISODateTime(iso: string): YMDT | null {
-  const m = iso.trim().match(/^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}))?/)
-  if (!m) return null
-  return {
-    y: +m[1],
-    m: +m[2],
-    d: +m[3],
-    hh: m[4] ? +m[4] : 0,
-    mm: m[5] ? +m[5] : 0,
-    hasTime: !!m[4],
-  }
-}
-
-/** ISO value -> human display string ('—' when empty/invalid). */
+/** ISO value -> human display string ('—' when empty/invalid). In datetime mode
+ *  the value is a true instant (timestamptz), rendered in the viewer's local
+ *  time; in date mode it's a plain calendar date with no timezone. */
 function displayFor(value: string | null, mode: 'date' | 'datetime'): string {
   if (!value) return '—'
   if (mode === 'datetime') {
-    const p = parseISODateTime(value)
+    const p = instantToLocalYMDT(value)
     return p ? formatDateTime(p) : '—'
   }
   const ymd = fromISODate(value.slice(0, 10))
@@ -120,7 +111,7 @@ export function DateCell({
       setError('Not a real date')
       return
     }
-    finish(mode === 'datetime' ? toISODateTime(raw) : toISODate(raw))
+    finish(mode === 'datetime' ? toInstantISO(raw) : toISODate(raw))
   }
 
   // Only commit when focus truly leaves the cell. Focus moving to the calendar
@@ -132,12 +123,19 @@ export function DateCell({
     commitText()
   }
 
+  // The native <input> gives a local wall-clock ('YYYY-MM-DDTHH:MM') in datetime
+  // mode; convert it to a UTC instant before saving. Date mode passes through.
   function commitNative(v: string) {
-    finish(v === '' ? null : v)
+    if (v === '') {
+      finish(null)
+      return
+    }
+    finish(mode === 'datetime' ? localWallClockToInstantISO(v) || null : v)
   }
 
   if (editing) {
-    const nativeValue = mode === 'datetime' ? (value ?? '').slice(0, 16) : (value ?? '').slice(0, 10)
+    const nativeValue =
+      mode === 'datetime' ? instantToLocalWallClock(value) : (value ?? '').slice(0, 10)
     return (
       <FieldCell label={label} tooltip={tooltip} editing saved={saved}>
         <div ref={containerRef}>
