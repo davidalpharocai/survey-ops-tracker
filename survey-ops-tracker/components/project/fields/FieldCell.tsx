@@ -67,7 +67,7 @@ export function FieldCell({
   return (
     <div
       className={cn(
-        'group relative border-b border-border/60 px-1.5 py-2 -mx-1.5 transition-colors',
+        'group relative border-b border-border/60 px-1.5 py-1.5 -mx-1.5 transition-colors',
         canEdit && 'hover:bg-muted/40',
       )}
     >
@@ -89,12 +89,12 @@ export function FieldCell({
           type="button"
           onClick={onEdit}
           title="Click to edit"
-          className="mt-0.5 flex w-full items-center text-left text-sm text-foreground cursor-pointer"
+          className="mt-0.5 flex w-full items-center text-left text-[13px] text-foreground cursor-pointer"
         >
           <span className="min-w-0 flex-1 truncate">{children}</span>
         </button>
       ) : (
-        <div className="mt-0.5 text-sm text-foreground">{children}</div>
+        <div className="mt-0.5 text-[13px] text-foreground">{children}</div>
       )}
 
       {canEdit && (
@@ -103,7 +103,7 @@ export function FieldCell({
           onClick={onEdit}
           aria-label={`Edit ${label}`}
           title="Edit"
-          className="absolute right-1 top-2 text-xs leading-none text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus:opacity-100 group-hover:opacity-100"
+          className="absolute right-1 top-1.5 text-xs leading-none text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus:opacity-100 group-hover:opacity-100"
         >
           ✎
         </button>

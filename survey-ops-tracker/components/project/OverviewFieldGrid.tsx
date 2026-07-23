@@ -56,7 +56,7 @@ export function OverviewFieldGrid({ project }: { project: SurveyProject }) {
   const dueWarn = !!project.due_date && !delivered && getDueUrgency(project.due_date) === 'overdue'
 
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col rounded-xl border border-border bg-card p-4 shadow-sm">
       <FieldSection title="Details" first>
         <DateCell
           label="Submitted date"
@@ -228,7 +228,7 @@ function FlagChip({
     <span
       className={cn(
         'inline-flex items-center rounded-full pl-2 pr-0.5 py-0.5 text-[10px] leading-none transition-colors',
-        value ? CHIP_ON[tone] : 'border border-dashed border-border bg-transparent text-muted-foreground',
+        value ? CHIP_ON[tone] : 'border border-border bg-transparent text-muted-foreground',
       )}
     >
       <button

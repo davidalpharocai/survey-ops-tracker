@@ -26,7 +26,7 @@ function relativeAsOf(iso: string): string {
   return daysAgoLabel(iso)
 }
 
-function SummaryField({
+function SummaryRow({
   label,
   value,
   tone,
@@ -36,19 +36,19 @@ function SummaryField({
   tone?: 'amber'
 }) {
   return (
-    <div>
-      <p className="text-[11px] uppercase tracking-wide text-muted-foreground font-medium mb-0.5">
+    <div className="flex gap-3">
+      <span className="w-20 shrink-0 pt-0.5 text-[11px] uppercase tracking-wide text-muted-foreground font-medium">
         {label}
-      </p>
-      <p
+      </span>
+      <span
         className={
           tone === 'amber'
-            ? 'text-sm text-amber-700 dark:text-amber-400'
-            : 'text-sm text-foreground'
+            ? 'text-[13px] text-amber-600 dark:text-amber-400'
+            : 'text-[13px] text-foreground'
         }
       >
         {value}
-      </p>
+      </span>
     </div>
   )
 }
@@ -61,13 +61,13 @@ export function ProjectSummaryStrip({ projectId }: { projectId: string }) {
   const n = watchouts.length
 
   return (
-    <div className="bg-card border border-border border-l-2 border-l-blue-500/50 rounded-xl shadow-sm">
+    <div className="bg-card border border-border border-l-2 border-l-primary/40 rounded-xl shadow-sm">
       <div className="flex items-center justify-between gap-2 px-4 py-3">
         <div className="flex items-center gap-2">
-          <span className="flex items-center gap-1.5 text-sm font-semibold text-blue-600 dark:text-blue-400">
+          <span className="flex items-center gap-1.5 text-sm font-semibold text-primary">
             <span aria-hidden>✦</span> Summary
           </span>
-          <span className="text-[10px] uppercase tracking-wide font-medium text-blue-600 dark:text-blue-400 bg-blue-500/10 border border-blue-500/30 rounded-full px-1.5 py-0.5">
+          <span className="text-[10px] uppercase tracking-wide font-medium text-primary bg-primary/15 rounded-full px-1.5 py-0.5">
             AI · Beta
           </span>
           <InfoTooltip text="Auto-generated from this project's live data. Every number is computed exactly, server-side — the AI only writes the sentences around them. Verify specifics before relying on them." />
@@ -113,7 +113,7 @@ export function ProjectSummaryStrip({ projectId }: { projectId: string }) {
             <span>Couldn&apos;t generate summary — retry</span>
             <button
               onClick={() => refetch()}
-              className="text-blue-600 dark:text-blue-400 hover:underline"
+              className="text-primary hover:underline"
               title="Retry"
             >
               ↻ Retry
@@ -132,19 +132,17 @@ export function ProjectSummaryStrip({ projectId }: { projectId: string }) {
             </p>
 
             {!collapsed && (
-              <div className="mt-3 flex flex-col gap-3 border-t border-border pt-3">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <SummaryField label="Status" value={data.narrative.status || '—'} />
-                  <SummaryField label="Progress" value={data.narrative.progress || '—'} />
-                  <SummaryField label="Money" value={data.narrative.money || '—'} />
-                </div>
-                <SummaryField
+              <div className="mt-3 flex flex-col gap-2 border-t border-border pt-3">
+                <SummaryRow label="Status" value={data.narrative.status || '—'} />
+                <SummaryRow label="Progress" value={data.narrative.progress || '—'} />
+                <SummaryRow label="Money" value={data.narrative.money || '—'} />
+                <SummaryRow
                   label="Watch-outs"
                   value={n > 0 ? watchouts.join(' · ') : 'None flagged.'}
                   tone={n > 0 ? 'amber' : undefined}
                 />
-                <SummaryField label="Next" value={data.narrative.next || '—'} />
-                <p className="text-xs text-muted-foreground/80 italic">
+                <SummaryRow label="Next" value={data.narrative.next || '—'} />
+                <p className="mt-1 text-[10.5px] text-muted-foreground/80 italic">
                   ✦ AI-generated from live project data · figures computed exactly; verify specifics.
                 </p>
               </div>

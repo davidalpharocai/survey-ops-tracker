@@ -1,6 +1,6 @@
 'use client'
 import { STAGE_ORDER, STAGE_DESCRIPTIONS, stageLabel, type BoardColumn } from '@/lib/utils/stage'
-import { usePipelineStage, STAGE_TO_FIELD } from '@/lib/hooks/usePipelineStage'
+import { usePipelineStage } from '@/lib/hooks/usePipelineStage'
 import { useUpdateProject } from '@/lib/hooks/useProjects'
 import { HelpTip } from '@/components/shared/InfoTooltip'
 import { ComplianceGateModal } from './ComplianceGateModal'
@@ -20,11 +20,6 @@ export function PipelineSpine({ project }: PipelineSpineProps) {
   const { toggleStage, gate, setGate } = usePipelineStage(project)
   const updateProject = useUpdateProject()
 
-  const stageDone = (stage: string) => {
-    const f = STAGE_TO_FIELD[stage]
-    return f ? !!project[f] : false
-  }
-
   // CTA state: the next stage to advance into is the one right after the
   // current board column. Delivery is terminal (shows a chip, not a button).
   const currentIdx = STAGE_ORDER.indexOf(project.board_column as BoardColumn)
@@ -40,11 +35,25 @@ export function PipelineSpine({ project }: PipelineSpineProps) {
       {/* Dot path */}
       <div className="flex items-start min-w-0 flex-1">
         {STAGE_ORDER.map((stage, i) => {
-          const done = stageDone(stage)
-          const isCurrent = stage === project.board_column
+          // Display state is derived purely from the board-column index (the
+          // source of truth for where the project *is*), not the per-stage
+          // checkbox fields: nodes before the current stage read done, the
+          // current node is ALWAYS the accent dot, and later nodes stay hollow
+          // even if a later checkbox was toggled. Delivered is terminal, so its
+          // (last) node reads done rather than "current". Click behavior below
+          // is unchanged — every node still calls toggleStage(stage).
+          const nodeState: 'done' | 'current' | 'upcoming' =
+            i < currentIdx
+              ? 'done'
+              : i === currentIdx
+              ? isDelivered
+                ? 'done'
+                : 'current'
+              : 'upcoming'
+          const isCurrent = nodeState === 'current'
           const isClickable = stage !== 'Submitted'
-          const leftFilled = i > 0 && stageDone(STAGE_ORDER[i - 1])
-          const rightFilled = done
+          const leftFilled = i > 0 && i <= currentIdx
+          const rightFilled = i < currentIdx
 
           return (
             <div key={stage} className="flex flex-col items-center min-w-0 flex-1">
@@ -67,14 +76,14 @@ export function PipelineSpine({ project }: PipelineSpineProps) {
                       : `${STAGE_DESCRIPTIONS[stage] ?? stage}${isCurrent ? ' (Current stage.)' : ''}`
                   }
                   className={`shrink-0 flex items-center justify-center w-7 h-7 rounded-full border text-xs leading-none transition-colors ${
-                    done
+                    nodeState === 'done'
                       ? 'bg-emerald-500 border-emerald-500 text-white'
-                      : isCurrent
+                      : nodeState === 'current'
                       ? 'bg-primary border-primary text-primary-foreground ring-2 ring-primary/40'
                       : 'bg-muted border-border text-muted-foreground'
                   } ${isClickable ? 'cursor-pointer hover:border-ring' : 'cursor-default'}`}
                 >
-                  <span aria-hidden>{done ? '✓' : isCurrent ? '▶' : ''}</span>
+                  <span aria-hidden>{nodeState === 'done' ? '✓' : nodeState === 'current' ? '▶' : ''}</span>
                 </button>
                 <span
                   aria-hidden
@@ -88,7 +97,7 @@ export function PipelineSpine({ project }: PipelineSpineProps) {
                 className={`mt-1.5 text-[10px] leading-tight whitespace-nowrap ${
                   isCurrent
                     ? 'text-primary font-semibold'
-                    : done
+                    : nodeState === 'done'
                     ? 'text-foreground/70'
                     : 'text-muted-foreground'
                 }`}

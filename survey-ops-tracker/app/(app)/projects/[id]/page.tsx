@@ -571,7 +571,7 @@ export default function ProjectDetailPage() {
                     </span>
                     <Link
                       href={`/clients/${project.client_id}`}
-                      className="text-sm text-blue-600 dark:text-blue-400 hover:underline truncate"
+                      className="text-sm text-primary hover:underline truncate"
                       title="Open this client's page"
                     >
                       {project.client}
@@ -612,7 +612,7 @@ export default function ProjectDetailPage() {
                     </span>
                     <a
                       href={slackDeepLink(project.slack_channel_url)}
-                      className="text-sm text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1 min-w-0"
+                      className="text-sm text-primary hover:underline inline-flex items-center gap-1 min-w-0"
                       title="Open this channel in the Slack app"
                     >
                       <span aria-hidden="true">💬</span>
@@ -640,7 +640,7 @@ export default function ProjectDetailPage() {
 function SidebarCard({ title, children, className = '', dense = false }: { title: string; children: React.ReactNode; className?: string; dense?: boolean }) {
   return (
     <div className={`bg-card border border-border shadow-sm rounded-xl ${dense ? 'p-3' : 'p-4'} ${className}`}>
-      <h3 className={`text-xs text-muted-foreground uppercase tracking-widest font-medium ${dense ? 'mb-2' : 'mb-4'}`}>
+      <h3 className={`border-b border-border text-[11px] text-muted-foreground uppercase tracking-wide font-medium ${dense ? 'mb-2.5 pb-1.5' : 'mb-3 pb-2'}`}>
         {title}
       </h3>
       <div className={`flex flex-col ${dense ? 'gap-2' : 'gap-3'}`}>{children}</div>

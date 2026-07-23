@@ -165,7 +165,7 @@ export function NSegmentsEditor({ project }: { project: SurveyProject }) {
                 audience_size: project.audience_size,
               })
             }
-            className="text-[12px] text-blue-600 hover:underline dark:text-blue-400"
+            className="text-[12px] text-primary hover:underline"
             title="Track separate collections (e.g. Buyers / Sellers) under this project — add as many segments as you need"
           >
             ＋ Split into segments
@@ -183,7 +183,7 @@ export function NSegmentsEditor({ project }: { project: SurveyProject }) {
             </button>
             <button
               onClick={() => addSeg.mutate(segments.length)}
-              className="text-[12px] text-blue-600 hover:underline dark:text-blue-400"
+              className="text-[12px] text-primary hover:underline"
             >
               + Add segment
             </button>
@@ -216,7 +216,7 @@ function SegmentBlock({
   const save = (updates: Partial<SegmentInput>) => update.mutate({ id: segment.id, updates })
 
   return (
-    <div className="rounded-lg border border-border/60 bg-muted/20 p-2.5">
+    <div className="rounded-lg border border-border bg-muted/30 p-2.5">
       <div className="mb-0.5 flex items-center justify-between gap-2">
         <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
           Segment {index + 1}
