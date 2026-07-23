@@ -1,5 +1,6 @@
 'use client'
 import { useState } from 'react'
+import Link from 'next/link'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
 import {
   useClientContacts,
@@ -7,6 +8,7 @@ import {
   useUpdateClientContact,
   type ClientContact,
 } from '@/lib/hooks/useClientContacts'
+import { useProjectsByContact } from '@/lib/hooks/useProjectsByContact'
 import { contactName, contactSubtitle } from '@/lib/utils/contact'
 import {
   ContactForm,
@@ -33,6 +35,7 @@ export function RequestedByRow({ clientId, contactId, snapshotName, tooltip, onC
   const update = useUpdateClientContact(clientId)
 
   const current = contactId ? contacts.find(c => c.id === contactId) ?? null : null
+  const { data: contactProjects = [] } = useProjectsByContact(current ? current.id : null)
   const active = contacts.filter(c => !c.archived)
   // Show the live contact's name if it still exists, else the saved snapshot.
   const label = current ? contactName(current) : snapshotName
@@ -71,7 +74,7 @@ export function RequestedByRow({ clientId, contactId, snapshotName, tooltip, onC
       </span>
       <button
         onClick={() => (mode === 'closed' ? setMode(current ? 'details' : 'pick') : setMode('closed'))}
-        className="text-sm text-right truncate text-blue-600 dark:text-blue-400 hover:underline"
+        className="text-sm text-right truncate text-primary hover:underline"
         title="View, edit, or change the requester"
       >
         {label ?? <span className="text-muted-foreground/50">— click to set</span>}
@@ -83,22 +86,55 @@ export function RequestedByRow({ clientId, contactId, snapshotName, tooltip, onC
           <div className="absolute right-0 top-full mt-1 z-20 w-64 bg-card border border-border rounded-lg shadow-lg p-2 text-left">
             {mode === 'details' && current && (
               <div className="flex flex-col gap-2">
-                <div>
-                  <p className="text-sm font-medium text-foreground">{contactName(current)}</p>
-                  {current.title && <p className="text-xs text-muted-foreground">{current.title}</p>}
-                  {current.email && (
-                    <a
-                      href={`mailto:${current.email}`}
-                      className="text-xs text-blue-600 dark:text-blue-400 hover:underline block truncate"
-                    >
-                      {current.email}
-                    </a>
-                  )}
-                  {current.phone && <p className="text-xs text-muted-foreground">{current.phone}</p>}
-                  {current.archived && (
-                    <p className="text-[12px] text-amber-600 dark:text-amber-400 mt-1">Archived contact</p>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-foreground">{contactName(current)}</p>
+                    {current.title && <p className="text-xs text-muted-foreground">{current.title}</p>}
+                    {current.email && (
+                      <a
+                        href={`mailto:${current.email}`}
+                        className="text-xs text-blue-600 dark:text-blue-400 hover:underline block truncate"
+                      >
+                        {current.email}
+                      </a>
+                    )}
+                    {current.phone && <p className="text-xs text-muted-foreground">{current.phone}</p>}
+                    {current.archived && (
+                      <p className="text-[12px] text-amber-600 dark:text-amber-400 mt-1">Archived contact</p>
+                    )}
+                  </div>
+                  <Link
+                    href={`/clients/${clientId}`}
+                    className="text-muted-foreground hover:text-primary text-xs shrink-0 mt-0.5"
+                    title="Open contact's full page"
+                  >
+                    ↗
+                  </Link>
+                </div>
+
+                <div className="border-t border-border pt-2">
+                  <p className="text-[12px] text-muted-foreground pb-1">
+                    Projects{contactProjects.length > 0 ? ` (${contactProjects.length})` : ''}
+                  </p>
+                  {contactProjects.length === 0 ? (
+                    <p className="text-xs text-muted-foreground/60">No projects for this contact.</p>
+                  ) : (
+                    <div className="flex flex-col max-h-32 overflow-y-auto gap-1">
+                      {contactProjects.map(p => (
+                        <Link
+                          key={p.id}
+                          href={`/projects/${p.id}`}
+                          className="text-xs text-primary hover:underline truncate"
+                          title={p.project_name}
+                        >
+                          {p.project_code ? `${p.project_code} · ` : ''}
+                          {p.project_name}
+                        </Link>
+                      ))}
+                    </div>
                   )}
                 </div>
+
                 <div className="flex items-center gap-3 border-t border-border pt-2 text-xs">
                   <button onClick={() => setMode('edit')} className="text-blue-600 dark:text-blue-400 hover:underline">
                     Edit
