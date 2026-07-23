@@ -265,9 +265,9 @@ export default function ProjectDetailPage() {
           </span>
         )}
         <div className="ml-auto flex items-center gap-2">
-          <PriorityButton
+          <PrioritySegmented
             priority={project.priority ?? 'none'}
-            onCycle={next => updateProject.mutate({ id, updates: { priority: next } })}
+            onSelect={next => updateProject.mutate({ id, updates: { priority: next } })}
           />
           {project.status === 'Closed' && (
             <span className="text-xs text-muted-foreground">
@@ -294,35 +294,16 @@ export default function ProjectDetailPage() {
               </button>
             </HelpTip>
           )}
-          {project.status !== 'Closed' ? (
-            <HelpTip text="Archives the project — kept for history but removed from the active board. It leaves Operations view but stays in Full View's Archived section, and can be reopened anytime.">
-              <button
-                onClick={() => setStatus('Closed')}
-                className="text-sm border border-border text-muted-foreground hover:text-foreground hover:border-ring px-3 py-1.5 rounded-lg transition-colors shrink-0"
-              >
-                ✕ Archive
-              </button>
-            </HelpTip>
-          ) : (
-            <HelpTip text="Brings this archived project back to the open board.">
-              <button
-                onClick={() => setStatus('Open')}
-                className="text-sm border border-border text-muted-foreground hover:text-foreground hover:border-ring px-3 py-1.5 rounded-lg transition-colors shrink-0"
-              >
-                ↺ Reopen
-              </button>
-            </HelpTip>
-          )}
-          {/* Record-level actions collected into one menu so the header stays
-              uncluttered (clone / merge / co-captains / delete). */}
+          {/* Record-level actions collected into one "More" menu so the header
+              stays uncluttered (clone / merge / co-captains / archive / delete). */}
           <div ref={actionsRef} className="relative shrink-0">
             <button
               onClick={() => setActionsOpen(o => !o)}
               aria-expanded={actionsOpen}
-              title="Actions on this record — clone, merge, manage co-captains, and delete"
+              title="More actions on this record — clone, merge, manage co-captains, archive, and delete"
               className="text-sm border border-border text-muted-foreground hover:text-foreground hover:border-ring px-3 py-1.5 rounded-lg transition-colors shrink-0 inline-flex items-center gap-1.5"
             >
-              Actions <span aria-hidden="true" className="text-xs">▾</span>
+              More <span aria-hidden="true" className="text-xs">▾</span>
             </button>
             {actionsOpen && (
               <div className="absolute right-0 top-full mt-1.5 z-50 w-64 bg-popover border border-border rounded-xl shadow-xl p-1.5 flex flex-col">
@@ -352,6 +333,24 @@ export default function ProjectDetailPage() {
                     />
                   )}
                 </div>
+                <div className="border-t border-border my-1" />
+                {project.status !== 'Closed' ? (
+                  <button
+                    onClick={() => { setActionsOpen(false); setStatus('Closed') }}
+                    title="Archives the project — kept for history but removed from the active board. It leaves Operations view but stays in Full View's Archived section, and can be reopened anytime."
+                    className="flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm text-foreground/90 hover:bg-accent transition-colors text-left"
+                  >
+                    <span aria-hidden="true">✕</span> Archive project
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => { setActionsOpen(false); setStatus('Open') }}
+                    title="Brings this archived project back to the open board."
+                    className="flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm text-foreground/90 hover:bg-accent transition-colors text-left"
+                  >
+                    <span aria-hidden="true">↺</span> Reopen project
+                  </button>
+                )}
                 <div className="border-t border-border my-1" />
                 <button
                   onClick={() => { setActionsOpen(false); setConfirmingDelete(true) }}
@@ -687,55 +686,62 @@ function NewProjectSetupBanner({ project }: { project: SurveyProject }) {
   )
 }
 
-const PRIORITY_NEXT: Record<string, string> = {
-  none: 'high',
-  high: 'urgent',
-  urgent: 'none',
-}
+// Segmented priority control: three inline segments in one bordered group.
+// The selected segment is tint-filled, the rest stay muted. Clicking a segment
+// writes the same project.priority values the old cycle button used
+// (none | high | urgent) via the same useUpdateProject mutation.
+const PRIORITY_SEGMENTS: { value: string; label: string; activeClass: string; help: string }[] = [
+  {
+    value: 'none',
+    label: 'None',
+    activeClass: 'bg-muted text-foreground',
+    help: 'No priority — the card sorts normally in its board column.',
+  },
+  {
+    value: 'high',
+    label: '⚑ High',
+    activeClass: 'bg-amber-500/15 text-amber-600 dark:text-amber-400',
+    help: '⚑ High priority — the card floats to the top of its board column.',
+  },
+  {
+    value: 'urgent',
+    label: '‼ Urgent',
+    activeClass: 'bg-red-500/15 text-red-600 dark:text-red-400',
+    help: '‼ Urgent priority — pinned to the very top of its board column.',
+  },
+]
 
-function PriorityButton({
+function PrioritySegmented({
   priority,
-  onCycle,
+  onSelect,
 }: {
   priority: string
-  onCycle: (next: string) => void
+  onSelect: (next: string) => void
 }) {
-  const next = PRIORITY_NEXT[priority] ?? 'high'
-  const help: Record<string, string> = {
-    none: 'Sets this project\'s priority. Each click cycles: none → ⚑ High → ‼ Urgent → back to none. High and urgent cards float to the top of their board column.',
-    high: 'Priority is ⚑ High — the card floats to the top of its board column. Click again for ‼ Urgent; one more click clears it back to none.',
-    urgent: 'Priority is ‼ Urgent — the very top of the board column. Click again to clear priority back to none.',
-  }
-  const text = help[priority] ?? help.none
-  const base = 'text-sm px-3 py-1.5 rounded-lg transition-colors shrink-0 cursor-pointer'
-
-  if (priority === 'high') {
-    return (
-      <HelpTip text={text}>
-        <button onClick={() => onCycle(next)}
-          className={`${base} bg-amber-500/15 text-amber-600 dark:text-amber-400 hover:bg-amber-500/25`}>
-          ⚑ High
-        </button>
-      </HelpTip>
-    )
-  }
-  if (priority === 'urgent') {
-    return (
-      <HelpTip text={text}>
-        <button onClick={() => onCycle(next)}
-          className={`${base} bg-red-500/15 text-red-600 dark:text-red-400 hover:bg-red-500/25`}>
-          ‼ Urgent
-        </button>
-      </HelpTip>
-    )
-  }
+  const current = priority || 'none'
   return (
-    <HelpTip text={text}>
-      <button onClick={() => onCycle(next)}
-        className={`${base} border border-border text-muted-foreground hover:text-foreground hover:border-ring`}>
-        ⚑ Priority
-      </button>
-    </HelpTip>
+    <div
+      role="group"
+      aria-label="Priority"
+      className="inline-flex items-center rounded-lg border border-border p-0.5 shrink-0"
+    >
+      {PRIORITY_SEGMENTS.map(seg => {
+        const active = current === seg.value
+        return (
+          <button
+            key={seg.value}
+            onClick={() => { if (!active) onSelect(seg.value) }}
+            aria-pressed={active}
+            title={seg.help}
+            className={`text-[11px] px-2 py-1 rounded-md transition-colors cursor-pointer ${
+              active ? seg.activeClass : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            {seg.label}
+          </button>
+        )
+      })}
+    </div>
   )
 }
 
@@ -792,7 +798,7 @@ function EditableType({ value, onSave }: { value: string | null; onSave: (next: 
         defaultValue={value ?? ''}
         onChange={e => { if (e.target.value) onSave(e.target.value); setEditing(false) }}
         onBlur={() => setEditing(false)}
-        className="text-xs px-1.5 py-1 rounded border border-border bg-background focus:outline-none focus:border-ring"
+        className="text-xs px-2 py-1 rounded border border-border bg-background focus:outline-none focus:border-ring"
       >
         <option value="" disabled>Type…</option>
         <option value="PS">PS</option>
@@ -801,15 +807,18 @@ function EditableType({ value, onSave }: { value: string | null; onSave: (next: 
       </select>
     )
   }
+  // Badge-dropdown: sized like the status pill (text-xs px-2 py-1 rounded),
+  // tinted by type via TYPE_BADGE, with a ▾ caret signalling it opens options.
   return (
     <button
       onClick={() => setEditing(true)}
       title="Click to change project type"
-      className={`text-xs px-2 py-1 rounded cursor-pointer hover:opacity-80 transition-opacity ${
-        value ? (TYPE_BADGE[value] ?? '') : 'border border-dashed border-border text-muted-foreground'
+      className={`text-xs px-2 py-1 rounded cursor-pointer hover:opacity-80 transition-opacity inline-flex items-center gap-1 ${
+        value ? (TYPE_BADGE[value] ?? 'bg-muted text-muted-foreground') : 'border border-dashed border-border text-muted-foreground'
       }`}
     >
       {value ?? '+ type'}
+      <span aria-hidden="true" className="text-[9px] opacity-70">▾</span>
     </button>
   )
 }
