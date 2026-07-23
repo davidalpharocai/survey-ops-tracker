@@ -46,3 +46,15 @@ export function useUploadDeliverable(projectId: string) {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['deliverables', projectId] }),
   })
 }
+
+export function useRemoveDeliverable(projectId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/deliverables/${id}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Remove failed')
+      return res.json()
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['deliverables', projectId] }),
+  })
+}
