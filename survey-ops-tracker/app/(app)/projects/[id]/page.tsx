@@ -7,10 +7,10 @@ import { createClient } from '@/lib/supabase/client'
 import { useProject, useUpdateProject, useDeleteProject, type SurveyProject } from '@/lib/hooks/useProjects'
 import { useTeamMembers, assignableMembers, type TeamMember } from '@/lib/hooks/useTeamMembers'
 import { PipelineSpine } from '@/components/project/PipelineSpine'
+import { ScopingSpine } from '@/components/project/ScopingSpine'
 import { WaveHistory } from '@/components/project/WaveHistory'
 import { CloneProjectModal } from '@/components/project/CloneProjectModal'
 import { OverviewFieldGrid } from '@/components/project/OverviewFieldGrid'
-import { ScopingProgress } from '@/components/project/ScopingProgress'
 import { ActivityLog } from '@/components/project/ActivityLog'
 import { DataChangeLog } from '@/components/project/DataChangeLog'
 import { ProjectAuditLog } from '@/components/project/ProjectAuditLog'
@@ -379,11 +379,17 @@ export default function ProjectDetailPage() {
         </div>
       </div>
 
-      {/* Cockpit Spine — dot pipeline progress + state-aware Advance CTA, lifted
-          into the command bar. Active phase only; Scoping keeps its own card below. */}
+      {/* Cockpit Spine — dot progress path + state-aware CTA, lifted into the
+          command bar. Active shows the pipeline spine; Scoping shows the scoping
+          spine (stages + Approve → pipeline). */}
       {project.phase === 'Active' && (
         <div className="bg-card border border-border shadow-sm rounded-xl px-4 py-3 mb-4">
           <PipelineSpine project={project} />
+        </div>
+      )}
+      {project.phase === 'Scoping' && (
+        <div className="bg-card border border-border shadow-sm rounded-xl px-4 py-3 mb-4">
+          <ScopingSpine project={project} />
         </div>
       )}
 
@@ -472,21 +478,10 @@ export default function ProjectDetailPage() {
         <ComplianceBanner project={project} />
         {/* Overview body — wide main column + slim rail */}
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_360px] gap-6">
-          {/* MAIN column: (scoping stage) → field-grid body → linked documents.
-              For Active projects the pipeline now lives in the command-bar spine,
-              so this card renders only for the Scoping phase. */}
+          {/* MAIN column: field-grid body → linked documents. Both the pipeline
+              (Active) and scoping (Scoping) progress now live in the command-bar
+              spine above, so no phase card renders here. */}
           <div className="flex flex-col gap-4">
-            {project.phase === 'Scoping' && (
-              <div className="bg-card border border-border shadow-sm rounded-xl p-4">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-xs text-muted-foreground uppercase tracking-widest font-medium">
-                    Scoping Stage
-                  </h3>
-                </div>
-                <ScopingProgress project={project} />
-              </div>
-            )}
-
             {/* Edwin survey-ID discrepancy — Survey IDs now edit in the Details
                 grid below, so the resolver rides above it as an inline banner. */}
             {project.survey_id_discrepancy && (
