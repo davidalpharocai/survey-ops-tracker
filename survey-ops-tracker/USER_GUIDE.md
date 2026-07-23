@@ -1,6 +1,6 @@
 # Survey Ops Command Center — User Guide
 
-*Last updated: June 12, 2026. The team's tracker for survey projects from first inquiry through delivery.*
+*Last updated: July 23, 2026. The team's tracker for survey projects from first inquiry through delivery.*
 
 **Finding this guide later:** the top navigation bar's **More** menu links straight here, along with the Systems & Handover doc.
 
@@ -53,31 +53,42 @@ New projects normally start in **Scoping** (New Inquiry → Proposal Sent → Pr
 
 [screenshot: project page Overview]
 
-### Hero stats (top)
-A compact three-zone strip: **N collected** (accented, click to edit) · a **Dates** tile holding all the project dates inline — **Submitted, Launch, Due (internal), Deliver (client)**, plus **Rerun** for longitudinal studies — each click-to-edit, with Due showing its urgency color and Deliver spelling out the buffer ("same day as due", "2d buffer", or a ⚠ if delivery is set before the internal due date) · and a compact **Waiting on** (computes itself from the stage checkboxes — use "Blocked by" to override when stuck on the client or on us). Budget now lives in the Money card, not the hero.
+### Header
+The project name (click to rename), a permanent **Project ID**, and a **Type** badge (PS / B2B / Rerun — click to change it; the same field also edits in the Details grid below) sit up top next to the status pill. On the right: **⚑ Priority** (cycles none → high → urgent) · **⏸ Hold** / **▶ Resume** (pauses; card greys out and sinks to the bottom of its column; Resume brings it right back) · **✕ Archive** / **↺ Reopen** (leaves Operations view but stays in Full View's Archived section, reopenable anytime) · and an **Actions ▾** menu that collects the less-frequent record actions in one place: **⎘ Clone project**, **⧉ Merge with a duplicate…** (see *Merging duplicates* in §7), managing **Co-Captains** (sharing a project shows "+1" on its board card), and **🗑 Delete project** (asks you to type "delete"; the project moves to Admin → Recently Deleted and can be restored — it's not gone for good unless deleted permanently from there).
 
-### Tabs
-- **Overview** — everything below
-- **Activity** — logged emails and events for the project (click one to expand and read; the search box finds a specific email by subject, body, or person). See §9b.
-- **Deliverables** — the final client deliverables filed for this project. See §9.
-- **Links** — Survey IDs (auto-synced nightly from the Edwin link; mismatches get flagged for review), Slack channel link, notification info. (Survey IDs also stay pinned to the top-right of the tab row so they're always in view.)
-- **Logs** — two histories in one place: the **Data Change Log**, where engineers log manual data edits ("removed 4 speeders from SV-2201"; date + author stamped, edit/delete with confirmation), and the automatic **Audit Log** — every field change on the project (who changed what, when, and the old → new value; "system" means an automated update like the nightly Edwin sync). You don't write to the Audit Log — the system records it for you.
+### ✦ Summary
+At the top of the **Overview** tab: an AI-written status brief. Every figure in it — N, spend, pace vs. the due date, days in the current stage — is computed exactly in code first; Claude (Haiku) only writes the sentences around those numbers, so it can't invent or alter one. It surfaces **watch-outs** automatically as a short amber list — past-due, spend running ahead of collection, a dip in blast completions. It's collapsible (collapsed shows just the one-line takeaway), shows an **"as of"** stamp for how stale it is, and has a **↻** to force a regenerate; otherwise it loads once when you open the project and does not refresh itself in the background. Labeled **AI · Beta** — the figures are exact, but verify specifics before relying on the prose.
 
-### Left column
-- **Pipeline progress** — check off stages (this moves the card on the board)
-- **Linked Documents** (shown first) — paste any URL (its document title fills in automatically), rename via the ✎ or remove via the ✕ (this only unlinks it — the file stays in Drive); questionnaire/Edwin/data sheet links live here
-- **Latest / Next Steps** — add to-dos (Ctrl+Enter saves); check one off and it moves to the "Latest" log with date + who (old imported notes live under "History"). It sits below Linked Documents so a long notes log can't push the documents down the page
-- **Compliance Review** — appears only when the client requires a review (before and/or after fielding) or a review has already been submitted (see §6)
+### Overview: the field grid
+Below the Summary, the Overview body is a Salesforce-style **field grid** — aligned label → value rows spanning the main column. Click any value to edit it in place; save on Enter or click-away, Escape cancels (a quick "Saved ✓" confirms it stuck). At the very top of the main column, **Pipeline Progress** still lets you check off stages (this moves the card on the board) — or **Scoping Stage** progress for deals not yet approved. Below that, the grid runs:
 
-(Changes in plain English are handled by the connector now — ask your Claude to make edits instead of a per-page box.)
+- **Details** — Submitted / Launch / Due / Delivery dates, a **Rerun date** row (longitudinal projects only), **Type**, and **Survey IDs** (comma separated; auto-filled overnight from the Edwin sync — a mismatch surfaces an inline "Use Edwin ID / Keep current" banner above the grid rather than overwriting silently).
+- **N & Audience** — see *N Segments* below.
+- **Money** — by project type: **PS** shows **Suppliers**, grouped into **launches** (fielding waves) — each launch has its own **target** plus supplier rows with a **$/complete (CPI)** and a per-supplier **cap**; before completes it shows a cost **range** (target × cheapest…priciest CPI), and **＋ Add launch** starts a new wave pre-filled from the last one. **B2B** shows **Blast Configuration** — each blast's **$/bid**, **# of people** reached, **# of completes** (editable inline as they trickle in), a date/time, and a description; cost = $/bid × completes. A Rerun-tagged or not-yet-typed project shows both, since neither maps cleanly. A **Budget & spend** summary sits underneath: Total budget, computed actual spend, cost/complete, and a budget-used bar.
+- **Flags** — five small color-coded, click-to-toggle chips — Longitudinal, Voter Survey QA, Citation Language, Row-Level Data, Terminations — each with an (i) explaining it.
 
-### Right sidebar
-Titled groups: **People** (spans the full sidebar width so names aren't clipped — client, the **Requested by** contact, captain + optional co-captains, salesperson from a dropdown), **Sample N & Audience** (N target, internal target, collected, actual, audience size), **Flags** (click a chip to toggle), **Money** (by project type first: **PS** shows **Suppliers**, grouped into **launches** (fielding waves) — each launch has its own **target** plus PureSpectrum supplier rows, each with a **$ / complete (CPI)** and a per-supplier **cap**. Before completes, a launch shows a cost **range** (target × cheapest…priciest CPI) and the project estimate is the **sum of the launch ranges**; once you enter each supplier's **N collected**, the **actual cost = Σ(CPI × N collected)**. **＋ Add launch** starts a new wave pre-filled from the last one (N collected reset). **B2B** shows **Blast Configuration** — each blast is its **$/bid** (a per-completion reward), the **# of people** it reached, the **# of completes**, a date/time, and an optional description; its cost is **$/bid × completes** (you only pay for people who completed), and completes are editable inline as they trickle in. Then the **Budgets** section beneath: Total budget + computed Actual $ / cost-per-complete / budget-used). Most projects have one captain; "+ add" under Co-Captains shares a project, and shared projects show "+1" on their board card. Project dates now live in the hero strip at the top, not the sidebar. A **Rerun history** card shows every wave of a recurring survey in order (Original → Wave 2 → …), each linking to that wave's page with its dates and N; when a survey stands alone you can **↻ Link this as a rerun of another survey** (it suggests the same client's likely originals), and a linked wave can be unlinked. Auto-spawned reruns are linked automatically; this is for tying together ones created by hand. For **Jenna's general-population studies**, a soft **gen-pop N floor** check warns (amber, in the Sample N card) when N target or N actual is below the expected sample — national ≈ **1,350**, state-level ≈ **500** (read from the free-text Audience). It's advisory: type **`override`** with an optional reason to dismiss it on that project, and Undo to bring it back.
+Alongside the grid, a slim right rail holds: **People** (Client — click to open their page; the **Requested by** contact; Captain; Salesperson; and, for **B2B** projects with a Slack channel set, a **Slack** row that opens the channel in the desktop app rather than the browser), **Rerun history** (every wave of a recurring survey in order, each linking to that wave's page with its dates and N; a stand-alone survey can **↻ Link this as a rerun of another survey**, and a linked wave can be unlinked), **Compliance** (only when the client requires a review — see §7b), and **Latest / Next Steps** (add a to-do with Ctrl+Enter; check one off and it moves to the "Latest" log with date + who; old imported notes live under "History"). **Linked Documents** now sits at the bottom of the main column, below the field grid — paste any URL (its title fills in automatically), rename via ✎ or unlink via ✕ (the file stays in Drive).
 
 **Requested by** is the client contact who asked for the survey. Click it to pick from that client's people or add a new one inline (first + last name required; email/title/phone optional), and click a chosen name to view or edit their details. Manage the full roster — and archive/delete contacts — on the client page.
 
-### Header buttons
-**⚑ Priority** (cycles none → high → urgent) · **⏸ Hold** (pauses; card greys out, sinks to column bottom; Resume brings it back) · **✕ Close** (done/archived — lives in Full View's Closed section, reopenable) · **🗑 Delete** (asks you to type "delete"; the project moves to Admin → Recently Deleted and can be restored — it's not gone for good unless you delete it permanently from there) · **Merge…** (fold a duplicate of this project into it — see *Merging duplicates* in §7)
+(Changes in plain English are still handled by the connector — ask your Claude to make edits instead of a per-page box.)
+
+### N Segments
+Split "N & Audience" into per-segment tracking — e.g. Buyers / Sellers — with **＋ Split into segments**; add as many as you need. Each segment gets its own **N Target, N Internal Target, N Collected, N Actual, Audience,** and **Audience Size**, editable the same way as any field-grid cell. Once segmented, the top-level N fields become **read-only sums** ("Σ across N segments") — edit the segments instead; an un-segmented project keeps its top-level N fields directly editable. **✕** removes a segment, with a one-click **↩ Undo** for the rest of the session. For **Jenna's general-population studies**, the same soft **gen-pop N floor** check as before still runs against the (summed) N — national ≈ **1,350**, state-level ≈ **500**, read from the free-text Audience — advisory, type **`override`** with an optional reason to dismiss it, Undo to bring it back.
+
+> **Note:** per-segment N and the Insights "Time in each stage" panel below both need **database migration 062** applied before they populate. Until then, N stays single-value (segments won't total) and the stage-timing panel shows its empty state.
+
+### Editing numbers and dates
+- **Number fields** — N Target / Internal Target / Collected / Actual (whole-project or per segment) and Audience Size — take plain numbers, comma-grouped numbers (`4,200`), or a leading **`=`** to auto-sum: type `=4200+800` and it commits as `5,000`.
+- **Date fields** — Submitted, Launch, Due, Delivery, Rerun — take typed entry (`7/23/2026` or `Jul 23, 2026`) or the **📅** calendar picker. A date that isn't real (`2/30/2026`, a garbled year) is rejected inline rather than silently saved.
+
+### Tabs
+- **Overview** — the field grid + rail above, topped by the ✦ Summary strip
+- **Insights (Beta)** — performance stats (completion/fill rates, cost per complete, pace, supplier mix), now including **Time in each stage**: a day-count bar per pipeline stage. The clock starts at **Doc Programming** — the Submitted → Doc Programming gap isn't tracked — and the current stage is marked "· now"
+- **Activity** — logged emails and events for the project (click one to expand and read; the search box finds a specific email by subject, body, or person). See §9b.
+- **Deliverables** — the final client deliverables filed for this project. See §9.
+- **Links** — Slack channel link and notification info. (Survey IDs live in the Details grid now, not here.)
+- **Logs** — two histories in one place: the **Data Change Log**, where engineers log manual data edits ("removed 4 speeders from SV-2201"; date + author stamped, edit/delete with confirmation), and the automatic **Audit Log** — every field change on the project (who changed what, when, and the old → new value; "system" means an automated update like the nightly Edwin sync). You don't write to the Audit Log — the system records it for you.
 
 ## 4. The List view
 
