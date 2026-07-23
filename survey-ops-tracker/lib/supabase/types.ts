@@ -21,8 +21,11 @@ export type Database = {
           project_id: string
           label: string
           n_target: number | null
+          n_internal_target: number | null
           n_collected: number
           n_actual: number | null
+          audience: string | null
+          audience_size: number | null
           sort_order: number
           created_at: string
         }
@@ -31,8 +34,11 @@ export type Database = {
           project_id: string
           label: string
           n_target?: number | null
+          n_internal_target?: number | null
           n_collected?: number
           n_actual?: number | null
+          audience?: string | null
+          audience_size?: number | null
           sort_order?: number
           created_at?: string
         }
@@ -41,8 +47,11 @@ export type Database = {
           project_id?: string
           label?: string
           n_target?: number | null
+          n_internal_target?: number | null
           n_collected?: number
           n_actual?: number | null
+          audience?: string | null
+          audience_size?: number | null
           sort_order?: number
           created_at?: string
         }
@@ -829,6 +838,30 @@ export type Database = {
           target?: number | null
           created_by?: string | null
           created_at?: string
+        }
+        Relationships: []
+      }
+      project_stage_history: {
+        Row: {
+          id: string
+          project_id: string
+          stage: string
+          entered_at: string
+          created_by: string | null
+        }
+        Insert: {
+          id?: string
+          project_id: string
+          stage: string
+          entered_at?: string
+          created_by?: string | null
+        }
+        Update: {
+          id?: string
+          project_id?: string
+          stage?: string
+          entered_at?: string
+          created_by?: string | null
         }
         Relationships: []
       }
