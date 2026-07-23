@@ -19,7 +19,7 @@ export default function RerunSeriesPage() {
         <span className="px-3 py-1 rounded-lg bg-accent text-foreground font-medium">Series</span>
       </div>
       <div>
-        <h1 className="text-2xl font-bold text-foreground">Rerun series</h1>
+        <h1 className="text-2xl font-bold text-foreground">Rerun Series</h1>
         <p className="text-sm text-muted-foreground mt-0.5">
           Every longitudinal wave series, grouped — the zoomed-out view. Toggle Table / Timeline on any series.
         </p>

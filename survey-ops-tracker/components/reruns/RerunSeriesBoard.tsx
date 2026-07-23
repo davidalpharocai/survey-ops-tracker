@@ -22,6 +22,7 @@ export function RerunSeriesBoard() {
   const [dragRoot, setDragRoot] = useState<string | null>(null)
   const [overRoot, setOverRoot] = useState<string | null>(null)
   const [overDetach, setOverDetach] = useState(false)
+  const [q, setQ] = useState('')
 
   if (isLoading) return <p className="text-sm text-muted-foreground">Loading series…</p>
 
@@ -31,6 +32,16 @@ export function RerunSeriesBoard() {
         No multi-wave series yet. On any survey&apos;s page, use “↻ Link this as a rerun of another survey” to start one.
       </div>
     )
+
+  // Multi-keyword search (AND), matching Radar's behavior — over series name,
+  // client, and every wave's PR code + name.
+  const terms = q.trim().toLowerCase().split(/\s+/).filter(Boolean)
+  const shown = terms.length
+    ? series.filter(s => {
+        const hay = `${seriesTitle(s.name)} ${s.client} ${s.waves.map(w => `${w.project_code ?? ''} ${w.project_name}`).join(' ')}`.toLowerCase()
+        return terms.every(t => hay.includes(t))
+      })
+    : series
 
   const read = (e: DragEvent): DragData | null => {
     try {
@@ -73,11 +84,27 @@ export function RerunSeriesBoard() {
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-sm text-muted-foreground">
-        {series.length} rerun series. Click a wave to open it; <span className="text-foreground">drag a wave onto another series to merge it in</span>, or into the strip below to split it out. On mobile / keyboard, use the ↻ Link controls on the wave&apos;s project page.
-      </p>
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <p className="text-sm text-muted-foreground flex-1 min-w-64">
+          {series.length} rerun series. Click a wave to open it; <span className="text-foreground">drag a wave onto another series to merge it in</span>, or into the strip below to split it out. On mobile / keyboard, use the ↻ Link controls on the wave&apos;s project page.
+        </p>
+        <div className="relative shrink-0">
+          <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground text-xs" aria-hidden="true">🔍</span>
+          <input
+            value={q}
+            onChange={e => setQ(e.target.value)}
+            placeholder="Search series, client, PR#…"
+            aria-label="Search rerun series"
+            className="bg-muted/60 border border-border rounded-lg pl-7 pr-2 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring focus:bg-background w-56"
+          />
+        </div>
+      </div>
 
-      {series.map(s => {
+      {shown.length === 0 && (
+        <div className="bg-card border border-border rounded-xl p-6 text-sm text-muted-foreground">No series match “{q.trim()}”.</div>
+      )}
+
+      {shown.map(s => {
         const isTarget = !!dragRoot && dragRoot !== s.rootId
         const isOver = isTarget && overRoot === s.rootId
         return (
