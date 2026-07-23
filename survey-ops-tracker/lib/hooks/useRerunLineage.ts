@@ -14,15 +14,18 @@ export interface Wave {
   rerun_number: number | null
   project_type: string | null
   status: string | null
+  board_column: string | null
   due_date: string | null
   deliver_date: string | null
+  delivered_at: string | null
+  launch_date: string | null
   n_target: number | null
   n_collected: number | null
   n_actual: number | null
 }
 
 const WAVE_COLS =
-  'id, project_code, project_name, client, rerun_series_id, rerun_number, project_type, status, due_date, deliver_date, n_target, n_collected, n_actual'
+  'id, project_code, project_name, client, rerun_series_id, rerun_number, project_type, status, board_column, due_date, deliver_date, delivered_at, launch_date, n_target, n_collected, n_actual'
 
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim()
 const esc = (s: string) => s.replace(/([%_\\])/g, '\\$1')

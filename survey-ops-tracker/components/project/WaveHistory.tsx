@@ -1,9 +1,7 @@
 'use client'
 import { useState } from 'react'
-import Link from 'next/link'
 import { useRerunSeries, useRerunCandidates, useLinkRerun } from '@/lib/hooks/useRerunLineage'
-import { formatDate } from '@/lib/utils/date'
-import { fmtNum } from '@/lib/utils/number'
+import { WaveSeriesView } from '@/components/reruns/WaveSeriesView'
 import { toast } from '@/lib/utils/toast'
 
 type P = {
@@ -65,37 +63,10 @@ export function WaveHistory({ project }: { project: P }) {
 
   return (
     <div className="flex flex-col gap-2 text-sm">
-      <ol className="flex flex-col gap-1">
-        {waves.map((w) => {
-          const isCurrent = w.id === project.id
-          const nVal = w.n_actual ?? w.n_collected ?? w.n_target ?? null
-          const date = formatDate(w.deliver_date ?? w.due_date ?? null)
-          const body = (
-            <span className="flex items-center justify-between gap-2 w-full">
-              <span className="flex items-center gap-2 min-w-0">
-                <span className="text-[12px] font-mono text-muted-foreground shrink-0">
-                  {w.rerun_number && w.rerun_number > 1 ? `Wave ${w.rerun_number}` : 'Original'}
-                </span>
-                <span
-                  className={`truncate ${isCurrent ? 'text-foreground font-medium' : 'text-blue-600 dark:text-blue-400'}`}
-                >
-                  {w.project_code ? `${w.project_code} · ` : ''}
-                  {w.project_name}
-                </span>
-              </span>
-              <span className="text-xs text-muted-foreground shrink-0 whitespace-nowrap">
-                {date}
-                {nVal != null && ` · N ${fmtNum(nVal)}`}
-              </span>
-            </span>
-          )
-          return (
-            <li key={w.id} className={`rounded px-1.5 py-1 ${isCurrent ? 'bg-accent/60' : 'hover:bg-accent/40'}`}>
-              {isCurrent ? body : <Link href={`/projects/${w.id}`} className="block">{body}</Link>}
-            </li>
-          )
-        })}
-      </ol>
+      <WaveSeriesView waves={waves} currentId={project.id} compact />
+      <p className="text-[11px] text-muted-foreground/70">
+        Toggle Table / Timeline · click a wave to open it · colored by status.
+      </p>
       {isChild && (
         <button
           onClick={unlink}

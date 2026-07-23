@@ -64,18 +64,10 @@ export async function POST(req: Request) {
     .maybeSingle()
   if (!child) return NextResponse.json({ error: 'Project not found.' }, { status: 404 })
 
-  // If this project is itself a series root that others hang off, refuse to move
-  // it — that would orphan its own waves. (Unlink/relink those individually.)
-  const { count: childrenOfChild } = await admin
-    .from('survey_projects')
-    .select('id', { count: 'exact', head: true })
-    .eq('rerun_series_id', childId)
-    .is('deleted_at', null)
-  if ((childrenOfChild ?? 0) > 0)
-    return NextResponse.json(
-      { error: 'This survey already has its own rerun waves linked to it — detach those first.' },
-      { status: 409 }
-    )
+  // If this project is itself a series root with its own waves, we MOVE the whole
+  // subtree under the new root at link time (below) — merging two series instead of
+  // refusing. The only illegal case is linking under yourself or your own wave,
+  // which the `root === childId` cycle guard further down rejects.
 
   // ---- Unlink: make it a standalone survey again ----
   if (!parentId) {
@@ -107,14 +99,20 @@ export async function POST(req: Request) {
       { status: 400 }
     )
 
-  // Attach to the target series, then renumber the whole series by chronological
-  // position so this wave lands at its correct # (not just max+1) and any existing
-  // waves re-order too.
+  // Move the child AND any waves that hang off it (its own subtree) under the new
+  // root, so merging two series keeps every wave rather than orphaning the child's.
+  // Then renumber the whole series by chronological position (not max+1).
+  const { data: descendants } = await admin
+    .from('survey_projects')
+    .select('id')
+    .eq('rerun_series_id', childId)
+    .is('deleted_at', null)
+  const moveIds = [childId, ...(descendants ?? []).map((d) => d.id)]
   const { error } = await admin
     .from('survey_projects')
     .update({ rerun_series_id: root })
-    .eq('id', childId)
+    .in('id', moveIds)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   await renumberSeries(admin, root)
-  return NextResponse.json({ ok: true, seriesId: root })
+  return NextResponse.json({ ok: true, seriesId: root, moved: moveIds.length })
 }
