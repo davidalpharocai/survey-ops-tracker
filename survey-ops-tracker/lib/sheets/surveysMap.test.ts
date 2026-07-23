@@ -97,6 +97,23 @@ describe('classifyLinkedDocs', () => {
     expect(classifyLinkedDocs(null)).toEqual({ doc: '', sheet: '' })
     expect(classifyLinkedDocs(['https://example.com'])).toEqual({ doc: '', sheet: '' })
   })
+  it('extracts .url from JSON-string entries (SOCC storage shape)', () => {
+    const links = [
+      '{"name":"Survey doc","url":"https://docs.google.com/document/d/abc/edit"}',
+      '{"name":"Data","url":"https://docs.google.com/spreadsheets/d/xyz/edit"}',
+    ]
+    expect(classifyLinkedDocs(links)).toEqual({
+      doc: 'https://docs.google.com/document/d/abc/edit',
+      sheet: 'https://docs.google.com/spreadsheets/d/xyz/edit',
+    })
+  })
+  it('handles object entries and ignores malformed JSON', () => {
+    expect(classifyLinkedDocs([{ url: 'https://docs.google.com/document/d/o/edit' }])).toEqual({
+      doc: 'https://docs.google.com/document/d/o/edit',
+      sheet: '',
+    })
+    expect(classifyLinkedDocs(['{not json'])).toEqual({ doc: '', sheet: '' })
+  })
 })
 
 describe('formula-injection escaping', () => {

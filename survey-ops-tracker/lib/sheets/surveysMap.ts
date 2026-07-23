@@ -44,11 +44,30 @@ export const escapeText = (s: string) => (/^[=+\-@]/.test(s) ? `'${s}` : s)
 // but we defend anyway); NOT run through escapeText (that would quote the '=').
 export const hyperlink = (url: string) => (url ? `=HYPERLINK("${url.replace(/"/g, '""')}")` : '')
 
-export function classifyLinkedDocs(links: string[] | null): { doc: string; sheet: string } {
-  const arr = links ?? []
+/** A linked_documents entry can be a plain URL string, a JSON string
+ *  `{"name":..,"url":..}`, or an object {url}. Normalize any of them to the URL
+ *  (empty string if none) — SOCC stores them as JSON strings, so the old code
+ *  that matched the whole entry against the URL regex wrote the JSON blob into
+ *  the cell. */
+function linkUrl(entry: unknown): string {
+  if (!entry) return ''
+  if (typeof entry === 'object') return String((entry as { url?: unknown }).url ?? '')
+  const s = String(entry).trim()
+  if (s.startsWith('{')) {
+    try {
+      return String((JSON.parse(s) as { url?: unknown }).url ?? '')
+    } catch {
+      return ''
+    }
+  }
+  return s
+}
+
+export function classifyLinkedDocs(links: unknown[] | null): { doc: string; sheet: string } {
+  const urls = (links ?? []).map(linkUrl).filter(Boolean)
   return {
-    doc: arr.find((u) => /docs\.google\.com\/document/i.test(u)) ?? '',
-    sheet: arr.find((u) => /docs\.google\.com\/spreadsheets/i.test(u)) ?? '',
+    doc: urls.find((u) => /docs\.google\.com\/document/i.test(u)) ?? '',
+    sheet: urls.find((u) => /docs\.google\.com\/spreadsheets/i.test(u)) ?? '',
   }
 }
 
