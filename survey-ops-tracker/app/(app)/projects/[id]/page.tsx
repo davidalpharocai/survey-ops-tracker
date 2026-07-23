@@ -34,15 +34,15 @@ import { ProjectSummaryStrip } from '@/components/project/summary/ProjectSummary
 type ActiveTab = 'overview' | 'insights' | 'activity' | 'compliance' | 'deliverables' | 'links' | 'logs'
 
 // Tab bar config — order here is the on-screen order. Compliance sits between
-// Activity and Deliverables.
+// Activity and Deliverables; "Other" (Slack + notifications) sits last.
 const PROJECT_TABS: { id: ActiveTab; label: string; title: string }[] = [
   { id: 'overview', label: 'Overview', title: 'The full project view — stats, pipeline, next steps, documents, and details' },
   { id: 'insights', label: 'Insights (Beta)', title: 'Performance stats — completion/fill rates, cost per complete, pace, supplier mix' },
   { id: 'activity', label: 'Activity', title: 'Logged emails and events for this project' },
   { id: 'compliance', label: 'Compliance', title: 'Compliance review — submit the question list for the client to approve before launch, and log the after-fielding results review' },
   { id: 'deliverables', label: 'Deliverables', title: 'Files delivered to the client for this project' },
-  { id: 'links', label: 'Links', title: 'Slack channel link and notification settings' },
   { id: 'logs', label: 'Logs', title: 'Manual data-change log and the automatic field-change audit trail' },
+  { id: 'links', label: 'Other', title: 'Slack channel link and notification settings' },
 ]
 
 const TOOLTIPS: Record<string, string> = {
@@ -511,14 +511,10 @@ export default function ProjectDetailPage() {
             )}
 
             <OverviewFieldGrid project={project} />
-
-            <LinkedDocuments
-              projectId={project.id}
-              documents={project.linked_documents ?? []}
-            />
           </div>
 
-          {/* RAIL: people → rerun series → compliance glance → next steps */}
+          {/* RAIL: people → next steps → linked docs → compliance → rerun.
+              Compliance + rerun collapse by default to keep the rail compact. */}
           <div className="flex flex-col gap-4 self-start">
             <SidebarCard title="People">
               <div className="flex flex-col gap-3">
@@ -561,34 +557,32 @@ export default function ProjectDetailPage() {
                   tooltip={TOOLTIPS['Salesperson']}
                   onSave={v => updateProject.mutate({ id, updates: { salesperson: v } })}
                 />
-                {/* Slack — B2B projects coordinate in a shared channel; the link
-                    opens the desktop app via a slack:// deep link. */}
-                {project.project_type === 'B2B' && project.slack_channel_url && (
-                  <div className="flex justify-between items-center text-sm gap-2">
-                    <span className="text-muted-foreground flex items-center text-xs shrink-0">
-                      Slack
-                      <InfoTooltip text="Opens this project's Slack channel in the desktop app." />
-                    </span>
-                    <a
-                      href={slackDeepLink(project.slack_channel_url)}
-                      className="text-sm text-primary hover:underline inline-flex items-center gap-1 min-w-0"
-                      title="Open this channel in the Slack app"
-                    >
-                      <span aria-hidden="true">💬</span>
-                      <span className="truncate">{slackChannelLabel(project.slack_channel_url)}</span>
-                    </a>
-                  </div>
+                {/* Slack — B2B projects coordinate in a shared channel. Always
+                    shown for B2B (editable inline) so the channel can be set from
+                    here; the link opens the desktop app via a slack:// deep link. */}
+                {project.project_type === 'B2B' && (
+                  <SlackRow
+                    url={project.slack_channel_url ?? null}
+                    onSave={v => updateProject.mutate({ id, updates: { slack_channel_url: v } })}
+                  />
                 )}
               </div>
             </SidebarCard>
 
-            <SidebarCard title="Rerun history" dense>
+            <LatestNextSteps projectId={project.id} notes={project.latest_next_steps} />
+
+            <LinkedDocuments
+              projectId={project.id}
+              documents={project.linked_documents ?? []}
+            />
+
+            {showCompliance && (
+              <CompliancePanel projectId={project.id} project={project} collapsible defaultCollapsed />
+            )}
+
+            <SidebarCard title="Rerun history" dense collapsible defaultCollapsed>
               <WaveHistory project={project} />
             </SidebarCard>
-
-            {showCompliance && <CompliancePanel projectId={project.id} project={project} />}
-
-            <LatestNextSteps projectId={project.id} notes={project.latest_next_steps} />
           </div>
         </div>
       </div>
@@ -626,13 +620,42 @@ function TabButton({
   )
 }
 
-function SidebarCard({ title, children, className = '', dense = false }: { title: string; children: React.ReactNode; className?: string; dense?: boolean }) {
+function SidebarCard({
+  title,
+  children,
+  className = '',
+  dense = false,
+  collapsible = false,
+  defaultCollapsed = false,
+}: {
+  title: string
+  children: React.ReactNode
+  className?: string
+  dense?: boolean
+  collapsible?: boolean
+  defaultCollapsed?: boolean
+}) {
+  const [collapsed, setCollapsed] = useState(collapsible && defaultCollapsed)
+  // Drop the header's bottom margin + underline when collapsed so it reads as a
+  // single compact row; keep them when open.
+  const headerSpace = collapsed ? '' : `border-b border-border ${dense ? 'mb-2.5 pb-1.5' : 'mb-3 pb-2'}`
+  const headerCls = `flex items-center gap-1.5 text-[11px] text-muted-foreground uppercase tracking-wide font-medium ${headerSpace}`
   return (
     <div className={`bg-card border border-border shadow-sm rounded-xl transition-all hover:border-primary/40 hover:bg-card/70 hover:shadow-md hover:backdrop-blur-sm ${dense ? 'p-3' : 'p-4'} ${className}`}>
-      <h3 className={`border-b border-border text-[11px] text-muted-foreground uppercase tracking-wide font-medium ${dense ? 'mb-2.5 pb-1.5' : 'mb-3 pb-2'}`}>
-        {title}
-      </h3>
-      <div className={`flex flex-col ${dense ? 'gap-2' : 'gap-3'}`}>{children}</div>
+      {collapsible ? (
+        <button
+          type="button"
+          onClick={() => setCollapsed(c => !c)}
+          aria-expanded={!collapsed}
+          className={`${headerCls} w-full transition-colors hover:text-foreground`}
+        >
+          <span className="text-sm leading-none text-primary">{collapsed ? '▸' : '▾'}</span>
+          {title}
+        </button>
+      ) : (
+        <h3 className={headerCls}>{title}</h3>
+      )}
+      {!collapsed && <div className={`flex flex-col ${dense ? 'gap-2' : 'gap-3'}`}>{children}</div>}
     </div>
   )
 }
@@ -890,6 +913,81 @@ function SalespersonRow({
       >
         {value || <span className="text-muted-foreground/50 whitespace-nowrap">— set</span>}
       </button>
+    </div>
+  )
+}
+
+// Slack channel row for the People tile (B2B only). When a URL is set it shows
+// a 💬 deep-link into the desktop app plus a ✎ to change it; when empty it shows
+// a "— set" affordance that opens an inline URL input. Commit on blur/Enter,
+// cancel on Escape (mirrors the field-grid cells' commit pattern).
+function SlackRow({ url, onSave }: { url: string | null; onSave: (next: string | null) => void }) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState('')
+  const skip = useRef(false)
+
+  function commit() {
+    if (skip.current) {
+      skip.current = false
+      setEditing(false)
+      return
+    }
+    onSave(draft.trim() || null)
+    setEditing(false)
+  }
+
+  return (
+    <div className="flex justify-between items-center text-sm gap-2">
+      <span className="text-muted-foreground flex items-center text-xs shrink-0">
+        Slack
+        <InfoTooltip text="This project's Slack channel — paste the channel URL; the link opens it in the desktop app." />
+      </span>
+      {editing ? (
+        <input
+          autoFocus
+          value={draft}
+          placeholder="Paste channel URL"
+          onChange={e => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={e => {
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              e.currentTarget.blur()
+            } else if (e.key === 'Escape') {
+              e.preventDefault()
+              skip.current = true
+              e.currentTarget.blur()
+            }
+          }}
+          className="min-w-0 w-40 bg-muted border border-border rounded px-2 py-1 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring"
+        />
+      ) : url ? (
+        <span className="flex items-center gap-1 min-w-0">
+          <a
+            href={slackDeepLink(url)}
+            className="text-sm text-primary hover:underline inline-flex items-center gap-1 min-w-0"
+            title="Open this channel in the Slack app"
+          >
+            <span aria-hidden="true">💬</span>
+            <span className="truncate">{slackChannelLabel(url)}</span>
+          </a>
+          <button
+            onClick={() => { setDraft(url); setEditing(true) }}
+            title="Change link"
+            className="shrink-0 text-xs text-muted-foreground/60 hover:text-foreground"
+          >
+            ✎
+          </button>
+        </span>
+      ) : (
+        <button
+          onClick={() => { setDraft(''); setEditing(true) }}
+          className="text-sm text-muted-foreground/50 hover:text-foreground rounded px-1.5 transition-colors"
+          title="Add the Slack channel URL"
+        >
+          — set
+        </button>
+      )}
     </div>
   )
 }

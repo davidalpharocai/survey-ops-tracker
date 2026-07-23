@@ -94,9 +94,9 @@ export function BlastBlocks({ project }: { project: SurveyProject }) {
         <span className="flex items-center">
           <button
             onClick={() => setExpanded(e => !e)}
-            className="flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-muted-foreground transition-colors hover:text-foreground"
+            className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground transition-colors hover:text-foreground"
           >
-            <span className="text-[10px]">{expanded ? '▾' : '▸'}</span>
+            <span className="text-sm leading-none text-primary">{expanded ? '▾' : '▸'}</span>
             Blasts · {count}
           </button>
           <InfoTooltip text={TIP.header} />
@@ -106,7 +106,7 @@ export function BlastBlocks({ project }: { project: SurveyProject }) {
             add.mutate({ bid: 0, people: 0, completes: 0, blast_at: null, note: '', created_by: userName })
           }
           disabled={add.isPending}
-          className="text-[12px] text-primary hover:underline disabled:cursor-not-allowed disabled:opacity-40"
+          className="text-sm font-medium text-primary hover:underline disabled:cursor-not-allowed disabled:opacity-40"
         >
           {add.isPending ? 'Adding…' : '+ Log blast'}
         </button>

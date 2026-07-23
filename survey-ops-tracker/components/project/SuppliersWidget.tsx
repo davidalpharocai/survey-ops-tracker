@@ -399,7 +399,7 @@ export function SuppliersWidget({
         <button
           onClick={() => void addLaunchWithCopy()}
           disabled={addLaunch.isPending}
-          className="self-start text-xs bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed px-2.5 py-1 rounded-lg"
+          className="self-start text-sm font-medium bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed px-3 py-1.5 rounded-lg"
         >
           {addLaunch.isPending ? 'Adding…' : launchList.length === 0 ? '＋ Add launch' : '＋ Add launch (copies the last one)'}
         </button>

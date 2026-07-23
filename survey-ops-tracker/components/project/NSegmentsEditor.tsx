@@ -44,7 +44,7 @@ export function NSegmentsEditor({ project }: { project: SurveyProject }) {
   const addSeg = useAddSegment(project.id)
   const removeSeg = useRemoveSegment(project.id)
 
-  const [expanded, setExpanded] = useState(true)
+  const [expanded, setExpanded] = useState(false)
   // Session-level Undo: the last-removed segment's full payload. Cleared when
   // re-added or replaced by a newer removal.
   const [undo, setUndo] = useState<ProjectSegment | null>(null)
@@ -55,11 +55,12 @@ export function NSegmentsEditor({ project }: { project: SurveyProject }) {
   const saveProject = (updates: ProjectUpdate) =>
     updateProject.mutate({ id: project.id, updates })
 
-  // When segmented, the top fields are trigger-summed — note that they're edited
-  // per segment below.
+  // When segmented, the top fields are a rollup of the segments — but they stay
+  // directly editable. Editing a segment re-sums and overwrites the top on save;
+  // a direct edit to a top field sticks until the next segment change rolls up.
   const sumNote = (base: string) =>
     segmented
-      ? `${base} · Σ across ${count} segment${count === 1 ? '' : 's'} — edit per segment below.`
+      ? `${base} · Rolls up from ${count} segment${count === 1 ? '' : 's'}: editing a segment overwrites this on save, but a direct edit here stays until then.`
       : base
 
   function handleRemove(seg: ProjectSegment) {
@@ -89,28 +90,24 @@ export function NSegmentsEditor({ project }: { project: SurveyProject }) {
         label="N Target"
         tooltip={sumNote(TIP.nTarget)}
         value={project.n_target}
-        readOnly={segmented}
         onSave={v => saveProject({ n_target: v })}
       />
       <NumberCell
         label="N Internal Target"
         tooltip={sumNote(TIP.nInternal)}
         value={project.n_internal_target ?? null}
-        readOnly={segmented}
         onSave={v => saveProject({ n_internal_target: v })}
       />
       <NumberCell
         label="N Collected"
         tooltip={sumNote(TIP.nCollected)}
         value={project.n_collected}
-        readOnly={segmented}
         onSave={v => saveProject({ n_collected: v ?? 0 })}
       />
       <NumberCell
         label="N Actual"
         tooltip={sumNote(TIP.nActual)}
         value={project.n_actual}
-        readOnly={segmented}
         onSave={v => saveProject({ n_actual: v })}
       />
 
@@ -165,7 +162,7 @@ export function NSegmentsEditor({ project }: { project: SurveyProject }) {
                 audience_size: project.audience_size,
               })
             }
-            className="text-[12px] text-primary hover:underline"
+            className="text-sm font-medium text-primary hover:underline"
             title="Track separate collections (e.g. Buyers / Sellers) under this project — add as many segments as you need"
           >
             ＋ Split into segments
@@ -176,14 +173,14 @@ export function NSegmentsEditor({ project }: { project: SurveyProject }) {
           <div className="mb-2 flex items-center justify-between">
             <button
               onClick={() => setExpanded(e => !e)}
-              className="flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-muted-foreground transition-colors hover:text-foreground"
+              className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground transition-colors hover:text-foreground"
             >
-              <span className="text-[10px]">{expanded ? '▾' : '▸'}</span>
+              <span className="text-sm leading-none text-primary">{expanded ? '▾' : '▸'}</span>
               N Segments · {count}
             </button>
             <button
               onClick={() => addSeg.mutate(segments.length)}
-              className="text-[12px] text-primary hover:underline"
+              className="text-sm font-medium text-primary hover:underline"
             >
               + Add segment
             </button>

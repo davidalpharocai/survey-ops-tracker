@@ -20,7 +20,7 @@ export interface FieldSectionProps {
 export function FieldSection({ title, tooltip, first = false, children }: FieldSectionProps) {
   return (
     <section className={cn(first ? 'pt-0' : 'pt-5')}>
-      <h3 className="mb-2.5 flex items-center border-b border-border pb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+      <h3 className="mb-2.5 flex items-center border-b border-border pb-1.5 text-[12px] font-bold uppercase tracking-wider text-foreground">
         {title}
         {tooltip && <InfoTooltip text={tooltip} />}
       </h3>
