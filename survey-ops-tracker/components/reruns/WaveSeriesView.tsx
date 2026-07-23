@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, type HTMLAttributes } from 'react'
 import { useRouter } from 'next/navigation'
 import { formatDate } from '@/lib/utils/date'
 import { waveStatus, WAVE_STATUS_LEGEND, type WaveLike } from '@/lib/reruns/waveStatus'
@@ -43,12 +43,16 @@ export function WaveSeriesView({
   waves,
   currentId,
   compact = false,
+  rowDragProps,
 }: {
   waves: SeriesWave[]
   /** The project whose page this is — highlighted, not linked. */
   currentId?: string
   /** Tighter spacing for the project-page rail. */
   compact?: boolean
+  /** Per-wave drag attributes (draggable + onDragStart…) injected by the board;
+   *  omitted on the project page (no drag there). */
+  rowDragProps?: (w: SeriesWave) => HTMLAttributes<HTMLDivElement>
 }) {
   const router = useRouter()
   const [view, setView] = useState<'table' | 'timeline'>('table')
@@ -90,6 +94,7 @@ export function WaveSeriesView({
     return (
       <div
         key={w.id}
+        {...(rowDragProps?.(w) ?? {})}
         role={isCurrent ? undefined : 'button'}
         tabIndex={isCurrent ? undefined : 0}
         onClick={() => open(w)}
@@ -187,6 +192,7 @@ export function WaveSeriesView({
                 return (
                   <div
                     key={w.id}
+                    {...(rowDragProps?.(w) ?? {})}
                     role={isCurrent ? undefined : 'button'}
                     tabIndex={isCurrent ? undefined : 0}
                     onClick={() => open(w)}

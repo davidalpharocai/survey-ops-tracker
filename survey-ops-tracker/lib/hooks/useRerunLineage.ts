@@ -158,6 +158,7 @@ export function useLinkRerun() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['rerun-series'] })
       queryClient.invalidateQueries({ queryKey: ['rerun-candidates'] })
+      queryClient.invalidateQueries({ queryKey: ['all-rerun-series'] })
       queryClient.invalidateQueries({ queryKey: ['project'] })
       queryClient.invalidateQueries({ queryKey: ['projects'] })
     },
