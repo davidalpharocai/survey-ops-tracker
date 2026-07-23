@@ -111,26 +111,34 @@ export function useAllRerunSeries() {
         .not('rerun_series_id', 'is', null)
         .is('deleted_at', null)
       if (error) throw error
-      const kids = (children ?? []) as Wave[]
-      const rootIds = Array.from(new Set(kids.map(c => c.rerun_series_id).filter(Boolean) as string[]))
-      let roots: Wave[] = []
-      if (rootIds.length) {
-        const { data, error: e2 } = await supabase
-          .from('survey_projects')
-          .select(WAVE_COLS)
-          .in('id', rootIds)
-          .is('deleted_at', null)
-        if (e2) throw e2
-        roots = (data ?? []) as Wave[]
+      // seen: id → wave for every wave we've fetched (children + their ancestors).
+      const seen = new Map<string, Wave>()
+      for (const k of (children ?? []) as Wave[]) seen.set(k.id, k)
+      // Pull in referenced ancestors, following the chain — robust to a stray
+      // 2-level link where a wave points at a mid-series wave instead of the root.
+      const pending = () =>
+        Array.from(new Set([...seen.values()].map(w => w.rerun_series_id).filter((x): x is string => !!x))).filter(id => !seen.has(id))
+      for (let round = 0, miss = pending(); round < 5 && miss.length; round++, miss = pending()) {
+        const { data } = await supabase.from('survey_projects').select(WAVE_COLS).in('id', miss).is('deleted_at', null)
+        for (const r of (data ?? []) as Wave[]) seen.set(r.id, r)
       }
-      const byRoot = new Map<string, Wave[]>()
-      for (const w of [...roots, ...kids]) {
-        const root = w.rerun_series_id ?? w.id
-        ;(byRoot.get(root) ?? byRoot.set(root, []).get(root)!).push(w)
+      // Ultimate root: follow rerun_series_id until null (or a wave we don't have).
+      const rootOf = (w: Wave): string => {
+        let cur = w
+        for (let i = 0; i < 12 && cur.rerun_series_id && seen.has(cur.rerun_series_id); i++) cur = seen.get(cur.rerun_series_id)!
+        return cur.rerun_series_id && !seen.has(cur.rerun_series_id) ? cur.rerun_series_id : cur.id
+      }
+      // Group by ultimate root; a per-root Map dedups by wave id (so a wave that
+      // is both a child and a stray-chain target can't appear twice).
+      const byRoot = new Map<string, Map<string, Wave>>()
+      for (const w of seen.values()) {
+        const root = rootOf(w)
+        if (!byRoot.has(root)) byRoot.set(root, new Map())
+        byRoot.get(root)!.set(w.id, w)
       }
       return [...byRoot.entries()]
-        .map(([rootId, ws]) => {
-          const waves = [...ws].sort((a, b) => (a.rerun_number ?? 0) - (b.rerun_number ?? 0))
+        .map(([rootId, m]) => {
+          const waves = [...m.values()].sort((a, b) => (a.rerun_number ?? 0) - (b.rerun_number ?? 0))
           const root = waves.find(w => w.id === rootId) ?? waves[0]
           return { rootId, client: root.client, name: root.project_name, waves }
         })

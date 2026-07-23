@@ -34,9 +34,11 @@ function waveLabel(n: number | null): string {
 }
 
 function dateFor(w: SeriesWave, key: string): string {
-  if (key === 'delivered') return formatDate(w.deliver_date ?? w.delivered_at ?? null)
-  if (key === 'upcoming') return w.launch_date ? `~${formatDate(w.launch_date)}` : '—'
-  return '—'
+  const deliv = w.deliver_date ?? w.delivered_at ?? null
+  if (key === 'delivered') return formatDate(deliv)
+  // Not delivered yet → show the EXPECTED delivery date, never the launch date
+  // (this column is "Delivered").
+  return deliv ? `~${formatDate(deliv)}` : '—'
 }
 
 export function WaveSeriesView({
@@ -59,6 +61,7 @@ export function WaveSeriesView({
   const [expanded, setExpanded] = useState(false)
   const t = todayStr()
   const ordered = [...waves].sort((a, b) => (a.rerun_number ?? 0) - (b.rerun_number ?? 0))
+  const canDrag = !!rowDragProps
 
   const collapsible = ordered.length > COLLAPSE_THRESHOLD
   const showingAll = expanded || !collapsible
@@ -104,10 +107,10 @@ export function WaveSeriesView({
             open(w)
           }
         }}
-        title={`${waveLabel(w.rerun_number)} · ${s.tip}${isCurrent ? ' (this project)' : ' — click to open'}`}
+        title={`${waveLabel(w.rerun_number)} · ${s.tip}${isCurrent ? ' (this project)' : ' — click to open'}${canDrag ? ' · drag onto another series to move it' : ''}`}
         className={`grid items-center gap-2 px-3 ${compact ? 'py-1.5' : 'py-2'} border-b border-border last:border-b-0 border-l-2 ${
           s.ring
-        } ${isCurrent ? 'bg-accent/60' : 'cursor-pointer hover:bg-accent/50'} transition-colors`}
+        } ${isCurrent ? 'bg-accent/60' : `${canDrag ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'} hover:bg-accent/50`} transition-colors`}
         style={{ gridTemplateColumns: GRID }}
       >
         <span
@@ -116,9 +119,14 @@ export function WaveSeriesView({
         >
           {waveLabel(w.rerun_number)}
         </span>
-        <span className="text-sm text-foreground truncate">
-          {w.project_name}
-          {isCurrent && <span className="text-muted-foreground text-xs"> · this project</span>}
+        <span className="text-sm text-foreground min-w-0 flex items-center gap-1.5">
+          {canDrag && (
+            <span className="text-muted-foreground/40 shrink-0 text-xs" title="Drag onto another series to move it" aria-hidden="true">⠿</span>
+          )}
+          <span className="truncate">
+            {w.project_name}
+            {isCurrent && <span className="text-muted-foreground text-xs"> · this project</span>}
+          </span>
         </span>
         <span
           className={`text-xs ${s.key === 'upcoming' ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'}`}
@@ -203,7 +211,7 @@ export function WaveSeriesView({
                       }
                     }}
                     title={`${waveLabel(w.rerun_number)} · ${s.tip}${isCurrent ? ' (this project)' : ' — click to open'}`}
-                    className={`w-[72px] shrink-0 flex flex-col items-center gap-1.5 ${isCurrent ? '' : 'cursor-pointer'}`}
+                    className={`w-[72px] shrink-0 flex flex-col items-center gap-1.5 ${isCurrent ? '' : canDrag ? 'cursor-grab' : 'cursor-pointer'}`}
                   >
                     <div
                       className={`w-full rounded px-1 py-1.5 text-center ${s.chip} ${

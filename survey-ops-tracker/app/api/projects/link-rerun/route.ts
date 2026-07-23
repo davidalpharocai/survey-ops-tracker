@@ -28,12 +28,15 @@ type Row = { id: string; rerun_series_id: string | null; rerun_number: number | 
 async function renumberSeries(admin: ReturnType<typeof createAdminClient>, root: string) {
   const { data: waves } = await admin
     .from('survey_projects')
-    .select('id, submitted_date, launch_date, created_at')
+    .select('id, submitted_date, launch_date, deliver_date, created_at')
     .or(`id.eq.${root},rerun_series_id.eq.${root}`)
     .is('deleted_at', null)
   if (!waves) return
-  const key = (w: { submitted_date: string | null; launch_date: string | null; created_at: string | null }) =>
-    String(w.submitted_date ?? w.launch_date ?? w.created_at ?? '')
+  // deliver_date is included because some series (e.g. weekly trackers) have no
+  // submitted/launch dates and share an import created_at — deliver_date is then
+  // the only per-wave signal that keeps the order stable.
+  const key = (w: { submitted_date: string | null; launch_date: string | null; deliver_date: string | null; created_at: string | null }) =>
+    String(w.submitted_date ?? w.launch_date ?? w.deliver_date ?? w.created_at ?? '')
   const rest = waves.filter((w) => w.id !== root).sort((a, b) => key(a).localeCompare(key(b)))
   const targets: { id: string; num: number }[] = [{ id: root, num: 1 }, ...rest.map((w, i) => ({ id: w.id, num: i + 2 }))]
   for (const t of targets) {
