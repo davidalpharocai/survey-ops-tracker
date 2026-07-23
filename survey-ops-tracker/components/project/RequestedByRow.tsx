@@ -104,9 +104,9 @@ export function RequestedByRow({ clientId, contactId, snapshotName, tooltip, onC
                     )}
                   </div>
                   <Link
-                    href={`/clients/${clientId}`}
-                    className="text-muted-foreground hover:text-primary text-xs shrink-0 mt-0.5"
-                    title="Open contact's full page"
+                    href={`/list?contact=${current.id}&contactName=${encodeURIComponent(contactName(current))}&view=full`}
+                    className="text-muted-foreground hover:text-primary text-sm shrink-0 mt-0.5"
+                    title={`See all projects requested by ${contactName(current)} in the list`}
                   >
                     ↗
                   </Link>

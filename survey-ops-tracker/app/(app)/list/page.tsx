@@ -52,6 +52,10 @@ export default function ListView() {
   const [dueTo, setDueTo] = useState<string | null>(null)
   const [stageFilter, setStageFilter] = useState<string | null>(null)
   const [clientFilter, setClientFilter] = useState<string | null>(null)
+  // Deep-link filter: only projects requested by one contact (from the project
+  // page's Requested-by ↗). contactName is just for the banner label.
+  const [contactFilter, setContactFilter] = useState<string | null>(null)
+  const [contactName, setContactName] = useState<string | null>(null)
 
   // Column visibility + sort live here so saved views can capture them; both
   // persist on their own so they survive a reload independent of views.
@@ -115,6 +119,12 @@ export default function ListView() {
     if (due) setDueFilter(due)
     const stage = params.get('stage')
     if (stage) setStageFilter(stage)
+    const contact = params.get('contact')
+    if (contact) {
+      setContactFilter(contact)
+      setContactName(params.get('contactName'))
+      setForceFull(true) // a contact's projects are often Closed / between waves
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -160,6 +170,7 @@ export default function ListView() {
       }
     }
     if (typeFilter && p.project_type !== typeFilter) return false
+    if (contactFilter && p.requested_by_contact_id !== contactFilter) return false
     if (!matchesDuePreset(p.due_date, dueFilter, dueFrom, dueTo)) return false
     if (stageFilter) {
       if (stageFilter === 'Closed') {
@@ -222,6 +233,23 @@ export default function ListView() {
           {exporting ? 'Exporting…' : '⬇ Export CSV'}
         </button>
       </div>
+
+      {/* Contact deep-link filter chip — clears back to the normal list. */}
+      {contactFilter && (
+        <div className="flex items-center gap-2 self-start rounded-lg border border-primary/40 bg-primary/10 px-3 py-1.5 text-xs text-foreground">
+          <span>
+            Showing projects requested by{' '}
+            <span className="font-medium">{contactName || 'this contact'}</span>
+          </span>
+          <button
+            onClick={() => { setContactFilter(null); setContactName(null) }}
+            className="text-muted-foreground hover:text-foreground"
+            title="Clear this filter"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* Filters + saved views (same filters as the board) */}
       <div className="flex items-start justify-between gap-3 flex-wrap">

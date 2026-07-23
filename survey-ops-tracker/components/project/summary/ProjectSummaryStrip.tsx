@@ -54,7 +54,7 @@ function SummaryRow({
 }
 
 export function ProjectSummaryStrip({ projectId }: { projectId: string }) {
-  const [collapsed, setCollapsed] = useState(false)
+  const [collapsed, setCollapsed] = useState(true)
   const { data, isLoading, isFetching, isError, refetch } = useProjectSummary(projectId)
 
   const watchouts = data?.watchouts ?? []

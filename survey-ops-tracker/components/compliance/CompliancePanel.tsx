@@ -185,7 +185,19 @@ function CountdownRow({
   )
 }
 
-export function CompliancePanel({ projectId, project }: { projectId: string; project?: SurveyProject }) {
+export function CompliancePanel({
+  projectId,
+  project,
+  collapsible = false,
+  defaultCollapsed = false,
+}: {
+  projectId: string
+  project?: SurveyProject
+  /** Rail usage renders a click-to-expand header; the full tab stays open. */
+  collapsible?: boolean
+  defaultCollapsed?: boolean
+}) {
+  const [collapsed, setCollapsed] = useState(collapsible && defaultCollapsed)
   const { data: submissions = [] } = useSubmissions(projectId)
   const { data: recipients = [] } = useRecipients(projectId)
   const hasComplianceContact = recipients.some(r => r.role === 'compliance')
@@ -226,19 +238,35 @@ export function CompliancePanel({ projectId, project }: { projectId: string; pro
 
   return (
     <div className="bg-card border border-border shadow-sm rounded-xl p-4">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-xs text-muted-foreground uppercase tracking-widest font-medium flex items-center">
-          Compliance Review
+      <div className={`flex items-center justify-between ${collapsed ? '' : 'mb-4'}`}>
+        <span className="flex items-center min-w-0">
+          {collapsible ? (
+            <button
+              type="button"
+              onClick={() => setCollapsed(c => !c)}
+              aria-expanded={!collapsed}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground uppercase tracking-widest font-medium transition-colors hover:text-foreground"
+            >
+              <span className="text-sm leading-none text-primary">{collapsed ? '▸' : '▾'}</span>
+              Compliance Review
+            </button>
+          ) : (
+            <h3 className="text-xs text-muted-foreground uppercase tracking-widest font-medium">
+              Compliance Review
+            </h3>
+          )}
           <InfoTooltip text="Submit the survey's question list for the client's compliance team to review and approve before launch. After you hit send there's a 60-second window to recall and edit before anything is visible to the client. Reviewers get an email with a one-click review link; you'll be notified when they approve or reject." />
-        </h3>
+        </span>
         {latest && (
-          <span className={`text-xs px-2 py-1 rounded ${latestIsUndispatched ? 'bg-amber-500/20 text-amber-600 dark:text-amber-400' : STATUS_BADGE[latest.status]}`}>
+          <span className={`text-xs px-2 py-1 rounded shrink-0 ${latestIsUndispatched ? 'bg-amber-500/20 text-amber-600 dark:text-amber-400' : STATUS_BADGE[latest.status]}`}>
             {latestIsUndispatched
               ? `v${latest.version} · Sending…`
               : `v${latest.version} · ${STATUS_LABEL[latest.status]}`}
           </span>
         )}
       </div>
+
+      {!collapsed && (<>
 
       {latestIsUndispatched && (
         <CountdownRow
@@ -361,6 +389,8 @@ export function CompliancePanel({ projectId, project }: { projectId: string; pro
       <div className="border-t border-border pt-3">
         <RecipientsManager projectId={projectId} suggestedContact={cs.data?.contact} />
       </div>
+
+      </>)}
 
       {modalOpen && (
         <SubmitQuestionsModal
