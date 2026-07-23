@@ -6,7 +6,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { useProject, useUpdateProject, useDeleteProject, type SurveyProject } from '@/lib/hooks/useProjects'
 import { useTeamMembers, assignableMembers, type TeamMember } from '@/lib/hooks/useTeamMembers'
-import { PipelineProgress } from '@/components/project/PipelineProgress'
+import { PipelineSpine } from '@/components/project/PipelineSpine'
 import { WaveHistory } from '@/components/project/WaveHistory'
 import { CloneProjectModal } from '@/components/project/CloneProjectModal'
 import { OverviewFieldGrid } from '@/components/project/OverviewFieldGrid'
@@ -366,6 +366,14 @@ export default function ProjectDetailPage() {
         </div>
       </div>
 
+      {/* Cockpit Spine — dot pipeline progress + state-aware Advance CTA, lifted
+          into the command bar. Active phase only; Scoping keeps its own card below. */}
+      {project.phase === 'Active' && (
+        <div className="bg-card border border-border shadow-sm rounded-xl px-4 py-3 mb-4">
+          <PipelineSpine project={project} />
+        </div>
+      )}
+
       {cloning && (
         <CloneProjectModal
           sourceId={id}
@@ -500,38 +508,20 @@ export default function ProjectDetailPage() {
         <ComplianceBanner project={project} />
         {/* Overview body — wide main column + slim rail */}
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_360px] gap-6">
-          {/* MAIN column: pipeline → field-grid body → linked documents */}
+          {/* MAIN column: (scoping stage) → field-grid body → linked documents.
+              For Active projects the pipeline now lives in the command-bar spine,
+              so this card renders only for the Scoping phase. */}
           <div className="flex flex-col gap-4">
-            <div className="bg-card border border-border shadow-sm rounded-xl p-4">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xs text-muted-foreground uppercase tracking-widest font-medium">
-                  {project.phase === 'Scoping' ? 'Scoping Stage' : 'Pipeline Progress'}
-                </h3>
-                {project.phase !== 'Scoping' && project.status !== 'Closed' && (
-                  <HelpTip text="Moves this project back to the Scoping board — for deals that reopened (pricing changed, approval fell through). Stage checkboxes are kept, so promoting it again picks up right where it left off. You can also drag the card onto a scoping column in Full View.">
-                    <button
-                      onClick={() =>
-                        updateProject.mutate({
-                          id,
-                          updates: {
-                            phase: 'Scoping',
-                            scoping_stage: project.scoping_stage ?? 'Awaiting Approval',
-                          },
-                        })
-                      }
-                      className="text-xs text-muted-foreground hover:text-violet-600 dark:hover:text-violet-400 transition-colors cursor-pointer"
-                    >
-                      ↩ Back to Scoping
-                    </button>
-                  </HelpTip>
-                )}
-              </div>
-              {project.phase === 'Scoping' ? (
+            {project.phase === 'Scoping' && (
+              <div className="bg-card border border-border shadow-sm rounded-xl p-4">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-xs text-muted-foreground uppercase tracking-widest font-medium">
+                    Scoping Stage
+                  </h3>
+                </div>
                 <ScopingProgress project={project} />
-              ) : (
-                <PipelineProgress project={project} />
-              )}
-            </div>
+              </div>
+            )}
 
             {/* Edwin survey-ID discrepancy — Survey IDs now edit in the Details
                 grid below, so the resolver rides above it as an inline banner. */}
