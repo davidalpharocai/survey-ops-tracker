@@ -7,7 +7,7 @@ import type { Database } from '@/lib/supabase/types'
 import { FieldSection, TextCell, DateCell, SelectCell } from './fields'
 import { NSegmentsEditor } from './NSegmentsEditor'
 import { SuppliersWidget } from './SuppliersWidget'
-import { BlastConfigWidget } from './BlastConfigWidget'
+import { BlastBlocks } from './BlastBlocks'
 import { BudgetWidget } from './BudgetWidget'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
 
@@ -118,7 +118,7 @@ export function OverviewFieldGrid({ project }: { project: SurveyProject }) {
       <FieldSection title="Money">
         {/* Full-width — the widgets below manage their own internal layout. */}
         <div className="sm:col-span-2 flex flex-col gap-3">
-          {/* PS -> Suppliers (PureSpectrum), B2B -> Blast Configuration.
+          {/* PS -> Suppliers (PureSpectrum), B2B -> blast blocks.
               Rerun/untyped show both (they don't map cleanly to one). */}
           {project.project_type === 'PS' && (
             <SuppliersWidget
@@ -128,7 +128,7 @@ export function OverviewFieldGrid({ project }: { project: SurveyProject }) {
               nActual={project.n_actual}
             />
           )}
-          {project.project_type === 'B2B' && <BlastConfigWidget projectId={project.id} />}
+          {project.project_type === 'B2B' && <BlastBlocks project={project} />}
           {(project.project_type === 'Rerun' || project.project_type == null) && (
             <>
               <SuppliersWidget
@@ -137,7 +137,7 @@ export function OverviewFieldGrid({ project }: { project: SurveyProject }) {
                 nInternalTarget={project.n_internal_target}
                 nActual={project.n_actual}
               />
-              <BlastConfigWidget projectId={project.id} />
+              <BlastBlocks project={project} />
             </>
           )}
           {/* Budget summary sits under the supplier/blast config — reuses
