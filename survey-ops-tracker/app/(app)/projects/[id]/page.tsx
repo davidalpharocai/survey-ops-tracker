@@ -6,11 +6,11 @@ import { useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { useProject, useUpdateProject, useDeleteProject, type SurveyProject } from '@/lib/hooks/useProjects'
 import { useTeamMembers, assignableMembers, type TeamMember } from '@/lib/hooks/useTeamMembers'
-import { PipelineProgress } from '@/components/project/PipelineProgress'
+import { PipelineSpine } from '@/components/project/PipelineSpine'
+import { ScopingSpine } from '@/components/project/ScopingSpine'
 import { WaveHistory } from '@/components/project/WaveHistory'
 import { CloneProjectModal } from '@/components/project/CloneProjectModal'
 import { OverviewFieldGrid } from '@/components/project/OverviewFieldGrid'
-import { ScopingProgress } from '@/components/project/ScopingProgress'
 import { ActivityLog } from '@/components/project/ActivityLog'
 import { DataChangeLog } from '@/components/project/DataChangeLog'
 import { ProjectAuditLog } from '@/components/project/ProjectAuditLog'
@@ -30,6 +30,20 @@ import { DeliverablesPanel } from '@/components/deliverables/DeliverablesPanel'
 import { salespersonOptions } from '@/lib/utils/salespeople'
 import { MergeButton } from '@/components/merge/MergeButton'
 import { ProjectSummaryStrip } from '@/components/project/summary/ProjectSummaryStrip'
+
+type ActiveTab = 'overview' | 'insights' | 'activity' | 'compliance' | 'deliverables' | 'links' | 'logs'
+
+// Tab bar config — order here is the on-screen order. Compliance sits between
+// Activity and Deliverables.
+const PROJECT_TABS: { id: ActiveTab; label: string; title: string }[] = [
+  { id: 'overview', label: 'Overview', title: 'The full project view — stats, pipeline, next steps, documents, and details' },
+  { id: 'insights', label: 'Insights (Beta)', title: 'Performance stats — completion/fill rates, cost per complete, pace, supplier mix' },
+  { id: 'activity', label: 'Activity', title: 'Logged emails and events for this project' },
+  { id: 'compliance', label: 'Compliance', title: 'Compliance review — submit the question list for the client to approve before launch, and log the after-fielding results review' },
+  { id: 'deliverables', label: 'Deliverables', title: 'Files delivered to the client for this project' },
+  { id: 'links', label: 'Links', title: 'Slack channel link and notification settings' },
+  { id: 'logs', label: 'Logs', title: 'Manual data-change log and the automatic field-change audit trail' },
+]
 
 const TOOLTIPS: Record<string, string> = {
   'Client': 'The client this project is for.',
@@ -109,7 +123,7 @@ export default function ProjectDetailPage() {
       document.removeEventListener('keydown', onKey)
     }
   }, [actionsOpen])
-  const [activeTab, setActiveTab] = useState<'overview' | 'insights' | 'activity' | 'deliverables' | 'links' | 'logs'>('overview')
+  const [activeTab, setActiveTab] = useState<ActiveTab>('overview')
   // Where to return on "← Back": the board or list, whichever the user came from
   const [backTo, setBackTo] = useState<{ href: string; label: string }>({ href: '/', label: 'Board' })
   useEffect(() => {
@@ -265,9 +279,9 @@ export default function ProjectDetailPage() {
           </span>
         )}
         <div className="ml-auto flex items-center gap-2">
-          <PriorityButton
+          <PrioritySegmented
             priority={project.priority ?? 'none'}
-            onCycle={next => updateProject.mutate({ id, updates: { priority: next } })}
+            onSelect={next => updateProject.mutate({ id, updates: { priority: next } })}
           />
           {project.status === 'Closed' && (
             <span className="text-xs text-muted-foreground">
@@ -294,35 +308,16 @@ export default function ProjectDetailPage() {
               </button>
             </HelpTip>
           )}
-          {project.status !== 'Closed' ? (
-            <HelpTip text="Archives the project — kept for history but removed from the active board. It leaves Operations view but stays in Full View's Archived section, and can be reopened anytime.">
-              <button
-                onClick={() => setStatus('Closed')}
-                className="text-sm border border-border text-muted-foreground hover:text-foreground hover:border-ring px-3 py-1.5 rounded-lg transition-colors shrink-0"
-              >
-                ✕ Archive
-              </button>
-            </HelpTip>
-          ) : (
-            <HelpTip text="Brings this archived project back to the open board.">
-              <button
-                onClick={() => setStatus('Open')}
-                className="text-sm border border-border text-muted-foreground hover:text-foreground hover:border-ring px-3 py-1.5 rounded-lg transition-colors shrink-0"
-              >
-                ↺ Reopen
-              </button>
-            </HelpTip>
-          )}
-          {/* Record-level actions collected into one menu so the header stays
-              uncluttered (clone / merge / co-captains / delete). */}
+          {/* Record-level actions collected into one "More" menu so the header
+              stays uncluttered (clone / merge / co-captains / archive / delete). */}
           <div ref={actionsRef} className="relative shrink-0">
             <button
               onClick={() => setActionsOpen(o => !o)}
               aria-expanded={actionsOpen}
-              title="Actions on this record — clone, merge, manage co-captains, and delete"
+              title="More actions on this record — clone, merge, manage co-captains, archive, and delete"
               className="text-sm border border-border text-muted-foreground hover:text-foreground hover:border-ring px-3 py-1.5 rounded-lg transition-colors shrink-0 inline-flex items-center gap-1.5"
             >
-              Actions <span aria-hidden="true" className="text-xs">▾</span>
+              More <span aria-hidden="true" className="text-xs">▾</span>
             </button>
             {actionsOpen && (
               <div className="absolute right-0 top-full mt-1.5 z-50 w-64 bg-popover border border-border rounded-xl shadow-xl p-1.5 flex flex-col">
@@ -353,6 +348,24 @@ export default function ProjectDetailPage() {
                   )}
                 </div>
                 <div className="border-t border-border my-1" />
+                {project.status !== 'Closed' ? (
+                  <button
+                    onClick={() => { setActionsOpen(false); setStatus('Closed') }}
+                    title="Archives the project — kept for history but removed from the active board. It leaves Operations view but stays in Full View's Archived section, and can be reopened anytime."
+                    className="flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm text-foreground/90 hover:bg-accent transition-colors text-left"
+                  >
+                    <span aria-hidden="true">✕</span> Archive project
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => { setActionsOpen(false); setStatus('Open') }}
+                    title="Brings this archived project back to the open board."
+                    className="flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm text-foreground/90 hover:bg-accent transition-colors text-left"
+                  >
+                    <span aria-hidden="true">↺</span> Reopen project
+                  </button>
+                )}
+                <div className="border-t border-border my-1" />
                 <button
                   onClick={() => { setActionsOpen(false); setConfirmingDelete(true) }}
                   title="Move to Recently Deleted (restorable on the Admin page). To just take it off the board, use Archive instead."
@@ -365,6 +378,20 @@ export default function ProjectDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Cockpit Spine — dot progress path + state-aware CTA, lifted into the
+          command bar. Active shows the pipeline spine; Scoping shows the scoping
+          spine (stages + Approve → pipeline). */}
+      {project.phase === 'Active' && (
+        <div className="bg-card border border-border shadow-sm rounded-xl px-4 py-3 mb-4">
+          <PipelineSpine project={project} />
+        </div>
+      )}
+      {project.phase === 'Scoping' && (
+        <div className="bg-card border border-border shadow-sm rounded-xl px-4 py-3 mb-4">
+          <ScopingSpine project={project} />
+        </div>
+      )}
 
       {cloning && (
         <CloneProjectModal
@@ -389,72 +416,15 @@ export default function ProjectDetailPage() {
 
       {/* Tabs */}
       <div className="flex flex-wrap bg-muted border border-border rounded-lg p-1 gap-1 w-fit mb-4">
-        <button
-          onClick={() => setActiveTab('overview')}
-          title='The full project view — stats, pipeline, next steps, documents, and details'
-          className={`text-sm px-3 py-1.5 rounded font-medium transition-colors ${
-            activeTab === 'overview'
-              ? 'bg-background text-foreground'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          Overview
-        </button>
-        <button
-          onClick={() => setActiveTab('insights')}
-          title="Performance stats — completion/fill rates, cost per complete, pace, supplier mix"
-          className={`text-sm px-3 py-1.5 rounded font-medium transition-colors ${
-            activeTab === 'insights'
-              ? 'bg-background text-foreground'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          Insights (Beta)
-        </button>
-        <button
-          onClick={() => setActiveTab('activity')}
-          title="Logged emails and events for this project"
-          className={`text-sm px-3 py-1.5 rounded font-medium transition-colors ${
-            activeTab === 'activity'
-              ? 'bg-background text-foreground'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          Activity
-        </button>
-        <button
-          onClick={() => setActiveTab('deliverables')}
-          title="Files delivered to the client for this project"
-          className={`text-sm px-3 py-1.5 rounded font-medium transition-colors ${
-            activeTab === 'deliverables'
-              ? 'bg-background text-foreground'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          Deliverables
-        </button>
-        <button
-          onClick={() => setActiveTab('links')}
-          title="Slack channel link and notification settings"
-          className={`text-sm px-3 py-1.5 rounded font-medium transition-colors ${
-            activeTab === 'links'
-              ? 'bg-background text-foreground'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          Links
-        </button>
-        <button
-          onClick={() => setActiveTab('logs')}
-          title="Manual data-change log and the automatic field-change audit trail"
-          className={`text-sm px-3 py-1.5 rounded font-medium transition-colors ${
-            activeTab === 'logs'
-              ? 'bg-background text-foreground'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          Logs
-        </button>
+        {PROJECT_TABS.map(t => (
+          <TabButton
+            key={t.id}
+            label={t.label}
+            title={t.title}
+            active={activeTab === t.id}
+            onSelect={() => setActiveTab(t.id)}
+          />
+        ))}
       </div>
 
       {activeTab === 'insights' && <ProjectInsights project={project} />}
@@ -462,6 +432,14 @@ export default function ProjectDetailPage() {
       {activeTab === 'activity' && (
         <div className="max-w-3xl">
           <ActivityLog projectId={project.id} />
+        </div>
+      )}
+
+      {/* Compliance review — reuses the same CompliancePanel shown in the rail
+          glance, rendered full-width as its own tab. */}
+      {activeTab === 'compliance' && (
+        <div className="max-w-3xl">
+          <CompliancePanel projectId={project.id} project={project} />
         </div>
       )}
 
@@ -500,39 +478,10 @@ export default function ProjectDetailPage() {
         <ComplianceBanner project={project} />
         {/* Overview body — wide main column + slim rail */}
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_360px] gap-6">
-          {/* MAIN column: pipeline → field-grid body → linked documents */}
+          {/* MAIN column: field-grid body → linked documents. Both the pipeline
+              (Active) and scoping (Scoping) progress now live in the command-bar
+              spine above, so no phase card renders here. */}
           <div className="flex flex-col gap-4">
-            <div className="bg-card border border-border shadow-sm rounded-xl p-4">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xs text-muted-foreground uppercase tracking-widest font-medium">
-                  {project.phase === 'Scoping' ? 'Scoping Stage' : 'Pipeline Progress'}
-                </h3>
-                {project.phase !== 'Scoping' && project.status !== 'Closed' && (
-                  <HelpTip text="Moves this project back to the Scoping board — for deals that reopened (pricing changed, approval fell through). Stage checkboxes are kept, so promoting it again picks up right where it left off. You can also drag the card onto a scoping column in Full View.">
-                    <button
-                      onClick={() =>
-                        updateProject.mutate({
-                          id,
-                          updates: {
-                            phase: 'Scoping',
-                            scoping_stage: project.scoping_stage ?? 'Awaiting Approval',
-                          },
-                        })
-                      }
-                      className="text-xs text-muted-foreground hover:text-violet-600 dark:hover:text-violet-400 transition-colors cursor-pointer"
-                    >
-                      ↩ Back to Scoping
-                    </button>
-                  </HelpTip>
-                )}
-              </div>
-              {project.phase === 'Scoping' ? (
-                <ScopingProgress project={project} />
-              ) : (
-                <PipelineProgress project={project} />
-              )}
-            </div>
-
             {/* Edwin survey-ID discrepancy — Survey IDs now edit in the Details
                 grid below, so the resolver rides above it as an inline banner. */}
             {project.survey_id_discrepancy && (
@@ -581,7 +530,7 @@ export default function ProjectDetailPage() {
                     </span>
                     <Link
                       href={`/clients/${project.client_id}`}
-                      className="text-sm text-blue-600 dark:text-blue-400 hover:underline truncate"
+                      className="text-sm text-primary hover:underline truncate"
                       title="Open this client's page"
                     >
                       {project.client}
@@ -622,7 +571,7 @@ export default function ProjectDetailPage() {
                     </span>
                     <a
                       href={slackDeepLink(project.slack_channel_url)}
-                      className="text-sm text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1 min-w-0"
+                      className="text-sm text-primary hover:underline inline-flex items-center gap-1 min-w-0"
                       title="Open this channel in the Slack app"
                     >
                       <span aria-hidden="true">💬</span>
@@ -647,10 +596,40 @@ export default function ProjectDetailPage() {
   )
 }
 
+// One tab pill. Inactive pills get the iOS-26 "liquid glass" hover — a
+// translucent card surface, accent-tinted border, soft shadow, and backdrop
+// blur. The transparent base border keeps the active/inactive pills the same
+// size so nothing shifts on hover; the active pill keeps its solid surface.
+function TabButton({
+  label,
+  title,
+  active,
+  onSelect,
+}: {
+  label: string
+  title: string
+  active: boolean
+  onSelect: () => void
+}) {
+  return (
+    <button
+      onClick={onSelect}
+      title={title}
+      className={`text-sm px-3 py-1.5 rounded font-medium border border-transparent transition-all ${
+        active
+          ? 'bg-background text-foreground'
+          : 'text-muted-foreground hover:text-foreground hover:border-primary/40 hover:bg-card/70 hover:shadow-sm hover:backdrop-blur-sm'
+      }`}
+    >
+      {label}
+    </button>
+  )
+}
+
 function SidebarCard({ title, children, className = '', dense = false }: { title: string; children: React.ReactNode; className?: string; dense?: boolean }) {
   return (
-    <div className={`bg-card border border-border shadow-sm rounded-xl ${dense ? 'p-3' : 'p-4'} ${className}`}>
-      <h3 className={`text-xs text-muted-foreground uppercase tracking-widest font-medium ${dense ? 'mb-2' : 'mb-4'}`}>
+    <div className={`bg-card border border-border shadow-sm rounded-xl transition-all hover:border-primary/40 hover:bg-card/70 hover:shadow-md hover:backdrop-blur-sm ${dense ? 'p-3' : 'p-4'} ${className}`}>
+      <h3 className={`border-b border-border text-[11px] text-muted-foreground uppercase tracking-wide font-medium ${dense ? 'mb-2.5 pb-1.5' : 'mb-3 pb-2'}`}>
         {title}
       </h3>
       <div className={`flex flex-col ${dense ? 'gap-2' : 'gap-3'}`}>{children}</div>
@@ -697,55 +676,62 @@ function NewProjectSetupBanner({ project }: { project: SurveyProject }) {
   )
 }
 
-const PRIORITY_NEXT: Record<string, string> = {
-  none: 'high',
-  high: 'urgent',
-  urgent: 'none',
-}
+// Segmented priority control: three inline segments in one bordered group.
+// The selected segment is tint-filled, the rest stay muted. Clicking a segment
+// writes the same project.priority values the old cycle button used
+// (none | high | urgent) via the same useUpdateProject mutation.
+const PRIORITY_SEGMENTS: { value: string; label: string; activeClass: string; help: string }[] = [
+  {
+    value: 'none',
+    label: 'None',
+    activeClass: 'bg-muted text-foreground',
+    help: 'No priority — the card sorts normally in its board column.',
+  },
+  {
+    value: 'high',
+    label: '⚑ High',
+    activeClass: 'bg-amber-500/15 text-amber-600 dark:text-amber-400',
+    help: '⚑ High priority — the card floats to the top of its board column.',
+  },
+  {
+    value: 'urgent',
+    label: '‼ Urgent',
+    activeClass: 'bg-red-500/15 text-red-600 dark:text-red-400',
+    help: '‼ Urgent priority — pinned to the very top of its board column.',
+  },
+]
 
-function PriorityButton({
+function PrioritySegmented({
   priority,
-  onCycle,
+  onSelect,
 }: {
   priority: string
-  onCycle: (next: string) => void
+  onSelect: (next: string) => void
 }) {
-  const next = PRIORITY_NEXT[priority] ?? 'high'
-  const help: Record<string, string> = {
-    none: 'Sets this project\'s priority. Each click cycles: none → ⚑ High → ‼ Urgent → back to none. High and urgent cards float to the top of their board column.',
-    high: 'Priority is ⚑ High — the card floats to the top of its board column. Click again for ‼ Urgent; one more click clears it back to none.',
-    urgent: 'Priority is ‼ Urgent — the very top of the board column. Click again to clear priority back to none.',
-  }
-  const text = help[priority] ?? help.none
-  const base = 'text-sm px-3 py-1.5 rounded-lg transition-colors shrink-0 cursor-pointer'
-
-  if (priority === 'high') {
-    return (
-      <HelpTip text={text}>
-        <button onClick={() => onCycle(next)}
-          className={`${base} bg-amber-500/15 text-amber-600 dark:text-amber-400 hover:bg-amber-500/25`}>
-          ⚑ High
-        </button>
-      </HelpTip>
-    )
-  }
-  if (priority === 'urgent') {
-    return (
-      <HelpTip text={text}>
-        <button onClick={() => onCycle(next)}
-          className={`${base} bg-red-500/15 text-red-600 dark:text-red-400 hover:bg-red-500/25`}>
-          ‼ Urgent
-        </button>
-      </HelpTip>
-    )
-  }
+  const current = priority || 'none'
   return (
-    <HelpTip text={text}>
-      <button onClick={() => onCycle(next)}
-        className={`${base} border border-border text-muted-foreground hover:text-foreground hover:border-ring`}>
-        ⚑ Priority
-      </button>
-    </HelpTip>
+    <div
+      role="group"
+      aria-label="Priority"
+      className="inline-flex items-center rounded-lg border border-border p-0.5 shrink-0"
+    >
+      {PRIORITY_SEGMENTS.map(seg => {
+        const active = current === seg.value
+        return (
+          <button
+            key={seg.value}
+            onClick={() => { if (!active) onSelect(seg.value) }}
+            aria-pressed={active}
+            title={seg.help}
+            className={`text-[11px] px-2 py-1 rounded-md transition-colors cursor-pointer ${
+              active ? seg.activeClass : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            {seg.label}
+          </button>
+        )
+      })}
+    </div>
   )
 }
 
@@ -802,7 +788,7 @@ function EditableType({ value, onSave }: { value: string | null; onSave: (next: 
         defaultValue={value ?? ''}
         onChange={e => { if (e.target.value) onSave(e.target.value); setEditing(false) }}
         onBlur={() => setEditing(false)}
-        className="text-xs px-1.5 py-1 rounded border border-border bg-background focus:outline-none focus:border-ring"
+        className="text-xs px-2 py-1 rounded border border-border bg-background focus:outline-none focus:border-ring"
       >
         <option value="" disabled>Type…</option>
         <option value="PS">PS</option>
@@ -811,15 +797,18 @@ function EditableType({ value, onSave }: { value: string | null; onSave: (next: 
       </select>
     )
   }
+  // Badge-dropdown: sized like the status pill (text-xs px-2 py-1 rounded),
+  // tinted by type via TYPE_BADGE, with a ▾ caret signalling it opens options.
   return (
     <button
       onClick={() => setEditing(true)}
       title="Click to change project type"
-      className={`text-xs px-2 py-1 rounded cursor-pointer hover:opacity-80 transition-opacity ${
-        value ? (TYPE_BADGE[value] ?? '') : 'border border-dashed border-border text-muted-foreground'
+      className={`text-xs px-2 py-1 rounded cursor-pointer hover:opacity-80 transition-opacity inline-flex items-center gap-1 ${
+        value ? (TYPE_BADGE[value] ?? 'bg-muted text-muted-foreground') : 'border border-dashed border-border text-muted-foreground'
       }`}
     >
       {value ?? '+ type'}
+      <span aria-hidden="true" className="text-[9px] opacity-70">▾</span>
     </button>
   )
 }
