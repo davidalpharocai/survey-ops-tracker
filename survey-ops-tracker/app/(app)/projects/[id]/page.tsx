@@ -29,6 +29,7 @@ import { RequestedByRow } from '@/components/project/RequestedByRow'
 import { DeliverablesPanel } from '@/components/deliverables/DeliverablesPanel'
 import { salespersonOptions } from '@/lib/utils/salespeople'
 import { MergeButton } from '@/components/merge/MergeButton'
+import { ProjectSummaryStrip } from '@/components/project/summary/ProjectSummaryStrip'
 
 const TOOLTIPS: Record<string, string> = {
   'Client': 'The client this project is for.',
@@ -492,6 +493,9 @@ export default function ProjectDetailPage() {
 
       {/* Overview tab — kept mounted (hidden) so in-progress edits survive tab switches */}
       <div className={activeTab === 'overview' ? '' : 'hidden'}>
+        <div className="mb-4">
+          <ProjectSummaryStrip projectId={project.id} />
+        </div>
         <NewProjectSetupBanner project={project} />
         <ComplianceBanner project={project} />
         {/* Overview body — wide main column + slim rail */}
