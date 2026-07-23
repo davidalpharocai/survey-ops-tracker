@@ -1,11 +1,26 @@
 'use client'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { MergeModal } from './MergeModal'
 
 type Row = { id: string } & Record<string, unknown>
 
-export function MergeButton({ kind, record }: { kind: 'project' | 'client'; record: Row }) {
+export function MergeButton({
+  kind,
+  record,
+  label = 'Merge…',
+  className = 'text-xs text-muted-foreground hover:text-foreground border border-border rounded px-2 py-1 transition-colors',
+  onOpen,
+}: {
+  kind: 'project' | 'client'
+  record: Row
+  /** Trigger content — a plain string for the standalone button, JSX for a menu item. */
+  label?: ReactNode
+  /** Override the trigger styling (e.g. to render as a dropdown menu item). */
+  className?: string
+  /** Called when the picker opens — lets a parent menu close itself. */
+  onOpen?: () => void
+}) {
   const supabase = createClient()
   const [picking, setPicking] = useState(false)
   const [q, setQ] = useState('')
@@ -35,11 +50,11 @@ export function MergeButton({ kind, record }: { kind: 'project' | 'client'; reco
   return (
     <>
       <button
-        onClick={() => setPicking(true)}
-        className="text-xs text-muted-foreground hover:text-foreground border border-border rounded px-2 py-1 transition-colors"
+        onClick={() => { setPicking(true); onOpen?.() }}
+        className={className}
         title={`Merge this ${kind} with a duplicate`}
       >
-        Merge…
+        {label}
       </button>
 
       {picking && (

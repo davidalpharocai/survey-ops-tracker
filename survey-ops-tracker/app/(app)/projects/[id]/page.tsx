@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { useQueryClient } from '@tanstack/react-query'
@@ -80,6 +80,23 @@ export default function ProjectDetailPage() {
   const deleteProject = useDeleteProject()
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [cloning, setCloning] = useState(false)
+  const [actionsOpen, setActionsOpen] = useState(false)
+  const actionsRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!actionsOpen) return
+    function onDown(e: PointerEvent) {
+      if (actionsRef.current && !actionsRef.current.contains(e.target as Node)) setActionsOpen(false)
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setActionsOpen(false)
+    }
+    document.addEventListener('pointerdown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('pointerdown', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [actionsOpen])
   const [activeTab, setActiveTab] = useState<'overview' | 'insights' | 'activity' | 'deliverables' | 'links' | 'logs'>('overview')
   // Where to return on "← Back": the board or list, whichever the user came from
   const [backTo, setBackTo] = useState<{ href: string; label: string }>({ href: '/', label: 'Board' })
@@ -284,27 +301,56 @@ export default function ProjectDetailPage() {
               </button>
             </HelpTip>
           )}
-          <HelpTip text="Create a fresh copy of this project — a new PR code, setup fields carried over (your choice), run-data reset. Great for the next wave of a recurring study.">
+          {/* Record-level actions collected into one menu so the header stays
+              uncluttered (clone / merge / co-captains / delete). */}
+          <div ref={actionsRef} className="relative shrink-0">
             <button
-              onClick={() => setCloning(true)}
-              className="text-sm border border-border text-muted-foreground hover:text-foreground hover:border-ring px-3 py-1.5 rounded-lg transition-colors shrink-0"
+              onClick={() => setActionsOpen(o => !o)}
+              aria-expanded={actionsOpen}
+              title="Actions on this record — clone, merge, manage co-captains, and delete"
+              className="text-sm border border-border text-muted-foreground hover:text-foreground hover:border-ring px-3 py-1.5 rounded-lg transition-colors shrink-0 inline-flex items-center gap-1.5"
             >
-              ⎘ Clone
+              Actions <span aria-hidden="true" className="text-xs">▾</span>
             </button>
-          </HelpTip>
-          {/* Destructive action set apart from Close by a divider + a red tint
-              that's visible at rest, so it can't be hit by reflex. */}
-          <span className="flex items-center border-l border-border pl-2 ml-1 gap-2">
-            <HelpTip text="Removes the project from the board and moves it to Recently Deleted on the Admin page, where you can restore it (it asks you to type 'delete' first). If you just want it off the board, use Close instead.">
-              <button
-                onClick={() => setConfirmingDelete(true)}
-                className="text-sm border border-border text-red-600/70 dark:text-red-400/70 hover:text-red-600 dark:hover:text-red-400 hover:border-red-500/50 px-3 py-1.5 rounded-lg transition-colors shrink-0"
-              >
-                🗑 Delete
-              </button>
-            </HelpTip>
-            <MergeButton kind="project" record={project} />
-          </span>
+            {actionsOpen && (
+              <div className="absolute right-0 top-full mt-1.5 z-50 w-64 bg-popover border border-border rounded-xl shadow-xl p-1.5 flex flex-col">
+                <button
+                  onClick={() => { setActionsOpen(false); setCloning(true) }}
+                  title="Create a fresh copy — new PR code, setup carried over, run-data reset. Great for the next wave of a recurring study."
+                  className="flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm text-foreground/90 hover:bg-accent transition-colors text-left"
+                >
+                  <span aria-hidden="true">⎘</span> Clone project
+                </button>
+                <MergeButton
+                  kind="project"
+                  record={project}
+                  label={<><span aria-hidden="true">⧉</span> Merge with a duplicate…</>}
+                  className="flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm text-foreground/90 hover:bg-accent transition-colors text-left w-full"
+                  onOpen={() => setActionsOpen(false)}
+                />
+                <div className="border-t border-border my-1" />
+                <div className="px-2.5 py-1">
+                  {'co_captain_ids' in project && (
+                    <CoCaptainsRow
+                      ids={project.co_captain_ids ?? []}
+                      teamMembers={teamMembers}
+                      primaryId={project.captain?.id ?? null}
+                      tooltip={TOOLTIPS['Co-Captains']}
+                      onSave={ids => updateProject.mutate({ id, updates: { co_captain_ids: ids } })}
+                    />
+                  )}
+                </div>
+                <div className="border-t border-border my-1" />
+                <button
+                  onClick={() => { setActionsOpen(false); setConfirmingDelete(true) }}
+                  title="Move to Recently Deleted (restorable on the Admin page). To just take it off the board, use Archive instead."
+                  className="flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm text-red-600/80 dark:text-red-400/80 hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400 transition-colors text-left"
+                >
+                  <span aria-hidden="true">🗑</span> Delete project
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -574,15 +620,7 @@ export default function ProjectDetailPage() {
                   tooltip={TOOLTIPS['Project Captain']}
                   onSave={v => updateProject.mutate({ id, updates: { captain_id: v } })}
                 />
-                {'co_captain_ids' in project && (
-                  <CoCaptainsRow
-                    ids={project.co_captain_ids ?? []}
-                    teamMembers={teamMembers}
-                    primaryId={project.captain?.id ?? null}
-                    tooltip={TOOLTIPS['Co-Captains']}
-                    onSave={ids => updateProject.mutate({ id, updates: { co_captain_ids: ids } })}
-                  />
-                )}
+                {/* Co-captains moved to the header Actions menu; salesperson takes this slot. */}
                 <SalespersonRow
                   value={project.salesperson ?? ''}
                   tooltip={TOOLTIPS['Salesperson']}
