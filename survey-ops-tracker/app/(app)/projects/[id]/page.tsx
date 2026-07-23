@@ -520,7 +520,7 @@ export default function ProjectDetailPage() {
         <NewProjectSetupBanner project={project} />
         <ComplianceBanner project={project} />
         {/* Hero stat strip */}
-        <div className="grid grid-cols-1 md:grid-cols-[minmax(130px,0.9fr)_minmax(0,2.6fr)_minmax(116px,0.8fr)] gap-3 mb-4 items-stretch">
+        <div className="grid grid-cols-1 md:grid-cols-[minmax(150px,0.9fr)_minmax(0,2.4fr)] gap-3 mb-4 items-stretch">
           <SegmentedNTile
             project={project}
             tooltip={TOOLTIPS['N Collected']}
@@ -531,10 +531,6 @@ export default function ProjectDetailPage() {
             project={project}
             closed={project.status === 'Closed'}
             onSaveField={updates => updateProject.mutate({ id, updates })}
-          />
-          <HeroWaitingOn
-            project={project}
-            onSetBlockedBy={v => updateProject.mutate({ id, updates: { blocked_by: v } })}
           />
         </div>
 
@@ -643,11 +639,10 @@ export default function ProjectDetailPage() {
                   tooltip={TOOLTIPS['N Internal Target']}
                   onSave={v => updateProject.mutate({ id, updates: { n_internal_target: v } })}
                 />
-                <EditableNumberRow
+                <DetailRow
                   label="N Collected"
-                  value={project.n_collected ?? 0}
-                  tooltip={TOOLTIPS['N Collected']}
-                  onSave={v => updateProject.mutate({ id, updates: { n_collected: v ?? 0 } })}
+                  value={(project.n_collected ?? 0).toLocaleString()}
+                  tooltip="Live count — edit it in the N tile at the top so it lives in one place (and syncs cleanly to the sheet)."
                 />
                 <EditableNumberRow
                   label="N Actual"
@@ -733,9 +728,6 @@ export default function ProjectDetailPage() {
                   nCollected={project.n_collected}
                   actualSpend={project.actual_spend ?? null}
                 />
-              </div>
-              <div className="border-t border-border pt-3 mt-1 flex items-center gap-1.5 text-xs text-muted-foreground/50">
-                <span aria-hidden="true">＋</span> Add cost line — other costs &amp; unit economics (coming soon)
               </div>
             </SidebarCard>
 
