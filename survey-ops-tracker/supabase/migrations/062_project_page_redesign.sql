@@ -12,20 +12,28 @@ alter table public.project_segments
   add column if not exists audience_size integer;
 
 -- 2) Extend the rollup to also sum n_internal_target onto the parent project
---    (mirrors the n_target / n_collected / n_actual sums from 039).
+--    (mirrors n_target / n_collected / n_actual from 039). Preserves 039's
+--    behavior of resetting segment_count to 0 when the last segment is removed
+--    (manual single-N mode), leaving the n_* totals as-is.
 create or replace function public.sync_segment_totals() returns trigger
-language plpgsql as $$
-declare pid uuid;
+language plpgsql security definer set search_path = public as $$
+declare
+  pid uuid;
+  cnt int;
 begin
   pid := coalesce(new.project_id, old.project_id);
-  update public.survey_projects s set
-    segment_count      = (select count(*) from public.project_segments where project_id = pid),
-    n_target           = (select sum(n_target) from public.project_segments where project_id = pid),
-    n_internal_target  = (select sum(n_internal_target) from public.project_segments where project_id = pid),
-    n_collected        = (select coalesce(sum(coalesce(n_collected,0)),0) from public.project_segments where project_id = pid),
-    n_actual           = (select case when count(n_actual) > 0 then sum(n_actual) end from public.project_segments where project_id = pid)
-  where s.id = pid
-    and (select count(*) from public.project_segments where project_id = pid) > 0;
+  select count(*) into cnt from public.project_segments where project_id = pid;
+  if cnt > 0 then
+    update public.survey_projects s set
+      segment_count     = cnt,
+      n_target          = (select sum(n_target) from public.project_segments where project_id = pid),
+      n_internal_target = (select sum(n_internal_target) from public.project_segments where project_id = pid),
+      n_collected       = (select coalesce(sum(coalesce(n_collected,0)),0) from public.project_segments where project_id = pid),
+      n_actual          = (select case when count(n_actual) > 0 then sum(n_actual) end from public.project_segments where project_id = pid)
+    where s.id = pid;
+  else
+    update public.survey_projects s set segment_count = 0 where s.id = pid;
+  end if;
   return null;
 end $$;
 
