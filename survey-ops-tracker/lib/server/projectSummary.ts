@@ -20,8 +20,13 @@ export interface SummaryInput {
 
 export interface SummaryFacts {
   stage: string
+  /** 'Open' | 'On hold' | 'Archived' — the project's lifecycle status. */
+  status: string
+  archived: boolean
   daysInStage: number | null
   delivered: boolean
+  /** When delivered (with year, e.g. "Apr 9, 2026"); null if not delivered. */
+  deliveredDate: string | null
   nCollected: number
   nTarget: number | null
   nPct: number | null
@@ -52,6 +57,18 @@ function toISO(now: Date | string): string {
   return typeof now === 'string' ? now : now.toISOString()
 }
 
+/** "Apr 9, 2026" (UTC-pinned, includes the year — unlike the year-less
+ *  formatDate used for near-term due dates). null for empty input. */
+function formatMonthDayYear(date: string | null | undefined): string | null {
+  if (!date) return null
+  return new Date(date).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone: 'UTC',
+  })
+}
+
 /** Sort blasts chronologically by blast_at. Stable sort — blasts without a
  *  blast_at keep their original (created) order relative to one another. */
 function sortBlasts(blasts: Blast[]): Blast[] {
@@ -64,6 +81,16 @@ export function buildSummaryFacts(input: SummaryInput): SummaryFacts {
 
   const stage = project.board_column
   const delivered = project.board_column === 'Delivery' || !!project.delivered_at
+
+  // Lifecycle status — the UI relabels the 'Closed' DB value as "Archived"
+  // ([[project-status-model]]), so use that word here too. Feeding this into the
+  // facts is what stops the model reading a done/archived project as active.
+  const archived = project.status === 'Closed'
+  const status = archived ? 'Archived' : project.status === 'Hold' ? 'On hold' : 'Open'
+  // Delivered date: the real delivered_at if recorded, else the planned deliver_date.
+  const deliveredDate = delivered
+    ? formatMonthDayYear(project.delivered_at ?? project.deliver_date)
+    : null
 
   const durations = stageDurations(stageHistory, input.now)
   const ongoingStage = durations.find((d) => d.ongoing)
@@ -131,8 +158,11 @@ export function buildSummaryFacts(input: SummaryInput): SummaryFacts {
 
   return {
     stage,
+    status,
+    archived,
     daysInStage,
     delivered,
+    deliveredDate,
     nCollected,
     nTarget,
     nPct,
