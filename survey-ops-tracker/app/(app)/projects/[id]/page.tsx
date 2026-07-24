@@ -86,7 +86,12 @@ function slackDeepLink(url: string): string {
   const team =
     url.match(/[?&]team=([A-Z0-9]+)/i)?.[1] ??
     url.match(/\/(?:client|team)\/([A-Z0-9]+)/i)?.[1]
-  return team ? `slack://channel?team=${team}&id=${channel}` : `slack://channel?id=${channel}`
+  // Slack's app_redirect opens the DESKTOP app AND navigates to the specific
+  // channel, resolving the workspace from the signed-in session. The bare
+  // `slack://channel?id=<id>` form (no team) only opens the app on whatever was
+  // last shown — which is why the old link "just opened Slack". Add team when we
+  // can parse it out for a faster resolve.
+  return `https://slack.com/app_redirect?channel=${channel}${team ? `&team=${team}` : ''}`
 }
 
 // Short label for the Slack link — the channel id from the archives URL, or a
