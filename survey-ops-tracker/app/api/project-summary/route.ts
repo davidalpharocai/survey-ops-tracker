@@ -30,6 +30,8 @@ const SYSTEM_PROMPT =
   'You write a terse, factual status brief for an internal survey-operations tool. ' +
   "You are GIVEN exact figures as JSON — NEVER invent, alter, recompute, or round numbers differently; only phrase what you're given. " +
   "If a field is null or 'n/a', omit it gracefully rather than guessing. " +
+  "The 'status' (Open / On hold / Archived), 'delivered', and 'deliveredDate' fields are authoritative about lifecycle: if delivered is true or status is Archived, describe the project as finished/archived (past tense) — NEVER as active, ongoing, or 'in progress'. " +
+  "Never assert progress, timing, or state (e.g. 'in progress', 'ongoing', 'currently', 'underway', 'wrapping up') that isn't explicitly present in the facts; 'rerun'/'Wave N' names the wave only — do not infer that a rerun is running. " +
   'Do NOT restate the watch-outs (shown separately). ' +
   'Respond with ONLY a JSON object: {"oneLine": string, "status": string, "progress": string, "money": string, "next": string}. ' +
   'Each value is ONE short sentence; oneLine <= 160 chars and is the headline.'
@@ -107,15 +109,25 @@ function fallbackNarrative(facts: SummaryFacts): Narrative {
         }`
       : `$${facts.spend.toLocaleString()} spent`
 
-  const oneLine = `${facts.stage}${facts.delivered ? ' · delivered' : ''} — ${nPart}.`.slice(0, 160)
+  // Lead with the lifecycle: delivered/archived projects read in the past tense,
+  // never as if they're still active.
+  const deliveredPhrase = `Delivered${facts.deliveredDate ? ` ${facts.deliveredDate}` : ''}${
+    facts.archived ? ' · archived' : ''
+  }`
+  const head = facts.delivered ? deliveredPhrase : facts.archived ? 'Archived' : facts.stage
+  const oneLine = `${head} — ${nPart}.`.slice(0, 160)
+
+  const statusLine = facts.delivered
+    ? `${deliveredPhrase}.`
+    : facts.archived
+      ? 'Archived (not delivered).'
+      : `Currently in ${facts.stage}${
+          facts.daysInStage != null ? ` (${facts.daysInStage} day${facts.daysInStage === 1 ? '' : 's'})` : ''
+        }.`
 
   return {
     oneLine,
-    status: facts.delivered
-      ? 'Delivered.'
-      : `Currently in ${facts.stage}${
-          facts.daysInStage != null ? ` (${facts.daysInStage} day${facts.daysInStage === 1 ? '' : 's'})` : ''
-        }.`,
+    status: statusLine,
     progress: `${nPart}.`,
     money: `${moneyPart}.`,
     next: facts.nextSteps[0] ?? 'No open next steps recorded.',

@@ -226,3 +226,51 @@ describe('buildSummaryFacts — happy path shape', () => {
     )
   })
 })
+
+describe('buildSummaryFacts — status & delivered lifecycle', () => {
+  it('open project → Open, not archived, no delivered date', () => {
+    const facts = buildSummaryFacts({
+      project: project({ status: 'Open', board_column: 'Fielding', delivered_at: null }),
+      blasts: [],
+      stageHistory: [],
+      now: '2026-07-10T00:00:00Z',
+    })
+    expect(facts.status).toBe('Open')
+    expect(facts.archived).toBe(false)
+    expect(facts.delivered).toBe(false)
+    expect(facts.deliveredDate).toBeNull()
+  })
+
+  it('closed + delivered → Archived, delivered true, dated with the year', () => {
+    const facts = buildSummaryFacts({
+      project: project({ status: 'Closed', board_column: 'Delivery', delivered_at: '2026-04-09T00:00:00Z' }),
+      blasts: [],
+      stageHistory: [],
+      now: '2026-07-15T00:00:00Z',
+    })
+    expect(facts.status).toBe('Archived')
+    expect(facts.archived).toBe(true)
+    expect(facts.delivered).toBe(true)
+    expect(facts.deliveredDate).toBe('Apr 9, 2026')
+  })
+
+  it('falls back to deliver_date when delivered_at is absent', () => {
+    const facts = buildSummaryFacts({
+      project: project({ status: 'Closed', board_column: 'Delivery', delivered_at: null, deliver_date: '2026-04-09' }),
+      blasts: [],
+      stageHistory: [],
+      now: '2026-07-15T00:00:00Z',
+    })
+    expect(facts.deliveredDate).toBe('Apr 9, 2026')
+  })
+
+  it('on hold → On hold', () => {
+    const facts = buildSummaryFacts({
+      project: project({ status: 'Hold' }),
+      blasts: [],
+      stageHistory: [],
+      now: '2026-07-10T00:00:00Z',
+    })
+    expect(facts.status).toBe('On hold')
+  })
+})
