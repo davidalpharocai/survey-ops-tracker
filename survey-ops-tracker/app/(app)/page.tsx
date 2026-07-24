@@ -19,6 +19,9 @@ import { exportProjectsCsv } from '@/lib/utils/exportCsv'
 import { isTypingTarget } from '@/lib/utils/keyboard'
 import { boardOrder, sortOrderBetween } from '@/lib/utils/ordering'
 import { STAGE_ORDER, getCheckboxesForColumn, type BoardColumn as BoardColumnType } from '@/lib/utils/stage'
+import { useComplianceMaps } from '@/lib/hooks/useComplianceState'
+import { complianceGate } from '@/lib/utils/compliance'
+import { toast } from '@/lib/utils/toast'
 import type { Database } from '@/lib/supabase/types'
 import Link from 'next/link'
 
@@ -29,6 +32,7 @@ export default function BoardPage() {
   const { data: teamMembers = [] } = useTeamMembers()
   const moveProject = useMoveProjectToColumn()
   const updateProject = useUpdateProject()
+  const { data: complianceMaps } = useComplianceMaps()
   const isNewForMe = useIsNewForMe()
   const { mode, setMode } = useViewMode()
   const [showNewProject, setShowNewProject] = useState(false)
@@ -110,6 +114,7 @@ export default function BoardPage() {
     const from = result.source.droppableId
     const to = result.destination.droppableId
     const id = result.draggableId
+    const moved = projects.find(p => p.id === id)
     if (from === to && result.destination.index === result.source.index) return
     const toScoping = (SCOPING_STAGES as string[]).includes(to)
     const fromScoping = (SCOPING_STAGES as string[]).includes(from)
@@ -160,12 +165,30 @@ export default function BoardPage() {
         },
       })
     } else if (toPipeline) {
+      const newColumn = to as BoardColumnType
+      // Compliance guardrail (same as the Operations board): block dragging into
+      // Fielding+ (before-fielding review) or onto Delivered (after-fielding review)
+      // when the client's review isn't approved. Override is a project-page action.
+      if (moved && complianceMaps) {
+        const firm = moved.client.split(' - ')[0].trim()
+        const gate = complianceGate({
+          targetColumn: newColumn,
+          willMarkDelivered: newColumn === 'Delivery',
+          client: complianceMaps.clientByFirm.get(firm) ?? null,
+          override: moved.compliance_override ?? null,
+          submissions: complianceMaps.approvedByProject.get(moved.id) ?? [],
+        })
+        if (gate.blocked) {
+          toast(gate.message + ' Open the project to review or override.')
+          return
+        }
+      }
       applyNow({
-        board_column: to as Database['public']['Enums']['board_column'],
+        board_column: newColumn,
         sort_order: sortOrder,
-        ...getCheckboxesForColumn(to as BoardColumnType),
+        ...getCheckboxesForColumn(newColumn),
       })
-      moveProject(id, to as BoardColumnType, sortOrder)
+      moveProject(id, newColumn, sortOrder)
     } else if (toScoping) {
       // Demote: pipeline card dragged back up to a scoping column — the deal
       // reopened. Stage checkboxes are kept so a re-promotion resumes intact.
