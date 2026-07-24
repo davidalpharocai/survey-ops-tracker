@@ -639,7 +639,9 @@ function SidebarCard({
   // Drop the header's bottom margin + underline when collapsed so it reads as a
   // single compact row; keep them when open.
   const headerSpace = collapsed ? '' : `border-b border-border ${dense ? 'mb-2.5 pb-1.5' : 'mb-3 pb-2'}`
-  const headerCls = `flex items-center gap-1.5 text-[11px] text-muted-foreground uppercase tracking-wide font-medium ${headerSpace}`
+  // Same spec as every other rail-card title (Latest/Next, Linked Documents,
+  // Compliance): text-xs · uppercase · tracking-widest · medium.
+  const headerCls = `flex items-center gap-1.5 text-xs text-muted-foreground uppercase tracking-widest font-medium ${headerSpace}`
   return (
     <div className={`bg-card border border-border shadow-sm rounded-xl transition-all hover:border-primary/40 hover:bg-card/70 hover:shadow-md hover:backdrop-blur-sm ${dense ? 'p-3' : 'p-4'} ${className}`}>
       {collapsible ? (
