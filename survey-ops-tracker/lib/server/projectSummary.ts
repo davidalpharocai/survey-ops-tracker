@@ -87,9 +87,12 @@ export function buildSummaryFacts(input: SummaryInput): SummaryFacts {
   // facts is what stops the model reading a done/archived project as active.
   const archived = project.status === 'Closed'
   const status = archived ? 'Archived' : project.status === 'Hold' ? 'On hold' : 'Open'
-  // Delivered date: the real delivered_at if recorded, else the planned deliver_date.
+  // Delivered date: prefer `deliver_date` — the "Delivery date" shown in the
+  // Details grid — so the summary matches what the user sees on the page; fall
+  // back to the internal `delivered_at` stamp (when the stage flipped) only if
+  // no delivery date is set.
   const deliveredDate = delivered
-    ? formatMonthDayYear(project.delivered_at ?? project.deliver_date)
+    ? formatMonthDayYear(project.deliver_date ?? project.delivered_at)
     : null
 
   const durations = stageDurations(stageHistory, input.now)

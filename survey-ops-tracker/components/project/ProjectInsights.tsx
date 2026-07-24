@@ -88,6 +88,9 @@ export function ProjectInsights({ project }: { project: SurveyProject }) {
   const projFinal = projectedFinalCost(cpc, target, collected)
   const startISO = project.launch_date ?? project.created_at ?? null
   const pace = computePace({ collected, target, startISO, todayISO })
+  // Once delivered, pace + "projected finish / past due" are meaningless — the
+  // survey is done. Suppress the projection (see the Pace tile below).
+  const delivered = project.board_column === 'Delivery' || !!project.delivered_at
 
   const type = project.project_type
   const showB2B = blasts.length > 0 || type === 'B2B'
@@ -109,9 +112,9 @@ export function ProjectInsights({ project }: { project: SurveyProject }) {
   const nProgress = target != null && target > 0 ? collected / target : null
   const burningFast = budgetUsed != null && nProgress != null && budgetUsed - nProgress > 0.1
 
-  // Pace vs due date.
+  // Pace vs due date — only while the project is still running.
   let paceNote: { text: string; tone: 'ok' | 'warn' } | null = null
-  if (pace.projectedFinishISO && project.due_date) {
+  if (!delivered && pace.projectedFinishISO && project.due_date) {
     const over = daysBetween(project.due_date, pace.projectedFinishISO)
     const under = daysBetween(pace.projectedFinishISO, project.due_date)
     paceNote = over > 0 ? { text: `~${over}d past due`, tone: 'warn' } : { text: under > 0 ? `~${under}d of buffer` : 'on the due date', tone: 'ok' }
@@ -144,14 +147,23 @@ export function ProjectInsights({ project }: { project: SurveyProject }) {
           <p className="text-[12px] text-muted-foreground mt-0.5">blended, to date</p>
         </KpiCard>
 
-        <KpiCard label="Pace" tooltip="Completes per day since fielding started, and a linear projection of when the N target is reached.">
-          <p className="text-lg font-semibold text-foreground leading-tight">
-            {pace.perDay != null ? `${fmtNum(Math.round(pace.perDay))}` : '—'}
-            <span className="text-sm font-normal text-muted-foreground">/day</span>
-          </p>
-          <p className="text-[12px] text-muted-foreground mt-0.5">
-            {pace.projectedFinishISO ? <>≈ {shortDate(pace.projectedFinishISO)}{paceNote && <span className={paceNote.tone === 'warn' ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}> · {paceNote.text}</span>}</> : 'set a target + start date'}
-          </p>
+        <KpiCard label="Pace" tooltip="Completes per day since fielding started, and a linear projection of when the N target is reached. Stops projecting once the project is delivered.">
+          {delivered ? (
+            <>
+              <p className="text-lg font-semibold text-foreground leading-tight">Delivered</p>
+              <p className="text-[12px] text-muted-foreground mt-0.5">pacing stops at delivery</p>
+            </>
+          ) : (
+            <>
+              <p className="text-lg font-semibold text-foreground leading-tight">
+                {pace.perDay != null ? `${fmtNum(Math.round(pace.perDay))}` : '—'}
+                <span className="text-sm font-normal text-muted-foreground">/day</span>
+              </p>
+              <p className="text-[12px] text-muted-foreground mt-0.5">
+                {pace.projectedFinishISO ? <>≈ {shortDate(pace.projectedFinishISO)}{paceNote && <span className={paceNote.tone === 'warn' ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}> · {paceNote.text}</span>}</> : 'set a target + start date'}
+              </p>
+            </>
+          )}
         </KpiCard>
       </div>
 

@@ -254,14 +254,26 @@ describe('buildSummaryFacts — status & delivered lifecycle', () => {
     expect(facts.deliveredDate).toBe('Apr 9, 2026')
   })
 
-  it('falls back to deliver_date when delivered_at is absent', () => {
+  it('falls back to delivered_at when deliver_date is absent', () => {
     const facts = buildSummaryFacts({
-      project: project({ status: 'Closed', board_column: 'Delivery', delivered_at: null, deliver_date: '2026-04-09' }),
+      project: project({ status: 'Closed', board_column: 'Delivery', delivered_at: '2026-04-09T00:00:00Z' }),
       blasts: [],
       stageHistory: [],
       now: '2026-07-15T00:00:00Z',
     })
     expect(facts.deliveredDate).toBe('Apr 9, 2026')
+  })
+
+  it('prefers deliver_date over delivered_at (matches the Details "Delivery date")', () => {
+    const facts = buildSummaryFacts({
+      // deliver_date Jun 25 is what the Details grid shows; delivered_at Jun 30 is
+      // the internal stage-flip stamp. The summary must read Jun 25.
+      project: project({ status: 'Closed', board_column: 'Delivery', deliver_date: '2026-06-25', delivered_at: '2026-06-30T00:00:00Z' }),
+      blasts: [],
+      stageHistory: [],
+      now: '2026-07-15T00:00:00Z',
+    })
+    expect(facts.deliveredDate).toBe('Jun 25, 2026')
   })
 
   it('on hold → On hold', () => {

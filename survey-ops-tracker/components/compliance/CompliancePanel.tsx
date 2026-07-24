@@ -224,6 +224,14 @@ export function CompliancePanel({
   const latest = submissions[0]
   const latestIsUndispatched = latest?.dispatched_at === null
 
+  // One-line status shown when the panel is collapsed (rail), so you can read
+  // where the review stands without expanding.
+  const previewText = latest
+    ? `Latest: v${latest.version} · ${latestIsUndispatched ? 'Sending…' : STATUS_LABEL[latest.status]}`
+    : requiresAfter
+      ? 'After-fielding review — not sent yet'
+      : 'Not yet submitted for review'
+
   // Auto-expand the latest row when it's rejected so the note is visible
   const defaultExpanded =
     latest && !latestIsUndispatched && latest.status === 'rejected' ? latest.id : null
@@ -265,6 +273,12 @@ export function CompliancePanel({
           </span>
         )}
       </div>
+
+      {collapsed && (
+        <p className="mt-1.5 text-[12px] text-muted-foreground/80">
+          {previewText} · <span className="italic">click for details</span>
+        </p>
+      )}
 
       {!collapsed && (<>
 
