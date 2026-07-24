@@ -291,9 +291,10 @@ export default function BoardPage() {
         />
       )}
 
-      {/* Archived section (Full View only) */}
-      {mode === 'full' && (
-        <div className="flex flex-col gap-3">
+      {/* Archived section — shown in BOTH Operations and Full view (collapsed by
+          default). Delivered projects auto-archive into here (delivered ⇒ closed),
+          and every archived project stays findable via the top search. */}
+      <div className="flex flex-col gap-3">
           <button
             onClick={() => setShowClosed(v => !v)}
             className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground uppercase tracking-widest font-semibold transition-colors self-start"
@@ -321,7 +322,6 @@ export default function BoardPage() {
             )
           )}
         </div>
-      )}
 
       {showNewProject && (
         <NewProjectModal

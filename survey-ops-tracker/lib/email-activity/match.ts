@@ -94,12 +94,14 @@ const uniq = (xs: string[]): string[] => [...new Set(xs)]
 /** Watching (active-operational) OR within the post-delivery Sweep window. */
 function inWatchWindow(p: EmailProjectRec, now: Date): boolean {
   if (isActiveOperational(p)) return true
-  // Post-delivery Sweep: still open (not Closed/Hold) but in the Delivered column
-  // within 48h — catches stragglers without reviving a deliver-then-close project.
-  if (p.status !== 'Closed' && p.status !== 'Hold' && p.board_column === 'Delivery' && p.delivered_at) {
+  // Post-delivery Sweep: in the Delivered column within 48h — catches stragglers.
+  // A delivered project is now auto-Closed (migration 064), so we do NOT exclude
+  // Closed here; the 48h window itself prevents reviving a long-archived project.
+  // (Hold is still excluded — a held project isn't actively wrapping up.)
+  if (p.status !== 'Hold' && p.board_column === 'Delivery' && p.delivered_at) {
     return now.getTime() <= Date.parse(p.delivered_at) + SWEEP_MS
   }
-  return false // Closed/Hold, or Delivered with NULL/expired delivered_at → past-sweep
+  return false // Hold, or Delivered with NULL/expired delivered_at → past-sweep
 }
 
 /**

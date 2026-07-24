@@ -339,12 +339,26 @@ describe('matchEmail — precision guards (review hardening)', () => {
     expect(r.candidates.map((x) => x.projectId).sort()).toEqual(['pa', 'pb'])
   })
 
-  it('does NOT auto-log a contact match onto a deliver-then-Closed project in the sweep window', () => {
+  it('auto-logs a straggler onto a just-delivered (now auto-closed) project within the sweep window', () => {
+    // Delivered ⇒ auto-Closed (migration 064), so Closed must NOT exclude a
+    // project from the 48h post-delivery sweep — that window is exactly when
+    // stragglers (thank-yous, final files) still belong on the project.
     const closed = P({ id: 'pcz', client_id: 'cH', status: 'Closed', board_column: 'Delivery', delivered_at: days(-1) })
     const r = matchEmail(
       { fromEmail: 'jane@holocene.com', toEmails: [], subject: 'thanks', body: '' },
       data([closed], c),
-      { now: NOW }
+      { fuzzyAutoLog: true, now: NOW }
+    )
+    expect(r.decision).toBe('auto-log')
+    expect(r.projectId).toBe('pcz')
+  })
+
+  it('does NOT revive a long-archived delivered project past the sweep window', () => {
+    const old = P({ id: 'pcz2', client_id: 'cH', status: 'Closed', board_column: 'Delivery', delivered_at: days(-10) })
+    const r = matchEmail(
+      { fromEmail: 'jane@holocene.com', toEmails: [], subject: 'thanks', body: '' },
+      data([old], c),
+      { fuzzyAutoLog: true, now: NOW }
     )
     expect(r.decision).toBe('review')
   })

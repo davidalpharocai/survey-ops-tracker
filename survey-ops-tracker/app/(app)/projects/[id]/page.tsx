@@ -290,10 +290,12 @@ export default function ProjectDetailPage() {
           />
           {project.status === 'Closed' && (
             <span className="text-xs text-muted-foreground">
-              Archived projects are hidden from Operations view — switch to Full View to find them.
+              {project.board_column === 'Delivery'
+                ? 'Delivered — archived automatically. Move it out of the Delivered stage to reopen.'
+                : 'Archived — in the Archived section (both views) and findable via search. Reopen from the ⋯ menu.'}
             </span>
           )}
-          {project.status === 'Open' && (
+          {project.status === 'Open' && project.board_column !== 'Delivery' && (
             <HelpTip text="Pauses the project. The card stays on the board but greys out and sinks to the bottom of its column. Resume brings it right back — nothing is lost.">
               <button
                 onClick={() => setStatus('Hold')}
@@ -303,7 +305,7 @@ export default function ProjectDetailPage() {
               </button>
             </HelpTip>
           )}
-          {project.status === 'Hold' && (
+          {project.status === 'Hold' && project.board_column !== 'Delivery' && (
             <HelpTip text="Takes the project off hold — the card returns to normal in its column.">
               <button
                 onClick={() => setStatus('Open')}
@@ -356,11 +358,19 @@ export default function ProjectDetailPage() {
                 {project.status !== 'Closed' ? (
                   <button
                     onClick={() => { setActionsOpen(false); setStatus('Closed') }}
-                    title="Archives the project — kept for history but removed from the active board. It leaves Operations view but stays in Full View's Archived section, and can be reopened anytime."
+                    title="Archives the project — kept for history but removed from the active board. It moves to the Archived section (both views) and stays findable via search; reopen it anytime."
                     className="flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm text-foreground/90 hover:bg-accent transition-colors text-left"
                   >
                     <span aria-hidden="true">✕</span> Archive project
                   </button>
+                ) : project.board_column === 'Delivery' ? (
+                  // Delivered ⇒ archived. It can't be reopened by flipping status
+                  // alone (that would leave it Delivered + Open); it reopens only by
+                  // moving it out of the Delivered stage in the pipeline above.
+                  <div className="px-2.5 py-2 text-xs text-muted-foreground leading-snug">
+                    Delivered &amp; archived. To reopen, move it out of the{' '}
+                    <span className="text-foreground">Delivered</span> stage in the pipeline above.
+                  </div>
                 ) : (
                   <button
                     onClick={() => { setActionsOpen(false); setStatus('Open') }}
