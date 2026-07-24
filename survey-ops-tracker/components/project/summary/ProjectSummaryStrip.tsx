@@ -1,6 +1,9 @@
 'use client'
 import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { createClient } from '@/lib/supabase/client'
 import { useProjectSummary } from '@/lib/hooks/useProjectSummary'
+import { canSeeSummaryPreview } from '@/lib/utils/summaryPreview'
 import { daysAgoLabel } from '@/lib/utils/date'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
 
@@ -54,11 +57,25 @@ function SummaryRow({
 }
 
 export function ProjectSummaryStrip({ projectId }: { projectId: string }) {
+  const supabase = createClient()
+  // ✦ Summary is in limited preview — only allowlisted accounts see it (and only
+  // their view triggers the paid model call). See lib/utils/summaryPreview.ts.
+  const { data: user } = useQuery({
+    queryKey: ['auth-user'],
+    queryFn: async () => (await supabase.auth.getUser()).data.user,
+    staleTime: Infinity,
+  })
+  const allowed = canSeeSummaryPreview(user?.email)
+
   const [collapsed, setCollapsed] = useState(true)
-  const { data, isLoading, isFetching, isError, refetch } = useProjectSummary(projectId)
+  const { data, isLoading, isFetching, isError, refetch } = useProjectSummary(projectId, allowed)
 
   const watchouts = data?.watchouts ?? []
   const n = watchouts.length
+
+  // Non-preview users (and the brief window before auth resolves) see nothing —
+  // no strip, no request.
+  if (!allowed) return null
 
   return (
     <div className="bg-card border border-border border-l-2 border-l-primary/40 rounded-xl shadow-sm">
