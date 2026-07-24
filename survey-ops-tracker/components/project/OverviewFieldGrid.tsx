@@ -97,19 +97,19 @@ export function OverviewFieldGrid({ project }: { project: SurveyProject }) {
             onSave={iso => updateProject.mutate({ id: project.id, updates: { rerun_date: iso, rerun_spawned_at: null } })}
           />
         )}
-        <SelectCell
-          label="Type"
-          tooltip={TIP.type}
-          value={project.project_type ?? ''}
-          options={TYPE_OPTIONS}
-          onSave={v => save({ project_type: v as 'PS' | 'B2B' | 'Rerun' })}
-        />
         <TextCell
           label="Survey IDs"
           tooltip={TIP.surveyIds}
           value={project.survey_tool_id}
           placeholder="e.g. SV-1042, SV-1043"
           onSave={v => save({ survey_tool_id: v || null })}
+        />
+        <SelectCell
+          label="Type"
+          tooltip={TIP.type}
+          value={project.project_type ?? ''}
+          options={TYPE_OPTIONS}
+          onSave={v => save({ project_type: v as 'PS' | 'B2B' | 'Rerun' })}
         />
       </FieldSection>
 
