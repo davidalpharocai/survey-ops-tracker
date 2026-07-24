@@ -3,6 +3,7 @@ import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { isAllowedEmail } from '@/lib/utils/allowedDomain'
+import { canSeeSummaryPreview } from '@/lib/utils/summaryPreview'
 import { getAiBudget, logAiUsage } from '@/lib/server/observability'
 import { buildSummaryFacts, type SummaryFacts } from '@/lib/server/projectSummary'
 import type { Blast } from '@/lib/hooks/useProjectBlasts'
@@ -125,6 +126,12 @@ export async function POST(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user || !isAllowedEmail(user.email)) return new Response('Unauthorized', { status: 401 })
+
+  // ✦ Summary is in limited preview — gate the paid call to the allowlist too,
+  // so it can't be reached even though the strip is hidden for everyone else.
+  if (!canSeeSummaryPreview(user.email)) {
+    return new Response('The ✦ Summary is in limited preview.', { status: 403 })
+  }
 
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey || apiKey.startsWith('your-')) {

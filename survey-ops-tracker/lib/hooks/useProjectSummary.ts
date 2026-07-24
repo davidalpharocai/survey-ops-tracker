@@ -37,13 +37,17 @@ async function fetchProjectSummary(projectId: string): Promise<ProjectSummaryRes
  * Fetch-on-mount + manual regenerate only (pass 1) — does NOT auto-refetch on
  * every field edit. `refetch()` (wired to the strip's ↻ button) is the only
  * way to force a fresh call once the 10-minute staleTime has passed.
+ *
+ * `enabled` lets the caller hold the fetch back (e.g. until the current user is
+ * confirmed to be in the ✦ Summary preview allowlist) so no paid model call
+ * fires for someone who won't see the result.
  */
-export function useProjectSummary(projectId: string) {
+export function useProjectSummary(projectId: string, enabled = true) {
   return useQuery({
     queryKey: ['project-summary', projectId],
     queryFn: () => fetchProjectSummary(projectId),
     staleTime: 10 * 60 * 1000,
     refetchOnWindowFocus: false,
-    enabled: !!projectId,
+    enabled: !!projectId && enabled,
   })
 }
