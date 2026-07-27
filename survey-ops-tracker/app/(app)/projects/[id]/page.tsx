@@ -111,6 +111,7 @@ export default function ProjectDetailPage() {
   const deleteProject = useDeleteProject()
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [cloning, setCloning] = useState(false)
+  const [merging, setMerging] = useState(false)
   const [actionsOpen, setActionsOpen] = useState(false)
   const actionsRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -335,13 +336,16 @@ export default function ProjectDetailPage() {
                 >
                   <span aria-hidden="true">⎘</span> Clone project
                 </button>
-                <MergeButton
-                  kind="project"
-                  record={project}
-                  label={<><span aria-hidden="true">⧉</span> Merge with a duplicate…</>}
+                {/* Trigger only — the actual picker/modal is the controlled
+                    <MergeButton> rendered at page level below, so closing this
+                    menu can't unmount the in-progress merge UI. */}
+                <button
+                  onClick={() => { setActionsOpen(false); setMerging(true) }}
+                  title="Merge this project with a duplicate"
                   className="flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm text-foreground/90 hover:bg-accent transition-colors text-left w-full"
-                  onOpen={() => setActionsOpen(false)}
-                />
+                >
+                  <span aria-hidden="true">⧉</span> Merge with a duplicate…
+                </button>
                 <div className="border-t border-border my-1" />
                 <div className="px-2.5 py-1">
                   {'co_captain_ids' in project && (
@@ -416,6 +420,11 @@ export default function ProjectDetailPage() {
           onClose={() => setCloning(false)}
         />
       )}
+
+      {/* Controlled merge picker/modal — mounted at the page level (not inside the
+          More menu) so closing that menu can't tear it down. Opened by the menu
+          item above. */}
+      <MergeButton kind="project" record={project} open={merging} onClose={() => setMerging(false)} />
 
       {confirmingDelete && (
         <DeleteProjectModal

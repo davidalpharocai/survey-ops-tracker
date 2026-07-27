@@ -11,6 +11,8 @@ export function MergeButton({
   label = 'Merge…',
   className = 'text-xs text-muted-foreground hover:text-foreground border border-border rounded px-2 py-1 transition-colors',
   onOpen,
+  open,
+  onClose,
 }: {
   kind: 'project' | 'client'
   record: Row
@@ -20,9 +22,21 @@ export function MergeButton({
   className?: string
   /** Called when the picker opens — lets a parent menu close itself. */
   onOpen?: () => void
+  /**
+   * Controlled mode. When `open` is provided, this component renders NO trigger
+   * button — the parent owns the trigger and this just shows the picker/modal
+   * driven by `open`. Use this when the trigger lives inside something that
+   * unmounts (e.g. an auto-closing dropdown menu): render the trigger in the
+   * menu and this controlled MergeButton at a stable top level, so closing the
+   * menu can't tear down the in-progress merge UI.
+   */
+  open?: boolean
+  onClose?: () => void
 }) {
   const supabase = createClient()
-  const [picking, setPicking] = useState(false)
+  const controlled = open !== undefined
+  const [searchingUncontrolled, setSearchingUncontrolled] = useState(false)
+  const searching = controlled ? !!open : searchingUncontrolled
   const [q, setQ] = useState('')
   const [results, setResults] = useState<Row[]>([])
   const [other, setOther] = useState<Row | null>(null)
@@ -33,7 +47,7 @@ export function MergeButton({
   const codeKey = kind === 'project' ? 'project_code' : 'code'
 
   useEffect(() => {
-    if (!picking || q.trim().length < 2) { setResults([]); return }
+    if (!searching || q.trim().length < 2) { setResults([]); return }
     if (timer.current) clearTimeout(timer.current)
     timer.current = setTimeout(async () => {
       const { data } = await supabase
@@ -45,20 +59,31 @@ export function MergeButton({
         .limit(8)
       setResults((data as Row[]) ?? [])
     }, 200)
-  }, [q, picking, table, nameKey, record.id, supabase])
+  }, [q, searching, table, nameKey, record.id, supabase])
+
+  // Close the whole flow (search + modal) and reset transient state.
+  function close() {
+    setQ('')
+    setResults([])
+    setOther(null)
+    if (controlled) onClose?.()
+    else setSearchingUncontrolled(false)
+  }
 
   return (
     <>
-      <button
-        onClick={() => { setPicking(true); onOpen?.() }}
-        className={className}
-        title={`Merge this ${kind} with a duplicate`}
-      >
-        {label}
-      </button>
+      {!controlled && (
+        <button
+          onClick={() => { setSearchingUncontrolled(true); onOpen?.() }}
+          className={className}
+          title={`Merge this ${kind} with a duplicate`}
+        >
+          {label}
+        </button>
+      )}
 
-      {picking && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/45 p-4 pt-24" onClick={() => setPicking(false)}>
+      {searching && !other && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/45 p-4 pt-24" onClick={close}>
           <div className="w-full max-w-md bg-card border border-border rounded-xl p-4" onClick={e => e.stopPropagation()}>
             <p className="text-sm font-medium text-foreground mb-2">Find the duplicate {kind} to merge with</p>
             <input
@@ -70,7 +95,7 @@ export function MergeButton({
               {results.map(r => (
                 <button
                   key={r.id}
-                  onClick={() => { setOther(r); setPicking(false); setQ('') }}
+                  onClick={() => { setOther(r); setQ('') }}
                   className="text-left rounded px-2 py-1.5 hover:bg-accent transition-colors"
                 >
                   <span className="block text-sm text-foreground truncate">{String(r[nameKey] ?? '')}</span>
@@ -85,7 +110,7 @@ export function MergeButton({
         </div>
       )}
 
-      {other && <MergeModal kind={kind} a={record} b={other} open onClose={() => setOther(null)} />}
+      {other && <MergeModal kind={kind} a={record} b={other} open onClose={close} />}
     </>
   )
 }
