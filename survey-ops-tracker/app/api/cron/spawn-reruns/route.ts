@@ -37,7 +37,11 @@ export async function GET(req: NextRequest) {
     .lte('rerun_date', horizon)
     .is('rerun_spawned_at', null)
     .is('deleted_at', null)
-    .neq('status', 'Closed')
+    // Skip genuinely-abandoned (Closed) projects, BUT include delivered waves —
+    // which are now Closed too (migration 064: delivered ⇒ archived). A delivered
+    // wave hitting its rerun_date is exactly when the next wave should spawn, so
+    // "Closed AND in the Delivery stage" must still qualify.
+    .or('status.neq.Closed,board_column.eq.Delivery')
 
   if (error) {
     await logSystemEvent({ source: 'spawn-reruns', status: 'error', detail: `Database error: ${error.message}` })
