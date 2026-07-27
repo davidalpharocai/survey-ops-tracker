@@ -109,6 +109,11 @@ export function MergeModal({ kind, a, b, open, onClose }: Props) {
         <div className="mb-4">
           <p className="text-[12px] uppercase tracking-widest text-muted-foreground mb-1">Everything else combines</p>
           <p className="text-xs text-muted-foreground">{COMBINES[kind].join(' · ')}</p>
+          {kind === 'project' && (
+            <p className="text-[11px] text-muted-foreground/70 mt-1">
+              N segments follow the survivor — the retired copy&apos;s are discarded.
+            </p>
+          )}
         </div>
 
         <div className="flex justify-end gap-2 border-t border-border pt-3">
