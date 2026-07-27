@@ -47,11 +47,15 @@ export async function promoteEmail(
 ): Promise<PromoteResult> {
   const extId = email.external_id
 
-  // Cross-pipeline / idempotency dedup on the Message-ID-derived external_id.
+  // Idempotency dedup, scoped to THIS project (migration 065): the same email
+  // may legitimately live on more than one project (an analyst "also logs" a
+  // chain that references two surveys), so we only skip a duplicate within the
+  // same project — not across all projects.
   const { data: existing } = await admin
     .from('project_activity')
     .select('id')
     .eq('external_id', extId)
+    .eq('project_id', projectId)
     .limit(1)
 
   let promoted = false
