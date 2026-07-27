@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
 import { toast } from '@/lib/utils/toast'
+import { useProjects } from '@/lib/hooks/useProjects'
 import type { Database } from '@/lib/supabase/types'
 
 type Activity = Database['public']['Tables']['project_activity']['Row']
@@ -178,6 +179,9 @@ export function ActivityLog({ projectId }: { projectId: string }) {
                   <pre className="text-sm text-foreground/90 whitespace-pre-wrap break-words font-sans leading-relaxed max-h-80 overflow-y-auto">
                     {a.body ?? a.snippet ?? ''}
                   </pre>
+                  {a.type === 'email' && a.external_id && (
+                    <AlsoLogControl activityId={a.id} currentProjectId={projectId} />
+                  )}
                 </div>
               )}
             </div>
@@ -193,6 +197,97 @@ export function ActivityLog({ projectId }: { projectId: string }) {
           {showAll ? 'Show fewer' : `Show all ${activity.length}`}
         </button>
       )}
+    </div>
+  )
+}
+
+// "Also log to another survey" — for an email chain that references two surveys.
+// Copies this email onto a second project's timeline via /api/activity/[id]/copy
+// (per-project idempotent, migration 065). Search excludes the current project.
+function AlsoLogControl({ activityId, currentProjectId }: { activityId: string; currentProjectId: string }) {
+  const { data: projects = [] } = useProjects()
+  const [open, setOpen] = useState(false)
+  const [q, setQ] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const s = q.trim().toLowerCase()
+  const matches =
+    s.length < 1
+      ? []
+      : projects
+          .filter(p => p.id !== currentProjectId)
+          .filter(
+            p =>
+              (p.project_code ?? '').toLowerCase().includes(s) ||
+              p.project_name.toLowerCase().includes(s) ||
+              p.client.toLowerCase().includes(s),
+          )
+          .slice(0, 6)
+
+  async function copyTo(projectId: string, label: string) {
+    setBusy(true)
+    try {
+      const res = await fetch(`/api/activity/${activityId}/copy`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId }),
+      })
+      const j = (await res.json().catch(() => ({}))) as { error?: string; deduplicated?: boolean }
+      if (!res.ok) throw new Error(j.error ?? 'copy failed')
+      toast(j.deduplicated ? `Already logged on ${label}.` : `Also logged on ${label}.`)
+      setOpen(false)
+      setQ('')
+    } catch {
+      toast("Couldn't log to that survey — please try again.")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        className="text-xs text-muted-foreground hover:text-foreground w-fit mt-0.5"
+        title="Log this same email onto another survey's timeline (for a chain that mentions two surveys)"
+      >
+        ＋ Also log to another survey
+      </button>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-1 w-full max-w-sm mt-0.5">
+      <input
+        autoFocus
+        value={q}
+        onChange={e => setQ(e.target.value)}
+        placeholder="Find a survey by name, client, or PR code…"
+        className="w-full text-xs px-2 py-1.5 rounded-lg border border-border bg-background"
+      />
+      {matches.map(p => (
+        <button
+          key={p.id}
+          disabled={busy}
+          onClick={() => copyTo(p.id, p.project_code ?? p.project_name)}
+          className="text-left text-xs px-2 py-1 rounded hover:bg-accent disabled:opacity-50 transition-colors truncate"
+        >
+          <span className="text-foreground">
+            {p.project_code ? `${p.project_code} · ` : ''}
+            {p.project_name}
+          </span>
+          <span className="text-muted-foreground"> — {p.client}</span>
+        </button>
+      ))}
+      {s.length >= 1 && matches.length === 0 && (
+        <p className="text-xs text-muted-foreground/60 px-2 py-1">No matching survey.</p>
+      )}
+      <button
+        onClick={() => { setOpen(false); setQ('') }}
+        className="text-xs text-muted-foreground/70 hover:text-foreground w-fit px-2"
+      >
+        cancel
+      </button>
     </div>
   )
 }
