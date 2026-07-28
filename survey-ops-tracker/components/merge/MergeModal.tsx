@@ -8,7 +8,7 @@ type Row = { id: string } & Record<string, unknown>
 type Props = { kind: 'project' | 'client'; a: Row; b: Row; open: boolean; onClose: () => void }
 
 const COMBINES: Record<'project' | 'client', string[]> = {
-  project: ['Bids & blasts', 'Next steps', 'Linked docs', 'Deliverables', 'Compliance submissions', 'Notes, activity & audit history'],
+  project: ['Bids & blasts', 'Suppliers & launches', 'Next steps', 'Linked docs', 'Deliverables', 'Compliance submissions', 'Notes, activity & audit history'],
   client: ['Projects', 'Contacts', 'Notes', 'Portal reviewers', 'Deliverables'],
 }
 
