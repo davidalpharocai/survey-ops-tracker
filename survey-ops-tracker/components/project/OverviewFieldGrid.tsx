@@ -11,6 +11,7 @@ import { SuppliersWidget } from './SuppliersWidget'
 import { BlastBlocks } from './BlastBlocks'
 import { BudgetWidget } from './BudgetWidget'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
+import { AlphaRocMark } from '@/components/shared/AlphaRocMark'
 
 type ProjectUpdate = Database['public']['Tables']['survey_projects']['Update']
 
@@ -200,7 +201,7 @@ export function OverviewFieldGrid({ project }: { project: SurveyProject }) {
           />
           <FlagChip
             label="Occam"
-            icon={<OccamMark />}
+            icon={<AlphaRocMark className="h-3.5 w-3.5" />}
             value={project.occam ?? false}
             tone="sky"
             tooltip={TIP.occam}
@@ -209,27 +210,6 @@ export function OverviewFieldGrid({ project }: { project: SurveyProject }) {
         </div>
       </FieldSection>
     </div>
-  )
-}
-
-// A compact recreation of the Occam logo's circular-loop mark, drawn in
-// currentColor so it takes the chip's tone (sky when the flag is on, muted when
-// off). Swap the paths if we get the brand's exact SVG.
-function OccamMark() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className="h-3.5 w-3.5"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="3"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M20 12a8 8 0 1 1-2.5-5.8" />
-      <path d="M20 4.5V9h-4.5" />
-    </svg>
   )
 }
 

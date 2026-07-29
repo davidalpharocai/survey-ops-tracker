@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { ThemeToggle } from '@/components/shared/ThemeToggle'
 import { NavSearch } from '@/components/shared/NavSearch'
+import { AlphaRocMark } from '@/components/shared/AlphaRocMark'
 
 const USER_GUIDE_URL =
   'https://docs.google.com/document/d/1FtnUeytOj1OI54dEhB5ogmoIcVKK18c9E1FztwKpQXE/edit'
@@ -95,11 +96,11 @@ export function TopNav() {
       <Link
         href="/"
         title="Board — the kanban home"
-        className={`font-bold text-sm px-1.5 py-1 rounded-lg transition-colors ${
+        className={`inline-flex items-center gap-1.5 font-bold text-sm px-1.5 py-1 rounded-lg transition-colors ${
           isProjects ? 'text-foreground' : 'text-foreground/80 hover:text-foreground'
         }`}
       >
-        <span className="text-blue-600 dark:text-blue-400">✦</span> Survey Ops
+        <AlphaRocMark className="h-4 w-4 shrink-0 text-primary" /> Survey Ops
       </Link>
 
       <div className="flex items-center gap-0.5 flex-wrap">
