@@ -1,5 +1,6 @@
 'use client'
 
+import type { ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 import { getDueUrgency } from '@/lib/utils/date'
 import { useUpdateProject, type SurveyProject } from '@/lib/hooks/useProjects'
@@ -199,7 +200,7 @@ export function OverviewFieldGrid({ project }: { project: SurveyProject }) {
           />
           <FlagChip
             label="Occam"
-            icon="🪒"
+            icon={<OccamMark />}
             value={project.occam ?? false}
             tone="sky"
             tooltip={TIP.occam}
@@ -208,6 +209,27 @@ export function OverviewFieldGrid({ project }: { project: SurveyProject }) {
         </div>
       </FieldSection>
     </div>
+  )
+}
+
+// A compact recreation of the Occam logo's circular-loop mark, drawn in
+// currentColor so it takes the chip's tone (sky when the flag is on, muted when
+// off). Swap the paths if we get the brand's exact SVG.
+function OccamMark() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="h-3.5 w-3.5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="3"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M20 12a8 8 0 1 1-2.5-5.8" />
+      <path d="M20 4.5V9h-4.5" />
+    </svg>
   )
 }
 
@@ -237,7 +259,7 @@ function FlagChip({
   label: string
   value: boolean
   tone: 'red' | 'amber' | 'emerald' | 'sky'
-  icon: string
+  icon: ReactNode
   tooltip?: string
   onToggle: (next: boolean) => void
 }) {
