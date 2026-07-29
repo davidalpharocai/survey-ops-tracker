@@ -37,6 +37,7 @@ const TIP = {
     'Whether deliverables need citation language. Auto-set the same way as Voter Survey QA. Click to override.',
   rowLevel: 'Whether individual respondent-level data is included in the deliverable.',
   terminations: 'Whether any survey participants have been terminated (screened out) from the study.',
+  occam: 'Whether this project uses Occam (our internal survey tool).',
 }
 
 /**
@@ -196,16 +197,25 @@ export function OverviewFieldGrid({ project }: { project: SurveyProject }) {
             tooltip={TIP.terminations}
             onToggle={v => save({ terminations: v })}
           />
+          <FlagChip
+            label="Occam"
+            icon="🪒"
+            value={project.occam ?? false}
+            tone="sky"
+            tooltip={TIP.occam}
+            onToggle={v => save({ occam: v })}
+          />
         </div>
       </FieldSection>
     </div>
   )
 }
 
-const CHIP_ON: Record<'red' | 'amber' | 'emerald', string> = {
+const CHIP_ON: Record<'red' | 'amber' | 'emerald' | 'sky', string> = {
   red: 'bg-red-500/15 text-red-600 dark:text-red-400',
   amber: 'bg-amber-500/15 text-amber-600 dark:text-amber-400',
   emerald: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400',
+  sky: 'bg-sky-500/15 text-sky-600 dark:text-sky-400',
 }
 
 /**
@@ -226,7 +236,7 @@ function FlagChip({
 }: {
   label: string
   value: boolean
-  tone: 'red' | 'amber' | 'emerald'
+  tone: 'red' | 'amber' | 'emerald' | 'sky'
   icon: string
   tooltip?: string
   onToggle: (next: boolean) => void

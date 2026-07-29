@@ -204,6 +204,7 @@ export type Database = {
           audience: string | null
           row_level_data: boolean
           terminations: boolean
+          occam: boolean
           stage_doc_programming: boolean
           stage_survey_programming: boolean
           stage_edwin_qa: boolean
@@ -275,6 +276,7 @@ export type Database = {
           audience_size?: number | null
           audience?: string | null
           row_level_data?: boolean
+          occam?: boolean
           terminations?: boolean
           stage_doc_programming?: boolean
           stage_survey_programming?: boolean
@@ -347,6 +349,7 @@ export type Database = {
           audience_size?: number | null
           audience?: string | null
           row_level_data?: boolean
+          occam?: boolean
           terminations?: boolean
           stage_doc_programming?: boolean
           stage_survey_programming?: boolean

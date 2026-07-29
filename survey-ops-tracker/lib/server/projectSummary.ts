@@ -51,6 +51,7 @@ const FLAG_LABELS: { key: keyof SurveyProject; label: string }[] = [
   { key: 'citation_language_needed', label: 'Citation Language' },
   { key: 'row_level_data', label: 'Row-Level Data' },
   { key: 'terminations', label: 'Terminations' },
+  { key: 'occam', label: 'Occam' },
 ]
 
 function toISO(now: Date | string): string {
