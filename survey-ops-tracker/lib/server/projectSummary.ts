@@ -84,10 +84,19 @@ export function buildSummaryFacts(input: SummaryInput): SummaryFacts {
   const delivered = project.board_column === 'Delivery' || !!project.delivered_at
 
   // Lifecycle status — the UI relabels the 'Closed' DB value as "Archived"
-  // ([[project-status-model]]), so use that word here too. Feeding this into the
-  // facts is what stops the model reading a done/archived project as active.
-  const archived = project.status === 'Closed'
-  const status = archived ? 'Archived' : project.status === 'Hold' ? 'On hold' : 'Open'
+  // ([[project-status-model]]), so use that word here too. Cancelled (client
+  // pulled the plug) is also off-board, so it counts as archived but keeps its
+  // own label. Feeding this into the facts is what stops the model reading a
+  // done/archived/cancelled project as active.
+  const archived = project.status === 'Closed' || project.status === 'Cancelled'
+  const status =
+    project.status === 'Cancelled'
+      ? 'Cancelled'
+      : project.status === 'Closed'
+      ? 'Archived'
+      : project.status === 'Hold'
+      ? 'On hold'
+      : 'Open'
   // Delivered date: prefer `deliver_date` — the "Delivery date" shown in the
   // Details grid — so the summary matches what the user sees on the page; fall
   // back to the internal `delivered_at` stamp (when the stage flipped) only if

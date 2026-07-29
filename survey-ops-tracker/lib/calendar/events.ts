@@ -85,7 +85,7 @@ export interface CalendarProject {
   client: string
   project_type: 'PS' | 'B2B' | 'Rerun' | 'Internal' | null
   phase: 'Scoping' | 'Active'
-  status: 'Open' | 'Closed' | 'Hold'
+  status: 'Open' | 'Closed' | 'Hold' | 'Cancelled'
   board_column: string | null
   priority: string | null
   longitudinal: boolean
@@ -169,12 +169,13 @@ function isCaptainedBy(p: CalendarProject, memberId: string): boolean {
 
 /**
  * Default scope is Open + Active only. Each toggle *adds* a bucket:
- * On-Hold (status Hold), Closed (status Closed), Scoping (phase Scoping).
+ * On-Hold (status Hold), Closed/Cancelled (archived), Scoping (phase Scoping).
+ * Cancelled folds into the Closed/archived bucket — same as on the board.
  */
 function passesStatusScope(p: CalendarProject, scope: StatusScope): boolean {
   if (p.status === 'Open' && p.phase === 'Active') return true
   if (scope.includeHold && p.status === 'Hold') return true
-  if (scope.includeClosed && p.status === 'Closed') return true
+  if (scope.includeClosed && (p.status === 'Closed' || p.status === 'Cancelled')) return true
   if (scope.includeScoping && p.phase === 'Scoping') return true
   return false
 }
@@ -229,7 +230,12 @@ export function deriveEvents(
     // board card). A delivered project keeps status 'Open' with board_column
     // 'Delivery', so guard on the column too — otherwise its due/deliver chips
     // still read red/overdue even though the work is done.
-    const tintable = !(p.status === 'Closed' || p.status === 'Hold' || p.board_column === 'Delivery')
+    const tintable = !(
+      p.status === 'Closed' ||
+      p.status === 'Hold' ||
+      p.status === 'Cancelled' ||
+      p.board_column === 'Delivery'
+    )
 
     const add = (type: CalendarEventType, date: string | null) => {
       if (!date || !filters.types[type]) return
