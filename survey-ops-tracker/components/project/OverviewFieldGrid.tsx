@@ -11,7 +11,7 @@ import { SuppliersWidget } from './SuppliersWidget'
 import { BlastBlocks } from './BlastBlocks'
 import { BudgetWidget } from './BudgetWidget'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
-import { AlphaRocMark } from '@/components/shared/AlphaRocMark'
+import { OccamMark } from '@/components/shared/OccamMark'
 
 type ProjectUpdate = Database['public']['Tables']['survey_projects']['Update']
 
@@ -201,7 +201,7 @@ export function OverviewFieldGrid({ project }: { project: SurveyProject }) {
           />
           <FlagChip
             label="Occam"
-            icon={<AlphaRocMark className="h-3.5 w-3.5" />}
+            icon={<OccamMark className="h-3.5 w-3.5" />}
             value={project.occam ?? false}
             tone="sky"
             tooltip={TIP.occam}
