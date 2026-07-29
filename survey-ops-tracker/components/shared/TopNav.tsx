@@ -6,7 +6,6 @@ import { useQuery } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { ThemeToggle } from '@/components/shared/ThemeToggle'
 import { NavSearch } from '@/components/shared/NavSearch'
-import { AlphaRocMark } from '@/components/shared/AlphaRocMark'
 
 const USER_GUIDE_URL =
   'https://docs.google.com/document/d/1FtnUeytOj1OI54dEhB5ogmoIcVKK18c9E1FztwKpQXE/edit'
@@ -100,7 +99,15 @@ export function TopNav() {
           isProjects ? 'text-foreground' : 'text-foreground/80 hover:text-foreground'
         }`}
       >
-        <AlphaRocMark className="h-4 w-4 shrink-0 text-primary" /> Survey Ops
+        {/* Real AlphaROC wordmark (same asset as the Credit Management app). It's
+            a white logo, so invert it on the light nav and leave it as-is on dark. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/alpharoc-logo.png"
+          alt="AlphaROC"
+          className="h-5 w-auto shrink-0 invert dark:invert-0"
+        />
+        Survey Ops
       </Link>
 
       <div className="flex items-center gap-0.5 flex-wrap">
