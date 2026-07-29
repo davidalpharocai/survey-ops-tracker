@@ -205,6 +205,8 @@ export type Database = {
           row_level_data: boolean
           terminations: boolean
           occam: boolean
+          cancel_reason: string | null
+          cancelled_at: string | null
           stage_doc_programming: boolean
           stage_survey_programming: boolean
           stage_edwin_qa: boolean
@@ -277,6 +279,8 @@ export type Database = {
           audience?: string | null
           row_level_data?: boolean
           occam?: boolean
+          cancel_reason?: string | null
+          cancelled_at?: string | null
           terminations?: boolean
           stage_doc_programming?: boolean
           stage_survey_programming?: boolean
@@ -350,6 +354,8 @@ export type Database = {
           audience?: string | null
           row_level_data?: boolean
           occam?: boolean
+          cancel_reason?: string | null
+          cancelled_at?: string | null
           terminations?: boolean
           stage_doc_programming?: boolean
           stage_survey_programming?: boolean
@@ -1660,7 +1666,7 @@ export type Database = {
       question_type: 'open_text' | 'single_select' | 'multi_select' | 'scale' | 'other'
       recipient_role: 'alpharoc' | 'compliance'
       project_type: 'PS' | 'B2B' | 'Rerun' | 'Internal'
-      project_status: 'Open' | 'Closed' | 'Hold'
+      project_status: 'Open' | 'Closed' | 'Hold' | 'Cancelled'
       project_phase: 'Scoping' | 'Active'
       board_column:
         | 'Submitted'

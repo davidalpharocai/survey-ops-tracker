@@ -60,14 +60,16 @@ interface ProjectCardProps {
 export function ProjectCard({ project, onClick, isNew }: ProjectCardProps) {
   const onHold = project.status === 'Hold'
   const closed = project.status === 'Closed'
+  const cancelled = project.status === 'Cancelled'
   // Delivered (in the Delivery column) counts as done for due-date purposes.
   const delivered = project.board_column === 'Delivery'
   // Hold takes precedence over NEW if both somehow apply
-  const showNew = !!isNew && !onHold
+  const showNew = !!isNew && !onHold && !cancelled
   const dueDateStatus = getDueDateStatus(project.due_date)
-  // Closed, Hold, and Delivered projects drop the due-date urgency treatment —
-  // they're done or paused, so red/orange/amber (and "overdue") would be misleading.
-  const urgency = onHold || closed || delivered ? null : getDueUrgency(project.due_date)
+  // Closed, Cancelled, Hold, and Delivered projects drop the due-date urgency
+  // treatment — they're done, cancelled, or paused, so red/orange/amber (and
+  // "overdue") would be misleading.
+  const urgency = onHold || closed || cancelled || delivered ? null : getDueUrgency(project.due_date)
   const badlyOverdue = urgency === 'overdue' && daysOverdue(project.due_date) > BADLY_OVERDUE_DAYS
   const urgencyBorder = urgency
     ? badlyOverdue
@@ -76,6 +78,8 @@ export function ProjectCard({ project, onClick, isNew }: ProjectCardProps) {
     : undefined
   const border = onHold
     ? 'border-2 border-muted-foreground/40 border-l-4 border-l-muted-foreground/50'
+    : cancelled
+    ? 'border border-red-500/40 border-l-4 border-l-red-500/60'
     : closed
     ? 'border border-border border-l-4 border-l-muted-foreground/30'
     : showNew
@@ -109,6 +113,17 @@ export function ProjectCard({ project, onClick, isNew }: ProjectCardProps) {
           title="On hold — paused; greyed out and sorted to the bottom of the column"
         >
           ⏸ Hold
+        </span>
+      )}
+
+      {/* Cancelled badge — client pulled the plug; distinguishes cancelled cards
+          from plain archived ones in the Archived section */}
+      {cancelled && (
+        <span
+          className="absolute -top-2.5 right-2 text-[12px] px-2 py-0.5 rounded-full bg-red-500/15 border border-red-500/50 text-red-700 dark:text-red-300"
+          title="Cancelled by the client — archived; reopen from the project's ⋯ menu"
+        >
+          ⛔ Cancelled
         </span>
       )}
 

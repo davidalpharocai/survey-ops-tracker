@@ -112,6 +112,7 @@ export default function ProjectDetailPage() {
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [cloning, setCloning] = useState(false)
   const [merging, setMerging] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
   const [actionsOpen, setActionsOpen] = useState(false)
   const actionsRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -242,8 +243,20 @@ export default function ProjectDetailPage() {
     return <InternalProjectView project={project} />
   }
 
-  function setStatus(status: 'Open' | 'Closed' | 'Hold') {
+  function setStatus(status: 'Open' | 'Closed' | 'Hold' | 'Cancelled') {
     updateProject.mutate({ id, updates: { status } })
+  }
+  // Client cancelled — record a reason (documented), stamp when, move to Archived.
+  function cancelProject(reason: string) {
+    updateProject.mutate({
+      id,
+      updates: { status: 'Cancelled', cancel_reason: reason, cancelled_at: new Date().toISOString() },
+    })
+  }
+  // Reopen from Closed or Cancelled → Open, clearing the cancel record (the audit
+  // log keeps the history).
+  function reopenProject() {
+    updateProject.mutate({ id, updates: { status: 'Open', cancel_reason: null, cancelled_at: null } })
   }
 
   return (
@@ -277,7 +290,11 @@ export default function ProjectDetailPage() {
               : 'bg-red-500/20 text-red-600 dark:text-red-400'
           }`}
         >
-          {project.status === 'Hold' ? '⏸ On Hold' : project.status}
+          {project.status === 'Hold'
+            ? '⏸ On Hold'
+            : project.status === 'Cancelled'
+            ? '⛔ Cancelled'
+            : project.status}
         </span>
         {project.phase === 'Scoping' && (
           <span className="text-xs px-2 py-1 rounded bg-violet-500/20 text-violet-600 dark:text-violet-400">
@@ -294,6 +311,11 @@ export default function ProjectDetailPage() {
               {project.board_column === 'Delivery'
                 ? 'Delivered — archived automatically. Move it out of the Delivered stage to reopen.'
                 : 'Archived — in the Archived section (both views) and findable via search. Reopen from the ⋯ menu.'}
+            </span>
+          )}
+          {project.status === 'Cancelled' && (
+            <span className="text-xs text-muted-foreground">
+              Cancelled by the client — in the Archived section and findable via search. Reopen from the ⋯ menu.
             </span>
           )}
           {project.status === 'Open' && project.board_column !== 'Delivery' && (
@@ -359,7 +381,24 @@ export default function ProjectDetailPage() {
                   )}
                 </div>
                 <div className="border-t border-border my-1" />
-                {project.status !== 'Closed' ? (
+                {(project.status === 'Open' || project.status === 'Hold') && (
+                  <button
+                    onClick={() => { setActionsOpen(false); setCancelling(true) }}
+                    title="Client cancelled the project — record a reason. Moves it to the Archived section; reversible."
+                    className="flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm text-foreground/90 hover:bg-accent transition-colors text-left"
+                  >
+                    <span aria-hidden="true">⛔</span> Cancel project
+                  </button>
+                )}
+                {project.status === 'Cancelled' ? (
+                  <button
+                    onClick={() => { setActionsOpen(false); reopenProject() }}
+                    title="Client un-cancelled — restore it to the open board. The cancel reason stays in the history."
+                    className="flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm text-foreground/90 hover:bg-accent transition-colors text-left"
+                  >
+                    <span aria-hidden="true">↺</span> Reopen project
+                  </button>
+                ) : project.status !== 'Closed' ? (
                   <button
                     onClick={() => { setActionsOpen(false); setStatus('Closed') }}
                     title="Archives the project — kept for history but removed from the active board. It moves to the Archived section (both views) and stays findable via search; reopen it anytime."
@@ -377,7 +416,7 @@ export default function ProjectDetailPage() {
                   </div>
                 ) : (
                   <button
-                    onClick={() => { setActionsOpen(false); setStatus('Open') }}
+                    onClick={() => { setActionsOpen(false); reopenProject() }}
                     title="Brings this archived project back to the open board."
                     className="flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm text-foreground/90 hover:bg-accent transition-colors text-left"
                   >
@@ -397,6 +436,30 @@ export default function ProjectDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Cancelled banner — the client cancelled; show the documented reason and
+          when, full-width so it can't be missed. Reopen lives in the ⋯ menu. */}
+      {project.status === 'Cancelled' && (
+        <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 mb-4">
+          <div className="flex items-start gap-2">
+            <span aria-hidden="true" className="text-red-600 dark:text-red-400 mt-0.5">⛔</span>
+            <div className="min-w-0">
+              <div className="text-sm font-medium text-red-700 dark:text-red-300">
+                Cancelled{project.cancelled_at
+                  ? ` on ${new Date(project.cancelled_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+                  : ''}
+              </div>
+              {project.cancel_reason ? (
+                <div className="text-sm text-foreground/80 mt-0.5 whitespace-pre-wrap break-words">
+                  {project.cancel_reason}
+                </div>
+              ) : (
+                <div className="text-sm text-muted-foreground mt-0.5">No reason recorded.</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Cockpit Spine — dot progress path + state-aware CTA, lifted into the
           command bar. Active shows the pipeline spine; Scoping shows the scoping
@@ -434,6 +497,18 @@ export default function ProjectDetailPage() {
           onConfirm={async () => {
             await deleteProject.mutateAsync(id)
             router.push('/')
+          }}
+        />
+      )}
+
+      {cancelling && (
+        <CancelProjectModal
+          projectName={project.project_name}
+          isPending={updateProject.isPending}
+          onClose={() => setCancelling(false)}
+          onConfirm={reason => {
+            cancelProject(reason)
+            setCancelling(false)
           }}
         />
       )}
@@ -1225,6 +1300,74 @@ function DeleteProjectModal({
             className="text-xs bg-red-600 hover:bg-red-500 disabled:opacity-40 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg transition-colors"
           >
             {isPending ? 'Deleting…' : 'Move to Recently Deleted'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Cancel a project the client pulled the plug on — captures a required reason so
+// the cancellation is documented, then archives it (status → Cancelled). Reason
+// is mandatory; the confirm button stays disabled until something is entered.
+function CancelProjectModal({
+  projectName,
+  isPending,
+  onClose,
+  onConfirm,
+}: {
+  projectName: string
+  isPending: boolean
+  onClose: () => void
+  onConfirm: (reason: string) => void
+}) {
+  const [reason, setReason] = useState('')
+  const canCancel = reason.trim().length > 0 && !isPending
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-card border border-border rounded-2xl p-5 w-full max-w-md flex flex-col gap-3 shadow-2xl"
+        onClick={e => e.stopPropagation()}
+      >
+        <h2 className="text-base font-semibold text-foreground">Cancel project</h2>
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          The client asked to cancel <span className="text-foreground font-medium">{projectName}</span>.
+          It moves to the <span className="text-foreground">Archived</span> section (findable via search) and
+          shows a <span className="text-red-600 dark:text-red-400">Cancelled</span> pill. You can reopen it later
+          from the ⋯ menu — the reason stays in the history.
+        </p>
+        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+          Cancellation reason <span className="text-red-500">*</span>
+          <textarea
+            autoFocus
+            value={reason}
+            onChange={e => setReason(e.target.value)}
+            placeholder="e.g. Client paused Q3 research budget; may revisit next quarter."
+            rows={3}
+            className="bg-muted border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring transition-colors resize-y"
+            onKeyDown={e => {
+              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && canCancel) onConfirm(reason.trim())
+              if (e.key === 'Escape') onClose()
+            }}
+          />
+        </label>
+        <div className="flex justify-end gap-2 mt-2">
+          <button
+            onClick={onClose}
+            className="text-xs text-muted-foreground hover:text-foreground px-3 py-2 transition-colors"
+          >
+            Never mind
+          </button>
+          <button
+            onClick={() => onConfirm(reason.trim())}
+            disabled={!canCancel}
+            className="text-xs bg-red-600 hover:bg-red-500 disabled:opacity-40 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg transition-colors"
+          >
+            {isPending ? 'Cancelling…' : 'Cancel project'}
           </button>
         </div>
       </div>

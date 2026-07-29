@@ -86,8 +86,12 @@ export default function BoardPage() {
   const activeProjects = projects.filter(
     p => p.phase === 'Active' && (p.status === 'Open' || p.status === 'Hold')
   )
+  // Archived section = closed (delivered/manually archived) plus cancelled. A
+  // client can cancel at any stage — including while still in Scoping — so
+  // Cancelled folds in regardless of phase (it would otherwise fall off the
+  // board entirely, since scopingProjects requires status 'Open').
   const closedProjects = projects.filter(
-    p => p.phase === 'Active' && p.status === 'Closed'
+    p => (p.phase === 'Active' && p.status === 'Closed') || p.status === 'Cancelled'
   )
   const exportableProjects =
     mode === 'full'

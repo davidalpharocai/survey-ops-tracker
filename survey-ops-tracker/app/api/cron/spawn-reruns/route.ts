@@ -42,6 +42,9 @@ export async function GET(req: NextRequest) {
     // wave hitting its rerun_date is exactly when the next wave should spawn, so
     // "Closed AND in the Delivery stage" must still qualify.
     .or('status.neq.Closed,board_column.eq.Delivery')
+    // A Cancelled wave (client pulled the plug) satisfies status.neq.Closed, so
+    // exclude it explicitly — a cancelled longitudinal must never spawn a next wave.
+    .neq('status', 'Cancelled')
 
   if (error) {
     await logSystemEvent({ source: 'spawn-reruns', status: 'error', detail: `Database error: ${error.message}` })
