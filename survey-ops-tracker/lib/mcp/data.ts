@@ -113,7 +113,7 @@ export async function searchProjects(args: {
   // for a Closed/Hold status or the Scoping phase, honor that instead; a passed
   // active_only always wins.
   const asksInactive =
-    args.status === 'Closed' || args.status === 'Hold' || args.phase === 'Scoping'
+    args.status === 'Closed' || args.status === 'Cancelled' || args.status === 'Hold' || args.phase === 'Scoping'
   const wantsActive = args.active_only ?? !asksInactive
   if (wantsActive) q = q.eq('status', 'Open').eq('phase', 'Active').neq('board_column', 'Delivery')
   if (args.query) {
@@ -496,7 +496,11 @@ export async function pipelineSummary(args: { mine?: boolean; userId?: string } 
     .select('board_column, status, phase, captain:team_members(initials)')
     .is('deleted_at', null)
     .or('project_type.is.null,project_type.neq.Internal')
+    // Exclude both archived buckets from the breakdown: Closed (archived) and
+    // Cancelled (client cancelled) are off-board, so they shouldn't inflate the
+    // in-flight counts — same treatment either way.
     .neq('status', 'Closed')
+    .neq('status', 'Cancelled')
 
   let allOpenRows = (allOpen ?? []) as unknown as Row[]
   if (myInitials) {
