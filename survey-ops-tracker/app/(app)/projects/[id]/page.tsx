@@ -796,7 +796,7 @@ function EditableTitle({ value, onSave }: { value: string; onSave: (next: string
 
   if (editing) {
     return (
-      <span className="flex items-center gap-1.5 min-w-0 flex-1">
+      <span className="flex items-center gap-1.5 flex-1 min-w-[14rem]">
         <input
           autoFocus
           value={draft}
