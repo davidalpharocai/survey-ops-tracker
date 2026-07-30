@@ -338,6 +338,190 @@ export async function runRemoveSegment(segmentId: string, actor: string): Promis
   if (error) throw new Error(error.message)
 }
 
+// ---- Launch runners (project_launches + project_suppliers) ----
+// PS launches/suppliers have no RPC — the app writes them directly (see
+// useProjectSuppliers) and the `project_suppliers_spend` trigger (migration 059)
+// keeps actual_spend in sync, plus `trg_audit_project_supplier` (054) audits the
+// change. So these mirror that: direct admin-client writes. Zod validates the
+// tool args before any write, and a failed supplier batch rolls the launch back
+// (compensating delete) so there's never a half-saved launch. A supplier is a FK
+// to the master `suppliers` table, so names resolve to ids (auto-created if new).
+
+export interface LaunchSupplierInput {
+  name: string
+  cpi: number
+  cap?: number | null
+  n_collected: number
+}
+/** Update variant — every supplier field except the name is optional (patch/upsert by name). */
+export interface LaunchSupplierPatch {
+  name: string
+  cpi?: number
+  cap?: number | null
+  n_collected?: number
+}
+export interface LaunchSupplierView {
+  id: string
+  supplier_id: string
+  name: string
+  cpi: number
+  cap: number
+  n_collected: number
+}
+export interface LaunchView {
+  id: string
+  project_id: string
+  label: string | null
+  launch_date: string | null
+  target: number | null
+  suppliers: LaunchSupplierView[]
+}
+
+/** Match an active-or-not supplier by name (case-insensitive exact); create one if none matches. */
+export async function resolveOrCreateSupplier(name: string, createdBy: string): Promise<string> {
+  const supabase = createAdminClient()
+  const trimmed = name.trim()
+  const { data: existing, error } = await supabase
+    .from('suppliers').select('id').ilike('name', trimmed).limit(1)
+  if (error) throw new Error(error.message)
+  if (existing && existing.length > 0) return existing[0].id
+  const { data: created, error: insErr } = await supabase
+    .from('suppliers').insert({ name: trimmed, active: true, created_by: createdBy }).select('id').single()
+  if (insErr) throw new Error(insErr.message)
+  return created.id
+}
+
+async function supplierNames(supabase: SupabaseClient<Database>, ids: string[]): Promise<Map<string, string>> {
+  const map = new Map<string, string>()
+  const uniq = [...new Set(ids)]
+  if (uniq.length === 0) return map
+  const { data } = await supabase.from('suppliers').select('id, name').in('id', uniq)
+  for (const s of data ?? []) map.set(s.id, s.name)
+  return map
+}
+
+export async function runLogLaunch(opts: {
+  projectId: string; label: string | null; launchDate: string | null; target: number | null
+  suppliers: LaunchSupplierInput[]; createdBy: string
+}): Promise<LaunchView> {
+  const supabase = createAdminClient()
+  // Resolve/create every supplier id up front (before the launch row exists).
+  const supplierIds: string[] = []
+  for (const s of opts.suppliers) supplierIds.push(await resolveOrCreateSupplier(s.name, opts.createdBy))
+
+  const { data: launch, error: lErr } = await supabase
+    .from('project_launches')
+    .insert({ project_id: opts.projectId, label: opts.label, launch_date: opts.launchDate, target: opts.target, created_by: opts.createdBy })
+    .select('id, project_id, label, launch_date, target')
+    .single()
+  if (lErr) throw new Error(lErr.message)
+
+  const rows = opts.suppliers.map((s, i) => ({
+    project_id: opts.projectId, launch_id: launch.id, supplier_id: supplierIds[i],
+    cpi: s.cpi, completes_cap: s.cap ?? 0, n_collected: s.n_collected ?? 0, created_by: opts.createdBy,
+  }))
+  const { data: sup, error: sErr } = await supabase
+    .from('project_suppliers').insert(rows).select('id, supplier_id, cpi, completes_cap, n_collected')
+  if (sErr) {
+    await supabase.from('project_launches').delete().eq('id', launch.id) // compensating rollback — no orphan
+    throw new Error(sErr.message)
+  }
+  const names = await supplierNames(supabase, supplierIds)
+  return {
+    id: launch.id, project_id: launch.project_id, label: launch.label, launch_date: launch.launch_date, target: launch.target,
+    suppliers: (sup ?? []).map(r => ({ id: r.id, supplier_id: r.supplier_id, name: names.get(r.supplier_id) ?? '', cpi: r.cpi, cap: r.completes_cap, n_collected: r.n_collected })),
+  }
+}
+
+/** Resolve a launch within a project: exact id, else case-insensitive substring on its label. */
+export async function resolveLaunch(
+  projectId: string, ref: string
+): Promise<Row | { ambiguous: Candidate[] } | null> {
+  const supabase = createAdminClient()
+  const { data, error } = await supabase
+    .from('project_launches').select('*').eq('project_id', projectId).order('created_at')
+  if (error) throw error
+  const rows = (data ?? []) as unknown as Row[]
+  const byId = rows.find(r => r.id === ref)
+  if (byId) return byId
+  const s = ref.trim().toLowerCase()
+  const matches = rows.filter(r => String(r.label ?? '').toLowerCase().includes(s))
+  if (matches.length === 0) return null
+  if (matches.length === 1) return matches[0]
+  return { ambiguous: matches.map(r => ({ id: r.id as string, label: String(r.label ?? r.id) })) }
+}
+
+export async function listLaunchesForProject(projectId: string): Promise<LaunchView[]> {
+  const supabase = createAdminClient()
+  const { data: launches, error } = await supabase
+    .from('project_launches').select('id, project_id, label, launch_date, target').eq('project_id', projectId).order('created_at')
+  if (error) throw error
+  const ls = launches ?? []
+  if (ls.length === 0) return []
+  const { data: sup, error: sErr } = await supabase
+    .from('project_suppliers').select('id, launch_id, supplier_id, cpi, completes_cap, n_collected')
+    .in('launch_id', ls.map(l => l.id)).order('created_at')
+  if (sErr) throw sErr
+  const names = await supplierNames(supabase, (sup ?? []).map(r => r.supplier_id))
+  return ls.map(l => ({
+    id: l.id, project_id: l.project_id, label: l.label, launch_date: l.launch_date, target: l.target,
+    suppliers: (sup ?? []).filter(r => r.launch_id === l.id).map(r => ({
+      id: r.id, supplier_id: r.supplier_id, name: names.get(r.supplier_id) ?? '', cpi: r.cpi, cap: r.completes_cap, n_collected: r.n_collected,
+    })),
+  }))
+}
+
+export async function runUpdateLaunch(opts: {
+  launchId: string; projectId: string; label?: string | null; launchDate?: string | null
+  target?: number | null; suppliers?: LaunchSupplierPatch[]; createdBy: string
+}): Promise<void> {
+  const supabase = createAdminClient()
+  const patch: Database['public']['Tables']['project_launches']['Update'] = {}
+  if (opts.label !== undefined) patch.label = opts.label
+  if (opts.launchDate !== undefined) patch.launch_date = opts.launchDate
+  if (opts.target !== undefined) patch.target = opts.target
+  if (Object.keys(patch).length > 0) {
+    const { error } = await supabase.from('project_launches').update(patch).eq('id', opts.launchId)
+    if (error) throw new Error(error.message)
+  }
+  if (opts.suppliers && opts.suppliers.length > 0) {
+    const { data: existing, error: exErr } = await supabase
+      .from('project_suppliers').select('id, supplier_id, cpi, completes_cap, n_collected').eq('launch_id', opts.launchId)
+    if (exErr) throw new Error(exErr.message)
+    const names = await supplierNames(supabase, (existing ?? []).map(r => r.supplier_id))
+    for (const s of opts.suppliers) {
+      const key = s.name.trim().toLowerCase()
+      const match = (existing ?? []).find(r => (names.get(r.supplier_id) ?? '').toLowerCase() === key)
+      if (match) {
+        const p: Database['public']['Tables']['project_suppliers']['Update'] = {}
+        if (s.cpi !== undefined) p.cpi = s.cpi
+        if (s.cap !== undefined) p.completes_cap = s.cap ?? 0
+        if (s.n_collected !== undefined) p.n_collected = s.n_collected
+        if (Object.keys(p).length > 0) {
+          const { error } = await supabase.from('project_suppliers').update(p).eq('id', match.id)
+          if (error) throw new Error(error.message)
+        }
+      } else {
+        const supplier_id = await resolveOrCreateSupplier(s.name, opts.createdBy)
+        const { error } = await supabase.from('project_suppliers').insert({
+          project_id: opts.projectId, launch_id: opts.launchId, supplier_id,
+          cpi: s.cpi ?? 0, completes_cap: s.cap ?? 0, n_collected: s.n_collected ?? 0, created_by: opts.createdBy,
+        })
+        if (error) throw new Error(error.message)
+      }
+    }
+  }
+}
+
+export async function runRemoveLaunch(launchId: string): Promise<void> {
+  const supabase = createAdminClient()
+  // Remove child supplier rows first (each delete triggers the spend recompute), then the launch.
+  const { error: sErr } = await supabase.from('project_suppliers').delete().eq('launch_id', launchId)
+  if (sErr) throw new Error(sErr.message)
+  const { error } = await supabase.from('project_launches').delete().eq('id', launchId)
+  if (error) throw new Error(error.message)
+}
+
 export async function runRenameClient(clientId: string, newName: string, actor: string): Promise<void> {
   const supabase = createAdminClient()
   const { error } = await supabase.rpc('mcp_rename_client', {
