@@ -23,9 +23,9 @@ export interface DateCellProps {
   value: string | null
   mode?: 'date' | 'datetime'
   onSave: (iso: string | null) => void
-  /** Render the display value in the warning color. */
-  warn?: boolean
-  /** Appended after the display value, e.g. " · overdue". */
+  /** Tailwind text-color class for the display value (due/deliver proximity tint). */
+  toneClass?: string
+  /** Appended after the display value, e.g. " · Due today". Inherits toneClass. */
   suffix?: string
 }
 
@@ -61,7 +61,7 @@ export function DateCell({
   value,
   mode = 'date',
   onSave,
-  warn = false,
+  toneClass,
   suffix,
 }: DateCellProps) {
   const [editing, setEditing] = useState(false)
@@ -204,9 +204,9 @@ export function DateCell({
   return (
     <FieldCell label={label} tooltip={tooltip} editable onEdit={begin} saved={saved}>
       {hasValue ? (
-        <span className={cn('truncate', warn && 'text-amber-600 dark:text-amber-400')}>
+        <span className={cn('truncate', toneClass)}>
           {display}
-          {suffix && <span className="text-muted-foreground">{suffix}</span>}
+          {suffix}
         </span>
       ) : (
         <span className="text-muted-foreground/50">— set</span>

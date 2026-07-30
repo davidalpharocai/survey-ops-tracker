@@ -1,8 +1,8 @@
 'use client'
 import Link from 'next/link'
 import {
-  getDueDateStatus,
   getDueUrgency,
+  urgencyTextClass,
   formatDate,
   daysOverdue,
   urgencyPrefix,
@@ -16,10 +16,12 @@ import { useLatestSubmissionStatuses } from '@/lib/hooks/useSubmissions'
 
 // Due-date urgency: a neutral card box plus a strong colored LEFT bar (so a
 // board full of overdue cards doesn't become an undifferentiated wall of red).
+// Heat gradient by proximity: overdue=red, today=orange, 1 day=amber, 2 days=yellow.
 const URGENCY_BORDER: Record<string, string> = {
-  overdue: 'border border-border border-l-4 border-l-red-500',
-  tomorrow: 'border border-border border-l-4 border-l-orange-500',
-  twodays: 'border border-border border-l-4 border-l-amber-300 dark:border-l-amber-400/70',
+  overdue: 'border border-border border-l-4 border-l-red-600',
+  today: 'border border-border border-l-4 border-l-orange-500',
+  tomorrow: 'border border-border border-l-4 border-l-amber-500',
+  twodays: 'border border-border border-l-4 border-l-yellow-500 dark:border-l-yellow-400',
 }
 // Badly overdue (> BADLY_OVERDUE_DAYS late): escalate back to a heavy full-red
 // border so the worst projects still shout.
@@ -65,7 +67,6 @@ export function ProjectCard({ project, onClick, isNew }: ProjectCardProps) {
   const delivered = project.board_column === 'Delivery'
   // Hold takes precedence over NEW if both somehow apply
   const showNew = !!isNew && !onHold && !cancelled
-  const dueDateStatus = getDueDateStatus(project.due_date)
   // Closed, Cancelled, Hold, and Delivered projects drop the due-date urgency
   // treatment — they're done, cancelled, or paused, so red/orange/amber (and
   // "overdue") would be misleading.
@@ -241,13 +242,9 @@ export function ProjectCard({ project, onClick, isNew }: ProjectCardProps) {
         {project.due_date && (
           <span
             className={`text-xs ${
-              onHold || closed || delivered
+              onHold || closed || cancelled || delivered
                 ? 'text-muted-foreground'
-                : dueDateStatus === 'overdue'
-                ? 'text-red-600 dark:text-red-400'
-                : dueDateStatus === 'soon'
-                ? 'text-amber-600 dark:text-amber-400'
-                : 'text-muted-foreground'
+                : urgencyTextClass(urgency) || 'text-muted-foreground'
             }`}
           >
             {/* Word label so urgency isn't conveyed by color alone */}

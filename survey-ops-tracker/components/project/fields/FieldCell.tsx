@@ -71,7 +71,7 @@ export function FieldCell({
         canEdit && 'hover:bg-muted/40',
       )}
     >
-      <div className="flex items-center gap-1 text-[11px] uppercase tracking-wide text-muted-foreground">
+      <div className="flex items-center gap-1 text-[12px] uppercase tracking-wide text-muted-foreground">
         <span className="truncate">{label}</span>
         {tooltip && <InfoTooltip text={tooltip} />}
         {saved && (
@@ -89,12 +89,12 @@ export function FieldCell({
           type="button"
           onClick={onEdit}
           title="Click to edit"
-          className="mt-0.5 flex w-full items-center text-left text-[13px] text-foreground cursor-pointer"
+          className="mt-0.5 flex w-full items-center text-left text-[14.3px] text-foreground cursor-pointer"
         >
           <span className="min-w-0 flex-1 truncate">{children}</span>
         </button>
       ) : (
-        <div className="mt-0.5 text-[13px] text-foreground">{children}</div>
+        <div className="mt-0.5 text-[14.3px] text-foreground">{children}</div>
       )}
 
       {canEdit && (

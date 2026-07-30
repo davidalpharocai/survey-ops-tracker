@@ -1,7 +1,8 @@
 const URGENCY_ITEMS = [
-  { classes: 'border border-border border-l-4 border-l-red-500', label: 'Due today / overdue' },
-  { classes: 'border border-border border-l-4 border-l-orange-500', label: 'Due tomorrow' },
-  { classes: 'border border-border border-l-4 border-l-amber-300 dark:border-l-amber-400/70', label: 'Due in 2 days' },
+  { classes: 'border border-border border-l-4 border-l-red-600', label: 'Overdue' },
+  { classes: 'border border-border border-l-4 border-l-orange-500', label: 'Due today' },
+  { classes: 'border border-border border-l-4 border-l-amber-500', label: 'Due in 1 day' },
+  { classes: 'border border-border border-l-4 border-l-yellow-500 dark:border-l-yellow-400', label: 'Due in 2 days' },
 ]
 
 const TYPE_ITEMS = [

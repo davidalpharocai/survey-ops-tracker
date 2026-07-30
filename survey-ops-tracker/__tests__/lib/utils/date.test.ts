@@ -18,8 +18,11 @@ describe('getDueUrgency', () => {
   it('returns overdue for past date', () => {
     expect(getDueUrgency('2020-01-01')).toBe('overdue')
   })
-  it('returns overdue for today', () => {
-    expect(getDueUrgency(daysFromNow(0))).toBe('overdue')
+  it('returns today for today (not overdue — today has not passed)', () => {
+    expect(getDueUrgency(daysFromNow(0))).toBe('today')
+  })
+  it('returns overdue for yesterday', () => {
+    expect(getDueUrgency(daysFromNow(-1))).toBe('overdue')
   })
   it('returns tomorrow for 1 day out', () => {
     expect(getDueUrgency(daysFromNow(1))).toBe('tomorrow')
@@ -38,6 +41,9 @@ describe('getDueDateStatus', () => {
   })
   it('returns overdue for past date', () => {
     expect(getDueDateStatus('2020-01-01')).toBe('overdue')
+  })
+  it('returns soon (not overdue) for today', () => {
+    expect(getDueDateStatus(daysFromNow(0))).toBe('soon')
   })
   it('returns soon for date 2 days from now', () => {
     expect(getDueDateStatus(daysFromNow(2))).toBe('soon')
@@ -62,10 +68,10 @@ describe('matchesDuePreset', () => {
       expect(matchesDuePreset(null, preset)).toBe(false)
     }
   })
-  it('overdue matches today or earlier (aligns with the overdue card badge)', () => {
+  it('overdue matches strictly-past dates (today is its own bucket now)', () => {
     expect(matchesDuePreset('2020-01-01', 'overdue')).toBe(true)
     expect(matchesDuePreset(daysFromNow(-1), 'overdue')).toBe(true)
-    expect(matchesDuePreset(daysFromNow(0), 'overdue')).toBe(true)
+    expect(matchesDuePreset(daysFromNow(0), 'overdue')).toBe(false)
     expect(matchesDuePreset(daysFromNow(1), 'overdue')).toBe(false)
   })
   it('today matches only the current day', () => {
