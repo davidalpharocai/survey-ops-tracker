@@ -148,7 +148,7 @@ export default async function ConnectPage() {
           Turn on automatic logging of your client emails into each project&apos;s Activity timeline.
           Only mail from a known client contact or domain is forwarded — and it&apos;s a copy, so your
           own inbox is untouched; personal, HR, and finance mail is never captured. Anything uncertain
-          waits in <a href="/email-review" className="text-primary hover:underline">Email Review</a> for
+          waits in <a href="/review" className="text-primary hover:underline">Review</a> for
           one click.
         </p>
         <ol className="list-decimal list-inside space-y-1.5 text-sm text-muted-foreground mt-3">

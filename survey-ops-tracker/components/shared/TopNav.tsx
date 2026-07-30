@@ -32,7 +32,7 @@ export function TopNav() {
   const [moreOpen, setMoreOpen] = useState(false)
   const moreRef = useRef<HTMLDivElement>(null)
 
-  // Pending Email Review + overdue Rerun counts → badges. Fail soft to 0.
+  // Pending Deliverables-review + Email-review + overdue Rerun counts → badges. Fail soft to 0.
   const { data: emailPending = 0 } = useQuery({
     queryKey: ['email-review-count'],
     queryFn: async () => {
@@ -40,6 +40,18 @@ export function TopNav() {
         .from('email_inbox')
         .select('id', { count: 'exact', head: true })
         .in('status', ['review', 'pending_no_project'])
+      return count ?? 0
+    },
+    staleTime: 60_000,
+  })
+  const { data: delivPending = 0 } = useQuery({
+    queryKey: ['deliverables-review-count'],
+    queryFn: async () => {
+      const { count } = await createClient()
+        .from('deliverables')
+        .select('id', { count: 'exact', head: true })
+        .in('status', ['review', 'unsorted'])
+        .is('deleted_at', null)
       return count ?? 0
     },
     staleTime: 60_000,
@@ -76,8 +88,9 @@ export function TopNav() {
 
   const tabs: Tab[] = [
     { href: '/calendar', label: 'Calendar', icon: '📅', title: 'Calendar — every dated event on a month grid, filterable by captain, type, client, and more' },
-    { href: '/deliverables', label: 'Deliverables Review', icon: '📦', title: 'Deliverables Review — emailed deliverables we couldn’t auto-file land here to confirm the client/project (most auto-file to the Shared Drive)' },
-    { href: '/email-review', label: 'Email Review', icon: '✉️', title: 'Email Review — client emails we couldn’t tie to one project; file or ignore them', badge: emailPending },
+    // Combined Deliverables + Email review — rendered specially below (two icons,
+    // two counts). Kept in the tabs array so it holds its position after Calendar.
+    { href: '/review', label: 'Review', icon: '📦', title: 'Review — emailed deliverables we couldn’t auto-file, and client emails we couldn’t tie to a project, in two columns to file or dismiss' },
     { href: '/reruns', label: 'Reruns', icon: '🔁', title: 'Rerun Radar — recurring & one-off reruns, bucketed overdue / upcoming / done', badge: rerunOverdue },
     { href: '/admin', label: 'Admin', icon: '⚙️', title: 'Admin — system links, client ids, roster, recently deleted, and data health' },
   ]
@@ -111,22 +124,45 @@ export function TopNav() {
       </Link>
 
       <div className="flex items-center gap-0.5 flex-wrap">
-        {tabs.map(t => (
-          <Link key={t.href} href={t.href} title={t.title} className={tabClass(t.href)}>
-            <span aria-hidden="true">{t.icon}</span> {t.label}
-            {!!t.badge && t.badge > 0 && (
-              <span
-                className={`ml-0.5 text-[12px] font-medium px-1.5 py-0.5 rounded-full ${
-                  t.href === '/reruns'
-                    ? 'bg-red-500/15 text-red-600 dark:text-red-400'
-                    : 'bg-primary/15 text-primary'
-                }`}
-              >
-                {t.badge}
-              </span>
-            )}
-          </Link>
-        ))}
+        {tabs.map(t =>
+          t.href === '/review' ? (
+            // Combined review item: "📦 Deliverables [#] / ✉️ Email [#] Review".
+            // Each count is a badge, shown only when > 0.
+            <Link key={t.href} href={t.href} title={t.title} className={tabClass(t.href)}>
+              <span aria-hidden="true">📦</span>
+              <span>Deliverables</span>
+              {delivPending > 0 && (
+                <span className="text-[12px] font-medium px-1.5 py-0.5 rounded-full bg-primary/15 text-primary">
+                  {delivPending}
+                </span>
+              )}
+              <span className="text-muted-foreground/50">/</span>
+              <span aria-hidden="true">✉️</span>
+              <span>Email</span>
+              {emailPending > 0 && (
+                <span className="text-[12px] font-medium px-1.5 py-0.5 rounded-full bg-primary/15 text-primary">
+                  {emailPending}
+                </span>
+              )}
+              <span>Review</span>
+            </Link>
+          ) : (
+            <Link key={t.href} href={t.href} title={t.title} className={tabClass(t.href)}>
+              <span aria-hidden="true">{t.icon}</span> {t.label}
+              {!!t.badge && t.badge > 0 && (
+                <span
+                  className={`ml-0.5 text-[12px] font-medium px-1.5 py-0.5 rounded-full ${
+                    t.href === '/reruns'
+                      ? 'bg-red-500/15 text-red-600 dark:text-red-400'
+                      : 'bg-primary/15 text-primary'
+                  }`}
+                >
+                  {t.badge}
+                </span>
+              )}
+            </Link>
+          )
+        )}
 
         {/* More — low-frequency / external destinations */}
         <div ref={moreRef} className="relative">
