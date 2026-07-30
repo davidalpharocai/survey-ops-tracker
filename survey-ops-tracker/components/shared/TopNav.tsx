@@ -76,7 +76,7 @@ export function TopNav() {
 
   const tabs: Tab[] = [
     { href: '/calendar', label: 'Calendar', icon: '📅', title: 'Calendar — every dated event on a month grid, filterable by captain, type, client, and more' },
-    { href: '/deliverables', label: 'Deliverables', icon: '📦', title: 'Deliverables depository — files and links sent to clients, filed to the Shared Drive' },
+    { href: '/deliverables', label: 'Deliverables Review', icon: '📦', title: 'Deliverables Review — emailed deliverables we couldn’t auto-file land here to confirm the client/project (most auto-file to the Shared Drive)' },
     { href: '/email-review', label: 'Email Review', icon: '✉️', title: 'Email Review — client emails we couldn’t tie to one project; file or ignore them', badge: emailPending },
     { href: '/reruns', label: 'Reruns', icon: '🔁', title: 'Rerun Radar — recurring & one-off reruns, bucketed overdue / upcoming / done', badge: rerunOverdue },
     { href: '/admin', label: 'Admin', icon: '⚙️', title: 'Admin — system links, client ids, roster, recently deleted, and data health' },
