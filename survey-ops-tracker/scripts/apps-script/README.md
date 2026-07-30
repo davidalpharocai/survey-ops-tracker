@@ -37,3 +37,9 @@ review queue) and replies "Filed ✓".
 - The script is intentionally dumb; all matching/filing logic is in the app. Retries are safe
   (the server de-dupes by Gmail message id).
 - Attachments over ~25 MB are skipped by the script — share those as a Drive link instead.
+- **Self-BCC is handled specially.** When you BCC/CC `deliverables@` on an email you send *from the
+  same account the Group delivers into*, Gmail won't deliver the Group's echo of your own message
+  back to your own inbox — so it never gets the `Deliverables` label and the inbox scan can't see it.
+  The script therefore also scans that account's **Sent** folder for outbound mail you BCC'd/CC'd to
+  `deliverables@` (`getBcc()` is readable on your own sent copy). Forwards address `deliverables@` in
+  **To** and are handled by the inbox scan, so the Sent scan matches Bcc/Cc only, to avoid double work.
