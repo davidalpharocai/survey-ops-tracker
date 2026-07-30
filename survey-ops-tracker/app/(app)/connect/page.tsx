@@ -129,7 +129,8 @@ export default async function ConnectPage() {
         <h3 className={heading}>What you can ask</h3>
         <p className="text-sm text-muted-foreground leading-relaxed">
           <strong className="text-foreground">Do:</strong> &quot;Log a 500-count blast on
-          PR00123&quot; · &quot;Push PR00119&apos;s due date to next Friday&quot; · &quot;Create
+          PR00123&quot; · &quot;Log PR00282&apos;s launch: DISQO $0.75, Fusion $0.65, target
+          1,350&quot; · &quot;Push PR00119&apos;s due date to next Friday&quot; · &quot;Create
           a B2B project for Coatue, 500 responses, due July 20&quot;. Every change or new record
           gets previewed before anything writes — nothing changes silently, and it can&apos;t
           bypass a compliance gate, touch internal projects, delete, or merge.
