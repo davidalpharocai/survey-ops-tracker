@@ -15,7 +15,15 @@ import {
   runAddSegment, runUpdateSegment, runRemoveSegment,
   runRenameClient, runCreateProject,
   pickProjectPatch, diffSummary, stageColumnsFor,
+  runLogLaunch, resolveLaunch, listLaunchesForProject, runUpdateLaunch, runRemoveLaunch,
+  type LaunchView, type LaunchSupplierInput, type LaunchSupplierPatch,
 } from '@/lib/mcp/writes'
+import {
+  actualCost, estimateRange, totalCollected,
+  projectActualCost, projectEstimateRange, projectCollected,
+  type SupplierLine,
+} from '@/lib/utils/suppliers'
+import { fmtNum } from '@/lib/utils/number'
 import { cloneProject } from '@/lib/server/clone'
 import {
   confirmable, describeChanges, fmtChangeVal, todayEastern, fetchDocTitle,
@@ -48,6 +56,34 @@ export interface AssistantTool {
    *  a one-line human summary of what committing will do (used by the in-app confirm UI). */
   previewSummary?: (args: Record<string, unknown>) => string
   handler: (args: Record<string, unknown>, ctx: ToolCtx, meta: ToolMeta) => Promise<unknown>
+}
+
+// ---- log_launch helpers: launch economics + preview text (shared by log_launch/list_launches) ----
+const money = (n: number) => `$${n.toFixed(2)}`
+function launchLines(l: LaunchView): SupplierLine[] {
+  return l.suppliers.map(s => ({ cpi: s.cpi, completes_cap: s.cap, n_collected: s.n_collected }))
+}
+/** Actual / collected / estimate-range for one launch, as scalars for structured output. */
+function launchEconOut(l: LaunchView) {
+  const lines = launchLines(l)
+  const est = estimateRange(l.target ?? null, lines)
+  return {
+    actual_spend: actualCost(lines),
+    collected: totalCollected(lines),
+    est_low: est?.low ?? null,
+    est_high: est?.high ?? null,
+  }
+}
+function renderLaunch(l: LaunchView): string {
+  const lines = launchLines(l)
+  const est = estimateRange(l.target ?? null, lines)
+  const head = `  ${l.label || 'Launch'}${l.launch_date ? ` — ${l.launch_date}` : ''}${l.target ? ` · target ${fmtNum(l.target)}` : ''}`
+  const rows = l.suppliers.map(
+    s => `    - ${s.name}: ${money(s.cpi)}/complete · cap ${s.cap || '—'} · ${fmtNum(s.n_collected)} collected`,
+  )
+  const foot = `  actual ${money(actualCost(lines))} (${fmtNum(totalCollected(lines))} collected)` +
+    (est ? ` · est ${money(est.low)}–${money(est.high)}` : '')
+  return [head, ...rows, foot].join('\n')
 }
 
 export const TOOLS: AssistantTool[] = [
@@ -822,6 +858,183 @@ export const TOOLS: AssistantTool[] = [
           })
           meta.detail = { created: { id: row.id, people: row.people, completes: row.completes, bid: row.bid } }
           return { ok: true, blast: { id: row.id, people: row.people, completes: row.completes, bid: row.bid, blast_at: row.blast_at } }
+        }
+      )
+    },
+  },
+
+  {
+    name: 'log_launch',
+    description:
+      "Log a PS launch (a fielding wave) on a project with its sample-supplier rows — each supplier's name, $/complete (CPI, in dollars e.g. 0.75), an optional per-supplier cap, and # collected so far. A PS project can have several launches; call once per launch. Actual spend = Σ(CPI × collected) — pay per complete, like blasts — and rolls up to the project automatically. Pass a target (goal N for the launch) so the pre-fielding estimate range shows. Supplier names not already in the roster are added. Preview first; confirm to apply.",
+    kind: 'write',
+    schema: {
+      project: z.string(),
+      label: z.string().max(120).optional(),
+      launch_date: z.string().optional(),
+      target: z.number().int().positive().optional(),
+      suppliers: z.array(z.object({
+        name: z.string().min(1),
+        cpi: z.number().min(0),
+        cap: z.number().int().positive().optional(),
+        n_collected: z.number().int().min(0).default(0),
+      })).min(1),
+      confirm: z.boolean().optional(),
+    },
+    handler: async (rawArgs, ctx, meta) => {
+      const args = rawArgs as {
+        project: string; label?: string; launch_date?: string; target?: number
+        suppliers: { name: string; cpi: number; cap?: number; n_collected?: number }[]; confirm?: boolean
+      }
+      const { userEmail } = ctx
+      const p = await resolveProjectWritable(args.project)
+      if (!p) return { error: 'Project not found.' }
+      if ('error' in p) return p
+      if ('ambiguous' in p) return p
+      meta.project_id = p.id as string
+
+      const suppliers: LaunchSupplierInput[] = args.suppliers.map(s => ({
+        name: s.name, cpi: s.cpi, cap: s.cap ?? null, n_collected: s.n_collected ?? 0,
+      }))
+      const lines: SupplierLine[] = suppliers.map(s => ({ cpi: s.cpi, completes_cap: s.cap ?? 0, n_collected: s.n_collected }))
+      const target = args.target ?? null
+      const est = estimateRange(target, lines)
+      const actual = actualCost(lines)
+
+      return confirmable(
+        args,
+        async () => ({
+          summary:
+            `Log launch${args.label ? ` "${args.label}"` : ''} on ${p.project_code}: ${suppliers.length} suppliers` +
+            (target ? `, target ${fmtNum(target)}` : '') +
+            ` — actual ${money(actual)}` + (est ? `, est ${money(est.low)}–${money(est.high)}` : ''),
+          target, suppliers, est_low: est?.low ?? null, est_high: est?.high ?? null, actual_spend: actual,
+        }),
+        async () => {
+          const launch = await runLogLaunch({
+            projectId: p.id as string, label: args.label ?? null, launchDate: args.launch_date ?? null,
+            target, suppliers, createdBy: userEmail.split('@')[0],
+          })
+          meta.detail = { created_launch: { id: launch.id, label: launch.label, suppliers: launch.suppliers.length } }
+          return { ok: true, launch, economics: launchEconOut(launch) }
+        }
+      )
+    },
+  },
+  {
+    name: 'list_launches',
+    description:
+      "List a project's PS launches with their supplier rows, actual spend (Σ CPI × collected), and pre-fielding estimate range (target × cheapest…priciest CPI), plus the project rollup.",
+    kind: 'read',
+    schema: { project: z.string() },
+    handler: async (rawArgs) => {
+      const args = rawArgs as { project: string }
+      const resolved = await data.resolveProject(args.project)
+      if (resolved === null) return { error: `No project found matching "${args.project}".` }
+      if ('ambiguous' in resolved) return { note: 'Multiple projects match — specify the project code.', candidates: resolved.ambiguous }
+      const launches = await listLaunchesForProject(resolved.id as string)
+      const lite = launches.map(l => ({ target: l.target ?? null, lines: launchLines(l) }))
+      const projActual = projectActualCost(lite)
+      const projEst = projectEstimateRange(lite)
+      const projCollected = projectCollected(lite)
+      const summary = launches.length
+        ? `${launches.length} launch(es) on ${resolved.project_code}. Project actual ${money(projActual)}` +
+          (projEst ? `, est ${money(projEst.low)}–${money(projEst.high)}` : '') +
+          `:\n${launches.map(renderLaunch).join('\n\n')}`
+        : `No launches logged on ${resolved.project_code}.`
+      return {
+        ok: true,
+        project: { id: resolved.id, project_code: resolved.project_code, project_name: resolved.project_name },
+        launches: launches.map(l => ({ ...l, economics: launchEconOut(l) })),
+        project_actual_spend: projActual, project_collected: projCollected,
+        project_est_low: projEst?.low ?? null, project_est_high: projEst?.high ?? null,
+        summary,
+      }
+    },
+  },
+  {
+    name: 'update_launch',
+    description:
+      "Update a PS launch — its label / launch_date / target, and/or upsert supplier rows by name (only the fields you pass change; supplier names not present are added). Identify the launch by its label or id. Preview first; confirm to apply.",
+    kind: 'write',
+    schema: {
+      project: z.string(),
+      launch_ref: z.string(),
+      label: z.string().max(120).optional(),
+      launch_date: z.string().optional(),
+      target: z.number().int().positive().nullable().optional(),
+      suppliers: z.array(z.object({
+        name: z.string().min(1),
+        cpi: z.number().min(0).optional(),
+        cap: z.number().int().positive().nullable().optional(),
+        n_collected: z.number().int().min(0).optional(),
+      })).optional(),
+      confirm: z.boolean().optional(),
+    },
+    handler: async (rawArgs, ctx, meta) => {
+      const args = rawArgs as {
+        project: string; launch_ref: string; label?: string; launch_date?: string; target?: number | null
+        suppliers?: { name: string; cpi?: number; cap?: number | null; n_collected?: number }[]; confirm?: boolean
+      }
+      const { userEmail } = ctx
+      const p = await resolveProjectWritable(args.project)
+      if (!p) return { error: 'Project not found.' }
+      if ('error' in p) return p
+      if ('ambiguous' in p) return p
+      meta.project_id = p.id as string
+      const launch = await resolveLaunch(p.id as string, args.launch_ref)
+      if (!launch) return { error: `No launch found matching "${args.launch_ref}" on this project.` }
+      if ('ambiguous' in launch) return { note: 'Multiple launches match — be more specific.', candidates: launch.ambiguous }
+
+      const desc = [
+        args.label !== undefined ? `label → "${args.label}"` : null,
+        args.launch_date !== undefined ? `date → ${args.launch_date}` : null,
+        args.target !== undefined ? `target → ${args.target ?? '—'}` : null,
+        args.suppliers?.length ? `${args.suppliers.length} supplier row(s) upserted` : null,
+      ].filter(Boolean).join(', ')
+      if (!desc) return { needs: 'a change', message: 'Specify at least one of: label, launch_date, target, suppliers.' }
+
+      return confirmable(
+        args,
+        async () => ({ summary: `Update launch "${String(launch.label ?? launch.id)}" on ${p.project_code}: ${desc}` }),
+        async () => {
+          await runUpdateLaunch({
+            launchId: launch.id as string, projectId: p.id as string,
+            label: args.label, launchDate: args.launch_date, target: args.target,
+            suppliers: args.suppliers as LaunchSupplierPatch[] | undefined, createdBy: userEmail.split('@')[0],
+          })
+          const fresh = (await listLaunchesForProject(p.id as string)).find(l => l.id === launch.id) ?? null
+          meta.detail = { updated_launch: { id: launch.id } }
+          return { ok: true, launch: fresh, economics: fresh ? launchEconOut(fresh) : null }
+        }
+      )
+    },
+  },
+  {
+    name: 'remove_launch',
+    description:
+      "Remove a PS launch (and its supplier rows) from a project. Identify it by label or id. Destructive — preview first; confirm to apply.",
+    kind: 'write',
+    schema: { project: z.string(), launch_ref: z.string(), confirm: z.boolean().optional() },
+    handler: async (rawArgs, ctx, meta) => {
+      const args = rawArgs as { project: string; launch_ref: string; confirm?: boolean }
+      const { userEmail } = ctx
+      const p = await resolveProjectWritable(args.project)
+      if (!p) return { error: 'Project not found.' }
+      if ('error' in p) return p
+      if ('ambiguous' in p) return p
+      meta.project_id = p.id as string
+      const launch = await resolveLaunch(p.id as string, args.launch_ref)
+      if (!launch) return { error: `No launch found matching "${args.launch_ref}" on this project.` }
+      if ('ambiguous' in launch) return { note: 'Multiple launches match — be more specific.', candidates: launch.ambiguous }
+
+      return confirmable(
+        args,
+        async () => ({ summary: `Remove launch "${String(launch.label ?? launch.id)}" and its suppliers from ${p.project_code}` }),
+        async () => {
+          await runRemoveLaunch(launch.id as string)
+          meta.detail = { removed_launch: { id: launch.id, label: launch.label ?? null }, by: userEmail }
+          return { ok: true, removed: String(launch.label ?? launch.id) }
         }
       )
     },
