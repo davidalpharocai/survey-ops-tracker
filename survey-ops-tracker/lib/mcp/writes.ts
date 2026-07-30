@@ -445,6 +445,11 @@ export async function resolveLaunch(
   const byId = rows.find(r => r.id === ref)
   if (byId) return byId
   const s = ref.trim().toLowerCase()
+  // Exact label match wins before any substring match — so a Survey# used as the
+  // launch label resolves precisely as a stable unique key (re-dropping the same
+  // supplier screenshot updates that launch instead of ambiguously matching).
+  const byExactLabel = rows.find(r => String(r.label ?? '').trim().toLowerCase() === s)
+  if (byExactLabel) return byExactLabel
   const matches = rows.filter(r => String(r.label ?? '').toLowerCase().includes(s))
   if (matches.length === 0) return null
   if (matches.length === 1) return matches[0]

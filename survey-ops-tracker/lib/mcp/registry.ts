@@ -866,7 +866,7 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'log_launch',
     description:
-      "Log a PS launch (a fielding wave) on a project with its sample-supplier rows — each supplier's name, $/complete (CPI, in dollars e.g. 0.75), an optional per-supplier cap, and # collected so far. A PS project can have several launches; call once per launch. Actual spend = Σ(CPI × collected) — pay per complete, like blasts — and rolls up to the project automatically. Pass a target (goal N for the launch) so the pre-fielding estimate range shows. Supplier names not already in the roster are added. Preview first; confirm to apply.",
+      "Log a PS launch (a fielding wave) on a project with its sample-supplier rows — each supplier's name, $/complete (CPI, in dollars e.g. 0.75), an optional per-supplier cap, and # collected so far. A PS project can have several launches; call once per launch. Actual spend = Σ(CPI × collected) — pay per complete, like blasts — and rolls up to the project automatically. Pass a target (goal N for the launch) so the pre-fielding estimate range shows. Supplier names not already in the roster are added. If the source has a Survey# (e.g. from a supplier-panel screenshot), pass it as `label` — it then serves as the stable unique key to update this same launch later (re-import = upsert, not a duplicate). Preview first; confirm to apply.",
     kind: 'write',
     schema: {
       project: z.string(),
@@ -955,7 +955,7 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'update_launch',
     description:
-      "Update a PS launch — its label / launch_date / target, and/or upsert supplier rows by name (only the fields you pass change; supplier names not present are added). Identify the launch by its label or id. Preview first; confirm to apply.",
+      "Update a PS launch — its label / launch_date / target, and/or upsert supplier rows by name (only the fields you pass change; supplier names not present are added). Identify the launch by its label or id — an exact label match wins, so the Survey# used as the launch's label works as a stable key (re-importing a supplier screenshot updates the same launch). Preview first; confirm to apply.",
     kind: 'write',
     schema: {
       project: z.string(),
