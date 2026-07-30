@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react'
 import { cn } from '@/lib/utils'
-import { getDueUrgency } from '@/lib/utils/date'
+import { getDueUrgency, urgencyTextClass, urgencySuffix } from '@/lib/utils/date'
 import { useUpdateProject, type SurveyProject } from '@/lib/hooks/useProjects'
 import type { Database } from '@/lib/supabase/types'
 import { FieldSection, TextCell, DateCell, SelectCell } from './fields'
@@ -11,7 +11,7 @@ import { SuppliersWidget } from './SuppliersWidget'
 import { BlastBlocks } from './BlastBlocks'
 import { BudgetWidget } from './BudgetWidget'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
-import { OccamMark } from '@/components/shared/OccamMark'
+import { OccamWordmark } from '@/components/shared/OccamWordmark'
 
 type ProjectUpdate = Database['public']['Tables']['survey_projects']['Update']
 
@@ -53,10 +53,13 @@ export function OverviewFieldGrid({ project }: { project: SurveyProject }) {
   const updateProject = useUpdateProject()
   const save = (updates: ProjectUpdate) => updateProject.mutate({ id: project.id, updates })
 
-  // Delivered projects (board_column 'Delivery') drop the overdue treatment —
-  // same convention as the board card's due-date border.
+  // Delivered projects (board_column 'Delivery') drop the proximity treatment —
+  // the work is done, so due/delivery dates no longer warn. Both the internal
+  // Due date and the client-facing Delivery date get the same tier colors +
+  // label (overdue only once the date has actually passed).
   const delivered = project.board_column === 'Delivery'
-  const dueWarn = !!project.due_date && !delivered && getDueUrgency(project.due_date) === 'overdue'
+  const dueUrgency = delivered ? null : getDueUrgency(project.due_date)
+  const deliverUrgency = delivered ? null : getDueUrgency(project.deliver_date)
 
   return (
     <div className="flex flex-col rounded-xl border border-border bg-card p-4 shadow-sm transition-all hover:border-primary/40 hover:bg-card/70 hover:shadow-md hover:backdrop-blur-sm">
@@ -80,8 +83,8 @@ export function OverviewFieldGrid({ project }: { project: SurveyProject }) {
           tooltip={TIP.due}
           mode="date"
           value={project.due_date}
-          warn={dueWarn}
-          suffix={dueWarn ? ' · overdue' : undefined}
+          toneClass={urgencyTextClass(dueUrgency)}
+          suffix={urgencySuffix(dueUrgency, project.due_date) || undefined}
           onSave={v => save({ due_date: v })}
         />
         <DateCell
@@ -89,6 +92,8 @@ export function OverviewFieldGrid({ project }: { project: SurveyProject }) {
           tooltip={TIP.deliver}
           mode="date"
           value={project.deliver_date}
+          toneClass={urgencyTextClass(deliverUrgency)}
+          suffix={urgencySuffix(deliverUrgency, project.deliver_date) || undefined}
           onSave={v => save({ deliver_date: v })}
         />
         {project.longitudinal && (
@@ -200,8 +205,8 @@ export function OverviewFieldGrid({ project }: { project: SurveyProject }) {
             onToggle={v => save({ terminations: v })}
           />
           <FlagChip
-            label="Occam"
-            icon={<OccamMark className="h-3.5 w-3.5" />}
+            label={<OccamWordmark className="h-3 w-auto" />}
+            ariaLabel="Occam"
             value={project.occam ?? false}
             tone="sky"
             tooltip={TIP.occam}
@@ -233,13 +238,18 @@ function FlagChip({
   value,
   tone,
   icon,
+  ariaLabel,
   tooltip,
   onToggle,
 }: {
-  label: string
+  /** Text label, or a node (e.g. the Occam wordmark, where the logo IS the text). */
+  label: ReactNode
   value: boolean
   tone: 'red' | 'amber' | 'emerald' | 'sky'
-  icon: ReactNode
+  /** Leading emoji/glyph. Omit when the label node already carries the identity. */
+  icon?: ReactNode
+  /** Accessible name when `label` is a node (SVG) rather than readable text. */
+  ariaLabel?: string
   tooltip?: string
   onToggle: (next: boolean) => void
 }) {
@@ -255,13 +265,16 @@ function FlagChip({
         type="button"
         onClick={() => onToggle(!value)}
         aria-pressed={value}
+        aria-label={ariaLabel}
         className="inline-flex items-center gap-1 cursor-pointer whitespace-nowrap hover:opacity-80 transition-opacity"
       >
         {/* Leading meaning-glyph (emoji don't follow text color, so dim it
             explicitly when the flag is OFF to match the muted chip). */}
-        <span aria-hidden="true" className={cn('text-[11px] leading-none', !value && 'opacity-50 grayscale')}>
-          {icon}
-        </span>
+        {icon && (
+          <span aria-hidden="true" className={cn('text-[11px] leading-none', !value && 'opacity-50 grayscale')}>
+            {icon}
+          </span>
+        )}
         <span aria-hidden="true">{mark}</span>
         {label}
       </button>

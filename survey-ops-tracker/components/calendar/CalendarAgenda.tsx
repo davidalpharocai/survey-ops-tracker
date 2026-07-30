@@ -4,9 +4,10 @@ import { format, parseISO } from 'date-fns'
 import { EVENT_TYPE_META, type CalendarEvent } from '@/lib/calendar/events'
 
 const URGENCY_RING: Record<string, string> = {
-  overdue: 'ring-1 ring-red-500',
-  tomorrow: 'ring-1 ring-orange-500',
-  twodays: 'ring-1 ring-amber-400',
+  overdue: 'ring-1 ring-red-600',
+  today: 'ring-1 ring-orange-500',
+  tomorrow: 'ring-1 ring-amber-500',
+  twodays: 'ring-1 ring-yellow-500 dark:ring-yellow-400',
 }
 
 function todayKey(): string {

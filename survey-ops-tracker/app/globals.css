@@ -71,7 +71,7 @@
   --secondary: #e7ebf1;           /* ink-100 */
   --secondary-foreground: #010b40;
   --muted: #e7ebf1;               /* ink-100 — subtle surfaces / skeletons */
-  --muted-foreground: #5b6472;    /* ink-600 — secondary text */
+  --muted-foreground: #414a5c;    /* ink-700 — darker secondary text for sharper contrast */
   --accent: #eaf6f6;              /* teal tint — hover surfaces */
   --accent-foreground: #0076af;
   --destructive: #b42318;
@@ -107,7 +107,7 @@
   --secondary: #1b2540;
   --secondary-foreground: #e6e9f2;
   --muted: #1c2748;
-  --muted-foreground: #98a1b5;
+  --muted-foreground: #b0b9cc;    /* lighter secondary text for sharper contrast on dark */
   --accent: #10273a;              /* teal-tinted hover surface */
   --accent-foreground: #7fc4ec;
   --destructive: #e4695c;
@@ -139,6 +139,11 @@
   }
   html {
     @apply font-sans;
+    /* Global size lift ("sharper" pass): bump the ROOT font size so every
+       rem-based text size AND rem-based spacing scale together — the same effect
+       as a browser zoom, which is why it stays crisp without feeling crowded
+       (the gaps grow with the text). Dialable: 100% = old, ~110% = a full zoom. */
+    font-size: 106.25%;
   }
 }
 

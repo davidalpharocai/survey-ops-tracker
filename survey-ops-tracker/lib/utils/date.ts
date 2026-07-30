@@ -15,28 +15,48 @@ export function daysSince(iso: string | null | undefined): number {
 
 export type DueDateStatus = 'overdue' | 'soon' | 'normal' | null
 
+// "overdue" means the date has actually PASSED (strictly before today); a date
+// falling on today is not overdue — it's "soon". Mirrors getDueUrgency.
 export function getDueDateStatus(dueDate: string | null): DueDateStatus {
   if (!dueDate) return null
   const today = startOfDay(new Date())
   const due = startOfDay(parseISO(dueDate))
-  if (!isAfter(due, today)) return 'overdue'
-  if (differenceInCalendarDays(due, today) <= 3) return 'soon'
+  const days = differenceInCalendarDays(due, today)
+  if (days < 0) return 'overdue'
+  if (days <= 3) return 'soon'
   return 'normal'
 }
 
-export type DueUrgency = 'overdue' | 'tomorrow' | 'twodays' | 'normal' | null
+export type DueUrgency = 'overdue' | 'today' | 'tomorrow' | 'twodays' | 'normal' | null
 
-// Granular urgency for kanban card borders:
-// overdue = due today or already past, tomorrow = due in 1 day, twodays = due in 2 days
+// Granular proximity tiers (mirror the sheet's conditional formatting):
+//   overdue  = the date has PASSED (strictly before today)
+//   today    = due today (NOT overdue — today hasn't ended yet)
+//   tomorrow = due in 1 day, twodays = due in 2 days, else normal.
 export function getDueUrgency(dueDate: string | null): DueUrgency {
   if (!dueDate) return null
   const today = startOfDay(new Date())
   const due = startOfDay(parseISO(dueDate))
   const days = differenceInCalendarDays(due, today)
-  if (days <= 0) return 'overdue'
+  if (days < 0) return 'overdue'
+  if (days === 0) return 'today'
   if (days === 1) return 'tomorrow'
   if (days === 2) return 'twodays'
   return 'normal'
+}
+
+// Gradient text color per proximity tier — chosen to stay clearly visible in
+// BOTH light and dark. Shared by the project fields, board card, and list so a
+// tier reads the same everywhere. overdue=red, today=orange, 1d=amber, 2d=yellow.
+export const URGENCY_TEXT: Record<'overdue' | 'today' | 'tomorrow' | 'twodays', string> = {
+  overdue: 'text-red-700 dark:text-red-400',
+  today: 'text-orange-600 dark:text-orange-400',
+  tomorrow: 'text-amber-600 dark:text-amber-400',
+  twodays: 'text-yellow-700 dark:text-yellow-400',
+}
+
+export function urgencyTextClass(u: DueUrgency): string {
+  return u && u !== 'normal' ? URGENCY_TEXT[u] : ''
 }
 
 export type DueFilterPreset =
@@ -69,10 +89,10 @@ export function matchesDuePreset(
   const days = differenceInCalendarDays(due, today)
   switch (preset) {
     case 'overdue':
-      // Today or earlier — matches getDueUrgency's overdue bucket and the
-      // "⚠ Overdue" card badge, so the filter and the card colors agree. The
-      // separate 'today' preset narrows to just today.
-      return days <= 0
+      // Strictly before today — matches getDueUrgency's overdue bucket and the
+      // "⚠ Overdue" card badge, so the filter and the card colors agree. Due
+      // today is its own bucket now (the separate 'today' preset).
+      return days < 0
     case 'today':
       return days === 0
     case 'tomorrow':
@@ -114,8 +134,22 @@ export function urgencyPrefix(urgency: DueUrgency, dueDate: string | null): stri
     const d = daysOverdue(dueDate)
     return d > 1 ? `⚠ ${d}d overdue · ` : '⚠ Overdue · '
   }
+  if (urgency === 'today') return 'Due today · '
   if (urgency === 'tomorrow') return 'Due tomorrow · '
   if (urgency === 'twodays') return 'Due in 2d · '
+  return ''
+}
+
+// Suffix variant (leading ' · ', no trailing) for a date field cell, e.g.
+// 'Jul 30, 2026 · Due today'. Empty outside the warning window.
+export function urgencySuffix(urgency: DueUrgency, dueDate: string | null): string {
+  if (urgency === 'overdue') {
+    const d = daysOverdue(dueDate)
+    return d > 1 ? ` · ${d}d overdue` : ' · Overdue'
+  }
+  if (urgency === 'today') return ' · Due today'
+  if (urgency === 'tomorrow') return ' · Due tomorrow'
+  if (urgency === 'twodays') return ' · Due in 2d'
   return ''
 }
 

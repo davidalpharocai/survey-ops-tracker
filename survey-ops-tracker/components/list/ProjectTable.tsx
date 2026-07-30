@@ -1,7 +1,7 @@
 'use client'
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { formatDate, getDueUrgency, daysOverdue, urgencyPrefix, BADLY_OVERDUE_DAYS } from '@/lib/utils/date'
+import { formatDate, getDueUrgency, urgencyTextClass, daysOverdue, urgencyPrefix, BADLY_OVERDUE_DAYS } from '@/lib/utils/date'
 import { stageLabel } from '@/lib/utils/stage'
 import { fmtNum } from '@/lib/utils/number'
 import type { SlimProject } from '@/lib/hooks/useProjects'
@@ -51,9 +51,10 @@ const TYPE_BADGE: Record<string, string> = {
 // the board cards — not a full rectangle, which fused adjacent overdue rows
 // into one merged box. Badly-overdue rows additionally get a light red tint.
 const URGENCY_LEFT_BAR: Record<string, string> = {
-  overdue: 'border-l-4 border-l-red-500',
-  tomorrow: 'border-l-4 border-l-orange-500',
-  twodays: 'border-l-4 border-l-amber-400 dark:border-l-amber-400/70',
+  overdue: 'border-l-4 border-l-red-600',
+  today: 'border-l-4 border-l-orange-500',
+  tomorrow: 'border-l-4 border-l-amber-500',
+  twodays: 'border-l-4 border-l-yellow-500 dark:border-l-yellow-400',
 }
 
 interface ProjectTableProps {
@@ -259,12 +260,7 @@ export function ProjectTable({
             const complianceStatus = complianceStatuses?.get(p.id)
             const badlyOverdue = urgency === 'overdue' && daysOverdue(p.due_date) > BADLY_OVERDUE_DAYS
             const leftBar = urgency ? URGENCY_LEFT_BAR[urgency] : ''
-            const dueColor =
-              urgency === 'overdue'
-                ? 'text-red-600 dark:text-red-400'
-                : urgency === 'tomorrow' || urgency === 'twodays'
-                ? 'text-amber-600 dark:text-amber-400'
-                : 'text-muted-foreground'
+            const dueColor = urgencyTextClass(urgency) || 'text-muted-foreground'
             // Row background: badly-overdue tint wins over the zebra stripe.
             const rowBg = badlyOverdue ? 'bg-red-500/5' : i % 2 === 1 ? 'bg-muted/70' : ''
             return (
