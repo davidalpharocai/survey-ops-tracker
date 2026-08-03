@@ -1,4 +1,5 @@
 'use client'
+import { Caret } from '@/components/shared/Caret'
 import { DragDropContext, type DropResult } from '@hello-pangea/dnd'
 import { BoardColumn } from './BoardColumn'
 import { useRouter } from 'next/navigation'
@@ -67,7 +68,7 @@ export function ScopingBoard({ projects, wrapInContext = true }: ScopingBoardPro
           title={collapsed ? 'Expand the scoping board' : 'Collapse the scoping board (your choice is remembered)'}
           className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground uppercase tracking-widest font-semibold transition-colors"
         >
-          <span>{collapsed ? '▸' : '▾'}</span>
+          <Caret open={!collapsed} className="text-foreground" />
           Scoping
         </button>
         <span className="text-xs bg-violet-500/15 text-violet-600 dark:text-violet-400 px-2 py-0.5 rounded-full">

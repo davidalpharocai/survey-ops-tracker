@@ -1,4 +1,5 @@
 'use client'
+import { Caret } from '@/components/shared/Caret'
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
@@ -109,7 +110,7 @@ function ClientComplianceCard({ client }: { client: Client }) {
         </span>
         <span className="flex items-center gap-1.5 text-xs">
           <span className={required ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'}>{status}</span>
-          <span className="text-muted-foreground/60">{open ? '▾' : '▸'}</span>
+          <Caret open={open} className="text-foreground" />
         </span>
       </button>
       {open && (

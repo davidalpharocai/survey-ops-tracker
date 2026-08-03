@@ -1,4 +1,5 @@
 'use client'
+import { Caret } from '@/components/shared/Caret'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useReruns, useSyncReruns, type RerunRow } from '@/lib/hooks/useReruns'
@@ -400,7 +401,7 @@ function CollapsibleSection({
           aria-expanded={open}
           className="flex items-center gap-2 hover:text-foreground transition-colors"
         >
-          <span className={`transition-transform ${open ? 'rotate-90' : ''}`} aria-hidden="true">▸</span>
+          <Caret open={open} className="text-foreground" />
           <HeadInner bucket={bucket} count={items.length} />
         </button>
         {TIPS[bucket] && <InfoTooltip text={TIPS[bucket]!} />}

@@ -1,4 +1,5 @@
 'use client'
+import { Caret } from '@/components/shared/Caret'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { DragDropContext, type DropResult } from '@hello-pangea/dnd'
@@ -293,7 +294,7 @@ export default function BoardPage() {
             title={pipelineCollapsed ? 'Expand the pipeline' : 'Collapse the pipeline (your choice is remembered)'}
             className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground uppercase tracking-widest font-semibold transition-colors self-start -mb-1"
           >
-            <span>{pipelineCollapsed ? '▸' : '▾'}</span>
+            <Caret open={!pipelineCollapsed} className="text-foreground" />
             Operations Pipeline
             {pipelineCollapsed && (
               <span className="bg-muted text-muted-foreground px-2 py-0.5 rounded-full normal-case tracking-normal">
@@ -326,7 +327,7 @@ export default function BoardPage() {
             onClick={() => setShowClosed(v => !v)}
             className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground uppercase tracking-widest font-semibold transition-colors self-start"
           >
-            <span>{showClosed ? '▾' : '▸'}</span>
+            <Caret open={showClosed} className="text-foreground" />
             Archived
             <span className="bg-muted text-muted-foreground px-2 py-0.5 rounded-full normal-case tracking-normal">
               {closedProjects.length}

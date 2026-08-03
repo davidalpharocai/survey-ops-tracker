@@ -1,4 +1,5 @@
 'use client'
+import { Caret } from '@/components/shared/Caret'
 import { useState, useEffect, useRef } from 'react'
 import { useSubmissions, useRecipients, useInvalidateCompliance } from '@/lib/hooks/useSubmissions'
 import { useComplianceState } from '@/lib/hooks/useComplianceState'
@@ -255,7 +256,7 @@ export function CompliancePanel({
               aria-expanded={!collapsed}
               className="flex items-center gap-1.5 text-xs text-muted-foreground uppercase tracking-widest font-medium transition-colors hover:text-foreground"
             >
-              <span className="text-sm leading-none text-primary">{collapsed ? '▸' : '▾'}</span>
+              <Caret open={!collapsed} className="text-primary" />
               Compliance Review
             </button>
           ) : (

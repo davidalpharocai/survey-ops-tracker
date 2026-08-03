@@ -1,4 +1,5 @@
 'use client'
+import { Caret } from '@/components/shared/Caret'
 
 import { useState } from 'react'
 import { FieldSection, NumberCell, TextCell } from './fields'
@@ -173,9 +174,9 @@ export function NSegmentsEditor({ project }: { project: SurveyProject }) {
           <div className="mb-2 flex items-center justify-between">
             <button
               onClick={() => setExpanded(e => !e)}
-              className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground transition-colors hover:text-foreground"
+              className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-foreground/90 transition-colors hover:text-foreground"
             >
-              <span className="text-sm leading-none text-primary">{expanded ? '▾' : '▸'}</span>
+              <Caret open={expanded} className="text-primary" />
               N Segments · {count}
             </button>
             <button

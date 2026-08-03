@@ -1,4 +1,5 @@
 'use client'
+import { Caret } from '@/components/shared/Caret'
 
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
@@ -96,7 +97,7 @@ export function BlastBlocks({ project }: { project: SurveyProject }) {
             onClick={() => setExpanded(e => !e)}
             className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground transition-colors hover:text-foreground"
           >
-            <span className="text-sm leading-none text-primary">{expanded ? '▾' : '▸'}</span>
+            <Caret open={expanded} className="text-primary" />
             Blasts · {count}
           </button>
           <InfoTooltip text={TIP.header} />
