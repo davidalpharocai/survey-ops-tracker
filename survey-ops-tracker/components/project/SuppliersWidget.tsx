@@ -1,4 +1,5 @@
 'use client'
+import { Caret } from '@/components/shared/Caret'
 import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
@@ -146,7 +147,8 @@ function LaunchBlock({
       {/* Header — click to expand/collapse; shows a summary when collapsed */}
       <div className="flex items-center gap-1.5 p-2">
         <button onClick={onToggle} className="flex items-center gap-1.5 min-w-0 flex-1 text-left" title={expanded ? 'Collapse' : 'Expand'}>
-          <span className="text-xs font-medium text-foreground whitespace-nowrap">{expanded ? '▾' : '▸'} Launch {index + 1}</span>
+          <Caret open={expanded} className="text-foreground" />
+          <span className="text-xs font-medium text-foreground whitespace-nowrap">Launch {index + 1}</span>
           {!expanded && (
             <>
               {launch.launch_date && <span className="text-[12px] text-muted-foreground whitespace-nowrap">{launch.launch_date}</span>}

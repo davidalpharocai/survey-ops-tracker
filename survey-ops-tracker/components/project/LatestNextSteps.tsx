@@ -1,4 +1,5 @@
 'use client'
+import { Caret } from '@/components/shared/Caret'
 import { useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useUpdateProject } from '@/lib/hooks/useProjects'
@@ -338,9 +339,10 @@ export function LatestNextSteps({ projectId, notes }: LatestNextStepsProps) {
           <div className="flex items-center justify-between">
             <button
               onClick={() => setHistoryOpen(o => !o)}
-              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
             >
-              {historyOpen || isError ? '▾' : '▸'} History ({historyLines} {historyLines === 1 ? 'line' : 'lines'})
+              <Caret open={historyOpen || isError} className="text-foreground" />
+              History ({historyLines} {historyLines === 1 ? 'line' : 'lines'})
             </button>
             {(historyOpen || isError) && !editingNotes && (
               <button

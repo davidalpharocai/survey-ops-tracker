@@ -1,4 +1,5 @@
 'use client'
+import { Caret } from '@/components/shared/Caret'
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
@@ -750,7 +751,7 @@ function SidebarCard({
           aria-expanded={!collapsed}
           className={`${headerCls} w-full transition-colors hover:text-foreground`}
         >
-          <span className="text-sm leading-none text-primary">{collapsed ? '▸' : '▾'}</span>
+          <Caret open={!collapsed} className="text-primary" />
           {title}
         </button>
       ) : (
