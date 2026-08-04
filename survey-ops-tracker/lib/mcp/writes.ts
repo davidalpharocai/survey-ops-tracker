@@ -237,11 +237,12 @@ export async function runProjectWrite(
   return data as SurveyProjectRow
 }
 
-export async function runCreateProject(patch: Record<string, unknown>, actor: string): Promise<SurveyProjectRow> {
+export async function runCreateProject(patch: Record<string, unknown>, actor: string, idemKey?: string | null): Promise<SurveyProjectRow> {
   const supabase = createAdminClient()
   const { data, error } = await supabase.rpc('mcp_create_project', {
     p_patch: patch as unknown as Json,
     p_actor: actor,
+    p_idem: idemKey ?? null,
   })
   if (error) throw new Error(error.message)
   return data as SurveyProjectRow

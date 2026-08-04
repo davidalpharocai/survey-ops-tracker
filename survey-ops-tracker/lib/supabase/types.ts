@@ -1595,7 +1595,7 @@ export type Database = {
         Returns: unknown
       }
       mcp_create_project: {
-        Args: { p_patch: Json; p_actor: string }
+        Args: { p_patch: Json; p_actor: string; p_idem?: string | null }
         Returns: unknown
       }
       mcp_add_step: {
