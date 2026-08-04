@@ -24,6 +24,14 @@ import {
   type SupplierLine,
 } from '@/lib/utils/suppliers'
 import { fmtNum } from '@/lib/utils/number'
+import {
+  resolvePeriod, surveyStats, surveyRows, projectRow,
+  REPORT_FIELD_KEYS, DEFAULT_REPORT_FIELDS,
+  type SurveyEvent, type SurveyType,
+} from '@/lib/mcp/reports'
+
+// Canonical prod origin for report download links surfaced to the connector user.
+const REPORT_BASE = 'https://survey-ops-tracker.vercel.app'
 import { cloneProject } from '@/lib/server/clone'
 import {
   confirmable, describeChanges, fmtChangeVal, todayEastern, fetchDocTitle,
@@ -146,6 +154,82 @@ export const TOOLS: AssistantTool[] = [
       const args = rawArgs as { mine?: boolean }
       const { userId } = ctx
       return data.pipelineSummary({ ...args, userId })
+    },
+  },
+  {
+    name: 'survey_stats',
+    description:
+      "Count surveys by type and lifecycle event over a flexible period. `event` is submitted (submitted_date), launched (launch_date), or delivered (deliver_date). The period is flexible — pass month (+year), a whole year, a single date, or a from/to span; month without a year defaults to the current year. Optionally filter to one type (PS / B2B / Rerun); otherwise the result breaks down by type plus a total. Excludes internal projects. Example: “how many PS launched in July 2026” → event:'launched', type:'PS', month:7, year:2026.",
+    kind: 'read',
+    schema: {
+      event: z.enum(['submitted', 'launched', 'delivered']),
+      type: z.enum(['PS', 'B2B', 'Rerun']).optional(),
+      month: z.number().int().min(1).max(12).optional(),
+      year: z.number().int().min(2000).max(2100).optional(),
+      date: z.string().optional(),
+      from: z.string().optional(),
+      to: z.string().optional(),
+    },
+    handler: async (rawArgs) => {
+      const args = rawArgs as {
+        event: SurveyEvent; type?: SurveyType; month?: number; year?: number; date?: string; from?: string; to?: string
+      }
+      const period = resolvePeriod(args)
+      if ('error' in period) return { error: period.error }
+      const stats = await surveyStats({ event: args.event, from: period.from, to: period.to, type: args.type })
+      const summary = args.type
+        ? `${stats.total} ${args.type} survey(s) ${args.event} in ${period.label}.`
+        : `${stats.total} survey(s) ${args.event} in ${period.label} — PS ${stats.by_type.PS}, B2B ${stats.by_type.B2B}, Rerun ${stats.by_type.Rerun}.`
+      return { ok: true, event: args.event, type: args.type ?? 'all', period, total: stats.total, by_type: stats.by_type, summary }
+    },
+  },
+  {
+    name: 'survey_report',
+    description:
+      "Build a report of the surveys matching an event + period (same flexible period as survey_stats), optionally filtered by type. Returns the matching rows as a preview table plus a link to download the FULL report as an Excel (.xlsx). Choose columns via `fields`: call once WITHOUT fields to get `available_fields` + the default set, then re-call with the subset you want. Use for “report of everything delivered in Q2” or “excel of PS launches in July with client, captain, N collected”.",
+    kind: 'read',
+    schema: {
+      event: z.enum(['submitted', 'launched', 'delivered']),
+      type: z.enum(['PS', 'B2B', 'Rerun']).optional(),
+      month: z.number().int().min(1).max(12).optional(),
+      year: z.number().int().min(2000).max(2100).optional(),
+      date: z.string().optional(),
+      from: z.string().optional(),
+      to: z.string().optional(),
+      fields: z.array(z.string()).optional(),
+    },
+    handler: async (rawArgs) => {
+      const args = rawArgs as {
+        event: SurveyEvent; type?: SurveyType; month?: number; year?: number
+        date?: string; from?: string; to?: string; fields?: string[]
+      }
+      const period = resolvePeriod(args)
+      if ('error' in period) return { error: period.error }
+      const chosen = (args.fields ?? []).filter(k => REPORT_FIELD_KEYS.includes(k))
+      const fields = chosen.length ? chosen : DEFAULT_REPORT_FIELDS
+      const rows = await surveyRows({ event: args.event, from: period.from, to: period.to, type: args.type })
+      const projected = rows.map(r => projectRow(r, fields))
+
+      const qs = new URLSearchParams()
+      qs.set('event', args.event)
+      if (args.type) qs.set('type', args.type)
+      if (args.date) qs.set('date', args.date)
+      if (args.from) qs.set('from', args.from)
+      if (args.to) qs.set('to', args.to)
+      if (args.month != null) qs.set('month', String(args.month))
+      if (args.year != null) qs.set('year', String(args.year))
+      qs.set('fields', fields.join(','))
+      const download_url = `${REPORT_BASE}/api/reports/surveys?${qs.toString()}`
+
+      return {
+        ok: true,
+        event: args.event, type: args.type ?? 'all', period, count: rows.length,
+        fields_used: fields, available_fields: REPORT_FIELD_KEYS, default_fields: DEFAULT_REPORT_FIELDS,
+        rows_preview: projected.slice(0, 50), truncated: projected.length > 50,
+        download_url,
+        note: (chosen.length ? '' : 'Used the default columns — re-call with a subset of available_fields to choose. ') +
+          `${rows.length} row(s) for ${period.label}. Download the Excel (.xlsx): ${download_url}`,
+      }
     },
   },
   {
