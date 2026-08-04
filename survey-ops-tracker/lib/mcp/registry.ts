@@ -908,7 +908,7 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'log_blast',
     description:
-      "Log a B2B blast against a project — its $/bid (the per-completion reward), the # of people it went to, the # of those who COMPLETED the survey, when it ran (optional), and an optional description of the audience. Its cost is $/bid × # of completes (we only pay people who completed, not everyone reached), and that counts toward the project's spend. If $/bid or # of people is missing, ask. If completes aren't known yet, pass 0 (spend stays $0 for this blast) and the user can fill them in later in the app. Preview first; confirm to apply.",
+      "Log a B2B blast against a project — its $/bid (the per-completion reward), the # of people it went to, the # of those who COMPLETED the survey, when it ran (optional), and an optional description of the audience. Its cost is $/bid × # of completes (we only pay people who completed, not everyone reached), and that counts toward the project's spend. If $/bid or # of people is missing, ask. If completes aren't known yet, pass 0 (spend stays $0 for this blast) and the user can fill them in later in the app. You can also ingest a blast-platform campaign screenshot: per blast, map Reward→bid, that blast's Sent→people, Rewards Count→completes (so spend matches the platform's Total Issued; NOT the higher \"Completed\" count), its Scheduled date/time→blast_at, and channel/audience/template→description; resolve the project by campaign name or Survey ID, and set idem_key to \"<SurveyID>#<BlastLabel>\" so re-importing the same screenshot doesn't double-log. Preview first; confirm to apply.",
     kind: 'write',
     schema: {
       project: z.string(),
