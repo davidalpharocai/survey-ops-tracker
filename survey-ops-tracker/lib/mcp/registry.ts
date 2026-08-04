@@ -1770,6 +1770,7 @@ export const TOOLS: AssistantTool[] = [
       skip_scoping: z.boolean().optional(),
       confirm: z.boolean().optional(),
       proceed_despite_duplicate: z.boolean().optional(),
+      idem_key: z.string().optional(),
     },
     handler: async (rawArgs, ctx, meta) => {
       const args = rawArgs as {
@@ -1779,7 +1780,7 @@ export const TOOLS: AssistantTool[] = [
         launch_date?: string; deliver_date?: string; submitted_date?: string
         row_level_data?: boolean; longitudinal?: boolean; voter_survey_qa?: boolean
         citation_language_needed?: boolean; terminations?: boolean; latest_next_steps?: string
-        skip_scoping?: boolean; confirm?: boolean; proceed_despite_duplicate?: boolean
+        skip_scoping?: boolean; confirm?: boolean; proceed_despite_duplicate?: boolean; idem_key?: string
       }
       const { userEmail } = ctx
 
@@ -1920,7 +1921,7 @@ export const TOOLS: AssistantTool[] = [
             : null,
         }),
         async () => {
-          const row = await runCreateProject(patch, `${userEmail} via Claude`)
+          const row = await runCreateProject(patch, `${userEmail} via Claude`, args.idem_key ?? randomUUID())
           if (Object.keys(extras).length > 0) {
             await runProjectWrite(supabase, { id: row.id as string, patch: extras, actor: `${userEmail} via Claude` })
           }
