@@ -147,7 +147,7 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'pipeline_summary',
     description:
-      'Digest of the active pipeline — overdue, due within 3 days, and fielding behind pace, all limited to in-flight work (Archived, On-Hold, and Delivered projects are excluded) — plus counts by stage/status/phase. Pass mine:true to scope to your own captained projects.',
+      'Digest of the active pipeline — overdue, due within 3 days, and fielding behind pace, all limited to in-flight work (Archived, On-Hold, and Delivered projects are excluded) — plus `active_count` (the number of in-flight operational projects) and counts by stage/status/phase. Pass mine:true to scope everything (including active_count) to your own captained projects. To answer “how many open/active projects”, read `active_count` — NOT counts.by_status.Open.',
     kind: 'read',
     schema: { mine: z.boolean().optional() },
     handler: async (rawArgs, ctx) => {
@@ -278,6 +278,28 @@ export const TOOLS: AssistantTool[] = [
         ` · PS ${m.by_type.PS} / B2B ${m.by_type.B2B} / Rerun ${m.by_type.Rerun}` +
         (m.prior ? ` · prior ${m.prior.count} delivered, on-time ${m.prior.on_time_pct ?? '—'}%` : '')
       return { ok: true, event, type: args.type ?? 'all', period, metrics: m, summary }
+    },
+  },
+  {
+    name: 'whats_at_risk',
+    description:
+      "One triage call for everything on the active board that needs attention now, bucketed by risk DIMENSION and severity-sorted: overdue (due date strictly passed, with days_overdue), due_soon (due today through +3 days, with days_until — days_until 0 means due today), fielding_behind (in Fielding, under target, due within the window — includes a projected final N and shortfall extrapolated from the collection rate so far), over_budget (actual spend > budget, with the overage), and reruns_overdue (recurring reruns past their due date). A project can appear in more than one bucket (e.g. overdue AND over budget) — `at_risk_count` is the DISTINCT project count, so use it for the headline rather than summing buckets. Pass mine:true to scope projects to your captained work and reruns to the ones you own. Use for “what needs my attention” / “what’s at risk” / “what’s slipping”.",
+    kind: 'read',
+    schema: { mine: z.boolean().optional() },
+    handler: async (rawArgs, ctx) => {
+      const args = rawArgs as { mine?: boolean }
+      return data.whatsAtRisk({ mine: args.mine, userId: ctx.userId, userEmail: ctx.userEmail })
+    },
+  },
+  {
+    name: 'get_change_history',
+    description:
+      "Recent field-level change history for one project, from the audit log: which field changed, old → new value, who changed it, and when (newest first, includes app / AI / sync / manual edits). Use for “what changed on <project>”, “who set the due date”, “when did N target change”. Default 20 most recent; pass limit up to 100.",
+    kind: 'read',
+    schema: { project: z.string(), limit: z.number().int().min(1).max(100).optional() },
+    handler: async (rawArgs) => {
+      const args = rawArgs as { project: string; limit?: number }
+      return data.getChangeHistory(args.project, args.limit)
     },
   },
   {
