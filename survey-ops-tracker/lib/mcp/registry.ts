@@ -754,6 +754,15 @@ export const TOOLS: AssistantTool[] = [
       if ('error' in p) return p
       if ('ambiguous' in p) return p
       meta.project_id = p.id as string
+      // Idempotency guard: don't add a second segment with the same label (a
+      // retried confirm would otherwise duplicate it). Point to update_segment.
+      const dupSeg = await resolveSegment(p.id as string, args.label)
+      if (dupSeg && !('ambiguous' in dupSeg)) {
+        const dupRow = dupSeg as Record<string, unknown>
+        if (String(dupRow.label ?? '').trim().toLowerCase() === args.label.trim().toLowerCase()) {
+          return { note: `A segment "${args.label}" already exists on ${p.project_code} — nothing added (use update_segment to change it).`, segment_id: dupRow.id }
+        }
+      }
       const existing = (p.segment_count as number | null) ?? 0
       return confirmable(
         args,
