@@ -130,3 +130,69 @@ export function projectRow(r: Row, fieldKeys: string[]): Record<string, string |
   }
   return out
 }
+
+// ---- ops_metrics: period-scoped analytics (mirrors the in-app Insights defs) ----
+
+// Day diff between two YYYY-MM-DD dates (UTC midnight so DST can't skew it).
+const dayDiff = (a: string, b: string) =>
+  Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86_400_000)
+function shiftDate(d: string, days: number): string {
+  return new Date(Date.parse(`${d}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10)
+}
+
+function aggregate(rows: Row[]) {
+  const by_type: Record<string, number> = { PS: 0, B2B: 0, Rerun: 0 }
+  let n_target = 0, n_collected = 0, n_actual = 0, budget = 0, actual_spend = 0, over_budget = 0
+  let onTimeDenom = 0, onTime = 0
+  const cycles: number[] = []
+  const fielding: number[] = []
+  for (const r of rows) {
+    const t = String(r.project_type ?? 'Other'); if (t in by_type) by_type[t]++
+    n_target += Number(r.n_target ?? 0)
+    n_collected += Number(r.n_collected ?? 0)
+    n_actual += Number(r.n_actual ?? 0)
+    const b = r.budget == null ? null : Number(r.budget)
+    const s = r.actual_spend == null ? null : Number(r.actual_spend)
+    if (b != null) budget += b
+    if (s != null) actual_spend += s
+    if (b != null && s != null && s > b) over_budget++
+    const sub = r.submitted_date as string | null
+    const del = r.deliver_date as string | null
+    const due = r.due_date as string | null
+    const lau = r.launch_date as string | null
+    if (del && due) { onTimeDenom++; if (del <= due) onTime++ }              // on-time = delivered on/before due
+    if (sub && del) { const d = dayDiff(sub, del); if (d >= 0) cycles.push(d) }  // cycle = submitted→delivered
+    if (lau && del) { const d = dayDiff(lau, del); if (d >= 0) fielding.push(d) } // fielding = launched→delivered
+  }
+  const avg = (xs: number[]) => (xs.length ? Math.round(xs.reduce((a, b) => a + b, 0) / xs.length) : null)
+  return {
+    count: rows.length,
+    by_type,
+    on_time_pct: onTimeDenom ? Math.round((onTime / onTimeDenom) * 100) : null,
+    on_time_denom: onTimeDenom,
+    avg_cycle_days: avg(cycles),
+    avg_fielding_days: avg(fielding),
+    n_target, n_collected, n_actual,
+    collection_pct: n_target > 0 ? Math.round((n_collected / n_target) * 100) : null,
+    budget: Math.round(budget),
+    actual_spend: Math.round(actual_spend),
+    over_budget,
+    budget_used_pct: budget > 0 ? Math.round((actual_spend / budget) * 100) : null,
+  }
+}
+
+/** Period-scoped operational metrics for surveys whose `event` date falls in
+ *  [from,to]. With compare, also computes the equal-length immediately-prior
+ *  period for a period-over-period read. */
+export async function opsMetrics(opts: { event: SurveyEvent; from: string; to: string; type?: SurveyType; compare?: boolean }) {
+  const agg = aggregate(await surveyRows({ event: opts.event, from: opts.from, to: opts.to, type: opts.type }))
+  let prior: { from: string; to: string; count: number; on_time_pct: number | null; actual_spend: number } | null = null
+  if (opts.compare) {
+    const len = Math.max(1, dayDiff(opts.from, opts.to) + 1)
+    const pTo = shiftDate(opts.from, -1)
+    const pFrom = shiftDate(opts.from, -len)
+    const pAgg = aggregate(await surveyRows({ event: opts.event, from: pFrom, to: pTo, type: opts.type }))
+    prior = { from: pFrom, to: pTo, count: pAgg.count, on_time_pct: pAgg.on_time_pct, actual_spend: pAgg.actual_spend }
+  }
+  return { ...agg, prior }
+}
