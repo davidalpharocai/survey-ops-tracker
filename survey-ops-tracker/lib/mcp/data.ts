@@ -450,7 +450,19 @@ export async function getClientHistory(clientRef: string) {
   }
 }
 
-/** Port of the daily-digest logic (overdue / due<=3d / fielding-behind-pace) plus counts.
+const DAY_MS = 86_400_000
+/** Today (YYYY-MM-DD) in the team's timezone — mirrors toolHelpers.todayEastern and
+ *  the app UI. All date comparisons here are against date-only (YYYY-MM-DD) columns,
+ *  so using a UTC "today" mis-dates work during the evening-ET window. */
+function todayET(): string {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' })
+}
+/** Shift a YYYY-MM-DD date by n days (UTC-anchored; safe for date-only comparisons). */
+function addDays(isoDate: string, n: number): string {
+  return new Date(Date.parse(`${isoDate}T00:00:00Z`) + n * DAY_MS).toISOString().slice(0, 10)
+}
+
+/** Port of the daily-digest logic (overdue / due-soon / fielding-behind-pace) plus counts.
  *  mine:true scopes everything (overdue/due-soon/fielding-behind AND the counts) to the
  *  caller's own captained projects, resolved via getMe(userId). */
 export async function pipelineSummary(args: { mine?: boolean; userId?: string } = {}) {
@@ -472,18 +484,23 @@ export async function pipelineSummary(args: { mine?: boolean; userId?: string } 
   let myInitials: string | null = null
   if (args.mine && args.userId) {
     const me = await getMe(args.userId)
-    myInitials = me?.initials ?? null
+    // Fail closed: if the caller isn't in Team Members we CAN'T scope to "them" —
+    // don't silently fall through and return the whole portfolio as if it were theirs.
+    if (!me) return { error: "Could not resolve your team-member record (no matching Team Members row) — can't scope this to you." }
+    myInitials = me.initials
   }
   if (myInitials) {
     const ci = myInitials.toLowerCase()
     rows = rows.filter(r => ((r.captain as { initials?: string } | null)?.initials ?? '').toLowerCase() === ci)
   }
 
-  const today = new Date().toISOString().split('T')[0]
-  const soon = new Date(Date.now() + 3 * 86400_000).toISOString().split('T')[0]
+  const today = todayET()
+  const soon = addDays(today, 3)
 
-  const overdue = rows.filter(p => p.due_date && (p.due_date as string) <= today)
-  const dueSoon = rows.filter(p => p.due_date && (p.due_date as string) > today && (p.due_date as string) <= soon)
+  // overdue = due date strictly in the past. A date falling on today is NOT overdue —
+  // it's due_soon (matches lib/utils/date.ts getDueUrgency, and whats_at_risk).
+  const overdue = rows.filter(p => p.due_date && (p.due_date as string) < today)
+  const dueSoon = rows.filter(p => p.due_date && (p.due_date as string) >= today && (p.due_date as string) <= soon)
   const fieldingBehind = rows.filter(p =>
     p.board_column === 'Fielding' &&
     p.n_target != null &&
@@ -521,8 +538,154 @@ export async function pipelineSummary(args: { mine?: boolean; userId?: string } 
   }
 
   return {
+    // The count of in-flight operational projects (isActiveOperational; mine-scoped
+    // when mine:true) — the single trustworthy "how many open/active projects"
+    // number. counts.by_status.Open below is NOT that (it includes Scoping/Hold/
+    // Delivered), so callers should read active_count, not by_status.Open.
+    active_count: rows.length,
     overdue, due_soon: dueSoon, fielding_behind: fieldingBehind,
     counts: { by_board_column: countsByColumn, by_status: countsByStatus, by_phase: countsByPhase },
+  }
+}
+
+/** Simple linear projection of where fielding N will land by the due date, from
+ *  the collection rate so far (n_collected / days since launch). Returns nulls when
+ *  there's no target, or no launch/due date to project against. */
+function projectShortfall(p: Row, today: string): {
+  collection_pct: number | null; projected_final: number | null; shortfall: number | null
+} {
+  const target = p.n_target as number | null
+  const collected = (p.n_collected as number | null) ?? 0
+  if (target == null || target <= 0) return { collection_pct: null, projected_final: null, shortfall: null }
+  const collection_pct = Math.round((collected / target) * 100)
+  const launch = p.launch_date as string | null
+  const due = p.due_date as string | null
+  if (!launch || !due) return { collection_pct, projected_final: null, shortfall: null }
+  // No projection until at least a day of fielding has elapsed. Guards both the
+  // launched-today divide-by-zero AND a future/mistyped launch_date (which would
+  // otherwise treat all of n_collected as one day's pace and wildly overstate the rate).
+  const elapsed = Math.round((Date.parse(today) - Date.parse(launch)) / DAY_MS)
+  if (elapsed < 1) return { collection_pct, projected_final: null, shortfall: null }
+  const daysLeft = Math.max(0, Math.round((Date.parse(due) - Date.parse(today)) / DAY_MS))
+  const rate = collected / elapsed
+  const projected_final = Math.round(collected + rate * daysLeft)
+  const shortfall = Math.max(0, target - projected_final)
+  return { collection_pct, projected_final, shortfall }
+}
+
+/** One triage call: everything on the ACTIVE operational board that needs attention
+ *  now, bucketed by risk DIMENSION (a project can appear in more than one — that's the
+ *  point) and sorted by severity within each:
+ *   - overdue: due date strictly passed (with days_overdue)
+ *   - due_soon: due today .. +3 days (with days_until; days_until 0 = due today)
+ *   - fielding_behind: in Fielding, under target, due within the window, with a
+ *     projected final N + shortfall extrapolated from the collection rate so far
+ *   - over_budget: actual_spend > budget (with the overage)
+ *   - reruns_overdue: recurring reruns past due (from the rerun_status view via rerunRadar)
+ *  at_risk_count is the DISTINCT project count across the four project buckets, so the
+ *  headline isn't inflated by a project that's in several. mine:true scopes projects to
+ *  your captained work and reruns to the ones you own. */
+export async function whatsAtRisk(args: { mine?: boolean; userId?: string; userEmail?: string } = {}) {
+  const supabase = createAdminClient()
+  const { data, error } = await supabase.from('survey_projects')
+    .select('project_code, project_name, client, board_column, due_date, launch_date, n_target, n_collected, budget, actual_spend, status, phase, captain:team_members(name, initials)')
+    .eq('status', 'Open').eq('phase', 'Active').is('deleted_at', null)
+    .or('project_type.is.null,project_type.neq.Internal')
+  if (error) throw error
+  let rows = ((data ?? []) as unknown as Row[]).filter(isActiveOperational)
+
+  if (args.mine && args.userId) {
+    const me = await getMe(args.userId)
+    // Fail closed: no Team Members row → we can't scope to "you"; don't return the
+    // whole portfolio as if it were the caller's (reruns scope by email independently,
+    // so a silent fall-through would also be inconsistent).
+    if (!me) return { error: "Could not resolve your team-member record (no matching Team Members row) — can't scope this to you." }
+    const ci = me.initials.toLowerCase()
+    rows = rows.filter(r => ((r.captain as { initials?: string } | null)?.initials ?? '').toLowerCase() === ci)
+  }
+
+  const today = todayET()
+  const soon = addDays(today, 3)
+  const capOf = (r: Row) => (r.captain as { initials?: string } | null)?.initials ?? null
+  const base = (r: Row) => ({
+    project_code: r.project_code, project_name: r.project_name, client: r.client,
+    board_column: r.board_column, captain: capOf(r), due_date: r.due_date,
+  })
+
+  const overdue = rows
+    .filter(r => r.due_date && (r.due_date as string) < today)
+    .map(r => ({ ...base(r), days_overdue: Math.round((Date.parse(today) - Date.parse(r.due_date as string)) / DAY_MS) }))
+    .sort((a, b) => b.days_overdue - a.days_overdue)
+
+  const dueSoon = rows
+    .filter(r => r.due_date && (r.due_date as string) >= today && (r.due_date as string) <= soon)
+    .map(r => ({ ...base(r), days_until: Math.round((Date.parse(r.due_date as string) - Date.parse(today)) / DAY_MS) }))
+    .sort((a, b) => a.days_until - b.days_until)
+
+  const fieldingBehind = rows
+    .filter(r =>
+      r.board_column === 'Fielding' &&
+      r.n_target != null &&
+      (((r.n_collected as number | null) ?? 0) < (r.n_target as number)) &&
+      r.due_date != null &&
+      (r.due_date as string) <= soon)
+    .map(r => ({ ...base(r), n_target: r.n_target, n_collected: (r.n_collected as number | null) ?? 0, ...projectShortfall(r, today) }))
+    .sort((a, b) => (b.shortfall ?? 0) - (a.shortfall ?? 0))
+
+  const overBudget = rows
+    .filter(r => r.budget != null && r.actual_spend != null && (r.actual_spend as number) > (r.budget as number))
+    .map(r => ({ ...base(r), budget: r.budget, actual_spend: r.actual_spend, overage: Math.round((r.actual_spend as number) - (r.budget as number)) }))
+    .sort((a, b) => b.overage - a.overage)
+
+  const reruns = await rerunRadar(args.mine && args.userEmail ? { ownerEmail: args.userEmail } : {})
+  const rerunsOverdue = reruns.overdue
+
+  // A project can surface in several buckets (different dimensions); count DISTINCT
+  // projects for the headline so it isn't double/triple-counted.
+  const distinct = new Set<string>()
+  for (const x of [...overdue, ...dueSoon, ...fieldingBehind, ...overBudget]) distinct.add(String(x.project_code))
+  const at_risk_count = distinct.size
+
+  const counts = {
+    overdue: overdue.length, due_soon: dueSoon.length, fielding_behind: fieldingBehind.length,
+    over_budget: overBudget.length, reruns_overdue: rerunsOverdue.length,
+  }
+  const summary = (at_risk_count === 0 && rerunsOverdue.length === 0)
+    ? 'Nothing flagged at risk right now.'
+    : `${at_risk_count} project(s) at risk — ${counts.overdue} overdue, ${counts.due_soon} due soon, ${counts.fielding_behind} fielding behind pace, ${counts.over_budget} over budget` +
+      (rerunsOverdue.length ? ` · ${rerunsOverdue.length} rerun(s) overdue` : '') + '.'
+  return {
+    ok: true, at_risk_count, counts,
+    overdue, due_soon: dueSoon, fielding_behind: fieldingBehind, over_budget: overBudget, reruns_overdue: rerunsOverdue,
+    summary,
+  }
+}
+
+/** Recent field-level change history for one project, from the project_audit log
+ *  (populated by DB triggers for app, AI, sync, and manual-SQL writes). Newest
+ *  first. Resolves the project ref the same way get_project does. */
+export async function getChangeHistory(projectRef: string, limit = 20) {
+  const resolved = await resolveProject(projectRef)
+  if (resolved === null) return { error: `No project found matching "${projectRef}".` }
+  if ('ambiguous' in resolved) {
+    return { note: 'Multiple projects match — specify the project code.', candidates: resolved.ambiguous }
+  }
+  const p = resolved as Row
+  const supabase = createAdminClient()
+  const { data, error } = await supabase.from('project_audit')
+    .select('field, old_value, new_value, changed_by, changed_at')
+    .eq('project_id', p.id as string)
+    .order('changed_at', { ascending: false })
+    .limit(Math.min(limit, 100))
+  if (error) throw error
+  const changes = (data ?? []).map(c => ({
+    field: c.field, from: c.old_value, to: c.new_value, by: c.changed_by, at: c.changed_at,
+  }))
+  return {
+    project_code: p.project_code as string | null,
+    project_name: p.project_name as string,
+    count: changes.length,
+    changes,
   }
 }
 
