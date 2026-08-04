@@ -25,7 +25,7 @@ import {
 } from '@/lib/utils/suppliers'
 import { fmtNum } from '@/lib/utils/number'
 import {
-  resolvePeriod, surveyStats, surveyRows, projectRow,
+  resolvePeriod, surveyStats, surveyRows, projectRow, opsMetrics,
   REPORT_FIELD_KEYS, DEFAULT_REPORT_FIELDS,
   type SurveyEvent, type SurveyType,
 } from '@/lib/mcp/reports'
@@ -241,6 +241,43 @@ export const TOOLS: AssistantTool[] = [
     handler: async (rawArgs, ctx) => {
       const args = rawArgs as { mine?: boolean }
       return data.rerunRadar({ ownerEmail: args.mine ? ctx.userEmail : undefined })
+    },
+  },
+  {
+    name: 'ops_metrics',
+    description:
+      "Operational analytics for a period — on-time delivery %, avg cycle time (submitted→delivered), avg fielding time (launched→delivered), N target vs collected vs actual (+ collection %), budget vs actual spend (+ over-budget count), and a PS/B2B/Rerun breakdown, with an equal-length prior-period comparison. Scoped to projects whose chosen `event` date falls in the period — default event is 'delivered' (deliver_date); pass 'submitted'/'launched' to measure intake/launch cohorts. Same flexible period as survey_stats (month+year / year / date / from-to). Mirrors the in-app Insights definitions.",
+    kind: 'read',
+    schema: {
+      event: z.enum(['submitted', 'launched', 'delivered']).optional(),
+      type: z.enum(['PS', 'B2B', 'Rerun']).optional(),
+      month: z.number().int().min(1).max(12).optional(),
+      year: z.number().int().min(2000).max(2100).optional(),
+      date: z.string().optional(),
+      from: z.string().optional(),
+      to: z.string().optional(),
+      compare: z.boolean().optional(),
+    },
+    handler: async (rawArgs) => {
+      const args = rawArgs as {
+        event?: SurveyEvent; type?: SurveyType; month?: number; year?: number
+        date?: string; from?: string; to?: string; compare?: boolean
+      }
+      const period = resolvePeriod(args)
+      if ('error' in period) return { error: period.error }
+      const event = args.event ?? 'delivered'
+      const m = await opsMetrics({ event, from: period.from, to: period.to, type: args.type, compare: args.compare ?? true })
+      const summary =
+        `${period.label}: ${m.count} ${event}` +
+        ` · on-time ${m.on_time_pct ?? '—'}%${m.on_time_denom ? ` (${m.on_time_denom})` : ''}` +
+        (m.avg_cycle_days != null ? ` · cycle ${m.avg_cycle_days}d` : '') +
+        (m.avg_fielding_days != null ? ` · fielding ${m.avg_fielding_days}d` : '') +
+        (m.collection_pct != null ? ` · collection ${m.collection_pct}%` : '') +
+        ` · spend $${m.actual_spend.toLocaleString('en-US')}` +
+        (m.budget > 0 ? ` / $${m.budget.toLocaleString('en-US')} budget (${m.over_budget} over)` : '') +
+        ` · PS ${m.by_type.PS} / B2B ${m.by_type.B2B} / Rerun ${m.by_type.Rerun}` +
+        (m.prior ? ` · prior ${m.prior.count} delivered, on-time ${m.prior.on_time_pct ?? '—'}%` : '')
+      return { ok: true, event, type: args.type ?? 'all', period, metrics: m, summary }
     },
   },
   {
