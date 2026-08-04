@@ -233,6 +233,17 @@ export const TOOLS: AssistantTool[] = [
     },
   },
   {
+    name: 'rerun_radar',
+    description:
+      "Recurring reruns that need attention, bucketed: overdue (past their effective due date), needs_definition (no cadence/owner set yet), prep_window (due within the lead time), and upcoming. Reads the live rerun_status view (paused series excluded); each item lists client, platform, cadence, last wave, due date, and owner. Pass mine:true to scope to reruns you own. Use for “what reruns are overdue / coming up / still need a cadence”.",
+    kind: 'read',
+    schema: { mine: z.boolean().optional() },
+    handler: async (rawArgs, ctx) => {
+      const args = rawArgs as { mine?: boolean }
+      return data.rerunRadar({ ownerEmail: args.mine ? ctx.userEmail : undefined })
+    },
+  },
+  {
     name: 'get_me',
     description:
       "Resolve the caller's own name, initials, and role — use this to answer 'me'/'my' questions (e.g. \"what's overdue for me\") before filtering other tools with mine:true or a captain name.",

@@ -526,6 +526,59 @@ export async function pipelineSummary(args: { mine?: boolean; userId?: string } 
   }
 }
 
+/** Rerun Radar — reads the pre-computed rerun_status view and buckets recurring
+ *  reruns into overdue / needs-definition / prep-window / upcoming (each row in
+ *  one bucket by priority). Paused series excluded. Optional owner filter. */
+export async function rerunRadar(opts: { ownerEmail?: string } = {}) {
+  const supabase = createAdminClient()
+  let q = supabase
+    .from('rerun_status')
+    .select(
+      'id, display_name, client, work, platform, cadence, cadence_months, last_wave_on, ' +
+      'expected_next_on, effective_due, days_to_due, is_overdue, in_prep_window, needs_definition, ' +
+      'owner_email, backup_owner_email, survey_ids'
+    )
+    .or('is_paused.is.null,is_paused.eq.false')
+  if (opts.ownerEmail) q = q.eq('owner_email', opts.ownerEmail)
+  const { data, error } = await q
+  if (error) throw error
+
+  type R = Record<string, unknown>
+  const shape = (r: R) => ({
+    id: r.id,
+    name: (r.display_name ?? r.work ?? r.client) as string | null,
+    client: r.client, platform: r.platform, cadence: r.cadence,
+    last_wave_on: r.last_wave_on, due: r.effective_due, days_to_due: r.days_to_due,
+    owner: r.owner_email, survey_ids: r.survey_ids,
+  })
+  const buckets = {
+    overdue: [] as ReturnType<typeof shape>[],
+    needs_definition: [] as ReturnType<typeof shape>[],
+    prep_window: [] as ReturnType<typeof shape>[],
+    upcoming: [] as ReturnType<typeof shape>[],
+  }
+  for (const r of (data ?? []) as unknown as R[]) {
+    if (r.is_overdue) buckets.overdue.push(shape(r))
+    else if (r.needs_definition) buckets.needs_definition.push(shape(r))
+    else if (r.in_prep_window) buckets.prep_window.push(shape(r))
+    else if (r.effective_due) buckets.upcoming.push(shape(r))
+  }
+  // Soonest-first within the date-bearing buckets.
+  const byDue = (a: { due: unknown }, b: { due: unknown }) => String(a.due ?? '').localeCompare(String(b.due ?? ''))
+  buckets.overdue.sort(byDue); buckets.prep_window.sort(byDue); buckets.upcoming.sort(byDue)
+
+  const counts = {
+    overdue: buckets.overdue.length,
+    needs_definition: buckets.needs_definition.length,
+    prep_window: buckets.prep_window.length,
+    upcoming: buckets.upcoming.length,
+  }
+  const summary =
+    `Reruns — ${counts.overdue} overdue, ${counts.needs_definition} need a cadence/owner, ` +
+    `${counts.prep_window} in the prep window, ${counts.upcoming} upcoming.`
+  return { ok: true, counts, ...buckets, summary }
+}
+
 export async function searchClients(args: { query?: string; limit?: number }) {
   const supabase = createAdminClient()
   let q = supabase.from('clients').select('*').is('deleted_at', null)
