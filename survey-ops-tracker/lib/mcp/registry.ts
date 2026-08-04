@@ -996,22 +996,50 @@ export const TOOLS: AssistantTool[] = [
       const est = estimateRange(target, lines)
       const actual = actualCost(lines)
 
+      // Idempotency: if a launch with this EXACT label (e.g. the Survey#) already
+      // exists on the project, UPDATE it instead of creating a duplicate — so
+      // re-importing the same launch/screenshot upserts, as documented.
+      let existingId: string | null = null
+      if (args.label && args.label.trim()) {
+        const found = await resolveLaunch(p.id as string, args.label.trim())
+        if (found && !('ambiguous' in found)) {
+          const foundRow = found as Record<string, unknown>
+          if (String(foundRow.label ?? '').trim().toLowerCase() === args.label.trim().toLowerCase()) {
+            existingId = foundRow.id as string
+          }
+        }
+      }
+
       return confirmable(
         args,
         async () => ({
           summary:
-            `Log launch${args.label ? ` "${args.label}"` : ''} on ${p.project_code}: ${suppliers.length} suppliers` +
+            `${existingId ? 'Update' : 'Log'} launch${args.label ? ` "${args.label}"` : ''} on ${p.project_code}: ${suppliers.length} suppliers` +
             (target ? `, target ${fmtNum(target)}` : '') +
-            ` — actual ${money(actual)}` + (est ? `, est ${money(est.low)}–${money(est.high)}` : ''),
+            ` — actual ${money(actual)}` + (est ? `, est ${money(est.low)}–${money(est.high)}` : '') +
+            (existingId ? ' (updates the existing launch with this label — no duplicate)' : ''),
+          mode: existingId ? 'update' : 'create',
           target, suppliers, est_low: est?.low ?? null, est_high: est?.high ?? null, actual_spend: actual,
         }),
         async () => {
+          if (existingId) {
+            await runUpdateLaunch({
+              launchId: existingId, projectId: p.id as string,
+              label: args.label,
+              launchDate: args.launch_date,                          // undefined ⇒ unchanged
+              target: args.target != null ? args.target : undefined, // undefined ⇒ unchanged
+              suppliers, createdBy: userEmail.split('@')[0],
+            })
+            const fresh = (await listLaunchesForProject(p.id as string)).find(l => l.id === existingId) ?? null
+            meta.detail = { upserted_launch: { id: existingId, label: args.label ?? null, suppliers: suppliers.length } }
+            return { ok: true, mode: 'updated', launch: fresh, economics: fresh ? launchEconOut(fresh) : null }
+          }
           const launch = await runLogLaunch({
             projectId: p.id as string, label: args.label ?? null, launchDate: args.launch_date ?? null,
             target, suppliers, createdBy: userEmail.split('@')[0],
           })
           meta.detail = { created_launch: { id: launch.id, label: launch.label, suppliers: launch.suppliers.length } }
-          return { ok: true, launch, economics: launchEconOut(launch) }
+          return { ok: true, mode: 'created', launch, economics: launchEconOut(launch) }
         }
       )
     },
