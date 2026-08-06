@@ -23,7 +23,7 @@ const TYPE_OPTIONS = [
 
 const TIP = {
   submitted: 'Date the project was submitted into the pipeline.',
-  launch: 'Date the survey went (or goes) live in the field.',
+  launch: 'Date the survey went (or goes) live in the field. Auto-filled with the day the project first enters Fielding (only if left blank); editable anytime.',
   due: 'Internal deadline — when everything needs to be finished on our side.',
   deliver:
     'Client-facing deadline — when the client needs the project in hand. Often the same day as the internal due date.',

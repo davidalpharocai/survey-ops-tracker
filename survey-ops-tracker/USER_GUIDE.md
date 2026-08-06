@@ -54,10 +54,10 @@ New projects normally start in **Scoping** (New Inquiry → Proposal Sent → Pr
 [screenshot: project page Overview]
 
 ### Header
-The project name (click to rename), a permanent **Project ID**, and a **Type** badge (PS / B2B / Rerun — click to change it; the same field also edits in the Details grid below) sit up top next to the status pill. On the right: **⚑ Priority** (cycles none → high → urgent) · **⏸ Hold** / **▶ Resume** (pauses; card greys out and sinks to the bottom of its column; Resume brings it right back) · **✕ Archive** / **↺ Reopen** (leaves Operations view but stays in Full View's Archived section, reopenable anytime) · and an **Actions ▾** menu that collects the less-frequent record actions in one place: **⎘ Clone project**, **⧉ Merge with a duplicate…** (see *Merging duplicates* in §7), managing **Co-Captains** (sharing a project shows "+1" on its board card), and **🗑 Delete project** (asks you to type "delete"; the project moves to Admin → Recently Deleted and can be restored — it's not gone for good unless deleted permanently from there).
+The project name (click to rename), a permanent **Project ID**, and a **Type** badge (PS / B2B / Rerun — click to change it; the same field also edits in the Details grid below) sit up top next to the status pill. On the right: **⚑ Priority** (cycles none → high → urgent) · **⏸ Hold** / **▶ Resume** (pauses; card greys out and sinks to the bottom of its column; Resume brings it right back) · **✕ Archive** / **↺ Reopen** (leaves Operations view but stays in Full View's Archived section, reopenable anytime) · and an **Actions ▾** menu that collects the less-frequent record actions in one place: **⎘ Clone project**, **⧉ Merge with a duplicate…** (see *Merging duplicates* in §7), managing **Co-Captains** (sharing a project shows "+1" on its board card), **⛔ Cancel project** (records a reason, then folds the project off the active board into Full View's **Archived** section as *Cancelled* — **Reopen** brings it back), and **🗑 Delete project** (asks you to type "delete"; the project moves to Admin → Recently Deleted and can be restored — it's not gone for good unless deleted permanently from there).
 
 ### ✦ Summary
-At the top of the **Overview** tab: an AI-written status brief. Every figure in it — N, spend, pace vs. the due date, days in the current stage — is computed exactly in code first; Claude (Haiku) only writes the sentences around those numbers, so it can't invent or alter one. It surfaces **watch-outs** automatically as a short amber list — past-due, spend running ahead of collection, a dip in blast completions. It's collapsible (collapsed shows just the one-line takeaway), shows an **"as of"** stamp for how stale it is, and has a **↻** to force a regenerate; otherwise it loads once when you open the project and does not refresh itself in the background. Labeled **AI · Beta** — the figures are exact, but verify specifics before relying on the prose.
+At the top of the **Overview** tab: an AI-written status brief. Every figure in it — N, spend, pace vs. the due date, days in the current stage — is computed exactly in code first; Claude (Haiku) only writes the sentences around those numbers, so it can't invent or alter one. It surfaces **watch-outs** automatically as a short amber list — past-due, spend running ahead of collection, a dip in blast completions, or a segment behind its own target. It's collapsible (collapsed shows just the one-line takeaway), shows an **"as of"** stamp for how stale it is, and has a **↻** to force a regenerate; otherwise it loads once when you open the project and does not refresh itself in the background. Labeled **AI · Beta** — the figures are exact, but verify specifics before relying on the prose.
 
 ### Overview: the field grid
 Below the Summary, the Overview body is a Salesforce-style **field grid** — aligned label → value rows spanning the main column. Click any value to edit it in place; save on Enter or click-away, Escape cancels (a quick "Saved ✓" confirms it stuck). At the very top of the main column, **Pipeline Progress** still lets you check off stages (this moves the card on the board) — or **Scoping Stage** progress for deals not yet approved. Below that, the grid runs:
@@ -76,15 +76,16 @@ Alongside the grid, a slim right rail holds: **People** (Client — click to ope
 ### N Segments
 Split "N & Audience" into per-segment tracking — e.g. Buyers / Sellers — with **＋ Split into segments**; add as many as you need. Each segment gets its own **N Target, N Internal Target, N Collected, N Actual, Audience,** and **Audience Size**, editable the same way as any field-grid cell. Once segmented, the top-level N fields become **read-only sums** ("Σ across N segments") — edit the segments instead; an un-segmented project keeps its top-level N fields directly editable. **✕** removes a segment, with a one-click **↩ Undo** for the rest of the session. For **Jenna's general-population studies**, the same soft **gen-pop N floor** check as before still runs against the (summed) N — national ≈ **1,350**, state-level ≈ **500**, read from the free-text Audience — advisory, type **`override`** with an optional reason to dismiss it, Undo to bring it back.
 
-> **Note:** per-segment N and the Insights "Time in each stage" panel below both need **database migration 062** applied before they populate. Until then, N stays single-value (segments won't total) and the stage-timing panel shows its empty state.
-
 ### Editing numbers and dates
 - **Number fields** — N Target / Internal Target / Collected / Actual (whole-project or per segment) and Audience Size — take plain numbers, comma-grouped numbers (`4,200`), or a leading **`=`** to auto-sum: type `=4200+800` and it commits as `5,000`.
 - **Date fields** — Submitted, Launch, Due, Delivery, Rerun — take typed entry (`7/23/2026` or `Jul 23, 2026`) or the **📅** calendar picker. A date that isn't real (`2/30/2026`, a garbled year) is rejected inline rather than silently saved.
 
 ### Tabs
 - **Overview** — the field grid + rail above, topped by the ✦ Summary strip
-- **Insights (Beta)** — performance stats (completion/fill rates, cost per complete, pace, supplier mix), now including **Time in each stage**: a day-count bar per pipeline stage. The clock starts at **Doc Programming** — the Submitted → Doc Programming gap isn't tracked — and the current stage is marked "· now"
+- **Insights (Beta)** — performance stats. A top **KPI row**: **N progress** (collected vs target), **Budget** (spend vs budget + a projected final cost), **Cost / complete**, and **Pace** — completes/day since fielding began, a projected finish date, and how much **buffer** you have before the due date (or how far past). Below it:
+  - **Segment pace** (multi-segment projects only) — each segment tracked against **its own** target with an on-track / behind read; because over-collecting one segment doesn't cover a shortfall in another, a caveat calls it out when the total looks complete but a segment is lagging.
+  - **Time in each stage** — a day-count bar per pipeline stage. The clock starts at **Doc Programming** (the Submitted → Doc Programming gap isn't tracked) and the current stage is marked "· now".
+  - Per-type **blast** (completion rate, cost/complete, best/worst send) or **launch & supplier** performance (fill rate per launch, supplier mix, best value).
 - **Activity** — logged emails and events for the project (click one to expand and read; the search box finds a specific email by subject, body, or person). See §9b.
 - **Deliverables** — the final client deliverables filed for this project. See §9.
 - **Links** — Slack channel link and notification info. (Survey IDs live in the Details grid now, not here.)
@@ -121,6 +122,7 @@ The **✦ Assistant** is now a full working assistant — it can both **answer q
 ## 6. Things that happen automatically
 
 - **Survey IDs** sync nightly (~6:45pm ET) from each project's Edwin link; conflicts show an amber review banner on the project
+- **Launch (fielding) date auto-fills** the day a project first moves into **Fielding** — but only if it's still blank, so a date you entered yourself is never overwritten. Still editable anytime in the Details grid.
 - **Voter QA + Citation flags** auto-set when the salesperson is Jenna or the project/client mentions "vote"
 - **Morning digest** posts to Slack at 8am ET: overdue, due-soon, and behind-pace projects
 - **Legacy sheet sync** (migration period): new PS/B2B projects and their changes are mirrored into the old "Surveys" Google Sheet automatically, so the team keeps seeing current data there while everyone moves onto SOCC
@@ -314,9 +316,12 @@ Meridian."*
   and their @alpharoc email).
 
 **Things you can ask it to recall:** *"What did we do last time for Coatue?"* · *"What's overdue
-for me?"* · *"How did last quarter's wave compare?"* If you ask what questions were asked last
-time, Claude hands the linked questionnaire doc over to your Drive connector rather than guess
-at the content.
+for me?"* · *"How did last quarter's wave compare?"* · *"How many PS surveys launched in July?"* ·
+*"Give me an Excel of everything delivered in Q2"* · *"What's at risk right now?"* · *"Which open
+projects have Alex Pinsky as sales?"* · *"What changed on PR00123?"* — it can pull period counts, a
+downloadable report, a risk triage, filtered project lists, and a project's field-change history.
+If you ask what questions were asked last time, Claude hands the linked questionnaire doc over to
+your Drive connector rather than guess at the content.
 
 **Corrections:** if a logged blast needs fixing, do that in the app — Claude can log new
 ones but won't edit or delete an existing entry.
