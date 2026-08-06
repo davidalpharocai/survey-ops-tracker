@@ -1,6 +1,6 @@
 # Survey Ops Command Center — User Guide
 
-*Last updated: July 23, 2026. The team's tracker for survey projects from first inquiry through delivery.*
+*Last updated: August 6, 2026. The team's tracker for survey projects from first inquiry through delivery.*
 
 **Finding this guide later:** the top navigation bar's **More** menu links straight here, along with the Systems & Handover doc.
 
@@ -143,6 +143,14 @@ Some clients (the financial ones) require their compliance team to sign off befo
 - **Tag the client** (Admin → Accounts shows a 🛡 Compliance chip, or set it on the client page): **before fielding** (the client reviews the *questions* before the survey goes live) and/or **after fielding** (they review the *questions + results* before delivery), plus the compliance contact email(s). Seeded from the sheet's Compliance tab; editable in the app.
 - **The guardrails**: a before-fielding client can't be moved into **Fielding** until the questionnaire review is **approved**; an after-fielding client can't be marked **Delivered** until the results review is approved. If you genuinely need to proceed, you can **override with a reason** (recorded on the project).
 - **How review happens**: it reuses the compliance portal — the contact gets an emailed link and approves/rejects. On a project page, the **Compliance Review** panel handles "Submit questions" (before) and "Send results to compliance" (after, available once N Actual is in). A banner flags any outstanding review.
+
+## 7c. Occam invite check (before first delivery)
+
+Clients view their data in Occam, so a new contact needs their Occam welcome email + a sign-in *before* they can open a deliverable. The tracker checks this the **first time** you deliver to a project's **Requested-by contact**.
+
+- **When it fires**: as you mark a project **Delivered** (checkbox row or the command-bar dots), if that project's Requested-by contact hasn't been confirmed as invited to Occam yet, a prompt asks whether the invite was sent. Choose **"Yes, invite sent — deliver"** (records it) or **"Deliver anyway…"** (needs a reason, recorded on the project). It only asks **once per contact** — after that, every future project for them delivers without the prompt. Projects with no Requested-by contact aren't gated. This is independent of the compliance gate; a first delivery for a compliance client will show both prompts in turn.
+- **Pre-mark people already onboarded**: on a client page, each contact row has an **"Occam ✓"** chip and a **"Mark Occam invited" / "Unmark Occam"** toggle — use it to flag contacts who already have their Occam account so their next delivery skips the prompt.
+- **Via Claude**: the connector's delivery tool enforces the same check — it will ask you to confirm the invite before it marks a first delivery.
 
 ## 8. Tips
 
