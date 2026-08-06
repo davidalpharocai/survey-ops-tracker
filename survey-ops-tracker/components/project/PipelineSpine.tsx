@@ -4,6 +4,7 @@ import { usePipelineStage } from '@/lib/hooks/usePipelineStage'
 import { useUpdateProject } from '@/lib/hooks/useProjects'
 import { HelpTip } from '@/components/shared/InfoTooltip'
 import { ComplianceGateModal } from './ComplianceGateModal'
+import { OccamGateModal } from './OccamGateModal'
 import type { SurveyProject } from '@/lib/hooks/useProjects'
 
 interface PipelineSpineProps {
@@ -17,7 +18,7 @@ interface PipelineSpineProps {
  * so clicking a dot or the CTA behaves identically to the legacy checkbox row.
  */
 export function PipelineSpine({ project }: PipelineSpineProps) {
-  const { toggleStage, gate, setGate } = usePipelineStage(project)
+  const { toggleStage, gate, setGate, occamGate, setOccamGate } = usePipelineStage(project)
   const updateProject = useUpdateProject()
 
   // CTA state: the next stage to advance into is the one right after the
@@ -162,6 +163,15 @@ export function PipelineSpine({ project }: PipelineSpineProps) {
           contact={gate.contact}
           onCancel={() => setGate(null)}
           onOverride={gate.onOverride}
+        />
+      )}
+      {occamGate && (
+        <OccamGateModal
+          contactName={occamGate.contactName}
+          contactEmail={occamGate.contactEmail}
+          onCancel={() => setOccamGate(null)}
+          onConfirmSent={occamGate.onConfirmSent}
+          onOverride={occamGate.onOverride}
         />
       )}
     </div>

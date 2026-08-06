@@ -129,6 +129,53 @@ export async function loadGateInput(projectId: string): Promise<GateInputData> {
   }
 }
 
+/** Occam onboarding gate input for a project: its requested-by contact + whether
+ *  that contact has already been confirmed as invited to Occam. Used by
+ *  advance_project (and the in-app gate) to block a first delivery until confirmed. */
+export async function loadOccamGate(projectId: string): Promise<{
+  requestedByContactId: string | null
+  contactOccamInvited: boolean
+  contactName: string | null
+  contactEmail: string | null
+}> {
+  const supabase = createAdminClient()
+  const { data: project, error: pErr } = await supabase
+    .from('survey_projects')
+    .select('requested_by_contact_id')
+    .eq('id', projectId)
+    .maybeSingle()
+  if (pErr) throw new Error(pErr.message)
+  const contactId = project?.requested_by_contact_id ?? null
+  if (!contactId) return { requestedByContactId: null, contactOccamInvited: false, contactName: null, contactEmail: null }
+  const { data: contact, error: cErr } = await supabase
+    .from('client_contacts')
+    .select('first_name, last_name, email, occam_invited')
+    .eq('id', contactId)
+    .maybeSingle()
+  if (cErr) throw new Error(cErr.message)
+  if (!contact) return { requestedByContactId: contactId, contactOccamInvited: false, contactName: null, contactEmail: null }
+  return {
+    requestedByContactId: contactId,
+    contactOccamInvited: !!contact.occam_invited,
+    contactName: `${contact.first_name} ${contact.last_name}`.trim() || null,
+    contactEmail: contact.email,
+  }
+}
+
+/** Record that a contact has been invited to Occam (welcome email sent), so the
+ *  delivery gate stops prompting for them. */
+export async function markContactOccamInvited(contactId: string, actor: string): Promise<void> {
+  const supabase = createAdminClient()
+  // Only stamp on the false→true transition so a redundant confirm never overwrites
+  // the original invite date/author.
+  const { error } = await supabase
+    .from('client_contacts')
+    .update({ occam_invited: true, occam_invited_at: new Date().toISOString(), occam_invited_by: actor })
+    .eq('id', contactId)
+    .eq('occam_invited', false)
+  if (error) throw new Error(error.message)
+}
+
 /** A clean, tool-facing error (never a throw) for a rejected/blocked resolution. */
 export type WritableError = { error: string }
 

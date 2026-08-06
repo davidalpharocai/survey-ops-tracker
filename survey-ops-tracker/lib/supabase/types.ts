@@ -470,6 +470,9 @@ export type Database = {
           archived: boolean
           created_by: string | null
           created_at: string
+          occam_invited: boolean
+          occam_invited_at: string | null
+          occam_invited_by: string | null
         }
         Insert: {
           id?: string
@@ -482,6 +485,9 @@ export type Database = {
           archived?: boolean
           created_by?: string | null
           created_at?: string
+          occam_invited?: boolean
+          occam_invited_at?: string | null
+          occam_invited_by?: string | null
         }
         Update: {
           id?: string
@@ -494,6 +500,9 @@ export type Database = {
           archived?: boolean
           created_by?: string | null
           created_at?: string
+          occam_invited?: boolean
+          occam_invited_at?: string | null
+          occam_invited_by?: string | null
         }
         Relationships: []
       }

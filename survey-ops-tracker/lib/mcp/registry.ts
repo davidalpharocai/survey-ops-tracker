@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getCheckboxesForColumn, STAGE_ORDER, type BoardColumn } from '@/lib/utils/stage'
 import { complianceGate } from '@/lib/utils/compliance'
+import { occamOnboardingGate } from '@/lib/utils/occam'
 import { autoStamp } from '@/lib/utils/date'
 import { normalizeClientText, firmNameFrom } from '@/lib/utils/clientName'
 import { blastTotal } from '@/lib/utils/blast'
@@ -16,7 +17,7 @@ import {
   runRenameClient, runCreateProject,
   pickProjectPatch, diffSummary, stageColumnsFor,
   runLogLaunch, resolveLaunch, listLaunchesForProject, runUpdateLaunch, runRemoveLaunch,
-  UNDOABLE_FIELDS,
+  UNDOABLE_FIELDS, loadOccamGate, markContactOccamInvited,
   type LaunchView, type LaunchSupplierInput, type LaunchSupplierPatch,
 } from '@/lib/mcp/writes'
 import {
@@ -1347,18 +1348,21 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'advance_project',
     description:
-      'Move an Active project to a pipeline column, or mark it delivered (preview first; confirm to apply). Enforces the compliance gate.',
+      "Move an Active project to a pipeline column, or mark it delivered (preview first; confirm to apply). Enforces the compliance gate (override_reason to proceed) AND, on the deliver transition, the Occam onboarding gate: the first time we deliver to a project's requested-by contact, it blocks (gate:'occam') until you confirm the Occam account invite (welcome email) was sent so the client can actually view the data. The two gates are independent — overriding compliance does NOT skip the Occam check. When it blocks on Occam, re-call with occam_invite_confirmed:true once the invite has gone out (records it, so the contact is never prompted again), or occam_override_reason to deliver without it.",
     kind: 'write',
     schema: {
       project: z.string(),
       to_column: z.string().optional(),
       mark_delivered: z.boolean().optional(),
       override_reason: z.string().optional(),
+      occam_invite_confirmed: z.boolean().optional(),
+      occam_override_reason: z.string().optional(),
       confirm: z.boolean().optional(),
     },
     handler: async (rawArgs, ctx, meta) => {
       const args = rawArgs as {
-        project: string; to_column?: string; mark_delivered?: boolean; override_reason?: string; confirm?: boolean
+        project: string; to_column?: string; mark_delivered?: boolean; override_reason?: string
+        occam_invite_confirmed?: boolean; occam_override_reason?: string; confirm?: boolean
       }
       const { userEmail } = ctx
       const p = await resolveProjectWritable(args.project)
@@ -1387,30 +1391,61 @@ export const TOOLS: AssistantTool[] = [
         targetColumn: stage.board_column, willMarkDelivered,
         client: gi.client, override: gi.override, submissions: gi.submissions,
       })
-      if (gate.blocked && !args.override_reason) return { blocked: true, reason: gate.message }
+      if (gate.blocked && !args.override_reason) return { blocked: true, gate: 'compliance', reason: gate.message }
+
+      // Occam onboarding gate — only on the deliver transition, only for a first-time
+      // requested-by contact. Resolved: occam_invite_confirmed marks the contact invited
+      // (so this never re-prompts); override_reason delivers without it (logged).
+      let occamContactToMark: string | null = null
+      const notes: string[] = []
+      if (gate.blocked && args.override_reason) notes.push(`⚠ Compliance override (${gate.phase}): ${args.override_reason}`)
+      if (willMarkDelivered) {
+        const og = await loadOccamGate(p.id as string)
+        const oGate = occamOnboardingGate({
+          willMarkDelivered,
+          requestedByContactId: og.requestedByContactId,
+          contactOccamInvited: og.contactOccamInvited,
+        })
+        if (oGate.blocked) {
+          // The Occam gate is resolved ONLY by its own signals — a compliance
+          // override_reason must NOT silently clear it (that would skip the invite
+          // check for exactly the compliance-sensitive clients most likely to care).
+          if (args.occam_invite_confirmed) {
+            occamContactToMark = og.requestedByContactId
+          } else if (args.occam_override_reason) {
+            notes.push(`⚠ Delivered without confirming the Occam invite: ${args.occam_override_reason}`)
+          } else {
+            const who = og.contactName ? `${og.contactName}${og.contactEmail ? ` <${og.contactEmail}>` : ''}` : 'the requested-by contact'
+            return {
+              blocked: true, gate: 'occam',
+              reason: `${oGate.message} Contact: ${who}. Re-call with occam_invite_confirmed:true once the invite has been sent, or occam_override_reason to deliver without it.`,
+            }
+          }
+        }
+      }
 
       const patch: Record<string, unknown> = { ...stage }
-      if (gate.blocked && args.override_reason) {
-        patch.latest_next_steps = autoStamp(
-          userEmail.split('@')[0],
-          p.latest_next_steps as string | null,
-          `⚠ Compliance override (${gate.phase}): ${args.override_reason}`
-        )
+      if (notes.length) {
+        patch.latest_next_steps = autoStamp(userEmail.split('@')[0], p.latest_next_steps as string | null, notes.join(' · '))
       }
 
       return confirmable(
         args,
         async () => ({
           project_code: p.project_code, to: stage.board_column, delivered: willMarkDelivered,
-          override: gate.blocked ? args.override_reason ?? null : null, updated_at: p.updated_at,
+          override: notes.length ? args.override_reason ?? null : null,
+          occam_invite_confirmed: occamContactToMark ? true : undefined,
+          updated_at: p.updated_at,
         }),
         async () => {
           const supabase = createAdminClient()
           const result = await runProjectWrite(supabase, { id: p.id as string, patch, actor: `${userEmail} via Claude` })
           if ('error' in result) return result
+          if (occamContactToMark) await markContactOccamInvited(occamContactToMark, `${userEmail} via Claude`)
           meta.detail = {
             to_column: result.board_column, delivered: willMarkDelivered,
-            override_reason: gate.blocked ? args.override_reason ?? null : null,
+            override_reason: notes.length ? args.override_reason ?? null : null,
+            occam_invite_confirmed: !!occamContactToMark,
           }
           return { ok: true, project_code: result.project_code, board_column: result.board_column }
         }
