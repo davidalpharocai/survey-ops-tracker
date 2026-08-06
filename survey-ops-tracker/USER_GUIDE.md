@@ -45,7 +45,23 @@ Captain, Type, Due (today/tomorrow/2 days), Stage (including Closed), and a sear
 
 ## 2. Creating a project
 
-Click **+ New Project** (or press N). Fill the form — or use the **✦ Describe it** box: type something like *"New B2B for Meridian, Tom sold it, Priya captain, 200 responses, due July 15, budget 15k"* and AI fills the form for your review. Check "Already approved" to skip scoping and land straight in the pipeline.
+You can create a project two ways — describe it in plain English and let AI fill the form, or fill it in yourself. Both open the same dialog.
+
+**Step by step:**
+
+1. On the board, click **+ New Project** at the top right (or press **N**). The New Project dialog opens:
+
+![The New Project dialog](/guide-img/create-1-new-project-dialog.png)
+
+2. **Fastest — describe it.** In the **✦ Describe it and I'll fill out the form** box, type it in plain English — e.g. *"New B2B for Meridian, Tom sold it, Priya captain, 200 responses, due July 15, budget 15k"* — and click **Fill form**. AI fills the fields below for you to review.
+3. **Or fill it in manually:**
+   - **Project name** (required).
+   - **Client** (required) — start typing, then pick an existing client from the list, or choose **+ New Client "…"** to create one on the spot.
+   - **Type** — PS, B2B, or Rerun.
+   - **Captain** — the team member running it (leave **Unassigned** if you're not sure yet).
+   - **Salesperson** — who sold it.
+4. **Already approved?** Tick **"Already approved — skip scoping and add straight to the pipeline"** to drop it onto the operational board (Submitted). Leave it unticked and the project starts in **Scoping** as a New Inquiry.
+5. Click **Create inquiry** (the button reads **Create project** if you ticked "Already approved"). The project is created and its page opens — dates, N targets, budget, and everything else are edited from there (see §3).
 
 New projects normally start in **Scoping** (New Inquiry → Proposal Sent → Pricing Discussion → Awaiting Approval). Approve a deal by dragging its card into the pipeline, or with the green button on its project page. It works in reverse too — if a deal reopens, drag the card back onto a scoping column (Full View), or use "↩ Back to Scoping" on the project page; pipeline progress is kept in case it gets re-approved.
 
