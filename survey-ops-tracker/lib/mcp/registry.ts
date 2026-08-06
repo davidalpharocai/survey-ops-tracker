@@ -16,6 +16,7 @@ import {
   runRenameClient, runCreateProject,
   pickProjectPatch, diffSummary, stageColumnsFor,
   runLogLaunch, resolveLaunch, listLaunchesForProject, runUpdateLaunch, runRemoveLaunch,
+  UNDOABLE_FIELDS,
   type LaunchView, type LaunchSupplierInput, type LaunchSupplierPatch,
 } from '@/lib/mcp/writes'
 import {
@@ -35,7 +36,7 @@ import * as health from '@/lib/mcp/health'
 const REPORT_BASE = 'https://survey-ops-tracker.vercel.app'
 import { cloneProject } from '@/lib/server/clone'
 import {
-  confirmable, describeChanges, fmtChangeVal, todayEastern, fetchDocTitle,
+  confirmable, describeChanges, fmtChangeVal, fieldLabel, describeUnrevertible, todayEastern, fetchDocTitle,
   DUE_DATE_RE, CLIENT_WRITE_FIELDS, CONTACT_WRITE_FIELDS,
 } from '@/lib/mcp/toolHelpers'
 
@@ -301,6 +302,80 @@ export const TOOLS: AssistantTool[] = [
     handler: async (rawArgs) => {
       const args = rawArgs as { project: string; limit?: number }
       return data.getChangeHistory(args.project, args.limit)
+    },
+  },
+  {
+    name: 'undo_last_change',
+    description:
+      "Revert the most recent EDIT to a project (from the audit log), preview-then-confirm. A single edit may have changed several fields at once; this reverts them together. Only plain content fields are auto-revertible (name, dates, N targets, audience, budget, flags, next-steps, survey/slack links); status/stage, spend/money-lines, relational fields, and a segmented project's N totals are skipped with a reason (use the dedicated tool or the app). Preview returns a `revert_token`; pass it back with confirm:true to apply (it refuses if a newer edit slipped in). Use for “undo that / revert the last edit / put the due date back”.",
+    kind: 'write',
+    schema: { project: z.string(), confirm: z.boolean().optional(), revert_token: z.string().optional() },
+    handler: async (rawArgs, ctx, meta) => {
+      const args = rawArgs as { project: string; confirm?: boolean; revert_token?: string }
+      const { userEmail } = ctx
+      const resolved = await data.resolveProject(args.project)
+      if (resolved === null) return { error: `No project found matching "${args.project}".` }
+      if ('ambiguous' in resolved) {
+        return { note: 'Multiple projects match — specify the project code.', candidates: resolved.ambiguous }
+      }
+      const p = resolved as { id: string; project_code?: string | null; segment_count?: number | null }
+      const batch = await data.getLastChangeBatch(p.id)
+      if (!batch || batch.rows.length === 0) return { note: 'No recorded change history for this project — nothing to undo.' }
+      const token = batch.changed_at // the whole edit (one transaction) is pinned by its timestamp
+
+      // A segmented project's N totals are trigger-derived from its segments; reverting the
+      // parent directly would desync it (and the trigger would later clobber it), so skip
+      // them here just as update_project refuses them — same guard.
+      const segmented = ((p.segment_count as number | null) ?? 0) > 0
+      const SEGMENT_OWNED_N = new Set(['n_target', 'n_collected', 'n_actual', 'n_internal_target'])
+      const revertible: { field: string; old_value: string | null; new_value: string | null }[] = []
+      const skipped: { field: string; reason: string }[] = []
+      for (const r of batch.rows) {
+        if (!UNDOABLE_FIELDS.has(r.field)) { skipped.push({ field: r.field, reason: describeUnrevertible(r.field) }); continue }
+        if (segmented && SEGMENT_OWNED_N.has(r.field)) { skipped.push({ field: r.field, reason: describeUnrevertible(r.field) }); continue }
+        revertible.push(r)
+      }
+      if (revertible.length === 0) {
+        return {
+          note: `The last edit (by ${batch.changed_by}) touched ${batch.rows.map(r => r.field).join(', ')} — none of which I can auto-undo (${skipped.map(s => `${s.field}: ${s.reason}`).join('; ')}).`,
+          last_change: batch.rows,
+        }
+      }
+      const describeReverts = (rs: typeof revertible) =>
+        rs.map(r => `${fieldLabel(r.field)} ${fmtChangeVal(r.new_value)} → ${fmtChangeVal(r.old_value)}`).join('; ')
+      return confirmable(
+        args,
+        async () => ({
+          summary: `Revert ${revertible.length} field(s) from the last edit (by ${batch.changed_by} at ${batch.changed_at}): ${describeReverts(revertible)}`,
+          reverting: revertible.map(r => ({ field: r.field, from: r.new_value, to: r.old_value })),
+          skipped,
+          revert_token: token,
+          note: (skipped.length
+            ? `${skipped.length} field(s) from that edit can't be auto-undone and will be left as-is: ${skipped.map(s => s.field).join(', ')}. `
+            : '') + 'Confirm by passing this revert_token back with confirm:true.',
+        }),
+        async () => {
+          if (!args.revert_token) {
+            return { error: 'Pass the revert_token from the preview with confirm:true so the exact edit being undone is pinned.' }
+          }
+          if (args.revert_token !== token) {
+            return { error: 'The latest edit is no longer the one you previewed (something changed since) — re-run undo_last_change to see the current last edit.' }
+          }
+          const patch: Record<string, unknown> = {}
+          for (const r of revertible) patch[r.field] = r.old_value
+          const supabase = createAdminClient()
+          const res = await runProjectWrite(supabase, { id: p.id, patch, actor: `${userEmail} via Claude` })
+          if ('error' in res) return res
+          meta.project_id = p.id
+          meta.detail = { undo: { fields: revertible.map(r => r.field) } }
+          return {
+            ok: true,
+            reverted: revertible.map(r => ({ field: r.field, from: r.new_value, to: r.old_value })),
+            skipped,
+            project_code: (res as { project_code?: string | null }).project_code ?? p.project_code ?? null,
+          }
+        }
+      )
     },
   },
   {

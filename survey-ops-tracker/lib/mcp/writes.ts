@@ -17,6 +17,26 @@ export const PROJECT_WRITE_FIELDS = [
   'audience','category','objective','sprint_number','n_floor_override','n_floor_override_reason',
 ] as const
 
+/**
+ * Fields undo_last_change may auto-revert: PLAIN scalar content only, whose audited
+ * OLD.col::text round-trips cleanly through mcp_write_project's ::type coercion, and
+ * which have NO side effects. Deliberately EXCLUDES:
+ *   - lifecycle (status/phase/scoping_stage/board_column/stage_*) — use advance/status tools
+ *   - trigger-owned/segment-synced (n_collected, actual_spend) — would be overwritten
+ *   - relational/identity (client, project_type, captain_id, co_captain_ids, requested_by_*)
+ *   - gated semantics (compliance_override, n_floor_override[_reason])
+ *   - money-line + synthetic audit rows (blast_*, segment_*, launch, created, merged)
+ * Anything not here is refused with a "fix it in the app / use the dedicated tool" note.
+ */
+export const UNDOABLE_FIELDS = new Set<string>([
+  'project_name', 'salesperson', 'priority', 'blocked_by',
+  'submitted_date', 'launch_date', 'due_date', 'deliver_date', 'rerun_date',
+  'n_target', 'n_actual', 'n_internal_target', 'audience_size', 'budget',
+  'audience', 'category', 'objective', 'sprint_number',
+  'longitudinal', 'voter_survey_qa', 'citation_language_needed', 'row_level_data', 'terminations',
+  'latest_next_steps', 'survey_tool_id', 'slack_channel_url',
+])
+
 type Patch = Record<string, unknown>
 
 /** Keep only whitelisted keys actually present; report everything else the caller tried to set. */
