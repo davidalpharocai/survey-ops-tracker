@@ -32,6 +32,7 @@ const SYSTEM_PROMPT =
   "If a field is null or 'n/a', omit it gracefully rather than guessing. " +
   "The 'status' (Open / On hold / Archived), 'delivered', and 'deliveredDate' fields are authoritative about lifecycle: if delivered is true or status is Archived, describe the project as finished/archived (past tense) — NEVER as active, ongoing, or 'in progress'. " +
   "Never assert progress, timing, or state (e.g. 'in progress', 'ongoing', 'currently', 'underway', 'wrapping up') that isn't explicitly present in the facts; 'rerun'/'Wave N' names the wave only — do not infer that a rerun is running. " +
+  "When 'segments' is non-empty the N is split into segments, each with its own target and 'onTrack' — judge progress by whether EVERY segment is on track, not just the total N; a total at or over target with any segment behind is NOT fully on track, so the 'progress' sentence must say so. " +
   'Do NOT restate the watch-outs (shown separately). ' +
   'Respond with ONLY a JSON object: {"oneLine": string, "status": string, "progress": string, "money": string, "next": string}. ' +
   'Each value is ONE short sentence; oneLine <= 160 chars and is the headline.'
@@ -183,15 +184,17 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: 'Project not found.' }, { status: 404 })
   }
 
-  const [blastsRes, stageHistoryRes, stepsRes] = await Promise.all([
+  const [blastsRes, stageHistoryRes, stepsRes, segmentsRes] = await Promise.all([
     admin.from('project_blasts').select('*').eq('project_id', projectId).order('created_at', { ascending: true }),
     admin.from('project_stage_history').select('stage, entered_at').eq('project_id', projectId).order('entered_at', { ascending: true }),
     admin.from('project_steps').select('text').eq('project_id', projectId).eq('done', false).order('created_at', { ascending: true }),
+    admin.from('project_segments').select('label, n_target, n_collected').eq('project_id', projectId).order('sort_order', { ascending: true }),
   ])
 
   const blasts = (blastsRes.data ?? []) as Blast[]
   const stageHistory = (stageHistoryRes.data ?? []) as StageHistoryRow[]
   const openNextSteps = (stepsRes.data ?? []).map((s) => s.text)
+  const segments = (segmentsRes.data ?? []) as { label: string | null; n_target: number | null; n_collected: number | null }[]
 
   const now = new Date().toISOString()
   const facts = buildSummaryFacts({
@@ -200,6 +203,7 @@ export async function POST(req: NextRequest) {
     stageHistory,
     now,
     openNextSteps,
+    segments,
   })
 
   const anthropic = new Anthropic({ apiKey })

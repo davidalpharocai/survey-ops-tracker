@@ -2,15 +2,17 @@
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
 import { NProgressBar } from '@/components/shared/NProgressBar'
 import { StageTimePanel } from '@/components/project/StageTimePanel'
+import { SegmentPacePanel } from '@/components/project/SegmentPacePanel'
 import { fmtNum } from '@/lib/utils/number'
 import type { SurveyProject } from '@/lib/hooks/useProjects'
 import { useProjectBlasts, type Blast } from '@/lib/hooks/useProjectBlasts'
 import { useProjectLaunches, type ProjectLaunch } from '@/lib/hooks/useProjectLaunches'
 import { useProjectSuppliers, type ProjectSupplier } from '@/lib/hooks/useProjectSuppliers'
+import { useProjectSegments } from '@/lib/hooks/useProjectSegments'
 import { projectEstimateRange, projectTarget, modalCap } from '@/lib/utils/suppliers'
 import {
   pctOf, computePace, costPerComplete, projectedFinalCost,
-  blastCompletionRate, cumulativeCompletes, supplierMix, bestValueSupplier, daysBetween,
+  blastCompletionRate, cumulativeCompletes, supplierMix, bestValueSupplier, daysBetween, segmentPaces,
 } from '@/lib/utils/insights'
 
 function money(v: number | null): string {
@@ -78,6 +80,7 @@ export function ProjectInsights({ project }: { project: SurveyProject }) {
   const { data: blasts = [] } = useProjectBlasts(project.id)
   const { data: launches = [] } = useProjectLaunches(project.id)
   const { data: suppliers = [] } = useProjectSuppliers(project.id)
+  const { data: segments = [] } = useProjectSegments(project.id)
 
   const todayISO = new Date().toISOString()
   const collected = project.n_collected ?? 0
@@ -91,6 +94,17 @@ export function ProjectInsights({ project }: { project: SurveyProject }) {
   // Once delivered, pace + "projected finish / past due" are meaningless — the
   // survey is done. Suppress the projection (see the Pace tile below).
   const delivered = project.board_column === 'Delivery' || !!project.delivered_at
+
+  // Per-segment pace — only for multi-segment projects. The total-N tiles above can
+  // read "complete" while one segment sits under its OWN target, so pace each segment
+  // against its own target on the shared project timeline.
+  const segRows = segments.length >= 2
+    ? segmentPaces({
+        segments: segments.map(s => ({ label: s.label, n_target: s.n_target, n_collected: s.n_collected })),
+        startISO, dueISO: project.due_date ?? null, todayISO, delivered,
+      })
+    : []
+  const segBehind = segRows.filter(r => r.onTrack === false).length
 
   const type = project.project_type
   const showB2B = blasts.length > 0 || type === 'B2B'
@@ -173,7 +187,16 @@ export function ProjectInsights({ project }: { project: SurveyProject }) {
         </p>
       )}
 
-      {/* Zone 1b — time in each stage (Doc Programming onward) */}
+      {!delivered && segBehind > 0 && (
+        <p className="text-[12px] text-amber-600/90 dark:text-amber-400/90 -mt-2">
+          ⚠ {segBehind} segment{segBehind === 1 ? '' : 's'} behind their own target — a total N at or over target can still hide a lagging segment (see Segment pace below).
+        </p>
+      )}
+
+      {/* Zone 1b — per-segment pace (multi-segment projects only) */}
+      <SegmentPacePanel rows={segRows} delivered={delivered} />
+
+      {/* Zone 1c — time in each stage (Doc Programming onward) */}
       <StageTimePanel project={project} />
 
       {/* Zone 2a — B2B blast performance */}

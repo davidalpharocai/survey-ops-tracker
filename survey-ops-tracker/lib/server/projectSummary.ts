@@ -2,7 +2,7 @@ import 'server-only'
 import type { SurveyProject } from '@/lib/hooks/useProjects'
 import type { Blast } from '@/lib/hooks/useProjectBlasts'
 import { formatDate } from '@/lib/utils/date'
-import { pctOf, daysBetween, computePace, costPerComplete, blastCompletionRate } from '@/lib/utils/insights'
+import { pctOf, daysBetween, computePace, costPerComplete, blastCompletionRate, segmentPaces, type SegmentPaceRow } from '@/lib/utils/insights'
 import { stageDurations, type StageHistoryRow } from '@/lib/utils/stageTiming'
 
 // Deterministic facts + watch-outs for the ✦ Summary. Every number here is
@@ -16,6 +16,8 @@ export interface SummaryInput {
   now: Date | string
   /** Open to-do texts (e.g. parsed from latest_next_steps) — passed straight through. */
   openNextSteps?: string[]
+  /** N segments (2+) for per-segment pacing; omit/empty for a single-N project. */
+  segments?: { label: string | null; n_target: number | null; n_collected: number | null }[]
 }
 
 export interface SummaryFacts {
@@ -30,6 +32,8 @@ export interface SummaryFacts {
   nCollected: number
   nTarget: number | null
   nPct: number | null
+  /** Per-segment pace (empty unless the project has 2+ N segments). */
+  segments: SegmentPaceRow[]
   spend: number
   budget: number | null
   spendPct: number | null
@@ -113,6 +117,19 @@ export function buildSummaryFacts(input: SummaryInput): SummaryFacts {
   const nTarget = project.n_target ?? null
   const nPct = pctOf(nCollected, nTarget)
 
+  // Per-segment pace (2+ segments) — the total nPct can read "complete" while a
+  // segment sits under its OWN target, so surface each segment independently.
+  const segments = input.segments ?? []
+  const segRows: SegmentPaceRow[] = segments.length >= 2
+    ? segmentPaces({
+        segments,
+        startISO: project.launch_date ?? project.created_at,
+        dueISO: project.due_date ?? null,
+        todayISO: nowISO,
+        delivered,
+      })
+    : []
+
   const spend = project.actual_spend ?? 0
   const budget = project.budget ?? null
   const spendPct = pctOf(spend, budget)
@@ -168,6 +185,11 @@ export function buildSummaryFacts(input: SummaryInput): SummaryFacts {
       `Blast completion dipped on the latest send (${Math.round(lastPct!)}% vs ${Math.round(firstPct!)}%).`
     )
   }
+  const segBehind = segRows.filter((s) => s.onTrack === false)
+  if (!delivered && segBehind.length > 0) {
+    const list = segBehind.map((s) => `${s.label} (~${Math.round(s.projectedPct ?? 0)}% projected)`).join(', ')
+    watchouts.push(`Segment(s) behind their own target: ${list}. Total N can look complete while a segment lags.`)
+  }
 
   return {
     stage,
@@ -179,6 +201,7 @@ export function buildSummaryFacts(input: SummaryInput): SummaryFacts {
     nCollected,
     nTarget,
     nPct,
+    segments: segRows,
     spend,
     budget,
     spendPct,
