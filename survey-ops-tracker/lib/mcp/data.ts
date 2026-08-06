@@ -89,7 +89,7 @@ export function isActiveOperational(p: {
 }
 
 export async function searchProjects(args: {
-  query?: string; status?: string; phase?: string; captain?: string;
+  query?: string; status?: string; phase?: string; captain?: string; salesperson?: string;
   due_before?: string; due_after?: string; limit?: number; mine?: boolean; userId?: string;
   active_only?: boolean
 }) {
@@ -122,6 +122,10 @@ export async function searchProjects(args: {
   }
   if (args.status) q = q.eq('status', args.status as never)
   if (args.phase) q = q.eq('phase', args.phase as never)
+  // Salesperson is a plain text column (free-text names like "Alex Pinsky"), so a
+  // contains-match filters in SQL directly — "Alex" finds "Alex Pinsky". (Captain,
+  // below, is a joined relation and is filtered in JS instead.)
+  if (args.salesperson) q = q.ilike('salesperson', `%${sanitizeQuery(args.salesperson)}%`)
   if (args.due_before) q = q.lte('due_date', args.due_before)
   if (args.due_after) q = q.gte('due_date', args.due_after)
   q = q.order('due_date', { ascending: true, nullsFirst: false })

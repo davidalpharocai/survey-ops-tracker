@@ -103,13 +103,14 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'search_projects',
     description:
-      'Search survey projects by name/code/client with optional filters. Returns only in-flight active projects by default (excludes Archived, Cancelled, On-Hold, Delivered, and pre-sale Scoping); pass active_only:false to search ALL projects regardless of status — e.g. to find a specific past or archived project. Pass status:"Cancelled" to find projects the client cancelled. Pass mine:true to scope to your own captained projects. ("Archived" is the status for finished/legacy projects kept for history; "Cancelled" is for projects a client asked to cancel.)',
+      'Search survey projects by name/code/client with optional filters. Filter by captain (the team member running it) and/or salesperson (the AlphaROC seller, e.g. "Alex Pinsky" — a partial name like "Alex" matches) — use the salesperson filter to answer "which projects have <person> as sales". Returns only in-flight active projects by default (excludes Archived, Cancelled, On-Hold, Delivered, and pre-sale Scoping); pass active_only:false to search ALL projects regardless of status — e.g. to find a specific past or archived project. Pass status:"Cancelled" to find projects the client cancelled. Pass mine:true to scope to your own captained projects. ("Archived" is the status for finished/legacy projects kept for history; "Cancelled" is for projects a client asked to cancel.)',
     kind: 'read',
     schema: {
       query: z.string().optional(),
       status: z.enum(['Open', 'Hold', 'Archived', 'Closed', 'Cancelled']).optional(),
       phase: z.enum(['Scoping', 'Active']).optional(),
       captain: z.string().optional(),
+      salesperson: z.string().optional(),
       due_before: z.string().optional(),
       due_after: z.string().optional(),
       limit: z.number().int().min(1).max(50).optional(),
@@ -119,7 +120,7 @@ export const TOOLS: AssistantTool[] = [
     handler: async (rawArgs, ctx) => {
       const args = rawArgs as {
         query?: string; status?: 'Open' | 'Hold' | 'Archived' | 'Closed' | 'Cancelled'; phase?: 'Scoping' | 'Active'
-        captain?: string; due_before?: string; due_after?: string; limit?: number
+        captain?: string; salesperson?: string; due_before?: string; due_after?: string; limit?: number
         mine?: boolean; active_only?: boolean
       }
       const { userId } = ctx
