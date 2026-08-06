@@ -689,6 +689,34 @@ export async function getChangeHistory(projectRef: string, limit = 20) {
   }
 }
 
+/** The most recent EDIT (all audit rows sharing the newest changed_at — a single
+ *  UPDATE audits one row per changed field, all with the same transaction timestamp)
+ *  for a project, or null. Powers undo_last_change, which reverts the batch as a unit
+ *  so a multi-field edit is undone together and the target is order-independent. */
+export async function getLastChangeBatch(projectId: string): Promise<
+  { changed_at: string; changed_by: string; rows: { field: string; old_value: string | null; new_value: string | null }[] } | null
+> {
+  const supabase = createAdminClient()
+  const { data: top, error: e1 } = await supabase.from('project_audit')
+    .select('changed_at, changed_by')
+    .eq('project_id', projectId)
+    .order('changed_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (e1) throw e1
+  if (!top) return null
+  const { data, error: e2 } = await supabase.from('project_audit')
+    .select('field, old_value, new_value')
+    .eq('project_id', projectId)
+    .eq('changed_at', top.changed_at as string)
+  if (e2) throw e2
+  return {
+    changed_at: top.changed_at as string,
+    changed_by: top.changed_by as string,
+    rows: (data ?? []) as { field: string; old_value: string | null; new_value: string | null }[],
+  }
+}
+
 /** Rerun Radar — reads the pre-computed rerun_status view and buckets recurring
  *  reruns into overdue / needs-definition / prep-window / upcoming (each row in
  *  one bucket by priority). Paused series excluded. Optional owner filter. */
