@@ -29,6 +29,7 @@ import {
   REPORT_FIELD_KEYS, DEFAULT_REPORT_FIELDS,
   type SurveyEvent, type SurveyType,
 } from '@/lib/mcp/reports'
+import * as health from '@/lib/mcp/health'
 
 // Canonical prod origin for report download links surfaced to the connector user.
 const REPORT_BASE = 'https://survey-ops-tracker.vercel.app'
@@ -300,6 +301,39 @@ export const TOOLS: AssistantTool[] = [
     handler: async (rawArgs) => {
       const args = rawArgs as { project: string; limit?: number }
       return data.getChangeHistory(args.project, args.limit)
+    },
+  },
+  {
+    name: 'reconcile_project',
+    description:
+      "Cross-field consistency check for ONE project: does actual_spend match Σ(cpi×collected)+Σ(bid×completes); do segment N totals sum to the project N; is a survey-ID discrepancy flagged; are the dates in a sane order — plus advisory notes (supplier N collected vs the delivered N, which legitimately differ via QA attrition; sheet copy behind the app). Returns the failing `issues`, `advisories`, and the full `checks`. Use for “does <project>'s money/N add up”, “is anything off on <project>”, or to explain a spend/N number that looks wrong.",
+    kind: 'read',
+    schema: { project: z.string() },
+    handler: async (rawArgs) => {
+      const args = rawArgs as { project: string }
+      return health.reconcileProject(args.project)
+    },
+  },
+  {
+    name: 'data_health',
+    description:
+      "Portfolio-wide anomaly scan — runs the reconcile_project checks over every project and returns the ones with real integrity issues (spend mismatch, segment totals off, survey-ID discrepancy, impossible date order), with counts_by_check and separate advisory_counts. Defaults to the active operational set; pass active_only:false to scan all non-deleted projects. Use for “is our data healthy / anything drifting”, a spend audit, or a pre-report sanity pass.",
+    kind: 'read',
+    schema: { active_only: z.boolean().optional(), limit: z.number().int().min(1).max(200).optional() },
+    handler: async (rawArgs) => {
+      const args = rawArgs as { active_only?: boolean; limit?: number }
+      return health.dataHealth(args)
+    },
+  },
+  {
+    name: 'pipeline_throughput',
+    description:
+      "Stage-timing analytics from the live board + stage history: per active stage (Submitted → Data QA) the current WIP count (from the authoritative board column), and for the tracked stages (Doc Programming onward) the median/avg days completed passes took, plus projects aging in their current stage past `stuck_days` (default 14). Active work only — Delivery (done) isn't measured; `untracked` counts active projects not yet in a timed stage (e.g. still in Submitted). Pass mine:true to scope to your captained projects. Use for “where are things bottlenecking”, “how long does Survey Programming take”, or “what's been stuck too long”.",
+    kind: 'read',
+    schema: { mine: z.boolean().optional(), stuck_days: z.number().int().min(1).max(365).optional() },
+    handler: async (rawArgs, ctx) => {
+      const args = rawArgs as { mine?: boolean; stuck_days?: number }
+      return health.pipelineThroughput({ mine: args.mine, userId: ctx.userId, stuck_days: args.stuck_days })
     },
   },
   {
