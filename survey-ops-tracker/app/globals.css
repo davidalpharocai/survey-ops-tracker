@@ -192,6 +192,7 @@
 .doc-prose h2 { font-size: 1.25rem; font-weight: 700; margin: 1.9rem 0 0.7rem; padding-bottom: 0.3rem; border-bottom: 1px solid var(--border); }
 .doc-prose h3 { font-size: 1.05rem; font-weight: 600; margin: 1.4rem 0 0.4rem; }
 .doc-prose h4 { font-size: 0.95rem; font-weight: 600; margin: 1.1rem 0 0.3rem; }
+.doc-prose h1, .doc-prose h2, .doc-prose h3 { scroll-margin-top: 1.25rem; }
 .doc-prose p { margin: 0.6rem 0; }
 .doc-prose ul, .doc-prose ol { margin: 0.5rem 0 0.85rem; padding-left: 1.4rem; }
 .doc-prose ul { list-style: disc; }
