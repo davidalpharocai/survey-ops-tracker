@@ -8,6 +8,7 @@ import {
   useArchiveClientContact,
   useDeleteClientContact,
 } from '@/lib/hooks/useClientContacts'
+import { useCurrentMember } from '@/lib/hooks/useCurrentMember'
 import { contactName, contactSubtitle } from '@/lib/utils/contact'
 import {
   ContactForm,
@@ -23,6 +24,7 @@ export function ClientContacts({ clientId }: { clientId: string }) {
   const update = useUpdateClientContact(clientId)
   const archive = useArchiveClientContact(clientId)
   const del = useDeleteClientContact(clientId)
+  const { data: currentMember } = useCurrentMember()
   const [adding, setAdding] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [showArchived, setShowArchived] = useState(false)
@@ -35,6 +37,16 @@ export function ClientContacts({ clientId }: { clientId: string }) {
   }
   function handleEdit(id: string, d: ContactDraft) {
     update.mutate({ id, updates: draftToFields(d) }, { onSuccess: () => setEditingId(null) })
+  }
+  // Occam onboarding flag. Marking it lets a first delivery to this contact skip the
+  // delivery-time prompt (they've already got their Occam invite); clearing it re-arms.
+  function toggleOccam(id: string, invited: boolean) {
+    update.mutate({
+      id,
+      updates: invited
+        ? { occam_invited: false, occam_invited_at: null, occam_invited_by: null }
+        : { occam_invited: true, occam_invited_at: new Date().toISOString(), occam_invited_by: currentMember?.name ?? null },
+    })
   }
 
   return (
@@ -81,11 +93,30 @@ export function ClientContacts({ clientId }: { clientId: string }) {
             ) : (
               <div key={c.id} className="flex items-center justify-between gap-2 py-2 group">
                 <div className="min-w-0">
-                  <p className="text-sm text-foreground truncate">{contactName(c)}</p>
+                  <p className="text-sm text-foreground truncate flex items-center gap-1.5">
+                    <span className="truncate">{contactName(c)}</span>
+                    {c.occam_invited && (
+                      <span
+                        className="shrink-0 text-[10px] leading-none px-1.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20"
+                        title={`Invited to Occam${c.occam_invited_at ? ` on ${String(c.occam_invited_at).slice(0, 10)}` : ''}${c.occam_invited_by ? ` by ${c.occam_invited_by}` : ''}`}
+                      >
+                        Occam ✓
+                      </span>
+                    )}
+                  </p>
                   {contactSubtitle(c) && <p className="text-xs text-muted-foreground truncate">{contactSubtitle(c)}</p>}
                   {c.phone && <p className="text-xs text-muted-foreground truncate">{c.phone}</p>}
                 </div>
                 <div className="flex items-center gap-2 text-xs shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    onClick={() => toggleOccam(c.id, c.occam_invited)}
+                    className="text-muted-foreground hover:text-foreground"
+                    title={c.occam_invited
+                      ? 'Clear the Occam-invited flag (they will be prompted again before their next first delivery)'
+                      : 'Mark that this contact has been invited to Occam (skips the delivery prompt)'}
+                  >
+                    {c.occam_invited ? 'Unmark Occam' : 'Mark Occam invited'}
+                  </button>
                   <button onClick={() => setEditingId(c.id)} className="text-blue-600 dark:text-blue-400 hover:underline">
                     Edit
                   </button>

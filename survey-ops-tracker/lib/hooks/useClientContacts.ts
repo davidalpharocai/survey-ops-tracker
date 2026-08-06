@@ -84,6 +84,9 @@ export function useUpdateClientContact(clientId: string) {
       qc.invalidateQueries({ queryKey: ['client-contacts', clientId] })
       // A name edit should reflect on any project page showing this contact.
       qc.invalidateQueries({ queryKey: ['project'] })
+      // The delivery-gate reads occam_invited via this key; keep it fresh when the
+      // roster's "Mark Occam invited" toggle (or any contact edit) changes it.
+      qc.invalidateQueries({ queryKey: ['requested-by-contact'] })
     },
   })
 }

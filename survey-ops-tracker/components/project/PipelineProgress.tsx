@@ -2,6 +2,7 @@
 import { STAGE_ORDER, STAGE_DESCRIPTIONS, stageLabel } from '@/lib/utils/stage'
 import { usePipelineStage, STAGE_TO_FIELD } from '@/lib/hooks/usePipelineStage'
 import { ComplianceGateModal } from './ComplianceGateModal'
+import { OccamGateModal } from './OccamGateModal'
 import type { SurveyProject } from '@/lib/hooks/useProjects'
 
 // The two-word programming stages have the longest labels, so give them extra
@@ -19,7 +20,7 @@ interface PipelineProgressProps {
 export function PipelineProgress({ project }: PipelineProgressProps) {
   // Advance mechanism + compliance gate live in the shared hook so this legacy
   // checkbox row and the command-bar PipelineSpine behave identically.
-  const { toggleStage, gate, setGate } = usePipelineStage(project)
+  const { toggleStage, gate, setGate, occamGate, setOccamGate } = usePipelineStage(project)
 
   return (
     <div>
@@ -70,6 +71,15 @@ export function PipelineProgress({ project }: PipelineProgressProps) {
           contact={gate.contact}
           onCancel={() => setGate(null)}
           onOverride={gate.onOverride}
+        />
+      )}
+      {occamGate && (
+        <OccamGateModal
+          contactName={occamGate.contactName}
+          contactEmail={occamGate.contactEmail}
+          onCancel={() => setOccamGate(null)}
+          onConfirmSent={occamGate.onConfirmSent}
+          onOverride={occamGate.onOverride}
         />
       )}
     </div>

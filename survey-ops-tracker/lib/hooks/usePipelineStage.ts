@@ -4,7 +4,9 @@ import { STAGE_ORDER } from '@/lib/utils/stage'
 import { useUpdateProject } from '@/lib/hooks/useProjects'
 import { useCurrentMember } from '@/lib/hooks/useCurrentMember'
 import { useComplianceState } from '@/lib/hooks/useComplianceState'
+import { useRequestedByContact, useMarkOccamInvited } from '@/lib/hooks/useOccamOnboarding'
 import { complianceGate } from '@/lib/utils/compliance'
+import { occamOnboardingGate } from '@/lib/utils/occam'
 import { autoStamp } from '@/lib/utils/date'
 import type { SurveyProject } from '@/lib/hooks/useProjects'
 import type { BoardColumn } from '@/lib/utils/stage'
@@ -41,6 +43,13 @@ export interface PipelineGate {
   onOverride: (reason: string) => void
 }
 
+export interface OccamGate {
+  contactName: string
+  contactEmail: string | null
+  onConfirmSent: () => void
+  onOverride: (reason: string) => void
+}
+
 /**
  * The shared pipeline-advance mechanism used by both PipelineProgress (the
  * legacy checkbox row) and PipelineSpine (the command-bar dot path). It owns
@@ -52,7 +61,10 @@ export function usePipelineStage(project: SurveyProject) {
   const updateProject = useUpdateProject()
   const { data: currentMember } = useCurrentMember()
   const { data: compliance } = useComplianceState(project.id, project.client, project.compliance_override ?? null)
+  const { data: requestedByContact } = useRequestedByContact(project.requested_by_contact_id ?? null)
+  const markOccamInvited = useMarkOccamInvited()
   const [gate, setGate] = useState<PipelineGate | null>(null)
+  const [occamGate, setOccamGate] = useState<OccamGate | null>(null)
 
   // Apply a stage move; `overrideNote`, when present, is stamped into the
   // project's Latest/Next Steps (attributed + timestamped + captured by the
@@ -67,6 +79,46 @@ export function usePipelineStage(project: SurveyProject) {
         ...(overrideNote ? { latest_next_steps: autoStamp(userName, project.latest_next_steps, overrideNote) } : {}),
       },
     })
+  }
+
+  // After compliance clears (or is overridden), run the Occam onboarding gate on the
+  // deliver transition: block the first delivery to a requested-by contact until the
+  // Occam invite is confirmed sent. `complianceNote`, if present, is carried through so
+  // an override is still recorded even if the Occam prompt also fires.
+  function proceedToDelivery(
+    newState: Record<string, boolean>,
+    newColumn: BoardColumn,
+    willMarkDelivered: boolean,
+    complianceNote?: string,
+  ) {
+    if (willMarkDelivered) {
+      const og = occamOnboardingGate({
+        willMarkDelivered,
+        requestedByContactId: project.requested_by_contact_id ?? null,
+        contactOccamInvited: requestedByContact?.occam_invited ?? false,
+      })
+      if (og.blocked) {
+        setOccamGate({
+          contactName: requestedByContact?.name ?? 'the requested-by contact',
+          contactEmail: requestedByContact?.email ?? null,
+          onConfirmSent: () => {
+            const contactId = project.requested_by_contact_id
+            if (contactId) markOccamInvited.mutate({ contactId, invitedBy: currentMember?.name ?? 'Someone' })
+            applyMove(newState, newColumn, complianceNote)
+            setOccamGate(null)
+          },
+          onOverride: (reason: string) => {
+            const note = [complianceNote, `⚠ Delivered without confirming the Occam invite: ${reason}`]
+              .filter(Boolean)
+              .join(' · ')
+            applyMove(newState, newColumn, note)
+            setOccamGate(null)
+          },
+        })
+        return
+      }
+    }
+    applyMove(newState, newColumn, complianceNote)
   }
 
   function toggleStage(stage: string) {
@@ -121,15 +173,15 @@ export function usePipelineStage(project: SurveyProject) {
         message: g.message,
         contact: compliance?.contact ?? null,
         onOverride: (reason: string) => {
-          applyMove(newState, newColumn, `⚠ Compliance override (${g.phase}): ${reason}`)
           setGate(null)
+          proceedToDelivery(newState, newColumn, willMarkDelivered, `⚠ Compliance override (${g.phase}): ${reason}`)
         },
       })
       return
     }
 
-    applyMove(newState, newColumn)
+    proceedToDelivery(newState, newColumn, willMarkDelivered)
   }
 
-  return { toggleStage, gate, setGate }
+  return { toggleStage, gate, setGate, occamGate, setOccamGate }
 }
