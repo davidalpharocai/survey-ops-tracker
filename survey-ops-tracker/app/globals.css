@@ -179,3 +179,51 @@
 .thin-scroll::-webkit-scrollbar-thumb:hover {
   background-color: var(--ring);
 }
+
+/* In-app User Guide (/guide) — styles the markdown rendered from USER_GUIDE.md.
+   Uses the app's theme tokens so it tracks light/dark automatically. */
+.doc-prose {
+  color: var(--foreground);
+  line-height: 1.65;
+  font-size: 0.95rem;
+}
+.doc-prose > *:first-child { margin-top: 0; }
+.doc-prose h1 { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.01em; margin: 1.6rem 0 0.8rem; }
+.doc-prose h2 { font-size: 1.25rem; font-weight: 700; margin: 1.9rem 0 0.7rem; padding-bottom: 0.3rem; border-bottom: 1px solid var(--border); }
+.doc-prose h3 { font-size: 1.05rem; font-weight: 600; margin: 1.4rem 0 0.4rem; }
+.doc-prose h4 { font-size: 0.95rem; font-weight: 600; margin: 1.1rem 0 0.3rem; }
+.doc-prose p { margin: 0.6rem 0; }
+.doc-prose ul, .doc-prose ol { margin: 0.5rem 0 0.85rem; padding-left: 1.4rem; }
+.doc-prose ul { list-style: disc; }
+.doc-prose ol { list-style: decimal; }
+.doc-prose li { margin: 0.28rem 0; }
+.doc-prose li > ul, .doc-prose li > ol { margin: 0.28rem 0; }
+.doc-prose a { color: var(--primary); text-decoration: underline; text-underline-offset: 2px; }
+.doc-prose strong { font-weight: 650; }
+.doc-prose em { font-style: italic; }
+.doc-prose code {
+  background: var(--muted);
+  padding: 0.1rem 0.35rem;
+  border-radius: 0.3rem;
+  font-size: 0.85em;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.doc-prose pre {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 0.6rem;
+  padding: 0.9rem 1rem;
+  overflow-x: auto;
+  margin: 0.85rem 0;
+}
+.doc-prose pre code { background: none; padding: 0; font-size: 0.82rem; }
+.doc-prose blockquote {
+  border-left: 3px solid var(--primary);
+  background: color-mix(in srgb, var(--primary) 7%, transparent);
+  color: var(--muted-foreground);
+  margin: 0.85rem 0;
+  padding: 0.5rem 0.9rem;
+  border-radius: 0 0.4rem 0.4rem 0;
+}
+.doc-prose blockquote p { margin: 0.2rem 0; }
+.doc-prose hr { border: none; border-top: 1px solid var(--border); margin: 1.7rem 0; }

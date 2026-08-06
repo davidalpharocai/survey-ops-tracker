@@ -43,8 +43,8 @@ const LINKS: { label: string; href: string; desc: string }[] = [
   },
   {
     label: 'User Guide',
-    href: 'https://docs.google.com/document/d/1FtnUeytOj1OI54dEhB5ogmoIcVKK18c9E1FztwKpQXE/edit',
-    desc: 'How to use the tracker.',
+    href: '/guide',
+    desc: 'How to use the tracker — the in-app guide (always current).',
   },
   {
     label: 'Systems & Handover',
