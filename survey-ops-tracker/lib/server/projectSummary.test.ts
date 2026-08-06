@@ -42,6 +42,36 @@ function blast(overrides: Partial<Blast> = {}): Blast {
   } as unknown as Blast
 }
 
+describe('buildSummaryFacts — segment pace', () => {
+  it('flags a lagging segment even when total N is over target', () => {
+    const facts = buildSummaryFacts({
+      // 10d elapsed (launch 8/1 → now 8/11), 10d left (due 8/21). Total 460 collected.
+      project: project({ launch_date: '2026-08-01', due_date: '2026-08-21', n_collected: 460, n_target: 600, board_column: 'Fielding' }),
+      blasts: [],
+      stageHistory: [],
+      now: '2026-08-11T00:00:00Z',
+      segments: [
+        { label: 'Buyers', n_target: 300, n_collected: 400 },
+        { label: 'Sellers', n_target: 300, n_collected: 60 },
+      ],
+    })
+    expect(facts.segments).toHaveLength(2)
+    expect(facts.segments[1].onTrack).toBe(false)
+    expect(facts.watchouts.some((w) => w.startsWith('Segment(s) behind'))).toBe(true)
+  })
+
+  it('no segment watch-out for a single-N project', () => {
+    const facts = buildSummaryFacts({
+      project: project({ n_collected: 10, n_target: 100, due_date: '2026-08-21', launch_date: '2026-08-01' }),
+      blasts: [],
+      stageHistory: [],
+      now: '2026-08-11T00:00:00Z',
+    })
+    expect(facts.segments).toHaveLength(0)
+    expect(facts.watchouts.some((w) => w.startsWith('Segment(s) behind'))).toBe(false)
+  })
+})
+
 describe('buildSummaryFacts — watch-outs', () => {
   it('overdue: true when due_date is past and the project is not delivered', () => {
     const facts = buildSummaryFacts({

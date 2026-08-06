@@ -1,8 +1,72 @@
 import { describe, it, expect } from 'vitest'
 import {
   pctOf, daysBetween, computePace, costPerComplete, projectedFinalCost,
-  blastCompletionRate, cumulativeCompletes, supplierMix, bestValueSupplier,
+  blastCompletionRate, cumulativeCompletes, supplierMix, bestValueSupplier, segmentPaces,
 } from './insights'
+
+describe('segmentPaces', () => {
+  const start = '2026-08-01', today = '2026-08-11', due = '2026-08-21' // 10d elapsed, 10d left
+  it('flags a lagging segment even when the OTHER segment over-collects', () => {
+    const rows = segmentPaces({
+      segments: [
+        { label: 'Buyers', n_target: 300, n_collected: 400 }, // already over its target
+        { label: 'Sellers', n_target: 300, n_collected: 60 }, // 6/day → ~120 by due < 300
+      ],
+      startISO: start, dueISO: due, todayISO: today,
+    })
+    expect(rows[0].onTrack).toBe(true)
+    expect(rows[1].onTrack).toBe(false)
+    expect(rows[1].projectedFinal).toBe(120) // 60 + 6/day * 10d
+  })
+  it('a segment already at/over its target is on track', () => {
+    const [r] = segmentPaces({
+      segments: [{ label: 'A', n_target: 100, n_collected: 100 }],
+      startISO: start, dueISO: due, todayISO: today,
+    })
+    expect(r.onTrack).toBe(true)
+    expect(r.pct).toBe(100)
+  })
+  it("can't assess a segment with no target (onTrack null)", () => {
+    const [r] = segmentPaces({
+      segments: [{ label: 'A', n_target: null, n_collected: 50 }],
+      startISO: start, dueISO: due, todayISO: today,
+    })
+    expect(r.onTrack).toBeNull()
+    expect(r.label).toBe('A')
+  })
+  it('falls back to "Segment N" for a blank label', () => {
+    const [r] = segmentPaces({
+      segments: [{ label: '', n_target: 100, n_collected: 10 }],
+      startISO: start, dueISO: due, todayISO: today,
+    })
+    expect(r.label).toBe('Segment 1')
+  })
+  it('delivered + under target = short (not a forward projection)', () => {
+    const [r] = segmentPaces({
+      // Historical pace would project a finish before due, but it's delivered + short.
+      segments: [{ label: 'A', n_target: 500, n_collected: 400 }],
+      startISO: start, dueISO: due, todayISO: today, delivered: true,
+    })
+    expect(r.onTrack).toBe(false)
+    expect(r.pct).toBe(80)
+  })
+  it('under target + no due date → projectedPct null (no bogus 0%) and onTrack null', () => {
+    const [r] = segmentPaces({
+      segments: [{ label: 'A', n_target: 300, n_collected: 100 }], // under target, actively collecting
+      startISO: start, dueISO: null, todayISO: today,
+    })
+    expect(r.projectedPct).toBeNull()
+    expect(r.onTrack).toBeNull()
+  })
+  it("pre-launch (future start) can't be assessed → onTrack null", () => {
+    const [r] = segmentPaces({
+      segments: [{ label: 'A', n_target: 100, n_collected: 0 }],
+      startISO: '2026-09-01', dueISO: '2026-09-30', todayISO: today, // start is after today
+    })
+    expect(r.perDay).toBeNull()
+    expect(r.onTrack).toBeNull()
+  })
+})
 
 describe('kpi math', () => {
   it('pctOf guards zero/none', () => {

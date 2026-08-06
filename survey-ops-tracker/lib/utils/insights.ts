@@ -52,6 +52,75 @@ export function costPerComplete(actualSpend: number, collected: number): number 
   return collected > 0 ? actualSpend / collected : null
 }
 
+export interface SegmentPaceRow {
+  label: string
+  collected: number
+  target: number | null
+  /** collected ÷ target, as a percent. */
+  pct: number | null
+  perDay: number | null
+  projectedFinishISO: string | null
+  /** Where this segment lands by the due date at the current pace. */
+  projectedFinal: number | null
+  /** projectedFinal ÷ target, as a percent. */
+  projectedPct: number | null
+  /** true = projected to hit its own target by the due date (or already met);
+   *  false = behind; null = can't assess (no target, or no due date to judge against). */
+  onTrack: boolean | null
+}
+
+/**
+ * Per-segment pace. A total-N that meets/exceeds the project target can hide a
+ * segment that's badly under its OWN target — over-collecting Buyers doesn't
+ * rescue an under-collected Sellers. So each segment is paced independently
+ * against its own target, using the project's launch date + due date (segments
+ * share the project timeline — they don't have their own dates).
+ * Pure: `todayISO` is passed in.
+ */
+export function segmentPaces(opts: {
+  segments: { label: string | null; n_target: number | null; n_collected: number | null }[]
+  startISO: string | null
+  dueISO: string | null
+  todayISO: string
+  /** Once delivered, collection has stopped — judge each segment on collected-vs-target,
+   *  not a meaningless forward projection. */
+  delivered?: boolean
+}): SegmentPaceRow[] {
+  return opts.segments.map((s, i) => {
+    const collected = s.n_collected ?? 0
+    const target = s.n_target
+    const pace = computePace({ collected, target, startISO: opts.startISO, todayISO: opts.todayISO })
+    const pct = pctOf(collected, target)
+    // Projected final only exists when there's a forward pace AND a due date to project to.
+    let projectedFinal: number | null = null
+    if (pace.perDay != null && opts.dueISO) {
+      const daysLeft = daysBetween(opts.todayISO, opts.dueISO)
+      projectedFinal = Math.round(collected + pace.perDay * daysLeft)
+    }
+    const projectedPct = projectedFinal != null ? pctOf(projectedFinal, target) : null
+    let onTrack: boolean | null = null
+    if (target != null && target > 0) {
+      if (collected >= target) onTrack = true // already met
+      else if (opts.delivered) onTrack = false // delivered under target = short (no projection)
+      else if (pace.perDay == null) onTrack = null // fielding hasn't started (pre-launch) — can't assess
+      else if (projectedPct == null) onTrack = null // no due date to judge against
+      // Derive from the SAME rounded % the UI shows, so status + number never contradict.
+      else onTrack = Math.round(projectedPct) >= 100
+    }
+    return {
+      label: (s.label && s.label.trim()) || `Segment ${i + 1}`,
+      collected,
+      target,
+      pct,
+      perDay: pace.perDay,
+      projectedFinishISO: pace.projectedFinishISO,
+      projectedFinal,
+      projectedPct,
+      onTrack,
+    }
+  })
+}
+
 /** Projected final cost = blended cost/complete × the completes we'll end up paying for.
  *  Floored at what's already collected so an over-quota project never projects a final
  *  cost below money already spent. */
