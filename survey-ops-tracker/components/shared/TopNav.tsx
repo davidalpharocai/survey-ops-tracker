@@ -7,8 +7,6 @@ import { createClient } from '@/lib/supabase/client'
 import { ThemeToggle } from '@/components/shared/ThemeToggle'
 import { NavSearch } from '@/components/shared/NavSearch'
 
-const USER_GUIDE_URL =
-  'https://docs.google.com/document/d/1FtnUeytOj1OI54dEhB5ogmoIcVKK18c9E1FztwKpQXE/edit'
 const HANDOVER_URL =
   'https://docs.google.com/document/d/1rkT0KYApcvYU1BlK-TO_lfiXyhL0FuGIPz9UjduSJgk/edit'
 
@@ -186,9 +184,9 @@ export function TopNav() {
                 <span>🔌</span> Connect your Claude
               </Link>
               <div className="border-t border-border my-1.5" />
-              <a href={USER_GUIDE_URL} target="_blank" rel="noopener noreferrer" className={menuItemClass} title="How to use the tracker — opens the Google Doc">
-                <span>📖</span> User Guide <span className="ml-auto text-xs text-muted-foreground">↗</span>
-              </a>
+              <Link href="/guide" className={menuItemClass} title="How to use the tracker — the in-app guide (always current)">
+                <span>📖</span> User Guide
+              </Link>
               <a href={HANDOVER_URL} target="_blank" rel="noopener noreferrer" className={menuItemClass} title="Systems, accounts, and runbooks — opens the Google Doc">
                 <span>🛟</span> Systems &amp; Handover <span className="ml-auto text-xs text-muted-foreground">↗</span>
               </a>
