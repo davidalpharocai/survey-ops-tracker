@@ -228,3 +228,12 @@
 }
 .doc-prose blockquote p { margin: 0.2rem 0; }
 .doc-prose hr { border: none; border-top: 1px solid var(--border); margin: 1.7rem 0; }
+.doc-prose img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0.9rem 0;
+  border: 1px solid var(--border);
+  border-radius: 0.6rem;
+  box-shadow: 0 1px 3px rgb(1 11 64 / 0.06);
+}
