@@ -1,6 +1,6 @@
 # Survey Ops Command Center — User Guide
 
-*Last updated: August 6, 2026. The team's tracker for survey projects from first inquiry through delivery.*
+*Last updated: August 7, 2026. The team's tracker for survey projects from first inquiry through delivery.*
 
 **Finding this guide later:** the top navigation bar's **More** menu links straight here, along with the Systems & Handover doc.
 
@@ -67,10 +67,14 @@ New projects normally start in **Scoping** (New Inquiry → Proposal Sent → Pr
 
 ## 3. The project page
 
-[screenshot: project page Overview]
+![The project page, Overview tab](/guide-img/project-overview.png)
+*Everything about one project on a single page: the command bar and pipeline spine up top, the ✦ Summary, the field grid (Details · N & Audience · Money · Flags) down the main column, and the People / Next Steps / Documents rail on the right.*
 
 ### Header
 The project name (click to rename), a permanent **Project ID**, and a **Type** badge (PS / B2B / Rerun — click to change it; the same field also edits in the Details grid below) sit up top next to the status pill. On the right: **⚑ Priority** (cycles none → high → urgent) · **⏸ Hold** / **▶ Resume** (pauses; card greys out and sinks to the bottom of its column; Resume brings it right back) · **✕ Archive** / **↺ Reopen** (leaves Operations view but stays in Full View's Archived section, reopenable anytime) · and an **Actions ▾** menu that collects the less-frequent record actions in one place: **⎘ Clone project**, **⧉ Merge with a duplicate…** (see *Merging duplicates* in §7), managing **Co-Captains** (sharing a project shows "+1" on its board card), **⛔ Cancel project** (records a reason, then folds the project off the active board into Full View's **Archived** section as *Cancelled* — **Reopen** brings it back), and **🗑 Delete project** (asks you to type "delete"; the project moves to Admin → Recently Deleted and can be restored — it's not gone for good unless deleted permanently from there).
+
+![The Actions ▾ menu](/guide-img/actions-menu.png)
+*The **Actions ▾** menu (top-right of the header) gathers the less-frequent record actions in one place.*
 
 ### ✦ Summary
 At the top of the **Overview** tab: an AI-written status brief. Every figure in it — N, spend, pace vs. the due date, days in the current stage — is computed exactly in code first; Claude (Haiku) only writes the sentences around those numbers, so it can't invent or alter one. It surfaces **watch-outs** automatically as a short amber list — past-due, spend running ahead of collection, a dip in blast completions, or a segment behind its own target. It's collapsible (collapsed shows just the one-line takeaway), shows an **"as of"** stamp for how stale it is, and has a **↻** to force a regenerate; otherwise it loads once when you open the project and does not refresh itself in the background. Labeled **AI · Beta** — the figures are exact, but verify specifics before relying on the prose.
@@ -102,6 +106,10 @@ Split "N & Audience" into per-segment tracking — e.g. Buyers / Sellers — wit
   - **Segment pace** (multi-segment projects only) — each segment tracked against **its own** target with an on-track / behind read; because over-collecting one segment doesn't cover a shortfall in another, a caveat calls it out when the total looks complete but a segment is lagging.
   - **Time in each stage** — a day-count bar per pipeline stage. The clock starts at **Doc Programming** (the Submitted → Doc Programming gap isn't tracked) and the current stage is marked "· now".
   - Per-type **blast** (completion rate, cost/complete, best/worst send) or **launch & supplier** performance (fill rate per launch, supplier mix, best value).
+
+![The Insights (Beta) tab](/guide-img/insights-segment-pace.png)
+*The Insights tab: the KPI row (N progress, budget, cost/complete, pace) up top, then **Segment pace** — here Buyers are on track while Sellers are behind, and the amber note flags that a healthy total N can still hide a lagging segment.*
+
 - **Activity** — logged emails and events for the project (click one to expand and read; the search box finds a specific email by subject, body, or person). See §9b.
 - **Deliverables** — the final client deliverables filed for this project. See §9.
 - **Links** — Slack channel link and notification info. (Survey IDs live in the Details grid now, not here.)
@@ -121,7 +129,8 @@ Open the **Calendar** tab in the top nav to see everything dated on one **month 
 
 ## 5. The AI Assistant
 
-[screenshot: assistant panel]
+![The ✦ Assistant panel](/guide-img/assistant-panel.png)
+*The ✦ Assistant opens from the floating button (bottom-right) or ⌘/Ctrl-K. Ask it about your projects or tell it to make a change — it shows a preview to confirm first.*
 
 The **✦ Assistant** is now a full working assistant — it can both **answer questions and make changes**, right in the app (no external setup). Open it from the floating **✦** button (bottom-right), press **⌘/Ctrl-K** anywhere, or expand it to the full-page view from the panel for a roomier session.
 
