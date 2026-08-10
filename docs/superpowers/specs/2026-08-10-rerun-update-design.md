@@ -118,6 +118,15 @@ On wave creation: `captain` = the series' configured rerun captain (**Sree** by 
 
 Entering rerun service is a deliberate human action (or seed); the *recurring waves* are the automatic part.
 
+**Stop a rerun from continuing** — three levels, all on the series record (header/Actions) and via the assistant/connector:
+- **Pause** (temporary) — `paused = true`: auto-spawning stops, the series stays live and shows as *Paused*, off the "due" counts + weekly digest until **Resume**.
+- **End rerun service** (permanent) — `in_service = false`: no more waves, drops off the radar + digest for good; past waves and the record are retained for history; re-activatable later.
+- **Switch to manual** — `service_mode = 'manual'`: series stays live but stops *auto*-creation; waves added by hand only.
+
+Edge case: if a next wave has already been auto-created but not yet fielded when the series is paused/ended, the app asks whether to also cancel that pending wave (normal Cancel flow) or leave it.
+
+**Numbering (confirmed):** waves default to date order; a manual drag saves an explicit order that overrides date order and sticks. New auto-created waves append at the end (newest = highest wave #).
+
 ## 12. Visibility (nothing missed)
 
 On the **Reruns page** (one screen): a **month view** of every series' scheduled/overdue waves across all clients — this is the correct, portfolio-level home for the cross-client list (it must NOT appear on an individual series record). Preserves the existing overdue / needs-definition radar flags.
@@ -137,7 +146,7 @@ Rerun data is integrated into both AI surfaces. Because the claude.ai connector 
 - **Search / list** — find series and waves by client, survey name, template id, cadence, in-service, or owner; filter to overdue / due-this-week / due-this-month.
 - **Ask** — grounded natural-language questions: *"what reruns are due this week?"*, *"which series are overdue?"*, *"when's the next BAM Consumer Study wave and what wave # is it?"*, *"how many waves has RP3 had and what were their N-actuals?"*
 - **Report** — date-windowed rollups: the rerun calendar for a month/quarter, all monthly PS reruns, waves delivered last quarter for a client, series with no cadence defined, on-time vs. late rate.
-- **Act** (confirm-before-write, as today) — put a project into rerun service (cadence + defaults), edit future-wave defaults, create / log / link a wave, pause/resume a series, and generate the weekly digest on demand.
+- **Act** (confirm-before-write, as today) — put a project into rerun service (cadence + defaults), edit future-wave defaults, create / log / link a wave, pause/resume/end a series or switch it to manual, and generate the weekly digest on demand.
 
 New/extended tools: `search_reruns`, `get_rerun_series`, `rerun_calendar` (report), `put_in_rerun_service`, `set_rerun_defaults`, `log_wave` / `link_wave`, plus the existing `rerun_radar` updated to read the new model.
 
@@ -157,8 +166,9 @@ New/extended tools: `search_reruns`, `get_rerun_series`, `rerun_calendar` (repor
 7. One-time `Rerun_DS` seed + dedup cross-check (with David).
 8. Guide update + adversarial review + ship.
 
-## 17. Open questions
+## 17. Confirmed decisions (from review)
 
-- Confirm the field-inheritance table (§8) — the one item flagged "ask if unsure."
-- Confirm manual drag order **overrides** date order (§6) rather than merely nudging it.
-- Who besides Sree can own a series / receive the monthly reminder?
+- **Field inheritance (§8):** confirmed as written.
+- **Numbering (§6):** Option A — waves default to date order; a manual drag saves an explicit order that overrides date and sticks; new auto-created waves append at the end.
+- **Ownership + notifications:** Sree owns each series and receives the **weekly digest**, cc David; recipients and send day/time are config-driven so they can change without a deploy. **No separate monthly reminder** — the weekly digest already covers every cadence (monthly, quarterly, ad-hoc), so a monthly nudge would be redundant.
+- **Rollout:** two phases — Phase 1 = core (data model, series record, wave lifecycle incl. stop/pause, compliance/captain rules, month visibility, weekly digest, Rerun_DS seed + dedup, connector/AI parity); Phase 2 = expand-in-place Reruns UX + historical backfill (§15/§16).
