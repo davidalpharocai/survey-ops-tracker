@@ -22,6 +22,7 @@ const SORT_KEY = 'sot.listSort'
 interface ListViewConfig {
   mode: 'operations' | 'full'
   captain: string | null
+  salesperson?: string | null
   type: string | null
   due: string | null
   dueFrom?: string | null
@@ -46,6 +47,7 @@ export default function ListView() {
 
   // Same filters as the board
   const [captainFilter, setCaptainFilter] = useState<string | null>(null)
+  const [salespersonFilter, setSalespersonFilter] = useState<string | null>(null)
   const [typeFilter, setTypeFilter] = useState<string | null>(null)
   const [dueFilter, setDueFilter] = useState<string | null>(null)
   const [dueFrom, setDueFrom] = useState<string | null>(null)
@@ -131,6 +133,7 @@ export default function ListView() {
   function applyView(c: ListViewConfig) {
     setMode(c.mode)
     setCaptainFilter(c.captain)
+    setSalespersonFilter(c.salesperson ?? null)
     setTypeFilter(c.type)
     setDueFilter(c.due)
     setDueFrom(c.dueFrom ?? null)
@@ -156,9 +159,12 @@ export default function ListView() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
 
+  const salespeople = [...new Set(projects.map(p => p.salesperson).filter((s): s is string => !!s && s.trim() !== ''))].sort((a, b) => a.localeCompare(b))
+
   const q = search.trim().toLowerCase()
   const visibleProjects = projects.filter(p => {
     if (!(effectiveMode === 'full' ? true : p.phase === 'Active' && p.status === 'Open')) return false
+    if (salespersonFilter && p.salesperson !== salespersonFilter) return false
     if (captainFilter) {
       if (captainFilter === 'unassigned') {
         if (p.captain != null) return false
@@ -257,6 +263,9 @@ export default function ListView() {
           captains={teamMembers}
           captainFilter={captainFilter}
           currentMemberId={currentMember?.id ?? null}
+          salespeople={salespeople}
+          salespersonFilter={salespersonFilter}
+          onSalespersonChange={setSalespersonFilter}
           typeFilter={typeFilter}
           dueFilter={dueFilter}
           dueFrom={dueFrom}
@@ -278,6 +287,7 @@ export default function ListView() {
           current={{
             mode,
             captain: captainFilter,
+            salesperson: salespersonFilter,
             type: typeFilter,
             due: dueFilter,
             dueFrom,
