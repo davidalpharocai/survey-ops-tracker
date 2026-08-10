@@ -66,6 +66,7 @@ create table if not exists public.rerun_series (
   delivery_cadence   text,                         -- e.g. "Beginning of month"
   in_service         boolean not null default true,
   service_mode       text not null default 'auto' check (service_mode in ('auto','manual')),
+  auto_armed         boolean not null default true,   -- seed sets FALSE so the first post-load wave is manual; first manual create / bulk-arm flips it true, then auto (see §18)
   paused             boolean not null default false,
   template_id        text,
   owner_email        text,                         -- defaults to the rerun captain (Sree)
@@ -119,7 +120,7 @@ select s.*,
        ((case when s.paused or not s.in_service then null
               when s.cadence_months is not null and lw.last_on is not null
                 then (lw.last_on + make_interval(months => s.cadence_months))::date
-              else null end) - current_date) as days_to_next
+              else null end) - (now() at time zone 'America/New_York')::date) as days_to_next  -- Eastern, not UTC (see §18)
 from public.rerun_series s
 left join last_wave lw on lw.series_id = s.id;
 grant select on public.rerun_series_status to authenticated, service_role;
@@ -271,7 +272,7 @@ Every tool is one `AssistantTool` entry in `TOOLS` (so both `app/api/mcp/route.t
 **Files:** modify `app/(app)/reruns/*`, `USER_GUIDE.md`.
 
 - [ ] **Step 1:** Add a **month view** to the Reruns page (all series' scheduled/overdue waves across clients, from `rerun_series_status` + waves). This is the cross-client home (never on a single series record).
-- [ ] **Step 2:** Update `USER_GUIDE.md` reruns section (series record, rerun service pause/end, weekly digest, type-vs-rerun, connector examples). Bump the date.
+- [ ] **Step 2:** ~~Update `USER_GUIDE.md`~~ — **MOVED OUT.** The guide update is the gated post-ship task (#60): done only after ship + David plays with it + signs off (per David's instruction). Do NOT update the guide in this task.
 - [ ] **Step 3:** Full verify — `npx tsc --noEmit` clean, `npx next build` passes, all vitest green; live smoke test of the Reruns page + a spawned wave.
 - [ ] **Step 4: Adversarial review** — fan out reviewer agents (Workflow) over the diff (correctness of the compliance waiver + gate threading, spawn inheritance, digest date-window math, dedup safety, RLS on the new table). Fix confirmed findings.
 - [ ] **Step 5: Ship** — PR, squash-merge `--admin`, re-trigger Vercel deploy, hand David migration 073 SQL (already run in Task 1 if done then; otherwise now). Update memory (`reruns-tab-plan`, `pending-migrations`).
@@ -289,3 +290,33 @@ Every tool is one `AssistantTool` entry in `TOOLS` (so both `app/api/mcp/route.t
 - **Ordering risk:** Tasks 1→2→3 are foundational; 4/5/6/7/8 depend on 1–2; 9 depends on 1,6,8; 10 last. Compliance (3) is independent of the series table except the SLIM column add.
 - **Migration numbering:** confirm `073` is unused (`ls supabase/migrations | tail`); bump if taken.
 - **Legacy bridge:** the old `rerun_series_id` root-pointer + `link-rerun` renumber keep working for un-seeded data; new series use `series_id`. Unifying/retiring the legacy path is Phase 2.
+
+---
+
+## Review-hardening addendum (v2 — 5-lens adversarial review, 2026-08-10)
+
+Apply these deltas on top of the task steps above; they resolve the review findings (rationale in spec §18).
+
+**Task 1 (migration 073):**
+- `service_mode` default `auto`; add `auto_armed boolean not null default true`.
+- **No `wave_no` column** — the wave number is the existing `rerun_number`; `wave_order` is only the drag override.
+- Add `unique (series_id, rerun_number) where deleted_at is null` — hard guard against duplicate/racey spawns.
+- Add a **resume anchor** column (`resume_anchor date null`); the view uses `effective_next = max(last_wave_on, resume_anchor) + cadence` so a resumed/re-activated series isn't instantly overdue.
+- View computes overdue/`days_to_next` in `America/New_York`, not UTC.
+- Also add a nullable **anchor** for seed-only series with no linked wave yet (fallback for `last_wave_on`), so a freshly-seeded series still computes a due date.
+
+**Task 3 (compliance):** waive when `(rerun_number ?? 1) >= 2` **regardless of client flag** (client flag still gates Wave 1); per-wave `compliance_required_override=true` forces it back on. Add the positive banner state ("not required — rerun wave; override to force"). Tests: strict-client wave 2 → waived; wave 2 + override → blocked; wave 1 → unchanged.
+
+**Task 4 (spawn):** selection filters on the prior wave's `rerun_spawned_at is null` AND `service_mode='auto' AND auto_armed AND not paused AND in_service`; the new wave gets a **concrete** next `rerun_date` (never blank) so `last_wave_on` advances; the legacy `longitudinal` path adds `AND series_id IS NULL`; carry **child rows** (suppliers/launches/blasts/segments) via `lib/server/clone.ts`; seed co_captain_ids once (original captain) and carry verbatim. Test: two back-to-back cron runs → exactly one wave; a row that's both `longitudinal` and in a series → exactly one wave.
+
+**Task 5 (digest):** build a **branded, table-based, inline-styled** email shell (navy `#010B40` header, teal `#0076AF` links) safe in Gmail/Outlook (no flex/inline-block pills); add `cc` to `SendArgs` (thread to nodemailer + Resend) and include `template`/`submissionId:null` in the call; **union legacy `rerun_status` reruns** into the digest during transition; empty-week subject shows `(0)`; DST note (arrives 7–8am ET); config'd base URL. **Retire the `rerun-nudges` cron** (remove from vercel.json / keep `RERUN_NUDGES_ENABLED` off) so Sree isn't double-emailed.
+
+**Task 6 (series record UI):** give reorder its **own dedicated drag handle** (vertical-only) distinct from the legacy cross-series move; drop indicator + on-drop toast naming the new order. Distinct save toasts ("Wave 3 updated" vs "Future-wave defaults updated — affects new waves") + scope microcopy. Waves list: **reduced column set** in the narrow project-page rail, full 7-col only on the record (or wrap in `overflow-x` thin-scroll); N via `fmtNum`. Add empty ("No waves yet — Create the next wave"), loading (skeleton), and error states. Add the project-page **"Put into rerun service"** action (Actions menu, near Clone) + dialog (cadence, Auto/Manual [default Auto], captain=Sree, and a "Defaults for future waves — this project stays as Wave 1" block with a computed first-auto-wave-date preview). Hide the legacy `rerun_meta` Paused control for seeded series. Implement the **pause/end pending-wave prompt** (cancel-or-leave the already-spawned un-fielded wave).
+
+**Task 7 (type split):** remove `Rerun` from every **editable** type selector (`OverviewFieldGrid` TYPE_OPTIONS, the `EditableType` dropdown) — render-only for legacy rows. Dedicated **teal-outline `↻ Rerun` chip** (no color collision); for legacy `project_type='Rerun'` rows with no base type, keep the historical badge so they're never badge-less, and keep the Money "show both" fallback. Extend the split to the **Calendar** filter (`CalendarFilters` + `lib/calendar/events`) — Sree's tool — as the same all/reruns-only/non-reruns dimension. "reruns only" matches `series_id IS NOT NULL OR rerun_number>1 OR project_type='Rerun'`; add its Chip + activeCount + clearAll; migrate any saved view storing `Type='Rerun'`.
+
+**Task 8 (connector/AI):** reports/`rerun_calendar`/`search_reruns`/updated `rerun_radar` count reruns by the **rerun dimension** (series membership OR legacy), not `project_type`; `rerun_radar` unions legacy + new and de-dupes on client+survey. Settle the lexicon: "Create next wave" (new project) / "Link existing wave" / rename legacy "Log wave collected" → "Mark wave collected"; put these exact phrasings in `MCP_INSTRUCTIONS`.
+
+**Task 9 (seed):** unique upsert key `(client_id, survey_name)` so the script is re-runnable; normalize names with `baseRerunName()` before the dedup compare and include existing `rerun_series` in the match; resolve `base_type` and `service_mode` from the Rerun_DS columns, routing ambiguous/blank/`Rerun` rows into the **per-item David decision** flow (don't guess/error on the check constraint); **migrate the whole legacy series** (set `series_id` on every existing wave, set `next_wave_no = max(existing)+1`); set `auto_armed=false` on seeded series and clear/reconcile `longitudinal` so the legacy spawn path won't fire.
+
+**Task 10 (visibility/ship):** month view pins a persistent **"Overdue / needs action"** strip above the grid (never hidden) + prev/next-month + today controls. Page IA: new series/month view is primary; the legacy sheet Radar is labelled "legacy (migrating), read-only" and a seeded study is de-duped/badged to its series. **Guide update is NOT here** — it's the gated post-ship task (#60) after David plays + signs off. Note the RLS dependency: reruns visibility assumes the analyst role; a read policy is needed before any future non-analyst (sales) role.

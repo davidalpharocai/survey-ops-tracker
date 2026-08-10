@@ -36,7 +36,8 @@ This supersedes the behind-the-scenes `rerun_meta` table (its cadence/owner/paus
 | `cadence_months` | int null | 1/3/6/12; null = ad-hoc |
 | `delivery_cadence` | text null | free text, e.g. "Beginning of month", "Mid-quarter" |
 | `in_service` | bool not null default true | in rerun service? |
-| `service_mode` | text check in ('auto','manual') default 'manual' | whether waves auto-spawn |
+| `service_mode` | text check in ('auto','manual') default 'auto' | whether waves auto-spawn (default auto = "auto to continue") |
+| `auto_armed` | bool not null default true | the seed sets this **false** so the first wave after the ~29-record load is manual; the first manual "Create next wave" (or a bulk "Arm") flips it true and auto runs thereafter (§18) |
 | `template_id` | text null | source/template survey id(s) |
 | `owner_email` | text | defaults to Sree |
 | `paused` | bool not null default false | |
@@ -51,12 +52,12 @@ RLS mirrors `rerun_meta` (analyst RW + service_role all).
 ### 4.2 Wave link on `survey_projects`
 | Column | Type | Notes |
 |---|---|---|
-| `rerun_series_id` | uuid null fk → rerun_series | a wave belongs to a series |
-| `wave_no` | int null | computed from ordering (§6) |
+| `series_id` | uuid null fk → rerun_series | **NEW** column — a wave belongs to a series. Distinct from the pre-existing `rerun_series_id`, which keeps its legacy root-project-pointer meaning until the Phase-2 backfill. |
+| `rerun_number` | int (existing) | the wave number — **REUSED as the single wave-number field**; the ordering utility (§6) writes it. There is NO new `wave_no` column (it read `rerun_number` all along, incl. the compliance waiver §9). |
 | `wave_order` | int null | manual drag override; null → order by date |
-| `compliance_required_override` | bool null | force compliance on a specific wave (§8) |
+| `compliance_required_override` | bool null | force compliance back on for a specific wave (§8/§9) |
 
-`is_rerun` is **derived** (`rerun_series_id is not null`) — no stored duplicate.
+`is_rerun` is **derived**: `series_id is not null OR rerun_series_id is not null` (covers new series waves and legacy lineage) — no stored duplicate.
 
 ### 4.3 Read model
 Replace/extend the `rerun_status` view so `/reruns` reads from `rerun_series` (effective next date = last wave's fielding/rerun date + cadence; overdue / needs-definition flags preserved). Legacy `rerun_meta` is migrated then deprecated.
@@ -69,9 +70,9 @@ Replace/extend the `rerun_status` view so `/reruns` reads from `rerun_series` (e
 
 ## 6. Wave numbering + drag reorder
 
-- Default order: by **fielding/rerun date** (ascending) → `wave_no` = position (original = Wave 1).
+- Default order: by **fielding/rerun date** (ascending) → `rerun_number` = position (original = Wave 1).
 - **Manual drag** on the waves list sets an explicit `wave_order` that **overrides** date order; on drop, the whole series renumbers and any wave whose name embeds its number updates too. (Generalizes today's lineage renumber.)
-- A single ordering utility computes `wave_no` from (`wave_order` if any, else date); every link/unlink/drag re-runs it. Self-heals gaps.
+- A single ordering utility computes `rerun_number` from (`wave_order` if any, else date); every link/unlink/drag re-runs it. Self-heals gaps. **The drag handle is distinct from the legacy cross-series move gesture** (see §18) so reorder can't accidentally detach a wave.
 
 ## 7. Future-wave defaults (the quiet mechanism — approved)
 
@@ -96,9 +97,11 @@ A dedicated **"Defaults for future waves"** section on the series record (NOT pe
 
 All fields remain editable on the wave afterward without affecting siblings or the series.
 
+**Child rows carry too:** PS suppliers/launches, B2B blast config, and multi-segment N are child tables (not scalar columns), so the new wave copies them from the prior wave via the shared `lib/server/clone.ts` (which already resets run-data), not just the scalar insert. **Co-captains:** the original (wave-1) captain is seeded into `co_captain_ids` **once at promotion** and carried verbatim to every wave, so the history never degrades to "Sree is her own co-captain."
+
 ## 9. Compliance
 
-Reruns/waves after wave 1 (the original) **skip the compliance gate** by default (client-approval-before-fielding + after-fielding review). A per-wave `compliance_required_override` can force it back on for a specific wave. Implemented in the existing `complianceGate` logic (`lib/utils/compliance.ts`) + the connector `advance_project` gate.
+Reruns/waves after wave 1 (the original) **skip the compliance gate** by default. This is **not** a client exemption — the client's `compliance_before/after_fielding` flag stays and still governs the relationship and **Wave 1**. The reason later waves skip it: a rerun wave is the **same survey Wave 1 already got compliance-approved for**, so subsequent waves don't need re-approval (David, 2026-08-10). The **only** thing that re-requires review on a specific wave is `compliance_required_override = true` on that wave. Implemented in the pure `complianceGate` (`lib/utils/compliance.ts`) keyed off `(rerun_number ?? 1) >= 2` (waive) with the per-wave override winning, threaded through its 3 enforcement sites + the connector `advance_project` gate. The compliance banner/panel shows a positive "not required — rerun wave (override to force)" state so an absent gate never reads as a bug.
 
 ## 10. Captain
 
@@ -173,3 +176,30 @@ New/extended tools: `search_reruns`, `get_rerun_series`, `rerun_calendar` (repor
 - **Numbering (§6):** Option A — waves default to date order; a manual drag saves an explicit order that overrides date and sticks; new auto-created waves append at the end.
 - **Ownership + notifications:** Sree owns each series and receives the **weekly digest**, cc David; recipients and send day/time are config-driven so they can change without a deploy. **No separate monthly reminder** — the weekly digest already covers every cadence (monthly, quarterly, ad-hoc), so a monthly nudge would be redundant.
 - **Rollout:** two phases — Phase 1 = core (data model, series record, wave lifecycle incl. stop/pause, compliance/captain rules, month visibility, weekly digest, Rerun_DS seed + dedup, connector/AI parity); Phase 2 = expand-in-place Reruns UX + historical backfill (§15/§16).
+
+## 18. v2 — review hardening (5-lens adversarial review, 2026-08-10)
+
+Locked decisions:
+- **Compliance:** waive on every wave ≥ 2 regardless of client flag; only a per-wave `compliance_required_override` re-requires it (§9).
+- **`service_mode` + `auto_armed`:** column default is **`auto`** (matches "auto to continue"); a newly promoted series is armed immediately. The one-time seed loads all ~29 as `service_mode='auto'` but `auto_armed=false`, so the **first** wave after the load is **manual** — David/Sree review the calendar and create that first wave by hand (or hit a bulk "Arm reviewed series"), which flips `auto_armed=true` and auto runs forever after. The cron auto-spawns only when `service_mode='auto' AND auto_armed AND not paused AND in_service`.
+- **Transition:** the digest + month view **union** the legacy `rerun_status` reruns during coexistence (nothing invisible pre-seed), de-dupe once a study is seeded, and the old `rerun-nudges` cron is **retired** (no double-email).
+- **Empty-week digest:** still sends, subject shows `(0)`.
+
+Corrections folded in (were spec/plan contradictions or blockers):
+- Wave number = existing `rerun_number` (no `wave_no` column); `wave_order` is only the drag override (§4.2, §6).
+- New wave→series FK = **new** `series_id`; legacy `rerun_series_id` keeps its root-pointer meaning; `is_rerun = series_id OR rerun_series_id not null` (§4.2).
+- **Spawn idempotency:** unique `(series_id, rerun_number)` partial index; selection filters on the prior wave's `rerun_spawned_at is null`; the new wave gets a concrete next `rerun_date` (never blank) so the "next due" provably advances; the legacy `longitudinal` spawn path excludes `series_id is not null` (and seed clears/reconciles `longitudinal`) so no double-spawn. Test: two back-to-back cron runs → exactly one wave.
+- **Child rows + co-captains** carried on spawn via `clone.ts`; original captain seeded once (§8).
+- **Resume/Re-activate rebase:** store a resume anchor so a paused/ended-then-resumed series doesn't land instantly "overdue"; `effective_next = max(last_wave, resume_anchor) + cadence`.
+- **Promote/seed migrate the whole legacy series** (set `series_id` on every existing wave, `next_wave_no = max(existing)+1`) so the record isn't just Wave 1 and the first spawn doesn't collide.
+- **View timezone:** compute overdue/`days_to_next` against `America/New_York`, not UTC.
+- **Type-split completeness:** remove `Rerun` from every *editable* type selector (render-only for legacy); dedicated teal-outline `↻ Rerun` chip (no color collision); waves-list uses a reduced column set in the narrow project rail (full 7-col only on the record) with `fmtNum` on N; extend the split to the **Calendar** filter (Sree's tool) and to connector/AI reports (count reruns by dimension, not `project_type`); migrate any saved view that stored Type=`Rerun`.
+- **Source-of-truth IA:** the new series/month view is primary; the legacy sheet Radar is labelled "legacy (migrating)"; a seeded study is de-duped/badged to its series rather than shown twice; the legacy `rerun_meta` "Paused" control is hidden for seeded series.
+- **Digest email:** one branded, table-based, inline-styled shell (navy `#010B40` / teal `#0076AF`), Gmail/Outlook-safe (no flex/inline-block pills), config'd base URL; subject < ~70 chars; DST note (arrives 7–8am ET). **Retire `rerun-nudges`.**
+- **Edit-scoping trust:** distinct save toasts ("Wave 3 updated" vs "Future-wave defaults updated — affects new waves") + scope microcopy on both editors.
+- **Month view:** pinned "Overdue / needs action" strip above the grid (never hidden), prev/next-month + today controls.
+- **Pause/End pending-wave prompt** implemented in the route + MCP handlers (cancel-or-leave the already-spawned un-fielded wave).
+- **Seed:** unique key `(client_id, survey_name)` (re-runnable), name-normalized dedup (`baseRerunName`), and base_type/service_mode resolution with a per-item David decision for ambiguous rows; add anchor columns/fallback for Rerun_DS "fielding start"/"last delivery" so a seed-only series (no linked wave yet) still computes a due date.
+- **Empty/loading/error states** for the new record + month view; consistent create/link/"mark collected" lexicon in UI + MCP.
+- **Guide** pulled out of the ship task → gated post-ship task (#60), matching David's instruction.
+- **RLS note:** reruns visibility assumes the analyst role; a read policy is required before any future non-analyst (sales) role can see the page/digest.
