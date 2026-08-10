@@ -120,7 +120,9 @@ Entering rerun service is a deliberate human action (or seed); the *recurring wa
 
 ## 12. Visibility (nothing missed)
 
-On the **Reruns page** (one screen): a **month view** of every series' scheduled/overdue waves across all clients — this is the correct, portfolio-level home for the cross-client list (it must NOT appear on an individual series record). Preserves the existing overdue / needs-definition radar flags. An **optional monthly digest to Sree** is a nice-to-have (may land in Phase 2).
+On the **Reruns page** (one screen): a **month view** of every series' scheduled/overdue waves across all clients — this is the correct, portfolio-level home for the cross-client list (it must NOT appear on an individual series record). Preserves the existing overdue / needs-definition radar flags.
+
+**Weekly Rerun Digest email (in scope):** every **Monday 8:00am ET** (configurable) a digest goes to **Sree (sreerag@alpharoc.ai)**, cc **David (david@alpharoc.ai)**, summarizing the week's rerun calendar in three cuts — **overdue / needs action**, **fielding this week**, **delivering this week** — each line showing client — survey, wave #, cadence, and date, with a link to the Reruns page. Subject line front-loads the counts. Sent via the app's existing transactional-email path (Resend/SendGrid) on a weekly cron. Recipients/day/time live in config so they can change without a deploy.
 
 ## 13. Data & rollout
 
@@ -135,7 +137,6 @@ Extend the existing rerun tools so the assistant + claude.ai connector can: put 
 ## 15. Out of scope / deferred (Phase 2)
 
 - **Reruns-page expand-in-place UX** — David's idea: the one screen shows a **details card** per series that you **click into or expand in place to see just its waves**. Deferred polish once the model + flow are clean.
-- **Monthly email digest** to Sree (may fold into Phase 2).
 - **Historical backfill** (§13).
 
 ## 16. Rough phasing (for the plan)
@@ -144,7 +145,7 @@ Extend the existing rerun tools so the assistant + claude.ai connector can: put 
 2. Series record UI (fields + waves list w/ N collected + N actual, "Fielded/rerun date", clickable rows, drag-reorder→renumber) + future-defaults editor.
 3. Lifecycle: "Put into rerun service", auto-spawn (§8 inheritance), manual create, link existing; compliance waiver; Sree-captain rule.
 4. Type-model split (separate Rerun filter dimension; chip).
-5. Reruns-page month visibility.
+5. Reruns-page month visibility + **weekly digest email** (weekly cron + Resend/SendGrid template, config-driven recipients/time).
 6. Connector/assistant parity.
 7. One-time `Rerun_DS` seed + dedup cross-check (with David).
 8. Guide update + adversarial review + ship.
