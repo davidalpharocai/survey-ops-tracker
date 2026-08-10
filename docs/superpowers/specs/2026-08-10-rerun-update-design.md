@@ -118,10 +118,11 @@ On wave creation: `captain` = the series' configured rerun captain (**Sree** by 
 
 Entering rerun service is a deliberate human action (or seed); the *recurring waves* are the automatic part.
 
-**Stop a rerun from continuing** — three levels, all on the series record (header/Actions) and via the assistant/connector:
-- **Pause** (temporary) — `paused = true`: auto-spawning stops, the series stays live and shows as *Paused*, off the "due" counts + weekly digest until **Resume**.
-- **End rerun service** (permanent) — `in_service = false`: no more waves, drops off the radar + digest for good; past waves and the record are retained for history; re-activatable later.
-- **Switch to manual** — `service_mode = 'manual'`: series stays live but stops *auto*-creation; waves added by hand only.
+**Stop a rerun from continuing** — two controls, on the series record (header/Actions) and via the assistant/connector, both reversible:
+- **Pause** (temporary) — `paused = true`: auto-spawning stops, the series stays live and shows as *Paused*, off the "due this week" counts + weekly digest until **Resume**. For a client on hold or a skipped cycle.
+- **End rerun service** (permanent) — `in_service = false`: out of rerun service entirely — no more waves, off the radar + digest for good; past waves and the record are retained for history; **Re-activate** later if the client comes back.
+
+(`service_mode` = auto/manual still exists in the model as the spawn setting — auto-spawn vs. add-by-hand — but it is not a "stop" control; Pause and End are.)
 
 Edge case: if a next wave has already been auto-created but not yet fielded when the series is paused/ended, the app asks whether to also cancel that pending wave (normal Cancel flow) or leave it.
 
@@ -146,7 +147,7 @@ Rerun data is integrated into both AI surfaces. Because the claude.ai connector 
 - **Search / list** — find series and waves by client, survey name, template id, cadence, in-service, or owner; filter to overdue / due-this-week / due-this-month.
 - **Ask** — grounded natural-language questions: *"what reruns are due this week?"*, *"which series are overdue?"*, *"when's the next BAM Consumer Study wave and what wave # is it?"*, *"how many waves has RP3 had and what were their N-actuals?"*
 - **Report** — date-windowed rollups: the rerun calendar for a month/quarter, all monthly PS reruns, waves delivered last quarter for a client, series with no cadence defined, on-time vs. late rate.
-- **Act** (confirm-before-write, as today) — put a project into rerun service (cadence + defaults), edit future-wave defaults, create / log / link a wave, pause/resume/end a series or switch it to manual, and generate the weekly digest on demand.
+- **Act** (confirm-before-write, as today) — put a project into rerun service (cadence + defaults), edit future-wave defaults, create / log / link a wave, pause/resume or end/re-activate a series, and generate the weekly digest on demand.
 
 New/extended tools: `search_reruns`, `get_rerun_series`, `rerun_calendar` (report), `put_in_rerun_service`, `set_rerun_defaults`, `log_wave` / `link_wave`, plus the existing `rerun_radar` updated to read the new model.
 
