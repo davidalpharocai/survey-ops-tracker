@@ -1,0 +1,156 @@
+# Rerun Update — Design Spec
+
+**Date:** 2026-08-10
+**Source of requirements:** `Reruns 2026.08.10.docx` (David's instructions) + the `Rerun_DS` tab of `Survey Ops (7).xlsx` (one-time field/data reference — NOT an ongoing feed).
+**Status:** Design approved in brainstorming; pending written-spec review before planning.
+
+---
+
+## 1. Goal
+
+Make reruns first-class in the Command Center: a recurring survey is represented by one **Rerun Series** record that owns its cadence, template, and the default values future waves inherit, and that spawns each **wave** as a normal project. The team (Sree) can see every wave scheduled each month so none are missed, waves are fully editable without disturbing each other, and the app — not the sheet — becomes the source of truth for reruns going forward.
+
+## 2. Definitions (these are distinct)
+
+- **Rerun** — a survey placed (manually to start, automatically thereafter) into **"rerun service"** to collect N for the next wave/run on a cadence.
+- **Longitudinal** — a survey whose data is collected and tracked over time. This is *independent* of rerun service. Today the `longitudinal` flag drives auto-rerun; after this update, auto-spawning keys off **rerun-service membership**, and `longitudinal` goes back to meaning only "data tracked over time."
+
+## 3. Architecture (approved)
+
+A recurring survey = **one first-class `rerun_series` record** (visible/editable, POC approved) that spawns each wave as a normal `survey_projects` row linked back to it.
+
+- Edit the **series** → changes apply to **future** waves only.
+- Edit a **wave** → changes apply to **that wave only**, never to siblings or the series.
+
+This supersedes the behind-the-scenes `rerun_meta` table (its cadence/owner/paused data migrates into `rerun_series`).
+
+## 4. Data model
+
+### 4.1 New table: `rerun_series`
+| Column | Type | Notes |
+|---|---|---|
+| `id` | uuid pk | |
+| `client_id` | uuid fk → clients | + denormalized `client` text for display parity |
+| `survey_name` | text | e.g. "Consumer Study" |
+| `base_type` | text check in ('B2B','PS') | the underlying survey type (see §5) |
+| `cadence_months` | int null | 1/3/6/12; null = ad-hoc |
+| `delivery_cadence` | text null | free text, e.g. "Beginning of month", "Mid-quarter" |
+| `in_service` | bool not null default true | in rerun service? |
+| `service_mode` | text check in ('auto','manual') default 'manual' | whether waves auto-spawn |
+| `template_id` | text null | source/template survey id(s) |
+| `owner_email` | text | defaults to Sree |
+| `paused` | bool not null default false | |
+| `next_wave_no` | int | next wave number to assign (derived/maintained) |
+| `future_defaults` | jsonb | see §7 |
+| `notes` | text null | |
+| `data_qa_note` | text null | mirrors Rerun_DS "DATA QA Note to self" |
+| `created_at` / `updated_at` / `updated_by` | | |
+
+RLS mirrors `rerun_meta` (analyst RW + service_role all).
+
+### 4.2 Wave link on `survey_projects`
+| Column | Type | Notes |
+|---|---|---|
+| `rerun_series_id` | uuid null fk → rerun_series | a wave belongs to a series |
+| `wave_no` | int null | computed from ordering (§6) |
+| `wave_order` | int null | manual drag override; null → order by date |
+| `compliance_required_override` | bool null | force compliance on a specific wave (§8) |
+
+`is_rerun` is **derived** (`rerun_series_id is not null`) — no stored duplicate.
+
+### 4.3 Read model
+Replace/extend the `rerun_status` view so `/reruns` reads from `rerun_series` (effective next date = last wave's fielding/rerun date + cadence; overdue / needs-definition flags preserved). Legacy `rerun_meta` is migrated then deprecated.
+
+## 5. Type model (approved: separate flag, not an enum change)
+
+- `project_type` enum stays `PS` / `B2B` (the value `Rerun` is retained only for legacy rows — see §12 — and is **not** used for new work).
+- "Rerun" is a separate dimension: a wave is a rerun because it links to a series; the UI shows a **`Rerun` chip** alongside the `PS`/`B2B` badge.
+- **Filters** (board + list, just shipped): keep the Type control at B2B/PS; add a separate **Rerun** filter (all / reruns only / non-reruns). Legacy `Rerun`-typed rows still match a "Rerun" option until backfilled.
+
+## 6. Wave numbering + drag reorder
+
+- Default order: by **fielding/rerun date** (ascending) → `wave_no` = position (original = Wave 1).
+- **Manual drag** on the waves list sets an explicit `wave_order` that **overrides** date order; on drop, the whole series renumbers and any wave whose name embeds its number updates too. (Generalizes today's lineage renumber.)
+- A single ordering utility computes `wave_no` from (`wave_order` if any, else date); every link/unlink/drag re-runs it. Self-heals gaps.
+
+## 7. Future-wave defaults (the quiet mechanism — approved)
+
+A dedicated **"Defaults for future waves"** section on the series record (NOT per-field toggles scattered on each wave). Stored in `rerun_series.future_defaults` (jsonb): `n_target`, `audience`, `money_model` (PS suppliers / B2B blasts), `template_id`, `compliance_waived` (default true), `captain_id` (default Sree), `co_captain_ids`, and any other carried fields.
+
+- Editing defaults affects **only waves created afterward**.
+- Existing waves are never touched by a defaults edit.
+- (Considered and rejected for now: a per-field "↳ apply to future too" toggle on each wave — noisier; may revisit as a secondary shortcut.)
+
+## 8. What a newly-created wave inherits
+
+| Field | New wave value |
+|---|---|
+| Client · survey name · base type (B2B/PS) | inherited from series |
+| Captain | **Sree = primary**; original captain → **co-captain** (history) |
+| N target · audience · money model · template | from `future_defaults` |
+| Compliance | **waived** for wave ≥ 2 unless `compliance_required_override` is set |
+| Fielding/rerun · due · delivery dates | advanced by the cadence from the prior wave |
+| Survey ID | blank → assigned at programming |
+| N collected · N actual · stage/status | reset — wave starts fresh at the first stage |
+| Wave # | next in sequence |
+
+All fields remain editable on the wave afterward without affecting siblings or the series.
+
+## 9. Compliance
+
+Reruns/waves after wave 1 (the original) **skip the compliance gate** by default (client-approval-before-fielding + after-fielding review). A per-wave `compliance_required_override` can force it back on for a specific wave. Implemented in the existing `complianceGate` logic (`lib/utils/compliance.ts`) + the connector `advance_project` gate.
+
+## 10. Captain
+
+On wave creation: `captain` = the series' configured rerun captain (**Sree** by default), and the wave's original/source captain is added to `co_captain_ids` so history is retained. Configurable per series via `future_defaults.captain_id`.
+
+## 11. Lifecycle
+
+**Create a series (enter rerun service):**
+- **Promote a project** — "Put into rerun service" action on any project → choose cadence + set defaults → that project becomes **Wave 1**, series created.
+- **One-time seed** — import the ~29 active series from the `Rerun_DS` tab (reference only; §13).
+- **Assistant/connector** — "put BAM Consumer Study into monthly rerun."
+
+**Add a wave:**
+- **Auto** (when `service_mode='auto'`) — cron spawns the next wave before its rerun date, applying §8 inheritance.
+- **Manual now** — "Create next wave" on the series.
+- **Link existing** — attach an already-created standalone project as a wave (renumbers).
+
+Entering rerun service is a deliberate human action (or seed); the *recurring waves* are the automatic part.
+
+## 12. Visibility (nothing missed)
+
+On the **Reruns page** (one screen): a **month view** of every series' scheduled/overdue waves across all clients — this is the correct, portfolio-level home for the cross-client list (it must NOT appear on an individual series record). Preserves the existing overdue / needs-definition radar flags. An **optional monthly digest to Sree** is a nice-to-have (may land in Phase 2).
+
+## 13. Data & rollout
+
+- **Clean going forward.** The app is the rerun source of truth; the sheet's rerun tabs are retired for this purpose. `Rerun_DS` is a **one-time reference** to (a) confirm the field set and (b) seed the ~29 active series.
+- **Dedup cross-check (required, thorough).** Before seeding/creating, match each candidate against recently-created `survey_projects` (by client + survey name + template id + date proximity). Surface each suspected duplicate to David for a **per-item decision** rather than guessing. Better to spend time here than create duplicate waves.
+- **Historical backfill deferred** — re-typing legacy `Rerun`-typed projects to their real B2B/PS + linking old delivered waves into series is a later pass, per David.
+
+## 14. Connector / assistant parity
+
+Extend the existing rerun tools so the assistant + claude.ai connector can: put a project into rerun service (with cadence + defaults), edit future-wave defaults, create/log/link a wave, and list "this month's scheduled waves." Same confirm-before-write pattern.
+
+## 15. Out of scope / deferred (Phase 2)
+
+- **Reruns-page expand-in-place UX** — David's idea: the one screen shows a **details card** per series that you **click into or expand in place to see just its waves**. Deferred polish once the model + flow are clean.
+- **Monthly email digest** to Sree (may fold into Phase 2).
+- **Historical backfill** (§13).
+
+## 16. Rough phasing (for the plan)
+
+1. Migration: `rerun_series` + wave-link columns + read-model view; migrate `rerun_meta`; separate `longitudinal` from auto-spawn.
+2. Series record UI (fields + waves list w/ N collected + N actual, "Fielded/rerun date", clickable rows, drag-reorder→renumber) + future-defaults editor.
+3. Lifecycle: "Put into rerun service", auto-spawn (§8 inheritance), manual create, link existing; compliance waiver; Sree-captain rule.
+4. Type-model split (separate Rerun filter dimension; chip).
+5. Reruns-page month visibility.
+6. Connector/assistant parity.
+7. One-time `Rerun_DS` seed + dedup cross-check (with David).
+8. Guide update + adversarial review + ship.
+
+## 17. Open questions
+
+- Confirm the field-inheritance table (§8) — the one item flagged "ask if unsure."
+- Confirm manual drag order **overrides** date order (§6) rather than merely nudging it.
+- Who besides Sree can own a series / receive the monthly reminder?
