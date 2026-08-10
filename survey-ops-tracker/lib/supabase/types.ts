@@ -248,6 +248,9 @@ export type Database = {
           rerun_date: string | null
           rerun_number: number
           rerun_series_id: string | null
+          series_id: string | null
+          wave_order: number | null
+          compliance_required_override: boolean | null
           rerun_spawned_at: string | null
           requested_by_contact_id: string | null
           requested_by_name: string | null
@@ -323,6 +326,9 @@ export type Database = {
           rerun_date?: string | null
           rerun_number?: number
           rerun_series_id?: string | null
+          series_id?: string | null
+          wave_order?: number | null
+          compliance_required_override?: boolean | null
           rerun_spawned_at?: string | null
           requested_by_contact_id?: string | null
           requested_by_name?: string | null
@@ -398,6 +404,9 @@ export type Database = {
           rerun_date?: string | null
           rerun_number?: number
           rerun_series_id?: string | null
+          series_id?: string | null
+          wave_order?: number | null
+          compliance_required_override?: boolean | null
           rerun_spawned_at?: string | null
           requested_by_contact_id?: string | null
           requested_by_name?: string | null
@@ -1497,6 +1506,84 @@ export type Database = {
         }
         Relationships: []
       }
+      rerun_series: {
+        Row: {
+          id: string
+          client_id: string | null
+          client: string
+          survey_name: string
+          base_type: string
+          origin_project_id: string | null
+          cadence_months: number | null
+          delivery_cadence: string | null
+          in_service: boolean
+          service_mode: string
+          auto_armed: boolean
+          paused: boolean
+          template_id: string | null
+          owner_email: string | null
+          next_wave_no: number
+          future_defaults: Json
+          anchor_date: string | null
+          resume_anchor: string | null
+          notes: string | null
+          data_qa_note: string | null
+          created_at: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          id?: string
+          client_id?: string | null
+          client: string
+          survey_name: string
+          base_type: string
+          origin_project_id?: string | null
+          cadence_months?: number | null
+          delivery_cadence?: string | null
+          in_service?: boolean
+          service_mode?: string
+          auto_armed?: boolean
+          paused?: boolean
+          template_id?: string | null
+          owner_email?: string | null
+          next_wave_no?: number
+          future_defaults?: Json
+          anchor_date?: string | null
+          resume_anchor?: string | null
+          notes?: string | null
+          data_qa_note?: string | null
+          created_at?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          id?: string
+          client_id?: string | null
+          client?: string
+          survey_name?: string
+          base_type?: string
+          origin_project_id?: string | null
+          cadence_months?: number | null
+          delivery_cadence?: string | null
+          in_service?: boolean
+          service_mode?: string
+          auto_armed?: boolean
+          paused?: boolean
+          template_id?: string | null
+          owner_email?: string | null
+          next_wave_no?: number
+          future_defaults?: Json
+          anchor_date?: string | null
+          resume_anchor?: string | null
+          notes?: string | null
+          data_qa_note?: string | null
+          created_at?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       rerun_review_log: {
         Row: {
           id: string
@@ -1565,6 +1652,39 @@ export type Database = {
           is_overdue: boolean | null
           in_prep_window: boolean | null
           needs_definition: boolean | null
+        }
+        Relationships: []
+      }
+      rerun_series_status: {
+        Row: {
+          id: string
+          client_id: string | null
+          client: string
+          survey_name: string
+          base_type: string
+          origin_project_id: string | null
+          cadence_months: number | null
+          delivery_cadence: string | null
+          in_service: boolean
+          service_mode: string
+          auto_armed: boolean
+          paused: boolean
+          template_id: string | null
+          owner_email: string | null
+          next_wave_no: number
+          future_defaults: Json
+          anchor_date: string | null
+          resume_anchor: string | null
+          notes: string | null
+          data_qa_note: string | null
+          created_at: string
+          updated_at: string
+          updated_by: string | null
+          last_on: string | null
+          cadence_anchor: string | null
+          effective_next: string | null
+          days_to_next: number | null
+          is_overdue: boolean | null
         }
         Relationships: []
       }
