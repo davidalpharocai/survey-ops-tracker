@@ -130,9 +130,16 @@ On the **Reruns page** (one screen): a **month view** of every series' scheduled
 - **Dedup cross-check (required, thorough).** Before seeding/creating, match each candidate against recently-created `survey_projects` (by client + survey name + template id + date proximity). Surface each suspected duplicate to David for a **per-item decision** rather than guessing. Better to spend time here than create duplicate waves.
 - **Historical backfill deferred** — re-typing legacy `Rerun`-typed projects to their real B2B/PS + linking old delivered waves into series is a later pass, per David.
 
-## 14. Connector / assistant parity
+## 14. Connector + in-app AI (full parity — ask, report, search)
 
-Extend the existing rerun tools so the assistant + claude.ai connector can: put a project into rerun service (with cadence + defaults), edit future-wave defaults, create/log/link a wave, and list "this month's scheduled waves." Same confirm-before-write pattern.
+Rerun data is integrated into both AI surfaces. Because the claude.ai connector and the ✦ in-app assistant share the tool registry (`lib/mcp/registry.ts`), every capability is defined once and available in both. Numbers are computed deterministically server-side (like the ✦ Summary) so the AI narrates exact figures, never invented ones.
+
+- **Search / list** — find series and waves by client, survey name, template id, cadence, in-service, or owner; filter to overdue / due-this-week / due-this-month.
+- **Ask** — grounded natural-language questions: *"what reruns are due this week?"*, *"which series are overdue?"*, *"when's the next BAM Consumer Study wave and what wave # is it?"*, *"how many waves has RP3 had and what were their N-actuals?"*
+- **Report** — date-windowed rollups: the rerun calendar for a month/quarter, all monthly PS reruns, waves delivered last quarter for a client, series with no cadence defined, on-time vs. late rate.
+- **Act** (confirm-before-write, as today) — put a project into rerun service (cadence + defaults), edit future-wave defaults, create / log / link a wave, pause/resume a series, and generate the weekly digest on demand.
+
+New/extended tools: `search_reruns`, `get_rerun_series`, `rerun_calendar` (report), `put_in_rerun_service`, `set_rerun_defaults`, `log_wave` / `link_wave`, plus the existing `rerun_radar` updated to read the new model.
 
 ## 15. Out of scope / deferred (Phase 2)
 
@@ -146,7 +153,7 @@ Extend the existing rerun tools so the assistant + claude.ai connector can: put 
 3. Lifecycle: "Put into rerun service", auto-spawn (§8 inheritance), manual create, link existing; compliance waiver; Sree-captain rule.
 4. Type-model split (separate Rerun filter dimension; chip).
 5. Reruns-page month visibility + **weekly digest email** (weekly cron + Resend/SendGrid template, config-driven recipients/time).
-6. Connector/assistant parity.
+6. Connector + in-app AI parity — search/list, grounded Q&A, date-windowed reports, and act (confirm-before-write); shared via the tool registry.
 7. One-time `Rerun_DS` seed + dedup cross-check (with David).
 8. Guide update + adversarial review + ship.
 
