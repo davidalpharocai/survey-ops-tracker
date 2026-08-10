@@ -34,7 +34,7 @@ The board shows every active project as a card moving left-to-right through the 
 - **PS / B2B / Rerun badges** = project type (PureSpectrum panel / expert panel / repeat wave)
 
 ### Filters & search
-Captain, Type, Due (today/tomorrow/2 days), Stage (including Closed), and a search box (project or client name). Hover any filter label's (i) for what it does.
+Captain (by full name), Salesperson, Client, Type, Due (today/tomorrow/2 days), Stage (including Closed), and a search box (project or client name). The Salesperson list is built from whoever actually sold the projects. Hover any filter label's (i) for what it does.
 
 **Saved views**: set the filters how you like, hit ★ Save, name it ("My urgent", "Jenna's PS work") — then jump back to it from the Views dropdown anytime. After picking a view you can **⟳ Update** it to your current filters, **✎** rename it, or **🗑** delete it. Views are personal (saved in your browser). In Full View, the Scoping and Operations Pipeline sections collapse with the ▾ next to their titles — also remembered per person.
 
@@ -117,7 +117,7 @@ Split "N & Audience" into per-segment tracking — e.g. Buyers / Sellers — wit
 
 ## 4. The List view
 
-A sortable table of all projects — click any column header to sort, including **N collected**, **N Actual**, **Captain**, and **Type** (the N columns sort by number, so you can rank who's furthest behind). The header stays frozen as you scroll and the **Project column stays pinned** when you scroll sideways; a line above the table shows the count and current sort, and a **Comfortable / Compact** toggle sets row density. It has the **same filters as the board** (Captain, Type, Due, Stage, search). **⚙ Columns** lets you hide columns you don't use — your choice is personal (saved in your browser) and doesn't affect teammates. **Saved views** here remember the whole table setup — Operations/Full, filters, which columns are showing, and the sort — under a name you pick; ⟳ Update, ✎ rename, and 🗑 delete them just like board views. Rows carry the same colored due-date edge as board cards (red overdue, orange tomorrow, amber in 2 days; dropped once a project is closed). **⬇ Export CSV** downloads whatever is currently shown, with every field regardless of hidden columns.
+A sortable table of all projects — click any column header to sort, including **N collected**, **N Actual**, **Captain**, and **Type** (the N columns sort by number, so you can rank who's furthest behind). The header stays frozen as you scroll and the **Project column stays pinned** when you scroll sideways; a line above the table shows the count and current sort, and a **Comfortable / Compact** toggle sets row density. It has the **same filters as the board** (Captain, Salesperson, Client, Type, Due, Stage, search). **⚙ Columns** lets you hide columns you don't use — your choice is personal (saved in your browser) and doesn't affect teammates. **Saved views** here remember the whole table setup — Operations/Full, filters, which columns are showing, and the sort — under a name you pick; ⟳ Update, ✎ rename, and 🗑 delete them just like board views. Rows carry the same colored due-date edge as board cards (red overdue, orange tomorrow, amber in 2 days; dropped once a project is closed). **⬇ Export CSV** downloads whatever is currently shown, with every field regardless of hidden columns.
 
 ## 4b. The Calendar
 

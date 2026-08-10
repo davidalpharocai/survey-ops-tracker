@@ -62,6 +62,9 @@ interface BoardFiltersProps {
   captains: { id: string; name: string; initials: string }[]
   captainFilter: string | null
   currentMemberId?: string | null
+  salespeople?: string[]
+  salespersonFilter?: string | null
+  onSalespersonChange?: (s: string | null) => void
   typeFilter: string | null
   dueFilter: string | null
   dueFrom: string | null
@@ -83,6 +86,9 @@ export function BoardFilters({
   captains,
   captainFilter,
   currentMemberId = null,
+  salespeople = [],
+  salespersonFilter = null,
+  onSalespersonChange,
   typeFilter,
   dueFilter,
   dueFrom,
@@ -124,9 +130,9 @@ export function BoardFilters({
   const captainLabel = captainFilter
     ? captainFilter === 'unassigned'
       ? 'Unassigned'
-      : captains.find(c => c.id === captainFilter)?.initials ?? '—'
+      : captains.find(c => c.id === captainFilter)?.name ?? '—'
     : null
-  const activeCount = [captainFilter, clientFilter, typeFilter, dueFilter, stageFilter].filter(
+  const activeCount = [captainFilter, salespersonFilter, clientFilter, typeFilter, dueFilter, stageFilter].filter(
     Boolean
   ).length
   const anyActive = activeCount > 0 || !!search
@@ -138,6 +144,7 @@ export function BoardFilters({
   }
   function clearAll() {
     onCaptainChange(null)
+    onSalespersonChange?.(null)
     onClientChange(null)
     onTypeChange(null)
     clearDue()
@@ -176,11 +183,27 @@ export function BoardFilters({
                   <option value="unassigned">Unassigned</option>
                   {captains.map(c => (
                     <option key={c.id} value={c.id}>
-                      {c.id === currentMemberId ? `${c.initials} (me)` : c.initials}
+                      {c.id === currentMemberId ? `${c.name} (me)` : c.name}
                     </option>
                   ))}
                 </select>
               </Field>
+              {onSalespersonChange && (
+                <Field label="Salesperson" tooltip="Show only projects sold by this salesperson — the AlphaROC sales lead who brought the project in.">
+                  <select
+                    value={salespersonFilter ?? ''}
+                    onChange={e => onSalespersonChange(e.target.value || null)}
+                    className={`${SELECT_CLASSES} w-full`}
+                  >
+                    <option value="">All Salespeople</option>
+                    {salespeople.map(s => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              )}
               <Field label="Client" tooltip="Filter by client (firm). Pick + New Client at the bottom to add one without leaving the board.">
                 <select
                   value={clientFilter ?? ''}
@@ -273,6 +296,7 @@ export function BoardFilters({
 
         {/* Active-filter chips — each clears just its own filter. */}
         {captainLabel && <Chip label={`Captain: ${captainLabel}`} onClear={() => onCaptainChange(null)} />}
+        {salespersonFilter && <Chip label={`Sales: ${salespersonFilter}`} onClear={() => onSalespersonChange?.(null)} />}
         {clientFilter && <Chip label={`Client: ${clientFilter}`} onClear={() => onClientChange(null)} />}
         {typeFilter && <Chip label={`Type: ${typeFilter}`} onClear={() => onTypeChange(null)} />}
         {dueFilter && <Chip label={`Due: ${DUE_LABELS[dueFilter] ?? dueFilter}`} onClear={clearDue} />}

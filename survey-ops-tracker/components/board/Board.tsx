@@ -44,6 +44,7 @@ export function Board({ projects, teamMembers, onMoveProject, wrapInContext = tr
   const isNewForMe = useIsNewForMe()
   const [captainFilter, setCaptainFilter] = useState<string | null>(null)
   const [filterReady, setFilterReady] = useState(false)
+  const [salespersonFilter, setSalespersonFilter] = useState<string | null>(null)
   const [typeFilter, setTypeFilter] = useState<string | null>(null)
   const [dueFilter, setDueFilter] = useState<string | null>(null)
   const [dueFrom, setDueFrom] = useState<string | null>(null)
@@ -76,9 +77,16 @@ export function Board({ projects, teamMembers, onMoveProject, wrapInContext = tr
     localStorage.setItem(CAPTAIN_FILTER_KEY, id ?? 'all')
   }
 
+  // Distinct salespeople actually present on the projects (for the filter list).
+  const salespeople = useMemo(
+    () => [...new Set(projects.map(p => p.salesperson).filter((s): s is string => !!s && s.trim() !== ''))].sort((a, b) => a.localeCompare(b)),
+    [projects]
+  )
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
     return projects.filter(p => {
+      if (salespersonFilter && p.salesperson !== salespersonFilter) return false
       if (captainFilter) {
         if (captainFilter === 'unassigned') {
           if (p.captain != null) return false
@@ -113,11 +121,12 @@ export function Board({ projects, teamMembers, onMoveProject, wrapInContext = tr
       }
       return true
     })
-  }, [projects, captainFilter, typeFilter, dueFilter, dueFrom, dueTo, stageFilter, clientFilter, search])
+  }, [projects, captainFilter, salespersonFilter, typeFilter, dueFilter, dueFrom, dueTo, stageFilter, clientFilter, search])
 
-  const hasActiveFilters = !!(captainFilter || typeFilter || dueFilter || stageFilter || clientFilter || search)
+  const hasActiveFilters = !!(captainFilter || salespersonFilter || typeFilter || dueFilter || stageFilter || clientFilter || search)
   function clearAllFilters() {
     handleCaptainChange(null)
+    setSalespersonFilter(null)
     setTypeFilter(null)
     setDueFilter(null)
     setDueFrom(null)
@@ -202,6 +211,7 @@ export function Board({ projects, teamMembers, onMoveProject, wrapInContext = tr
 
   type BoardViewConfig = {
     captain: string | null
+    salesperson?: string | null
     type: string | null
     due: string | null
     dueFrom?: string | null
@@ -210,6 +220,7 @@ export function Board({ projects, teamMembers, onMoveProject, wrapInContext = tr
   }
   function applyView(c: BoardViewConfig) {
     handleCaptainChange(c.captain)
+    setSalespersonFilter(c.salesperson ?? null)
     setTypeFilter(c.type)
     setDueFilter(c.due)
     setDueFrom(c.dueFrom ?? null)
@@ -224,6 +235,9 @@ export function Board({ projects, teamMembers, onMoveProject, wrapInContext = tr
           captains={teamMembers}
           captainFilter={captainFilter}
           currentMemberId={currentMember?.id ?? null}
+          salespeople={salespeople}
+          salespersonFilter={salespersonFilter}
+          onSalespersonChange={setSalespersonFilter}
           typeFilter={typeFilter}
           dueFilter={dueFilter}
           dueFrom={dueFrom}
@@ -242,7 +256,7 @@ export function Board({ projects, teamMembers, onMoveProject, wrapInContext = tr
         />
         <SavedViews<BoardViewConfig>
           storageKey="sot.savedViews"
-          current={{ captain: captainFilter, type: typeFilter, due: dueFilter, dueFrom, dueTo, stage: stageFilter }}
+          current={{ captain: captainFilter, salesperson: salespersonFilter, type: typeFilter, due: dueFilter, dueFrom, dueTo, stage: stageFilter }}
           onApply={applyView}
           tooltip="Save the current board filters (captain, type, due, stage) as a named view and jump back in one click. Personal to you. Pick one, then Update / Rename / Delete."
         />
