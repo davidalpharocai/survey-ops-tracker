@@ -144,7 +144,17 @@ const WAVE_COLUMN_REGISTRY: WaveColumnDef[] = [
     tooltip: 'Wave status',
     width: '90px',
     render: (w, s) => (
-      <span className={`text-[11px] font-medium px-1.5 py-0.5 rounded text-center whitespace-nowrap w-fit ${s.chip}`}>{s.label}</span>
+      <span className="flex flex-wrap items-center gap-1 min-w-0">
+        <span className={`text-[11px] font-medium px-1.5 py-0.5 rounded text-center whitespace-nowrap w-fit ${s.chip}`}>{s.label}</span>
+        {w.is_placeholder && (
+          <span
+            title="Assumed-delivered wave — no real data yet; Sree will backfill"
+            className="border border-border text-muted-foreground bg-transparent text-[10px] px-1.5 py-0.5 rounded whitespace-nowrap"
+          >
+            Placeholder
+          </span>
+        )}
+      </span>
     ),
   },
   {
