@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import {
   startOfMonth,
@@ -117,7 +117,7 @@ export function RerunMonthView({ series }: { series: SeriesListRow[] }) {
   const [viewMonth, setViewMonth] = useState(() => startOfMonth(new Date()))
   const [popoverDay, setPopoverDay] = useState<Date | null>(null)
 
-  const byDate = seriesMonthEvents(series)
+  const byDate = useMemo(() => seriesMonthEvents(series), [series])
 
   const monthStart = startOfMonth(viewMonth)
   const gridStart = startOfWeek(monthStart, { weekStartsOn: 0 })
@@ -126,8 +126,12 @@ export function RerunMonthView({ series }: { series: SeriesListRow[] }) {
   for (let d = gridStart; d <= gridEnd; d = addDays(d, 1)) days.push(d)
 
   const today = new Date()
-  // Any reruns land in the visible grid window? Drives the empty-state line.
-  const monthHasReruns = days.some((d) => (byDate[dayKey(d)]?.length ?? 0) > 0)
+  // Any reruns land in the FOCUS month? Drives the empty-state line. Only
+  // in-month days count — a rerun on an adjacent-month spillover cell must not
+  // suppress the "No reruns scheduled in {month}" message for an empty focus month.
+  const monthHasReruns = days.some(
+    (d) => isSameMonth(d, monthStart) && (byDate[dayKey(d)]?.length ?? 0) > 0
+  )
 
   return (
     <div className="flex flex-col gap-3">

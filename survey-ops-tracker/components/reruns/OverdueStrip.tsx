@@ -9,6 +9,10 @@ import type { SeriesListRow } from '@/lib/hooks/useRerunSeriesRecord'
 // can never slip below the fold. Amber/red accent only when non-empty; a quiet
 // positive line when clear.
 
+// Cap the inline pills so the pinned strip stays a bounded height even in a
+// pile-up; the rest are reachable via a "＋N more" link to the full series list.
+const MAX_PILLS = 12
+
 function ActionPill({ s }: { s: SeriesListRow }) {
   const overdue = !!s.is_overdue
   const days = typeof s.days_to_next === 'number' ? Math.abs(s.days_to_next) : null
@@ -40,6 +44,8 @@ export function OverdueStrip({ series }: { series: SeriesListRow[] }) {
   const overdueCount = needing.filter((s) => s.is_overdue).length
   const cadenceCount = needing.length - overdueCount
   const active = needing.length > 0
+  const shown = needing.slice(0, MAX_PILLS)
+  const overflow = needing.length - shown.length
 
   return (
     <section
@@ -68,10 +74,19 @@ export function OverdueStrip({ series }: { series: SeriesListRow[] }) {
             {overdueCount > 0 && cadenceCount > 0 && ' · '}
             {cadenceCount > 0 && `${cadenceCount} need a cadence`}
           </p>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {needing.map((s) => (
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            {shown.map((s) => (
               <ActionPill key={s.id} s={s} />
             ))}
+            {overflow > 0 && (
+              <Link
+                href="/reruns/series"
+                title="See every rerun series"
+                className="inline-flex items-center rounded-full border border-border bg-transparent px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:border-ring transition-colors"
+              >
+                ＋{overflow} more
+              </Link>
+            )}
           </div>
         </>
       ) : (

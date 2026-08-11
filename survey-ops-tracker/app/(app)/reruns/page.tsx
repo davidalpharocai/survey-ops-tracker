@@ -940,7 +940,11 @@ export default function RerunsPage() {
 
       {/* Selected view */}
       {view === 'month' ? (
-        fcLoading ? (
+        fcError ? (
+          <div className="bg-card border border-border rounded-xl p-6 text-sm text-muted-foreground text-center">
+            Couldn’t load reruns.
+          </div>
+        ) : fcLoading ? (
           <Skeleton className="h-96 w-full rounded-xl" />
         ) : (
           <RerunMonthView series={firstClassSeries} />
