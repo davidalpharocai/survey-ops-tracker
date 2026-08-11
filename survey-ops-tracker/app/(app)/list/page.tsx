@@ -12,6 +12,7 @@ import { useViewMode } from '@/lib/hooks/useViewMode'
 import { exportProjectsCsv } from '@/lib/utils/exportCsv'
 import { matchesDuePreset } from '@/lib/utils/date'
 import { isTypingTarget } from '@/lib/utils/keyboard'
+import { isRerunProject } from '@/lib/reruns/isRerun'
 import Link from 'next/link'
 
 const HIDDEN_COLS_KEY = 'sot.listHiddenColumns'
@@ -23,6 +24,7 @@ interface ListViewConfig {
   mode: 'operations' | 'full'
   captain: string | null
   salesperson?: string | null
+  rerun?: string | null
   type: string | null
   due: string | null
   dueFrom?: string | null
@@ -48,6 +50,7 @@ export default function ListView() {
   // Same filters as the board
   const [captainFilter, setCaptainFilter] = useState<string | null>(null)
   const [salespersonFilter, setSalespersonFilter] = useState<string | null>(null)
+  const [rerunFilter, setRerunFilter] = useState<string | null>(null)
   const [typeFilter, setTypeFilter] = useState<string | null>(null)
   const [dueFilter, setDueFilter] = useState<string | null>(null)
   const [dueFrom, setDueFrom] = useState<string | null>(null)
@@ -134,7 +137,14 @@ export default function ListView() {
     setMode(c.mode)
     setCaptainFilter(c.captain)
     setSalespersonFilter(c.salesperson ?? null)
+    setRerunFilter(c.rerun ?? null)
     setTypeFilter(c.type)
+    // Legacy saved views may still carry type: 'Rerun' from before the split —
+    // migrate them to the rerun filter instead of the (now Rerun-less) type one.
+    if (c.type === 'Rerun') {
+      setTypeFilter(null)
+      setRerunFilter('only')
+    }
     setDueFilter(c.due)
     setDueFrom(c.dueFrom ?? null)
     setDueTo(c.dueTo ?? null)
@@ -165,6 +175,8 @@ export default function ListView() {
   const visibleProjects = projects.filter(p => {
     if (!(effectiveMode === 'full' ? true : p.phase === 'Active' && p.status === 'Open')) return false
     if (salespersonFilter && p.salesperson !== salespersonFilter) return false
+    if (rerunFilter === 'only' && !isRerunProject(p)) return false
+    if (rerunFilter === 'non' && isRerunProject(p)) return false
     if (captainFilter) {
       if (captainFilter === 'unassigned') {
         if (p.captain != null) return false
@@ -266,6 +278,8 @@ export default function ListView() {
           salespeople={salespeople}
           salespersonFilter={salespersonFilter}
           onSalespersonChange={setSalespersonFilter}
+          rerunFilter={rerunFilter}
+          onRerunChange={setRerunFilter}
           typeFilter={typeFilter}
           dueFilter={dueFilter}
           dueFrom={dueFrom}
@@ -288,6 +302,7 @@ export default function ListView() {
             mode,
             captain: captainFilter,
             salesperson: salespersonFilter,
+            rerun: rerunFilter,
             type: typeFilter,
             due: dueFilter,
             dueFrom,

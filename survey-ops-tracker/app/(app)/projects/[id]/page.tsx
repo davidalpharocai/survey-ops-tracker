@@ -32,6 +32,8 @@ import { DeliverablesPanel } from '@/components/deliverables/DeliverablesPanel'
 import { salespersonOptions } from '@/lib/utils/salespeople'
 import { MergeButton } from '@/components/merge/MergeButton'
 import { ProjectSummaryStrip } from '@/components/project/summary/ProjectSummaryStrip'
+import { isRerunProject } from '@/lib/reruns/isRerun'
+import { RerunChip } from '@/components/reruns/RerunChip'
 
 type ActiveTab = 'overview' | 'insights' | 'activity' | 'compliance' | 'deliverables' | 'links' | 'logs'
 
@@ -74,7 +76,6 @@ const TOOLTIPS: Record<string, string> = {
 const TYPE_BADGE: Record<string, string> = {
   'PS': 'bg-blue-500/20 text-blue-600 dark:text-blue-400',
   'B2B': 'bg-violet-500/20 text-violet-600 dark:text-violet-400',
-  'Rerun': 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400',
 }
 
 // Rewrite a web ".../archives/<CHANNEL>" Slack link into a slack:// deep link so
@@ -284,6 +285,7 @@ export default function ProjectDetailPage() {
           </span>
         )}
         <EditableType value={project.project_type} onSave={v => updateProject.mutate({ id, updates: { project_type: v as 'PS' | 'B2B' | 'Rerun' } })} />
+        {isRerunProject(project) && <RerunChip />}
         <span
           className={`text-xs px-2 py-1 rounded ${
             project.status === 'Open'
@@ -953,7 +955,6 @@ function EditableType({ value, onSave }: { value: string | null; onSave: (next: 
         <option value="" disabled>Type…</option>
         <option value="PS">PS</option>
         <option value="B2B">B2B</option>
-        <option value="Rerun">Rerun</option>
       </select>
     )
   }

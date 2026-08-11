@@ -132,7 +132,7 @@ export function CalendarFilters({ filters, onChange }: CalendarFiltersProps) {
           </select>
         </Field>
 
-        <Field label="Type" tooltip="Project type: PS (PureSpectrum consumer panel), B2B (expert/business panel), or Rerun. Lets Sree isolate reruns.">
+        <Field label="Type" tooltip="Base survey type: PS (PureSpectrum consumer panel) or B2B (expert/business panel).">
           <select
             value={filters.projectType ?? ''}
             onChange={e =>
@@ -143,7 +143,20 @@ export function CalendarFilters({ filters, onChange }: CalendarFiltersProps) {
             <option value="">All types</option>
             <option value="PS">PS</option>
             <option value="B2B">B2B</option>
-            <option value="Rerun">Rerun</option>
+          </select>
+        </Field>
+
+        <Field label="Rerun" tooltip="Isolate reruns (repeat waves) or hide them.">
+          <select
+            value={filters.rerunScope === 'all' ? '' : filters.rerunScope}
+            onChange={e =>
+              patch({ rerunScope: (e.target.value || 'all') as CalendarFilterState['rerunScope'] })
+            }
+            className={SELECT_CLASSES}
+          >
+            <option value="">All projects</option>
+            <option value="only">Reruns only</option>
+            <option value="non">Non-reruns</option>
           </select>
         </Field>
 

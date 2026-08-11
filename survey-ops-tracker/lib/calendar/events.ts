@@ -1,4 +1,5 @@
 import { getDueUrgency, type DueUrgency } from '@/lib/utils/date'
+import { isRerunProject } from '@/lib/reruns/isRerun'
 
 // ---------------------------------------------------------------------------
 // Pure calendar-event derivation. No React / Supabase imports here so the whole
@@ -95,6 +96,10 @@ export interface CalendarProject {
   rerun_date: string | null
   captain: { id: string } | null
   co_captain_ids: string[] | null
+  /** Rerun DIMENSION inputs — see lib/reruns/isRerun.ts. Optional so existing
+   *  test fixtures / callers that predate the rerun split still compile. */
+  series_id?: string | null
+  rerun_number?: number | null
 }
 
 export interface CalendarReminder {
@@ -129,7 +134,11 @@ export interface CalendarFilterState {
   /** Legend on/off per event type. */
   types: Record<CalendarEventType, boolean>
   captainId: string | null
-  projectType: 'PS' | 'B2B' | 'Rerun' | null
+  /** Base survey type only — PS/B2B. Rerun is filtered separately via `rerunScope`. */
+  projectType: 'PS' | 'B2B' | null
+  /** Isolate reruns (repeat waves), hide them, or show all — a dimension
+   *  separate from `projectType`. See lib/reruns/isRerun.ts. */
+  rerunScope: 'all' | 'only' | 'non'
   /** Restrict to the caller's own captained projects. */
   justMine: boolean
   /** Default = open only (Open + Active); each toggle widens the scope. */
@@ -143,6 +152,7 @@ export const DEFAULT_FILTERS: CalendarFilterState = {
   types: { due: true, deliver: true, launch: true, rerun: true, reminder: true },
   captainId: null,
   projectType: null,
+  rerunScope: 'all',
   justMine: false,
   statusScope: { includeHold: false, includeClosed: false, includeScoping: false },
   client: null,
@@ -187,6 +197,8 @@ function passesProjectFilters(
 ): boolean {
   if (!passesStatusScope(p, filters.statusScope)) return false
   if (filters.projectType && p.project_type !== filters.projectType) return false
+  if (filters.rerunScope === 'only' && !isRerunProject(p)) return false
+  if (filters.rerunScope === 'non' && isRerunProject(p)) return false
   if (filters.captainId && !isCaptainedBy(p, filters.captainId)) return false
   if (filters.justMine && (!currentMemberId || !isCaptainedBy(p, currentMemberId))) return false
   if (filters.client && firmKey(p.client) !== firmKey(filters.client)) return false

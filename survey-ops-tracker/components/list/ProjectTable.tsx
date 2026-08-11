@@ -6,6 +6,8 @@ import { stageLabel } from '@/lib/utils/stage'
 import { fmtNum } from '@/lib/utils/number'
 import type { SlimProject } from '@/lib/hooks/useProjects'
 import { useLatestSubmissionStatuses } from '@/lib/hooks/useSubmissions'
+import { isRerunProject } from '@/lib/reruns/isRerun'
+import { RerunChip } from '@/components/reruns/RerunChip'
 
 export type SortField =
   | 'project_name'
@@ -44,7 +46,6 @@ const STAGE_BADGE: Record<string, string> = {
 const TYPE_BADGE: Record<string, string> = {
   'PS': 'bg-blue-500/20 text-blue-600 dark:text-blue-400',
   'B2B': 'bg-violet-500/20 text-violet-600 dark:text-violet-400',
-  'Rerun': 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400',
 }
 
 // Urgency shows as a strong LEFT accent bar on the row (first cell), matching
@@ -156,7 +157,7 @@ export function ProjectTable({
   const headers: { key: string | null; field: SortField | null; label: string; title: string }[] = [
     { key: null, field: 'project_name', label: 'Project', title: 'Project name. ⏸ marks projects on hold.' },
     { key: 'client', field: 'client', label: 'Client', title: 'The client this project is for.' },
-    { key: 'type', field: 'type', label: 'Type', title: 'PS = PureSpectrum consumer panel, B2B = expert/business panel, Rerun = repeat wave. Click to sort.' },
+    { key: 'type', field: 'type', label: 'Type', title: 'PS = PureSpectrum consumer panel, B2B = expert/business panel. A ↻ Rerun chip marks repeat waves separately. Click to sort.' },
     { key: 'stage', field: 'board_column', label: 'Stage', title: 'Current pipeline stage, from Submitted through Delivery.' },
     { key: 'captain', field: 'captain', label: 'Captain', title: 'Team member responsible end-to-end. ! = unassigned. Click to sort by initials.' },
     { key: 'n', field: 'n', label: 'N / Target', title: 'Responses collected so far vs the goal. Click to sort by N collected.' },
@@ -318,11 +319,14 @@ export function ProjectTable({
                 )}
                 {show('type') && (
                   <td className={`px-4 ${pad}`}>
-                    {p.project_type && (
-                      <span className={`text-xs px-2 py-0.5 rounded ${TYPE_BADGE[p.project_type] ?? ''}`}>
-                        {p.project_type}
-                      </span>
-                    )}
+                    <div className="flex items-center gap-1 flex-wrap">
+                      {(p.project_type === 'PS' || p.project_type === 'B2B') && (
+                        <span className={`text-xs px-2 py-0.5 rounded ${TYPE_BADGE[p.project_type] ?? ''}`}>
+                          {p.project_type}
+                        </span>
+                      )}
+                      {isRerunProject(p) && <RerunChip className="text-xs px-2 py-0.5" />}
+                    </div>
                   </td>
                 )}
                 {show('stage') && (

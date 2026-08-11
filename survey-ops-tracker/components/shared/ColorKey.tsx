@@ -8,7 +8,6 @@ const URGENCY_ITEMS = [
 const TYPE_ITEMS = [
   { classes: 'bg-blue-500/20 text-blue-600 dark:text-blue-400', label: 'PS' },
   { classes: 'bg-violet-500/20 text-violet-600 dark:text-violet-400', label: 'B2B' },
-  { classes: 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400', label: 'Rerun' },
 ]
 
 export function ColorKey() {
@@ -32,6 +31,12 @@ export function ColorKey() {
           {item.label}
         </span>
       ))}
+      <span
+        className="text-[12px] px-1.5 py-0.5 rounded border border-teal-500/60 text-teal-700 dark:text-teal-300"
+        title="Rerun — a repeat wave of an earlier study, shown alongside the PS/B2B type"
+      >
+        ↻ Rerun
+      </span>
       <span className="text-border">|</span>
       <span className="flex items-center gap-1.5">
         <span className="text-[12px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400">⚑</span>

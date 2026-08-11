@@ -18,7 +18,6 @@ type ProjectUpdate = Database['public']['Tables']['survey_projects']['Update']
 const TYPE_OPTIONS = [
   { value: 'PS', label: 'PS' },
   { value: 'B2B', label: 'B2B' },
-  { value: 'Rerun', label: 'Rerun' },
 ]
 
 const TIP = {
@@ -29,7 +28,7 @@ const TIP = {
     'Client-facing deadline — when the client needs the project in hand. Often the same day as the internal due date.',
   rerun:
     'Date the next wave auto-spawns (arms the rerun cron); changing it re-arms it.',
-  type: 'PS (PureSpectrum sample), B2B (blast outreach), or Rerun. Drives which Money widget shows below.',
+  type: 'PS (PureSpectrum sample) or B2B (blast outreach). Drives which Money widget shows below. Rerun is shown as a separate ↻ chip, not a type.',
   surveyIds:
     "IDs of this project's surveys, comma separated. Auto-filled from the attached Google Sheet by the scheduled sync; manual edits stick unless the sheet changes.",
   longitudinal: 'Whether this is a longitudinal study tracked across multiple waves.',
@@ -126,8 +125,10 @@ export function OverviewFieldGrid({ project }: { project: SurveyProject }) {
       <FieldSection title="Money">
         {/* Full-width — the widgets below manage their own internal layout. */}
         <div className="sm:col-span-2 flex flex-col gap-3">
-          {/* PS -> Suppliers (PureSpectrum), B2B -> blast blocks.
-              Rerun/untyped show both (they don't map cleanly to one). */}
+          {/* Rerun is a dimension, not a type — a rerun wave still carries its
+              base type (PS/B2B) on project_type, so it maps to one widget
+              below like any other project. PS -> Suppliers (PureSpectrum),
+              B2B -> blast blocks. Untyped shows both (doesn't map cleanly). */}
           {project.project_type === 'PS' && (
             <SuppliersWidget
               projectId={project.id}
@@ -137,7 +138,7 @@ export function OverviewFieldGrid({ project }: { project: SurveyProject }) {
             />
           )}
           {project.project_type === 'B2B' && <BlastBlocks project={project} />}
-          {(project.project_type === 'Rerun' || project.project_type == null) && (
+          {project.project_type == null && (
             <>
               <SuppliersWidget
                 projectId={project.id}

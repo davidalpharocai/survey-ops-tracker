@@ -16,13 +16,23 @@ const STORAGE_KEY = 'sot.calendarFilters'
 /** Merge stored filters over the defaults so a new field can be added safely. */
 function mergeFilters(stored: unknown): CalendarFilterState {
   if (!stored || typeof stored !== 'object') return DEFAULT_FILTERS
+  // Untyped view of the raw stored blob — a pre-split blob may still carry a
+  // projectType value ('Rerun') that no longer fits the (now-narrowed) type.
+  const raw = stored as Record<string, unknown>
   const s = stored as Partial<CalendarFilterState>
-  return {
+  const merged: CalendarFilterState = {
     ...DEFAULT_FILTERS,
     ...s,
     types: { ...DEFAULT_FILTERS.types, ...(s.types ?? {}) },
     statusScope: { ...DEFAULT_FILTERS.statusScope, ...(s.statusScope ?? {}) },
   }
+  // Migrate a pre-split stored filter of projectType: 'Rerun' — Rerun is no
+  // longer a project type, it's the separate rerunScope dimension.
+  if (raw.projectType === 'Rerun') {
+    merged.projectType = null
+    merged.rerunScope = 'only'
+  }
+  return merged
 }
 
 export default function CalendarPage() {
