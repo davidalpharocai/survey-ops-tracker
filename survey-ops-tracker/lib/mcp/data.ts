@@ -866,6 +866,36 @@ export async function getRerunSeries(seriesId: string) {
   return { series: s, waves: waveList, summary }
 }
 
+/** Resolve a series ref for a WRITE tool: same resolution as resolveRerunSeries
+ *  (uuid or client/survey-name query) but returns the ready-to-use pieces the
+ *  lifecycle tools need — the series id, a "<client> — <survey>" label, and the
+ *  status ROW (no waves — the lifecycle writes don't need the wave list). Errors
+ *  and ambiguity come back as the same { error } / { note, candidates } sentinels
+ *  the tools already forward. */
+export async function resolveSeriesForWrite(
+  ref: string
+): Promise<
+  | { error: string }
+  | { note: string; candidates: { id: string; client: string; survey_name: string }[] }
+  | { seriesId: string; label: string; series: SeriesStatusRow }
+> {
+  const resolved = await resolveRerunSeries(ref)
+  if (resolved === null) return { error: `No rerun series found matching "${ref}".` }
+  if ('ambiguous' in resolved) {
+    return { note: 'Multiple rerun series match — specify the series id.', candidates: resolved.ambiguous }
+  }
+  const supabase = createAdminClient()
+  const { data: series, error } = await supabase
+    .from('rerun_series_status')
+    .select('*')
+    .eq('id', resolved.id)
+    .maybeSingle()
+  if (error) throw error
+  if (!series) return { error: 'No rerun series with that id.' }
+  const s = series as SeriesStatusRow
+  return { seriesId: s.id, label: `${s.client} — ${s.survey_name}`, series: s }
+}
+
 /** Rerun calendar — in-service, non-paused series bucketed by effective_next
  *  relative to today (ET): overdue / due within the window horizon / upcoming.
  *  window is week (7d) / month (30d) / quarter (90d). */
@@ -947,14 +977,20 @@ export async function rerunRadar(opts: { ownerEmail?: string } = {}) {
       cadence: cadenceLabel(r.cadence_months), last_wave_on: r.last_on, due: r.effective_next,
       days_to_due: r.days_to_next, owner: r.owner_email, survey_ids: null,
     }
-    seen.add(dedupeKey(r.client, r.survey_name))
+    // The first-class model always has a DELIBERATE cadence choice at creation
+    // (adhoc → null cadence is "by choice", not "undefined"), so there is NO
+    // needs_definition state here — an adhoc / no-anchor series simply has no
+    // due date and isn't surfaced on a due-date radar (same as the no-anchor
+    // fall-through). Only mark the dedupe key when the row is actually SURFACED,
+    // so an omitted first-class row never suppresses its legacy-mirror twin
+    // (which may carry a real due date and must still show).
+    let surfaced = true
     if (r.is_overdue) buckets.overdue.push(item)
-    else if (r.cadence_months == null) buckets.needs_definition.push(item)
     else if (r.effective_next && r.days_to_next != null && r.days_to_next <= SERIES_PREP_LEAD_DAYS)
       buckets.prep_window.push(item)
     else if (r.effective_next) buckets.upcoming.push(item)
-    // else: cadence set but no computable due date and not overdue → not shown
-    // (matches the guard: only "upcoming" when it actually has a due date).
+    else surfaced = false
+    if (surfaced) seen.add(dedupeKey(r.client, r.survey_name))
   }
 
   // ---- Legacy sheet-mirror, skipping anything already surfaced above ----

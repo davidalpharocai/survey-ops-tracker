@@ -331,6 +331,12 @@ export const TOOLS: AssistantTool[] = [
       if ('error' in p) return p
       if ('ambiguous' in p) return p
       meta.project_id = p.id as string
+      // Re-promotion guard: createSeriesFromProject sweeps a legacy
+      // rerun_series_id lineage but NOT an existing first-class series_id, so
+      // promoting an already-in-service project would mint a DUPLICATE series.
+      if (p.series_id) {
+        return { error: 'This project is already in a rerun series.', series_id: p.series_id as string }
+      }
       const serviceMode = args.service_mode ?? 'auto'
       const cadenceMonths = cadenceToMonths(args.cadence)
       return confirmable(
@@ -377,20 +383,11 @@ export const TOOLS: AssistantTool[] = [
         template_id?: string; compliance_required_override?: boolean; confirm?: boolean
       }
       const { userEmail } = ctx
-      const resolved = await data.resolveRerunSeries(args.series)
-      if (resolved === null) return { error: `No rerun series found matching "${args.series}".` }
-      if ('ambiguous' in resolved) {
-        return { note: 'Multiple rerun series match — specify the series id.', candidates: resolved.ambiguous }
-      }
-      const seriesId = resolved.id
+      const resolved = await data.resolveSeriesForWrite(args.series)
+      if ('error' in resolved) return resolved
+      if ('note' in resolved) return resolved
+      const { seriesId, label, series: statusRow } = resolved
       const admin = createAdminClient()
-      const { data: existing, error } = await admin
-        .from('rerun_series')
-        .select('future_defaults, client, survey_name')
-        .eq('id', seriesId)
-        .maybeSingle()
-      if (error) throw error
-      if (!existing) return { error: 'No rerun series with that id.' }
       const provided: Record<string, unknown> = {}
       if (args.n_target !== undefined) provided.n_target = args.n_target
       if (args.audience !== undefined) provided.audience = args.audience
@@ -400,11 +397,11 @@ export const TOOLS: AssistantTool[] = [
       if (Object.keys(provided).length === 0) {
         return { needs: 'a change', message: 'Specify at least one default to set: n_target, audience, money_model, template_id, or compliance_required_override.' }
       }
-      const merged = { ...((existing.future_defaults ?? {}) as Record<string, unknown>), ...provided }
+      const merged = { ...((statusRow.future_defaults ?? {}) as Record<string, unknown>), ...provided }
       const changeDesc = Object.entries(provided).map(([k, v]) => `${k} → ${v ?? '—'}`).join(', ')
       return confirmable(
         args,
-        async () => ({ summary: `Set rerun defaults for ${existing.client} — ${existing.survey_name}: ${changeDesc}`, changes: provided }),
+        async () => ({ summary: `Set rerun defaults for ${label}: ${changeDesc}`, changes: provided }),
         async () => {
           const { series } = await setSeriesDefaults(admin, seriesId, merged, `${userEmail} via Claude`)
           meta.detail = { series_id: seriesId, defaults: provided }
@@ -422,16 +419,11 @@ export const TOOLS: AssistantTool[] = [
     handler: async (rawArgs, ctx, meta) => {
       const args = rawArgs as { series: string; cancel_pending?: boolean; confirm?: boolean }
       const { userEmail } = ctx
-      const resolved = await data.resolveRerunSeries(args.series)
-      if (resolved === null) return { error: `No rerun series found matching "${args.series}".` }
-      if ('ambiguous' in resolved) {
-        return { note: 'Multiple rerun series match — specify the series id.', candidates: resolved.ambiguous }
-      }
-      const seriesId = resolved.id
+      const resolved = await data.resolveSeriesForWrite(args.series)
+      if ('error' in resolved) return resolved
+      if ('note' in resolved) return resolved
+      const { seriesId, label } = resolved
       const admin = createAdminClient()
-      const detail = await data.getRerunSeries(seriesId)
-      if ('error' in detail) return detail
-      const label = `${detail.series.client} — ${detail.series.survey_name}`
       return confirmable(
         args,
         async () => {
@@ -461,16 +453,11 @@ export const TOOLS: AssistantTool[] = [
     handler: async (rawArgs, ctx, meta) => {
       const args = rawArgs as { series: string; confirm?: boolean }
       const { userEmail } = ctx
-      const resolved = await data.resolveRerunSeries(args.series)
-      if (resolved === null) return { error: `No rerun series found matching "${args.series}".` }
-      if ('ambiguous' in resolved) {
-        return { note: 'Multiple rerun series match — specify the series id.', candidates: resolved.ambiguous }
-      }
-      const seriesId = resolved.id
+      const resolved = await data.resolveSeriesForWrite(args.series)
+      if ('error' in resolved) return resolved
+      if ('note' in resolved) return resolved
+      const { seriesId, label } = resolved
       const admin = createAdminClient()
-      const detail = await data.getRerunSeries(seriesId)
-      if ('error' in detail) return detail
-      const label = `${detail.series.client} — ${detail.series.survey_name}`
       return confirmable(
         args,
         async () => ({ summary: `Resume rerun service for ${label}` }),
@@ -491,16 +478,11 @@ export const TOOLS: AssistantTool[] = [
     handler: async (rawArgs, ctx, meta) => {
       const args = rawArgs as { series: string; cancel_pending?: boolean; confirm?: boolean }
       const { userEmail } = ctx
-      const resolved = await data.resolveRerunSeries(args.series)
-      if (resolved === null) return { error: `No rerun series found matching "${args.series}".` }
-      if ('ambiguous' in resolved) {
-        return { note: 'Multiple rerun series match — specify the series id.', candidates: resolved.ambiguous }
-      }
-      const seriesId = resolved.id
+      const resolved = await data.resolveSeriesForWrite(args.series)
+      if ('error' in resolved) return resolved
+      if ('note' in resolved) return resolved
+      const { seriesId, label } = resolved
       const admin = createAdminClient()
-      const detail = await data.getRerunSeries(seriesId)
-      if ('error' in detail) return detail
-      const label = `${detail.series.client} — ${detail.series.survey_name}`
       return confirmable(
         args,
         async () => {
@@ -530,17 +512,12 @@ export const TOOLS: AssistantTool[] = [
     handler: async (rawArgs, ctx, meta) => {
       const args = rawArgs as { series: string; confirm?: boolean }
       const { userEmail } = ctx
-      const resolved = await data.resolveRerunSeries(args.series)
-      if (resolved === null) return { error: `No rerun series found matching "${args.series}".` }
-      if ('ambiguous' in resolved) {
-        return { note: 'Multiple rerun series match — specify the series id.', candidates: resolved.ambiguous }
-      }
-      const seriesId = resolved.id
+      const resolved = await data.resolveSeriesForWrite(args.series)
+      if ('error' in resolved) return resolved
+      if ('note' in resolved) return resolved
+      const { seriesId, label, series: statusRow } = resolved
       const admin = createAdminClient()
-      const detail = await data.getRerunSeries(seriesId)
-      if ('error' in detail) return detail
-      const label = `${detail.series.client} — ${detail.series.survey_name}`
-      const nextNo = detail.series.next_wave_no
+      const nextNo = statusRow.next_wave_no
       return confirmable(
         args,
         async () => ({ summary: `Create wave ${nextNo} for ${label} now` }),
@@ -548,6 +525,9 @@ export const TOOLS: AssistantTool[] = [
           const { series, spawn } = await spawnNextWave(admin, seriesId, `${userEmail} via Claude`)
           meta.detail = { series_id: seriesId, action: 'create_next_wave', spawn }
           if (!spawn.created) return { ok: false, series_id: series.id, skipped: true, reason: spawn.reason }
+          // Link the audit/telemetry row to the newly-created wave (consistent
+          // with the other project-scoped writes).
+          if (spawn.waveId) meta.project_id = spawn.waveId
           return { ok: true, series_id: series.id, wave: { id: spawn.waveId, name: spawn.waveName } }
         }
       )
