@@ -6,6 +6,8 @@ import { logSystemEvent } from '@/lib/server/observability'
 
 export type SendArgs = {
   to: string
+  /** Optional cc recipient(s) — a single address or comma-separated list. */
+  cc?: string
   subject: string
   html: string
   template: string
@@ -54,6 +56,7 @@ export async function sendAndLog(args: SendArgs): Promise<boolean> {
       await transport.sendMail({
         from,
         to: args.to,
+        cc: args.cc,
         subject: args.subject,
         html: args.html,
       })
@@ -96,6 +99,7 @@ export async function sendAndLog(args: SendArgs): Promise<boolean> {
     const { data, error } = await resend.emails.send({
       from: process.env.EMAIL_FROM!,
       to: args.to,
+      cc: args.cc,
       subject: args.subject,
       html: args.html,
     })
