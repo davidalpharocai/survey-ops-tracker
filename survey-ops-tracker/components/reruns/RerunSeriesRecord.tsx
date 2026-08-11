@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useRef, useState, cloneElement, type ReactElement, type ReactNode } from 'react'
+import { useEffect, useState, cloneElement, type ReactElement, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd'
 import {
@@ -14,6 +14,7 @@ import { useTeamMembers, assignableMembers } from '@/lib/hooks/useTeamMembers'
 import { waveStatus, type WaveStatusMeta } from '@/lib/reruns/waveStatus'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
 import { Skeleton } from '@/components/shared/Skeleton'
+import { ColumnsMenu } from '@/components/shared/ColumnsMenu'
 import { BaseTypeTag } from '@/components/reruns/BaseTypeTag'
 import { formatDate } from '@/lib/utils/date'
 import { fmtNum } from '@/lib/utils/number'
@@ -234,104 +235,6 @@ function saveStoredWaveColumns(keys: WaveColumnKey[]) {
   }
 }
 
-/** "⚙ Columns" control for the Waves table — same show/hide + popover
- * convention as ProjectTable's column menu, plus simple up/down reordering
- * (no drag-and-drop needed for a short column list). */
-function WaveColumnsMenu({
-  visibleKeys,
-  onChange,
-}: {
-  visibleKeys: WaveColumnKey[]
-  onChange: (next: WaveColumnKey[]) => void
-}) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!open) return
-    function onPointerDown(e: PointerEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener('pointerdown', onPointerDown)
-    return () => document.removeEventListener('pointerdown', onPointerDown)
-  }, [open])
-
-  const hiddenKeys = WAVE_COLUMN_KEYS.filter((k) => !visibleKeys.includes(k))
-  const menuOrder = [...visibleKeys, ...hiddenKeys]
-
-  function toggle(key: WaveColumnKey) {
-    onChange(visibleKeys.includes(key) ? visibleKeys.filter((k) => k !== key) : [...visibleKeys, key])
-  }
-  function move(key: WaveColumnKey, dir: -1 | 1) {
-    const idx = visibleKeys.indexOf(key)
-    const swapWith = idx + dir
-    if (idx < 0 || swapWith < 0 || swapWith >= visibleKeys.length) return
-    const next = [...visibleKeys]
-    ;[next[idx], next[swapWith]] = [next[swapWith], next[idx]]
-    onChange(next)
-  }
-
-  return (
-    <div className="relative shrink-0" ref={ref}>
-      <button
-        onClick={() => setOpen((o) => !o)}
-        title="Choose which wave columns you see, and their order — personal to you, remembered in this browser"
-        className="text-xs text-muted-foreground hover:text-foreground border border-border hover:border-ring rounded px-2 py-1 transition-colors"
-      >
-        ⚙ Columns
-      </button>
-      {open && (
-        <div className="absolute right-0 top-full mt-1 z-40 bg-popover border border-border rounded-lg shadow-xl p-2 flex flex-col gap-0.5 w-64">
-          {menuOrder.map((key) => {
-            const col = WAVE_COLUMN_REGISTRY.find((c) => c.key === key)
-            if (!col) return null
-            const visible = visibleKeys.includes(key)
-            const idx = visibleKeys.indexOf(key)
-            return (
-              <div key={key} className="flex items-center gap-1 text-sm text-foreground/90 hover:bg-accent rounded px-1.5 py-1" title={col.tooltip}>
-                <label className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer">
-                  <input type="checkbox" checked={visible} onChange={() => toggle(key)} className="accent-blue-600 shrink-0" />
-                  <span className="truncate">{col.label}</span>
-                </label>
-                {visible && (
-                  <span className="flex items-center gap-0.5 shrink-0">
-                    <button
-                      onClick={() => move(key, -1)}
-                      disabled={idx === 0}
-                      title="Move earlier"
-                      aria-label={`Move ${col.label} earlier`}
-                      className="text-muted-foreground hover:text-foreground disabled:opacity-25 disabled:hover:text-muted-foreground w-4"
-                    >
-                      ↑
-                    </button>
-                    <button
-                      onClick={() => move(key, 1)}
-                      disabled={idx === visibleKeys.length - 1}
-                      title="Move later"
-                      aria-label={`Move ${col.label} later`}
-                      className="text-muted-foreground hover:text-foreground disabled:opacity-25 disabled:hover:text-muted-foreground w-4"
-                    >
-                      ↓
-                    </button>
-                  </span>
-                )}
-              </div>
-            )
-          })}
-          <div className="border-t border-border mt-1 pt-1">
-            <button
-              onClick={() => onChange(DEFAULT_WAVE_COLUMNS)}
-              className="text-[12px] text-muted-foreground hover:text-foreground px-1.5 py-1 w-full text-left"
-            >
-              Reset to default
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
 /** Extracts the leading pixel size from a grid track (e.g. '100px' -> 100,
  * 'minmax(130px,1.1fr)' -> 130) so the scroll wrapper gets a sensible
  * min-width even though the column set is now dynamic. Approximate by
@@ -455,9 +358,14 @@ export function RerunSeriesRecord({ seriesId }: { seriesId: string }) {
     if (stored) setWaveColumnsState(stored)
   }, [])
 
-  function setWaveColumns(next: WaveColumnKey[]) {
-    setWaveColumnsState(next)
-    saveStoredWaveColumns(next)
+  // Accepts a plain string[] (the shared ColumnsMenu's onChange contract) and
+  // narrows/filters to the known WaveColumnKey shape before storing — the menu
+  // only ever emits keys drawn from WAVE_COLUMN_REGISTRY, so this is a cheap
+  // defensive guard rather than a real narrowing need.
+  function setWaveColumns(next: string[]) {
+    const filtered = next.filter((k): k is WaveColumnKey => WAVE_COLUMN_KEYS.includes(k as WaveColumnKey))
+    setWaveColumnsState(filtered)
+    saveStoredWaveColumns(filtered)
   }
 
   if (isLoading) {
@@ -781,7 +689,13 @@ export function RerunSeriesRecord({ seriesId }: { seriesId: string }) {
               Click a row to open the wave · drag the ⠿ grip to reorder within this series
             </p>
           </div>
-          <WaveColumnsMenu visibleKeys={waveColumns} onChange={setWaveColumns} />
+          <ColumnsMenu
+            visibleKeys={waveColumns}
+            allColumns={WAVE_COLUMN_REGISTRY}
+            defaultKeys={DEFAULT_WAVE_COLUMNS}
+            onChange={setWaveColumns}
+            buttonTitle="Choose which wave columns you see, and their order — personal to you, remembered in this browser"
+          />
         </div>
         {waves.length === 0 ? (
           <div className="p-6 text-center text-sm text-muted-foreground">
