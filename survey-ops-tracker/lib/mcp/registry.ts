@@ -1691,6 +1691,8 @@ export const TOOLS: AssistantTool[] = [
         const oGate = occamOnboardingGate({
           willMarkDelivered,
           requestedByContactId: og.requestedByContactId,
+          projectUsesOccam: og.projectUsesOccam,
+          contactHasPriorDelivery: og.contactHasPriorDelivery,
           contactOccamInvited: og.contactOccamInvited,
         })
         if (oGate.blocked) {

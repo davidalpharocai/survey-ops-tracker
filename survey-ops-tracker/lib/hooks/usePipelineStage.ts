@@ -95,6 +95,8 @@ export function usePipelineStage(project: SurveyProject) {
       const og = occamOnboardingGate({
         willMarkDelivered,
         requestedByContactId: project.requested_by_contact_id ?? null,
+        projectUsesOccam: project.occam ?? false,
+        contactHasPriorDelivery: requestedByContact?.hasPriorDelivery ?? false,
         contactOccamInvited: requestedByContact?.occam_invited ?? false,
       })
       if (og.blocked) {

@@ -12,6 +12,10 @@ export interface OccamGateInput {
   willMarkDelivered: boolean
   /** The project's requested-by contact id, or null if none is set. */
   requestedByContactId: string | null
+  /** Whether the project itself uses Occam (survey_projects.occam). Only Occam projects gate. */
+  projectUsesOccam: boolean
+  /** Whether that contact has already had a prior delivery (any other delivered project). */
+  contactHasPriorDelivery: boolean
   /** Whether that contact has already been confirmed as invited to Occam. */
   contactOccamInvited: boolean
 }
@@ -26,6 +30,10 @@ export function occamOnboardingGate(input: OccamGateInput): OccamGateResult {
   if (!input.willMarkDelivered) return { blocked: false, message: '' }
   // No requested-by contact recorded → no external user to onboard; don't gate.
   if (!input.requestedByContactId) return { blocked: false, message: '' }
+  // Not an Occam project → nothing to onboard into.
+  if (!input.projectUsesOccam) return { blocked: false, message: '' }
+  // This contact has had a prior delivery → already onboarded; don't prompt.
+  if (input.contactHasPriorDelivery) return { blocked: false, message: '' }
   // Already invited (confirmed once) → never prompt again for this contact.
   if (input.contactOccamInvited) return { blocked: false, message: '' }
   return {

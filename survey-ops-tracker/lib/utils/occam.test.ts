@@ -4,6 +4,8 @@ import { occamOnboardingGate, type OccamGateInput } from './occam'
 const input = (o: Partial<OccamGateInput> = {}): OccamGateInput => ({
   willMarkDelivered: true,
   requestedByContactId: 'contact-1',
+  projectUsesOccam: true,
+  contactHasPriorDelivery: false,
   contactOccamInvited: false,
   ...o,
 })
@@ -11,6 +13,18 @@ const input = (o: Partial<OccamGateInput> = {}): OccamGateInput => ({
 describe('occamOnboardingGate', () => {
   it('blocks the first delivery for a not-yet-invited requested-by contact', () => {
     const r = occamOnboardingGate(input())
+    expect(r.blocked).toBe(true)
+    expect(r.message).toMatch(/Occam/i)
+  })
+
+  it('blocks when all five conditions hold', () => {
+    const r = occamOnboardingGate(input({
+      willMarkDelivered: true,
+      requestedByContactId: 'contact-1',
+      projectUsesOccam: true,
+      contactHasPriorDelivery: false,
+      contactOccamInvited: false,
+    }))
     expect(r.blocked).toBe(true)
     expect(r.message).toMatch(/Occam/i)
   })
@@ -25,5 +39,13 @@ describe('occamOnboardingGate', () => {
 
   it('does not gate when there is no requested-by contact to onboard', () => {
     expect(occamOnboardingGate(input({ requestedByContactId: null })).blocked).toBe(false)
+  })
+
+  it('does not gate a non-Occam project', () => {
+    expect(occamOnboardingGate(input({ projectUsesOccam: false })).blocked).toBe(false)
+  })
+
+  it('does not gate a contact who has had a prior delivery', () => {
+    expect(occamOnboardingGate(input({ contactHasPriorDelivery: true })).blocked).toBe(false)
   })
 })
