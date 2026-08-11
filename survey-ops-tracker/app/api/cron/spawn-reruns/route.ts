@@ -3,15 +3,24 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { safeEqual } from '@/lib/utils/secureCompare'
 import { logSystemEvent } from '@/lib/server/observability'
 import { nextRerunName } from '@/lib/utils/rerun'
+import { nextWaveInherit, type PrevWaveForInherit } from '@/lib/reruns/series'
+import { selectDueSeries, canSpawnNextWave, isLegacyEligible, addDaysISO } from '@/lib/reruns/spawn'
+import { copySupplierLaunches, copyProjectBlasts, copyProjectSegments } from '@/lib/server/clone'
+import type { Database, TablesInsert } from '@/lib/supabase/types'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
-// Daily (see vercel.json). Spawns the next wave of each longitudinal survey
-// whose rerun_date is within a week and that hasn't spawned yet. The copy lands
-// in Submitted for the captain to review; setup carried over, run-data reset,
-// numbered + linked as a series. One-shot: the copy's rerun_date is left blank
-// for a human to set the next wave.
+// Daily (see vercel.json). Spawns the next wave for every rerun_series that's
+// due (the first-class model, migration 073) AND, for un-migrated data, every
+// legacy `longitudinal` project whose `rerun_date` is within a week. The copy
+// lands in Submitted for the captain to review; setup carries over, run-data
+// resets, numbered + linked as a series. Idempotent: a series' unique
+// `(series_id, rerun_number)` DB index is the hard backstop against duplicate
+// waves; the query-time checks below are the fast path that skips a re-run
+// without needing to hit that constraint. See
+// docs/superpowers/plans/2026-08-10-rerun-update.md Task 4 + review-hardening
+// addendum, spec §8/§18.
 function authorized(req: NextRequest): boolean {
   const bearer = req.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
   if (safeEqual(bearer, process.env.CRON_SECRET)) return true
@@ -20,22 +29,159 @@ function authorized(req: NextRequest): boolean {
 
 const LEAD_DAYS = 7
 
+type SeriesStatusRow = Database['public']['Views']['rerun_series_status']['Row']
+type WaveRow = Pick<
+  Database['public']['Tables']['survey_projects']['Row'],
+  'id' | 'project_name' | 'rerun_number' | 'rerun_date' | 'launch_date' | 'due_date' | 'deliver_date' | 'captain_id' | 'rerun_spawned_at'
+>
+
+/** Resolve the default rerun captain (Sree by default, configurable via env)
+ * by email, falling back to initials 'SC' if the email lookup misses. */
+async function resolveRerunCaptainId(supabase: ReturnType<typeof createAdminClient>): Promise<string | null> {
+  const email = process.env.RERUN_CAPTAIN_EMAIL ?? 'sreerag@alpharoc.ai'
+  const { data: byEmail } = await supabase.from('team_members').select('id').eq('email', email).maybeSingle()
+  if (byEmail) return byEmail.id
+  const { data: byInitials } = await supabase.from('team_members').select('id').eq('initials', 'SC').maybeSingle()
+  return byInitials?.id ?? null
+}
+
 export async function GET(req: NextRequest) {
   if (!authorized(req)) return new Response('Unauthorized', { status: 401 })
 
   const supabase = createAdminClient()
-  const horizon = new Date(Date.now() + LEAD_DAYS * 86400_000).toISOString().split('T')[0]
-  const today = new Date().toISOString().split('T')[0]
+  const todayISO = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' })
+
+  const spawned: string[] = []
+  const errors: string[] = []
+  let seriesChecked = 0
+  let legacyChecked = 0
+
+  // -------------------------------------------------------------------------
+  // Series path (migration 073): the first-class model.
+  // -------------------------------------------------------------------------
+  const horizonSeries = addDaysISO(todayISO, LEAD_DAYS)
+  const { data: seriesRaw, error: seriesQueryErr } = await supabase
+    .from('rerun_series_status')
+    .select('*')
+    .eq('service_mode', 'auto')
+    .eq('auto_armed', true)
+    .eq('paused', false)
+    .eq('in_service', true)
+    .not('effective_next', 'is', null)
+    .lte('effective_next', horizonSeries)
+
+  if (seriesQueryErr) {
+    errors.push(`series query: ${seriesQueryErr.message}`)
+  } else {
+    // The SQL filters above are a performance narrowing; selectDueSeries is
+    // the actual (unit-tested) gate applied to what we spawn from.
+    const dueSeries = selectDueSeries(seriesRaw ?? [], todayISO, LEAD_DAYS)
+    seriesChecked = dueSeries.length
+
+    let captainId: string | null | undefined // resolved lazily, once, only if a series needs it
+    const rerunCaptainId = async () => {
+      if (captainId === undefined) captainId = await resolveRerunCaptainId(supabase)
+      return captainId
+    }
+
+    for (const series of dueSeries as SeriesStatusRow[]) {
+      try {
+        const { data: waves, error: wavesErr } = await supabase
+          .from('survey_projects')
+          .select('id, project_name, rerun_number, rerun_date, launch_date, due_date, deliver_date, captain_id, rerun_spawned_at')
+          .eq('series_id', series.id)
+          .is('deleted_at', null)
+          .order('rerun_number', { ascending: false })
+        if (wavesErr) {
+          errors.push(`${series.client} — ${series.survey_name}: ${wavesErr.message}`)
+          continue
+        }
+
+        const liveWaves = (waves ?? []) as WaveRow[]
+        const prevWave = liveWaves[0] as WaveRow | undefined
+        const decision = canSpawnNextWave({
+          hasPrevWave: prevWave != null,
+          existingWaveNumbers: liveWaves.map((w) => w.rerun_number),
+          nextWaveNo: series.next_wave_no,
+          prevWaveSpawnedAt: prevWave?.rerun_spawned_at ?? null,
+        })
+        if (!decision.spawn || !prevWave) continue // already spawned, or no wave to spawn from — skip quietly
+
+        const prevWaveForInherit: PrevWaveForInherit = {
+          project_name: prevWave.project_name,
+          rerun_date: prevWave.rerun_date,
+          launch_date: prevWave.launch_date,
+          due_date: prevWave.due_date,
+          deliver_date: prevWave.deliver_date,
+          captain_id: prevWave.captain_id,
+        }
+        const inherited = nextWaveInherit(series, prevWaveForInherit, todayISO)
+        if (inherited.captain_id == null) {
+          inherited.captain_id = await rerunCaptainId()
+        }
+
+        const { data: newWave, error: insErr } = await supabase
+          .from('survey_projects')
+          .insert(inherited as unknown as TablesInsert<'survey_projects'>)
+          .select('id, project_name')
+          .single()
+
+        if (insErr) {
+          // 23505 = unique_violation on (series_id, rerun_number): another
+          // process already spawned this exact wave number — idempotent
+          // no-op, not an error.
+          if (insErr.code === '23505') continue
+          errors.push(`${series.client} — ${series.survey_name}: ${insErr.message}`)
+          continue
+        }
+        if (!newWave) continue
+
+        // Copy child rows so the new wave's Money section + segments land
+        // populated like the prior wave, run-data zeroed.
+        await copySupplierLaunches(supabase, prevWave.id, newWave.id, 'system')
+        await copyProjectBlasts(supabase, prevWave.id, newWave.id, 'system')
+        await copyProjectSegments(supabase, prevWave.id, newWave.id)
+
+        // Stamp the prior wave so it never spawns a second successor, and
+        // advance the series' next wave number.
+        const { error: stampErr } = await supabase
+          .from('survey_projects')
+          .update({ rerun_spawned_at: new Date().toISOString() })
+          .eq('id', prevWave.id)
+        if (stampErr) errors.push(`stamp ${prevWave.project_name}: ${stampErr.message}`)
+
+        const { error: seriesUpdateErr } = await supabase
+          .from('rerun_series')
+          .update({ next_wave_no: series.next_wave_no + 1 })
+          .eq('id', series.id)
+        if (seriesUpdateErr) errors.push(`advance next_wave_no for ${series.survey_name}: ${seriesUpdateErr.message}`)
+
+        spawned.push(newWave.project_name)
+      } catch (err) {
+        errors.push(`${series.client} — ${series.survey_name}: ${err instanceof Error ? err.message : String(err)}`)
+      }
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Legacy path: un-migrated `longitudinal` projects (no series_id). A row
+  // that has been seeded into a series must NEVER also spawn here — that's
+  // the `series_id is null` filter (SQL) + `isLegacyEligible` (re-applied
+  // client-side as the authoritative, unit-tested gate) below.
+  // -------------------------------------------------------------------------
+  const horizonLegacy = new Date(Date.now() + LEAD_DAYS * 86400_000).toISOString().split('T')[0]
+  const todayLegacy = new Date().toISOString().split('T')[0]
 
   const { data: due, error } = await supabase
     .from('survey_projects')
     .select(
-      'id, project_name, client, captain_id, co_captain_ids, salesperson, n_target, audience_size, linked_documents, voter_survey_qa, citation_language_needed, row_level_data, compliance_override, rerun_number, rerun_series_id'
+      'id, project_name, client, captain_id, co_captain_ids, salesperson, n_target, audience_size, linked_documents, voter_survey_qa, citation_language_needed, row_level_data, compliance_override, rerun_number, rerun_series_id, series_id, rerun_date, rerun_spawned_at, longitudinal, status, board_column'
     )
     .eq('longitudinal', true)
     .not('rerun_date', 'is', null)
-    .lte('rerun_date', horizon)
+    .lte('rerun_date', horizonLegacy)
     .is('rerun_spawned_at', null)
+    .is('series_id', null)
     .is('deleted_at', null)
     // Skip genuinely-abandoned (Closed) projects, BUT include delivered waves —
     // which are now Closed too (migration 064: delivered ⇒ archived). A delivered
@@ -47,69 +193,81 @@ export async function GET(req: NextRequest) {
     .neq('status', 'Cancelled')
 
   if (error) {
-    await logSystemEvent({ source: 'spawn-reruns', status: 'error', detail: `Database error: ${error.message}` })
-    return new Response('Database error', { status: 500 })
-  }
+    errors.push(`legacy query: ${error.message}`)
+  } else {
+    const legacyDue = (due ?? []).filter((p) =>
+      isLegacyEligible(
+        {
+          longitudinal: p.longitudinal,
+          rerun_date: p.rerun_date,
+          rerun_spawned_at: p.rerun_spawned_at,
+          series_id: p.series_id,
+          status: p.status,
+          board_column: p.board_column,
+        },
+        todayLegacy,
+        LEAD_DAYS
+      )
+    )
+    legacyChecked = legacyDue.length
 
-  const spawned: string[] = []
-  const errors: string[] = []
-
-  for (const p of due ?? []) {
-    const nextNum = (p.rerun_number ?? 1) + 1
-    const name = nextRerunName(p.project_name, nextNum)
-    const copy = {
-      project_name: name,
-      client: p.client,
-      project_type: 'Rerun' as const,
-      phase: 'Active' as const,
-      status: 'Open' as const,
-      board_column: 'Submitted' as const,
-      captain_id: p.captain_id,
-      co_captain_ids: p.co_captain_ids,
-      salesperson: p.salesperson,
-      n_target: p.n_target,
-      n_collected: 0,
-      n_actual: null,
-      audience_size: p.audience_size,
-      longitudinal: true,
-      voter_survey_qa: p.voter_survey_qa,
-      citation_language_needed: p.citation_language_needed,
-      row_level_data: p.row_level_data,
-      compliance_override: p.compliance_override,
-      linked_documents: p.linked_documents,
-      stage_doc_programming: false,
-      stage_survey_programming: false,
-      stage_edwin_qa: false,
-      stage_fielding: false,
-      stage_data_qa: false,
-      stage_delivery: false,
-      submitted_date: today,
-      rerun_number: nextNum,
-      rerun_series_id: p.rerun_series_id ?? p.id,
+    for (const p of legacyDue) {
+      const nextNum = (p.rerun_number ?? 1) + 1
+      const name = nextRerunName(p.project_name, nextNum)
+      const copy = {
+        project_name: name,
+        client: p.client,
+        project_type: 'Rerun' as const,
+        phase: 'Active' as const,
+        status: 'Open' as const,
+        board_column: 'Submitted' as const,
+        captain_id: p.captain_id,
+        co_captain_ids: p.co_captain_ids,
+        salesperson: p.salesperson,
+        n_target: p.n_target,
+        n_collected: 0,
+        n_actual: null,
+        audience_size: p.audience_size,
+        longitudinal: true,
+        voter_survey_qa: p.voter_survey_qa,
+        citation_language_needed: p.citation_language_needed,
+        row_level_data: p.row_level_data,
+        compliance_override: p.compliance_override,
+        linked_documents: p.linked_documents,
+        stage_doc_programming: false,
+        stage_survey_programming: false,
+        stage_edwin_qa: false,
+        stage_fielding: false,
+        stage_data_qa: false,
+        stage_delivery: false,
+        submitted_date: todayLegacy,
+        rerun_number: nextNum,
+        rerun_series_id: p.rerun_series_id ?? p.id,
+      }
+      const { error: insErr } = await supabase.from('survey_projects').insert(copy)
+      if (insErr) {
+        errors.push(`${p.project_name}: ${insErr.message}`)
+        continue
+      }
+      // Stamp the source so it never re-spawns this wave.
+      const { error: stampErr } = await supabase
+        .from('survey_projects')
+        .update({ rerun_spawned_at: new Date().toISOString() })
+        .eq('id', p.id)
+      if (stampErr) errors.push(`stamp ${p.project_name}: ${stampErr.message}`)
+      spawned.push(name)
     }
-    const { error: insErr } = await supabase.from('survey_projects').insert(copy)
-    if (insErr) {
-      errors.push(`${p.project_name}: ${insErr.message}`)
-      continue
-    }
-    // Stamp the source so it never re-spawns this wave.
-    const { error: stampErr } = await supabase
-      .from('survey_projects')
-      .update({ rerun_spawned_at: new Date().toISOString() })
-      .eq('id', p.id)
-    if (stampErr) errors.push(`stamp ${p.project_name}: ${stampErr.message}`)
-    spawned.push(name)
   }
 
   await logSystemEvent({
     source: 'spawn-reruns',
     status: errors.length ? 'partial' : 'ok',
     detail: spawned.length ? `Spawned ${spawned.length} rerun(s): ${spawned.join(', ')}` : 'No reruns due.',
-    meta: { spawned, errors },
+    meta: { spawned, errors, seriesChecked, legacyChecked },
   })
 
   return Response.json(
-    { checked: due?.length ?? 0, spawned, errors },
+    { checked: seriesChecked + legacyChecked, spawned, errors },
     { status: errors.length ? 207 : 200 }
   )
 }

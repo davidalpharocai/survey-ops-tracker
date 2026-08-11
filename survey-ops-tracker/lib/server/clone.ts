@@ -17,6 +17,122 @@ export interface CloneCarry {
 
 const on = (v: boolean | undefined) => v !== false // default: carry unless explicitly false
 
+type Admin = ReturnType<typeof createAdminClient>
+
+/** Copy the PS launch structure (launches + supplier rows) from one project
+ * to another. Run-data resets: `launch_date` is left blank (a fresh plan) and
+ * each supplier's `n_collected` resets to 0; `cpi`/`completes_cap` carry over
+ * verbatim. Shared by `cloneProject` (Clone button, below) and the rerun
+ * auto-spawn cron (`app/api/cron/spawn-reruns/route.ts`), which copies the
+ * same structure onto a newly spawned wave. */
+export async function copySupplierLaunches(
+  admin: Admin,
+  sourceProjectId: string,
+  targetProjectId: string,
+  createdBy: string
+): Promise<void> {
+  const { data: srcLaunches } = await admin
+    .from('project_launches')
+    .select('id, label, target, created_at')
+    .eq('project_id', sourceProjectId)
+    .order('created_at', { ascending: true })
+  if (!srcLaunches || srcLaunches.length === 0) return
+  const { data: srcSuppliers } = await admin
+    .from('project_suppliers')
+    .select('launch_id, supplier_id, cpi, completes_cap')
+    .eq('project_id', sourceProjectId)
+  const byLaunch = new Map<string, { supplier_id: string; cpi: number; completes_cap: number }[]>()
+  for (const s of srcSuppliers ?? []) {
+    if (!s.launch_id) continue
+    const arr = byLaunch.get(s.launch_id) ?? []
+    arr.push({ supplier_id: s.supplier_id, cpi: s.cpi, completes_cap: s.completes_cap })
+    byLaunch.set(s.launch_id, arr)
+  }
+  for (const l of srcLaunches) {
+    const { data: newLaunch } = await admin
+      .from('project_launches')
+      .insert({ project_id: targetProjectId, label: l.label, target: l.target, created_by: createdBy })
+      .select('id')
+      .single()
+    if (!newLaunch) continue
+    const supRows = byLaunch.get(l.id) ?? []
+    if (supRows.length > 0) {
+      await admin.from('project_suppliers').insert(
+        supRows.map((s) => ({
+          project_id: targetProjectId,
+          launch_id: newLaunch.id,
+          supplier_id: s.supplier_id,
+          cpi: s.cpi,
+          completes_cap: s.completes_cap,
+          n_collected: 0,
+          created_by: createdBy,
+        }))
+      )
+    }
+  }
+}
+
+/** Copy B2B blast config rows from one project to another, resetting
+ * run-data (# people reached, # completes) to 0 since the new wave hasn't
+ * sent anything yet — `bid` ($/completion) and the description (`note`)
+ * carry over as the plan. Used ONLY by the rerun auto-spawn cron so a new
+ * wave's Money section lands populated (not empty) like the prior wave.
+ * Deliberately NOT called by `cloneProject` below — a Clone is a brand-new
+ * project, and blasts belong to the source project they were actually sent
+ * from, not a copy (see the CloneCarry doc + `components/project/CloneProjectModal.tsx`). */
+export async function copyProjectBlasts(
+  admin: Admin,
+  sourceProjectId: string,
+  targetProjectId: string,
+  createdBy: string
+): Promise<void> {
+  const { data: srcBlasts } = await admin
+    .from('project_blasts')
+    .select('bid, note')
+    .eq('project_id', sourceProjectId)
+  if (!srcBlasts || srcBlasts.length === 0) return
+  await admin.from('project_blasts').insert(
+    srcBlasts.map((b) => ({
+      project_id: targetProjectId,
+      bid: b.bid,
+      note: b.note,
+      people: 0,
+      completes: 0,
+      created_by: createdBy,
+    }))
+  )
+}
+
+/** Copy multi-segment N rows from one project to another, resetting
+ * `n_collected` to 0 and `n_actual` to null — the segment structure/targets
+ * carry over, the collection run-data doesn't. Used ONLY by the rerun
+ * auto-spawn cron (same rationale as `copyProjectBlasts` above). */
+export async function copyProjectSegments(
+  admin: Admin,
+  sourceProjectId: string,
+  targetProjectId: string
+): Promise<void> {
+  const { data: srcSegments } = await admin
+    .from('project_segments')
+    .select('label, n_target, n_internal_target, audience, audience_size, sort_order')
+    .eq('project_id', sourceProjectId)
+    .order('sort_order', { ascending: true })
+  if (!srcSegments || srcSegments.length === 0) return
+  await admin.from('project_segments').insert(
+    srcSegments.map((s) => ({
+      project_id: targetProjectId,
+      label: s.label,
+      n_target: s.n_target,
+      n_internal_target: s.n_internal_target,
+      n_collected: 0,
+      n_actual: null,
+      audience: s.audience,
+      audience_size: s.audience_size,
+      sort_order: s.sort_order,
+    }))
+  )
+}
+
 export async function cloneProject(opts: {
   sourceId: string
   newName: string
@@ -80,47 +196,8 @@ export async function cloneProject(opts: {
   //    resets — it's a fresh plan) then copy its supplier rows (CPIs + caps), N collected
   //    reset to 0.
   if (on(c.suppliers)) {
-    const { data: srcLaunches } = await admin
-      .from('project_launches')
-      .select('id, label, target, created_at')
-      .eq('project_id', opts.sourceId)
-      .order('created_at', { ascending: true })
-    if (srcLaunches && srcLaunches.length > 0) {
-      const { data: srcSuppliers } = await admin
-        .from('project_suppliers')
-        .select('launch_id, supplier_id, cpi, completes_cap')
-        .eq('project_id', opts.sourceId)
-      const byLaunch = new Map<string, { supplier_id: string; cpi: number; completes_cap: number }[]>()
-      for (const s of srcSuppliers ?? []) {
-        if (!s.launch_id) continue
-        const arr = byLaunch.get(s.launch_id) ?? []
-        arr.push({ supplier_id: s.supplier_id, cpi: s.cpi, completes_cap: s.completes_cap })
-        byLaunch.set(s.launch_id, arr)
-      }
-      const creator = opts.actor.split(/[@ ]/)[0]
-      for (const l of srcLaunches) {
-        const { data: newLaunch } = await admin
-          .from('project_launches')
-          .insert({ project_id: created.id, label: l.label, target: l.target, created_by: creator })
-          .select('id')
-          .single()
-        if (!newLaunch) continue
-        const supRows = byLaunch.get(l.id) ?? []
-        if (supRows.length > 0) {
-          await admin.from('project_suppliers').insert(
-            supRows.map((s) => ({
-              project_id: created.id,
-              launch_id: newLaunch.id,
-              supplier_id: s.supplier_id,
-              cpi: s.cpi,
-              completes_cap: s.completes_cap,
-              n_collected: 0,
-              created_by: creator,
-            }))
-          )
-        }
-      }
-    }
+    const creator = opts.actor.split(/[@ ]/)[0]
+    await copySupplierLaunches(admin, opts.sourceId, created.id, creator)
   }
 
   // 4) Record in the audit log what this is a clone of.
