@@ -29,12 +29,13 @@ export interface SeriesWave {
   n_target: number | null
   n_collected: number | null
   n_actual: number | null
+  survey_tool_id: string | null
   status: string | null
   board_column: string | null
 }
 
 const WAVE_COLS =
-  'id, project_code, project_name, rerun_number, wave_order, submitted_date, launch_date, due_date, deliver_date, delivered_at, n_target, n_collected, n_actual, status, board_column'
+  'id, project_code, project_name, rerun_number, wave_order, submitted_date, launch_date, due_date, deliver_date, delivered_at, n_target, n_collected, n_actual, survey_tool_id, status, board_column'
 
 export interface RerunSeriesRecord {
   series: SeriesStatusRow

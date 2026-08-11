@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState, cloneElement, type ReactElement } from 'react'
 import { useRouter } from 'next/navigation'
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd'
 import {
@@ -11,7 +11,7 @@ import {
 } from '@/lib/hooks/useRerunSeriesRecord'
 import type { FutureDefaults } from '@/lib/reruns/series'
 import { useTeamMembers, assignableMembers } from '@/lib/hooks/useTeamMembers'
-import { waveStatus } from '@/lib/reruns/waveStatus'
+import { waveStatus, type WaveStatusMeta } from '@/lib/reruns/waveStatus'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
 import { Skeleton } from '@/components/shared/Skeleton'
 import { formatDate } from '@/lib/utils/date'
@@ -57,11 +57,373 @@ type FutureDefaultsUI = FutureDefaults & { money_model?: string | null }
 const inputCls =
   'bg-muted border border-border text-foreground text-[12px] rounded-md px-1.5 py-1 focus:outline-none focus:border-ring'
 
-const WAVE_GRID = '22px 68px 92px 96px 96px 84px 84px 100px'
-
 function deliveredCell(w: SeriesWave): string {
   if (w.delivered_at || w.board_column === 'Delivery') return formatDate(w.deliver_date ?? w.delivered_at)
   return w.deliver_date ? `~${formatDate(w.deliver_date)}` : '—'
+}
+
+// ---------------------------------------------------------------------------
+// Waves table — user-configurable columns (show/hide + reorder), persisted
+// per browser like the List view's "⚙ Columns" (app/(app)/list/page.tsx +
+// components/list/ProjectTable.tsx, key sot.listHiddenColumns). The ⠿
+// row-reorder grip is a fixed first column, outside this registry, since it's
+// structural (drives the drag-to-reorder gesture) rather than a data column.
+// ---------------------------------------------------------------------------
+
+type WaveColumnKey =
+  | 'wave'
+  | 'project'
+  | 'fielded'
+  | 'delivered'
+  | 'n_collected'
+  | 'n_actual'
+  | 'status'
+  | 'survey_ids'
+  | 'n_target'
+  | 'submitted'
+  | 'due'
+
+interface WaveColumnDef {
+  key: WaveColumnKey
+  label: string
+  tooltip: string
+  /** CSS grid track size, e.g. '100px' or 'minmax(130px,1.1fr)'. */
+  width: string
+  align?: 'right'
+  render: (w: SeriesWave, s: WaveStatusMeta) => ReactElement
+}
+
+const WAVE_COLUMN_REGISTRY: WaveColumnDef[] = [
+  {
+    key: 'wave',
+    label: 'Wave',
+    tooltip: 'Wave number',
+    width: '72px',
+    render: (w, s) => (
+      <span className={`text-[11px] font-medium px-1.5 py-0.5 rounded text-center whitespace-nowrap w-fit ${s.chip}`}>
+        Wave {w.rerun_number}
+      </span>
+    ),
+  },
+  {
+    key: 'project',
+    label: 'Project',
+    tooltip: 'Project code — click the row to open it',
+    width: '84px',
+    render: (w) => <span className="text-xs font-mono text-muted-foreground truncate">{w.project_code ?? '—'}</span>,
+  },
+  {
+    key: 'fielded',
+    label: 'Fielded / rerun date',
+    tooltip: 'When it went (or goes) live in the field',
+    width: '100px',
+    render: (w) => <span className="text-xs text-muted-foreground">{formatDate(w.launch_date)}</span>,
+  },
+  {
+    key: 'delivered',
+    label: 'Delivered',
+    tooltip: 'When it was (or is expected to be) sent to the client',
+    width: '100px',
+    render: (w) => <span className="text-xs text-muted-foreground">{deliveredCell(w)}</span>,
+  },
+  {
+    key: 'n_collected',
+    label: 'N collected',
+    tooltip: 'Responses collected so far',
+    width: '78px',
+    align: 'right',
+    render: (w) => <span className="text-sm text-foreground text-right tabular-nums">{fmtNum(w.n_collected)}</span>,
+  },
+  {
+    key: 'n_actual',
+    label: 'N actual',
+    tooltip: 'Final usable response count',
+    width: '78px',
+    align: 'right',
+    render: (w) => <span className="text-sm text-foreground text-right tabular-nums">{fmtNum(w.n_actual)}</span>,
+  },
+  {
+    key: 'status',
+    label: 'Status',
+    tooltip: 'Wave status',
+    width: '90px',
+    render: (w, s) => (
+      <span className={`text-[11px] font-medium px-1.5 py-0.5 rounded text-center whitespace-nowrap w-fit ${s.chip}`}>{s.label}</span>
+    ),
+  },
+  {
+    key: 'survey_ids',
+    label: 'Survey IDs',
+    tooltip: 'Survey IDs used in this wave (comma-separated). Can differ per wave.',
+    width: 'minmax(130px,1.1fr)',
+    render: (w) => (
+      <span className="text-xs font-mono text-muted-foreground truncate" title={w.survey_tool_id ?? undefined}>
+        {w.survey_tool_id || '—'}
+      </span>
+    ),
+  },
+  {
+    key: 'n_target',
+    label: 'N target',
+    tooltip: 'Target response count for this wave',
+    width: '78px',
+    align: 'right',
+    render: (w) => <span className="text-sm text-foreground text-right tabular-nums">{fmtNum(w.n_target)}</span>,
+  },
+  {
+    key: 'submitted',
+    label: 'Submitted',
+    tooltip: 'When this wave was submitted / created',
+    width: '100px',
+    render: (w) => <span className="text-xs text-muted-foreground">{formatDate(w.submitted_date)}</span>,
+  },
+  {
+    key: 'due',
+    label: 'Due',
+    tooltip: 'Internal due date for this wave',
+    width: '100px',
+    render: (w) => <span className="text-xs text-muted-foreground">{formatDate(w.due_date)}</span>,
+  },
+]
+
+const WAVE_COLUMN_KEYS: WaveColumnKey[] = WAVE_COLUMN_REGISTRY.map((c) => c.key)
+
+// survey_ids deliberately LAST (far right) — it's the least-often-needed
+// column for a quick glance and can run long (comma-separated IDs).
+const DEFAULT_WAVE_COLUMNS: WaveColumnKey[] = [
+  'wave',
+  'project',
+  'fielded',
+  'delivered',
+  'n_collected',
+  'n_actual',
+  'status',
+  'survey_ids',
+]
+
+const WAVE_COLUMNS_STORAGE_KEY = 'sot.rerunWaveColumns'
+
+/** Personal-to-browser column prefs, like the List view's hiddenCols. Guards
+ * against unknown/renamed keys (a stale localStorage entry from a prior
+ * registry shape) by filtering to keys that still exist in the registry, and
+ * falls back to the default order if nothing valid survives. */
+function loadStoredWaveColumns(): WaveColumnKey[] | null {
+  try {
+    const raw = localStorage.getItem(WAVE_COLUMNS_STORAGE_KEY)
+    if (!raw) return null
+    const parsed: unknown = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return null
+    const valid = parsed.filter((k): k is WaveColumnKey => WAVE_COLUMN_KEYS.includes(k as WaveColumnKey))
+    return valid.length > 0 ? valid : null
+  } catch {
+    return null
+  }
+}
+
+function saveStoredWaveColumns(keys: WaveColumnKey[]) {
+  try {
+    localStorage.setItem(WAVE_COLUMNS_STORAGE_KEY, JSON.stringify(keys))
+  } catch {
+    // storage unavailable/full — the in-memory choice still works this visit
+  }
+}
+
+/** "⚙ Columns" control for the Waves table — same show/hide + popover
+ * convention as ProjectTable's column menu, plus simple up/down reordering
+ * (no drag-and-drop needed for a short column list). */
+function WaveColumnsMenu({
+  visibleKeys,
+  onChange,
+}: {
+  visibleKeys: WaveColumnKey[]
+  onChange: (next: WaveColumnKey[]) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    function onPointerDown(e: PointerEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    return () => document.removeEventListener('pointerdown', onPointerDown)
+  }, [open])
+
+  const hiddenKeys = WAVE_COLUMN_KEYS.filter((k) => !visibleKeys.includes(k))
+  const menuOrder = [...visibleKeys, ...hiddenKeys]
+
+  function toggle(key: WaveColumnKey) {
+    onChange(visibleKeys.includes(key) ? visibleKeys.filter((k) => k !== key) : [...visibleKeys, key])
+  }
+  function move(key: WaveColumnKey, dir: -1 | 1) {
+    const idx = visibleKeys.indexOf(key)
+    const swapWith = idx + dir
+    if (idx < 0 || swapWith < 0 || swapWith >= visibleKeys.length) return
+    const next = [...visibleKeys]
+    ;[next[idx], next[swapWith]] = [next[swapWith], next[idx]]
+    onChange(next)
+  }
+
+  return (
+    <div className="relative shrink-0" ref={ref}>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        title="Choose which wave columns you see, and their order — personal to you, remembered in this browser"
+        className="text-xs text-muted-foreground hover:text-foreground border border-border hover:border-ring rounded px-2 py-1 transition-colors"
+      >
+        ⚙ Columns
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 z-40 bg-popover border border-border rounded-lg shadow-xl p-2 flex flex-col gap-0.5 w-64">
+          {menuOrder.map((key) => {
+            const col = WAVE_COLUMN_REGISTRY.find((c) => c.key === key)
+            if (!col) return null
+            const visible = visibleKeys.includes(key)
+            const idx = visibleKeys.indexOf(key)
+            return (
+              <div key={key} className="flex items-center gap-1 text-sm text-foreground/90 hover:bg-accent rounded px-1.5 py-1" title={col.tooltip}>
+                <label className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer">
+                  <input type="checkbox" checked={visible} onChange={() => toggle(key)} className="accent-blue-600 shrink-0" />
+                  <span className="truncate">{col.label}</span>
+                </label>
+                {visible && (
+                  <span className="flex items-center gap-0.5 shrink-0">
+                    <button
+                      onClick={() => move(key, -1)}
+                      disabled={idx === 0}
+                      title="Move earlier"
+                      aria-label={`Move ${col.label} earlier`}
+                      className="text-muted-foreground hover:text-foreground disabled:opacity-25 disabled:hover:text-muted-foreground w-4"
+                    >
+                      ↑
+                    </button>
+                    <button
+                      onClick={() => move(key, 1)}
+                      disabled={idx === visibleKeys.length - 1}
+                      title="Move later"
+                      aria-label={`Move ${col.label} later`}
+                      className="text-muted-foreground hover:text-foreground disabled:opacity-25 disabled:hover:text-muted-foreground w-4"
+                    >
+                      ↓
+                    </button>
+                  </span>
+                )}
+              </div>
+            )
+          })}
+          <div className="border-t border-border mt-1 pt-1">
+            <button
+              onClick={() => onChange(DEFAULT_WAVE_COLUMNS)}
+              className="text-[12px] text-muted-foreground hover:text-foreground px-1.5 py-1 w-full text-left"
+            >
+              Reset to default
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** Extracts the leading pixel size from a grid track (e.g. '100px' -> 100,
+ * 'minmax(130px,1.1fr)' -> 130) so the scroll wrapper gets a sensible
+ * min-width even though the column set is now dynamic. Approximate by
+ * design — it only needs to keep columns from getting too cramped. */
+function trackMinPx(width: string): number {
+  const m = width.match(/(\d+)px/)
+  return m ? Number(m[1]) : 80
+}
+
+/** The waves grid itself — header row + drag-to-reorder body — built from
+ * whichever columns are currently visible. The ⠿ grip is a fixed first
+ * track outside the column registry so row-reorder can never be hidden or
+ * moved by the column picker. */
+function WavesTable({
+  waves,
+  waveColumns,
+  onDragEnd,
+  onOpenWave,
+}: {
+  waves: SeriesWave[]
+  waveColumns: WaveColumnKey[]
+  onDragEnd: (result: DropResult) => void
+  onOpenWave: (id: string) => void
+}) {
+  const visibleColumns = waveColumns
+    .map((key) => WAVE_COLUMN_REGISTRY.find((c) => c.key === key))
+    .filter((c): c is WaveColumnDef => !!c)
+  const gridTemplate = ['22px', ...visibleColumns.map((c) => c.width)].join(' ')
+  const minWidth = 22 + visibleColumns.reduce((sum, c) => sum + trackMinPx(c.width) + 8, 0)
+
+  return (
+    <div className="overflow-x-auto thin-scroll">
+      <div style={{ minWidth }}>
+        <div
+          className="grid items-center gap-2 px-3 py-1.5 text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border"
+          style={{ gridTemplateColumns: gridTemplate }}
+        >
+          <span />
+          {visibleColumns.map((col) => (
+            <span key={col.key} title={col.tooltip} className={col.align === 'right' ? 'text-right' : undefined}>
+              {col.label}
+            </span>
+          ))}
+        </div>
+        <DragDropContext onDragEnd={onDragEnd}>
+          <Droppable droppableId="rerun-series-waves">
+            {(dropProvided, dropSnapshot) => (
+              <div
+                ref={dropProvided.innerRef}
+                {...dropProvided.droppableProps}
+                className={dropSnapshot.isDraggingOver ? 'bg-primary/5' : undefined}
+              >
+                {waves.map((w, index) => {
+                  const s = waveStatus(w, new Date().toISOString().slice(0, 10))
+                  return (
+                    <Draggable key={w.id} draggableId={w.id} index={index}>
+                      {(dragProvided, dragSnapshot) => (
+                        <div
+                          ref={dragProvided.innerRef}
+                          {...dragProvided.draggableProps}
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => onOpenWave(w.id)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault()
+                              onOpenWave(w.id)
+                            }
+                          }}
+                          title={`Wave ${w.rerun_number} · ${s.tip} — click to open`}
+                          style={{ ...dragProvided.draggableProps.style, gridTemplateColumns: gridTemplate }}
+                          className={`grid items-center gap-2 px-3 py-2 border-b border-border last:border-b-0 border-l-2 ${s.ring} cursor-pointer hover:bg-accent/50 hover:ring-1 hover:ring-inset hover:ring-primary/30 transition ${
+                            dragSnapshot.isDragging ? 'bg-card shadow-lg ring-1 ring-primary/40 rounded-lg' : ''
+                          }`}
+                        >
+                          <span
+                            {...dragProvided.dragHandleProps}
+                            onClick={(e) => e.stopPropagation()}
+                            title="Drag to reorder this wave within the series"
+                            aria-label="Drag to reorder"
+                            className="text-muted-foreground/40 hover:text-muted-foreground cursor-grab active:cursor-grabbing justify-self-center"
+                          >
+                            ⠿
+                          </span>
+                          {visibleColumns.map((col) => cloneElement(col.render(w, s), { key: col.key }))}
+                        </div>
+                      )}
+                    </Draggable>
+                  )
+                })}
+                {dropProvided.placeholder}
+              </div>
+            )}
+          </Droppable>
+        </DragDropContext>
+      </div>
+    </div>
+  )
 }
 
 export function RerunSeriesRecord({ seriesId }: { seriesId: string }) {
@@ -74,10 +436,23 @@ export function RerunSeriesRecord({ seriesId }: { seriesId: string }) {
   const [editingDefaults, setEditingDefaults] = useState(false)
   const [pendingPrompt, setPendingPrompt] = useState<{ action: 'pause' | 'end'; wave: NonNullable<PendingWave> } | null>(null)
   const [localWaves, setLocalWaves] = useState<SeriesWave[] | null>(null)
+  const [waveColumns, setWaveColumnsState] = useState<WaveColumnKey[]>(DEFAULT_WAVE_COLUMNS)
 
   useEffect(() => {
     if (data?.waves) setLocalWaves([...data.waves].sort((a, b) => a.rerun_number - b.rerun_number))
   }, [data?.waves])
+
+  // Hydrate the column prefs from localStorage on mount (client-only, like
+  // ProjectTable's density/hiddenCols reads) — avoids an SSR/client mismatch.
+  useEffect(() => {
+    const stored = loadStoredWaveColumns()
+    if (stored) setWaveColumnsState(stored)
+  }, [])
+
+  function setWaveColumns(next: WaveColumnKey[]) {
+    setWaveColumnsState(next)
+    saveStoredWaveColumns(next)
+  }
 
   if (isLoading) {
     return (
@@ -352,7 +727,7 @@ export function RerunSeriesRecord({ seriesId }: { seriesId: string }) {
         <button
           onClick={spawnNext}
           disabled={actions.isPending || !series.in_service}
-          title="Create the next wave right now, applying the future-wave defaults below."
+          title="Manually push the next wave now (applies the future-wave defaults below). For a series that isn't armed yet, this first manual push also turns on auto-spawn going forward."
           className="text-xs px-3 py-1.5 rounded-lg bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-40 shrink-0"
         >
           {actions.isPending ? 'Working…' : 'Create next wave now'}
@@ -393,93 +768,21 @@ export function RerunSeriesRecord({ seriesId }: { seriesId: string }) {
 
       {/* Waves list */}
       <div className="bg-card border border-border shadow-sm rounded-xl overflow-hidden">
-        <div className="px-4 py-2.5 border-b border-border">
-          <h2 className="text-sm font-semibold text-foreground">Waves</h2>
-          <p className="text-[11px] text-muted-foreground mt-0.5">
-            Click a row to open the wave · drag the ⠿ grip to reorder within this series
-          </p>
+        <div className="px-4 py-2.5 border-b border-border flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="text-sm font-semibold text-foreground">Waves</h2>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              Click a row to open the wave · drag the ⠿ grip to reorder within this series
+            </p>
+          </div>
+          <WaveColumnsMenu visibleKeys={waveColumns} onChange={setWaveColumns} />
         </div>
         {waves.length === 0 ? (
           <div className="p-6 text-center text-sm text-muted-foreground">
             No waves yet — <button onClick={spawnNext} className="text-primary hover:underline">Create the next wave</button>
           </div>
         ) : (
-          <div className="overflow-x-auto thin-scroll">
-            <div className="min-w-[720px]">
-              <div
-                className="grid items-center gap-2 px-3 py-1.5 text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border"
-                style={{ gridTemplateColumns: WAVE_GRID }}
-              >
-                <span />
-                <span title="Wave number">Wave</span>
-                <span title="Permanent project ID">Survey ID</span>
-                <span title="When it went (or goes) live in the field">Fielded / rerun date</span>
-                <span title="When it was (or is expected to be) sent to the client">Delivered</span>
-                <span className="text-right" title="Responses collected so far">N collected</span>
-                <span className="text-right" title="Final usable response count">N actual</span>
-                <span title="Wave status">Status</span>
-              </div>
-              <DragDropContext onDragEnd={onDragEnd}>
-                <Droppable droppableId="rerun-series-waves">
-                  {(dropProvided, dropSnapshot) => (
-                    <div
-                      ref={dropProvided.innerRef}
-                      {...dropProvided.droppableProps}
-                      className={dropSnapshot.isDraggingOver ? 'bg-primary/5' : undefined}
-                    >
-                      {waves.map((w, index) => {
-                        const s = waveStatus(w, new Date().toISOString().slice(0, 10))
-                        return (
-                          <Draggable key={w.id} draggableId={w.id} index={index}>
-                            {(dragProvided, dragSnapshot) => (
-                              <div
-                                ref={dragProvided.innerRef}
-                                {...dragProvided.draggableProps}
-                                role="button"
-                                tabIndex={0}
-                                onClick={() => router.push(`/projects/${w.id}`)}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter' || e.key === ' ') {
-                                    e.preventDefault()
-                                    router.push(`/projects/${w.id}`)
-                                  }
-                                }}
-                                title={`Wave ${w.rerun_number} · ${s.tip} — click to open`}
-                                style={{ ...dragProvided.draggableProps.style, gridTemplateColumns: WAVE_GRID }}
-                                className={`grid items-center gap-2 px-3 py-2 border-b border-border last:border-b-0 border-l-2 ${s.ring} cursor-pointer hover:bg-accent/50 hover:ring-1 hover:ring-inset hover:ring-primary/30 transition ${
-                                  dragSnapshot.isDragging ? 'bg-card shadow-lg ring-1 ring-primary/40 rounded-lg' : ''
-                                }`}
-                              >
-                                <span
-                                  {...dragProvided.dragHandleProps}
-                                  onClick={(e) => e.stopPropagation()}
-                                  title="Drag to reorder this wave within the series"
-                                  aria-label="Drag to reorder"
-                                  className="text-muted-foreground/40 hover:text-muted-foreground cursor-grab active:cursor-grabbing justify-self-center"
-                                >
-                                  ⠿
-                                </span>
-                                <span className={`text-[11px] font-medium px-1.5 py-0.5 rounded text-center whitespace-nowrap ${s.chip}`}>
-                                  Wave {w.rerun_number}
-                                </span>
-                                <span className="text-xs font-mono text-muted-foreground truncate">{w.project_code ?? '—'}</span>
-                                <span className="text-xs text-muted-foreground">{formatDate(w.launch_date)}</span>
-                                <span className="text-xs text-muted-foreground">{deliveredCell(w)}</span>
-                                <span className="text-sm text-foreground text-right tabular-nums">{fmtNum(w.n_collected)}</span>
-                                <span className="text-sm text-foreground text-right tabular-nums">{fmtNum(w.n_actual)}</span>
-                                <span className={`text-[11px] font-medium px-1.5 py-0.5 rounded text-center whitespace-nowrap w-fit ${s.chip}`}>{s.label}</span>
-                              </div>
-                            )}
-                          </Draggable>
-                        )
-                      })}
-                      {dropProvided.placeholder}
-                    </div>
-                  )}
-                </Droppable>
-              </DragDropContext>
-            </div>
-          </div>
+          <WavesTable waves={waves} waveColumns={waveColumns} onDragEnd={onDragEnd} onOpenWave={(id) => router.push(`/projects/${id}`)} />
         )}
       </div>
     </div>
@@ -549,7 +852,7 @@ function SeriesDetailsSection({
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <Field label="Cadence" value={cadenceLabel(series.cadence_months)} />
           <Field label="Delivery cadence" value={series.delivery_cadence ?? '—'} />
-          <Field label="Template" value={series.template_id ?? '—'} />
+          <Field label="Source template" value={series.template_id ?? '—'} />
           <Field label="Owner" value={series.owner_email ?? '—'} />
           <Field label="Fielding start (anchor)" value={formatDate(series.anchor_date)} tip="Fallback due-date anchor for a seeded/fresh series with no wave dates yet." />
           <Field label="Next due" value={series.effective_next ? formatDate(series.effective_next) : '—'} />
@@ -720,7 +1023,7 @@ function FutureDefaultsSection({
             <div className="text-foreground">{fd.money_model || '—'}</div>
           </div>
           <div>
-            <div className="text-[11px] text-muted-foreground">Template</div>
+            <div className="text-[11px] text-muted-foreground" title="New waves start from this template. Each wave's actual survey IDs can differ — see the Waves table.">Default template</div>
             <div className="text-foreground truncate">{fd.template_id || '—'}</div>
           </div>
           <div>
