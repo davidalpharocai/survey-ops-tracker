@@ -58,16 +58,15 @@ export function TopNav() {
     queryKey: ['rerun-overdue-count'],
     queryFn: async () => {
       const supabase = createClient()
-      // Count overdue in BOTH rerun models: the legacy sheet mirror (rerun_status)
-      // and the first-class series (rerun_series_status). During the migration a
-      // study can exist in both, so this sum may slightly double-count — that's
-      // an acceptable over-count (never under-count), and it collapses to the
-      // first-class count once the sheet mirror is retired.
-      const [legacy, firstClass] = await Promise.all([
-        supabase.from('rerun_status').select('id', { count: 'exact', head: true }).eq('is_overdue', true),
-        supabase.from('rerun_series_status').select('id', { count: 'exact', head: true }).eq('is_overdue', true),
-      ])
-      return (legacy.count ?? 0) + (firstClass.count ?? 0)
+      // Overdue count from the first-class rerun model (rerun_series_status) only.
+      // The legacy sheet mirror (rerun_status) is retired as a rerun view and no
+      // longer contributes to the badge — so the count reflects real, current
+      // first-class reruns needing action.
+      const { count } = await supabase
+        .from('rerun_series_status')
+        .select('id', { count: 'exact', head: true })
+        .eq('is_overdue', true)
+      return count ?? 0
     },
     staleTime: 60_000,
   })
@@ -95,7 +94,7 @@ export function TopNav() {
     // Combined Deliverables + Email review — rendered specially below (two icons,
     // two counts). Kept in the tabs array so it holds its position after Calendar.
     { href: '/review', label: 'Review', icon: '📦', title: 'Review — emailed deliverables we couldn’t auto-file, and client emails we couldn’t tie to a project, in two columns to file or dismiss' },
-    { href: '/reruns', label: 'Reruns', icon: '🔁', title: 'Rerun Radar — recurring & one-off reruns, bucketed overdue / upcoming / done', badge: rerunOverdue },
+    { href: '/reruns', label: 'Reruns', icon: '🔁', title: 'Reruns — recurring surveys on a calendar / list / series view; badge = overdue', badge: rerunOverdue },
     { href: '/admin', label: 'Admin', icon: '⚙️', title: 'Admin — system links, client ids, roster, recently deleted, and data health' },
   ]
 
