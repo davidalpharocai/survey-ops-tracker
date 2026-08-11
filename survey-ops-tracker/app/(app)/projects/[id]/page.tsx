@@ -11,6 +11,7 @@ import { PipelineSpine } from '@/components/project/PipelineSpine'
 import { ScopingSpine } from '@/components/project/ScopingSpine'
 import { WaveHistory } from '@/components/project/WaveHistory'
 import { CloneProjectModal } from '@/components/project/CloneProjectModal'
+import { PutIntoRerunServiceModal } from '@/components/project/PutIntoRerunServiceModal'
 import { OverviewFieldGrid } from '@/components/project/OverviewFieldGrid'
 import { ActivityLog } from '@/components/project/ActivityLog'
 import { DataChangeLog } from '@/components/project/DataChangeLog'
@@ -114,6 +115,7 @@ export default function ProjectDetailPage() {
   const [cloning, setCloning] = useState(false)
   const [merging, setMerging] = useState(false)
   const [cancelling, setCancelling] = useState(false)
+  const [puttingIntoService, setPuttingIntoService] = useState(false)
   const [actionsOpen, setActionsOpen] = useState(false)
   const actionsRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -369,6 +371,24 @@ export default function ProjectDetailPage() {
                 >
                   <span aria-hidden="true">⧉</span> Merge with a duplicate…
                 </button>
+                {project.series_id ? (
+                  <Link
+                    href={`/reruns/series/${project.series_id}`}
+                    onClick={() => setActionsOpen(false)}
+                    title="Open this survey's first-class rerun series record"
+                    className="flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm text-foreground/90 hover:bg-accent transition-colors text-left w-full"
+                  >
+                    <span aria-hidden="true">↻</span> View rerun series
+                  </Link>
+                ) : (
+                  <button
+                    onClick={() => { setActionsOpen(false); setPuttingIntoService(true) }}
+                    title="Start a cadence: this project becomes Wave 1 of a new rerun series that spawns future waves for you"
+                    className="flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm text-foreground/90 hover:bg-accent transition-colors text-left w-full"
+                  >
+                    <span aria-hidden="true">↻</span> Put into rerun service
+                  </button>
+                )}
                 <div className="border-t border-border my-1" />
                 <div className="px-2.5 py-1">
                   {'co_captain_ids' in project && (
@@ -482,6 +502,21 @@ export default function ProjectDetailPage() {
           sourceName={project.project_name}
           sourceCode={project.project_code}
           onClose={() => setCloning(false)}
+        />
+      )}
+
+      {puttingIntoService && (
+        <PutIntoRerunServiceModal
+          project={{
+            id: project.id,
+            project_name: project.project_name,
+            project_code: project.project_code,
+            project_type: project.project_type,
+            client: project.client,
+            rerun_date: project.rerun_date,
+            launch_date: project.launch_date,
+          }}
+          onClose={() => setPuttingIntoService(false)}
         />
       )}
 

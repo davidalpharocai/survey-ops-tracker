@@ -68,6 +68,37 @@ export function useRerunSeriesRecord(seriesId: string | null | undefined) {
   })
 }
 
+export interface SeriesListRow extends SeriesStatusRow {
+  /** Live wave count — computed client-side from survey_projects.series_id
+   * since the status view is per-series scalar fields only. */
+  wave_count: number
+}
+
+/** Every first-class rerun series (the new model), for the /reruns/series
+ * list — sibling to (not a replacement of) the legacy useAllRerunSeries()
+ * lineage grouping in useRerunLineage.ts. Distinct query key on purpose so
+ * the two lists never collide in the cache. */
+export function useRerunSeriesList() {
+  const supabase = createClient()
+  return useQuery({
+    queryKey: ['rerun-series-list'],
+    queryFn: async (): Promise<SeriesListRow[]> => {
+      const [{ data: series, error: seriesErr }, { data: waveRows, error: waveErr }] = await Promise.all([
+        supabase.from('rerun_series_status').select('*').order('client', { ascending: true }),
+        supabase.from('survey_projects').select('series_id').not('series_id', 'is', null).is('deleted_at', null),
+      ])
+      if (seriesErr) throw seriesErr
+      if (waveErr) throw waveErr
+      const counts = new Map<string, number>()
+      for (const row of (waveRows ?? []) as { series_id: string | null }[]) {
+        if (row.series_id) counts.set(row.series_id, (counts.get(row.series_id) ?? 0) + 1)
+      }
+      return ((series ?? []) as SeriesStatusRow[]).map((s) => ({ ...s, wave_count: counts.get(s.id) ?? 0 }))
+    },
+    staleTime: 30_000,
+  })
+}
+
 // ---------------------------------------------------------------------------
 // Mutations — one endpoint (app/api/reruns/series), discriminated by `action`.
 // ---------------------------------------------------------------------------
@@ -151,6 +182,7 @@ export function useRerunSeriesActions() {
       const seriesId = 'seriesId' in variables ? variables.seriesId : data.series?.id
       if (seriesId) queryClient.invalidateQueries({ queryKey: ['rerun-series-record', seriesId] })
       queryClient.invalidateQueries({ queryKey: ['all-rerun-series'] })
+      queryClient.invalidateQueries({ queryKey: ['rerun-series-list'] })
       queryClient.invalidateQueries({ queryKey: ['projects'] })
       queryClient.invalidateQueries({ queryKey: ['rerun-snapshot'] })
     },

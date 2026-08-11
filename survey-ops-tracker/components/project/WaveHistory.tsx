@@ -1,6 +1,8 @@
 'use client'
 import { useState } from 'react'
+import Link from 'next/link'
 import { useRerunSeries, useRerunCandidates, useLinkRerun } from '@/lib/hooks/useRerunLineage'
+import { useRerunSeriesRecord } from '@/lib/hooks/useRerunSeriesRecord'
 import { WaveSeriesView } from '@/components/reruns/WaveSeriesView'
 import { toast } from '@/lib/utils/toast'
 
@@ -10,12 +12,45 @@ type P = {
   project_name: string
   rerun_series_id: string | null
   rerun_number: number | null
+  /** First-class rerun_series link (migration 073). When set, this wave's
+   * history reads through the new series record instead of the legacy
+   * rerun_series_id root-pointer lineage. */
+  series_id?: string | null
 }
 
 // The rerun-series history for a project: every wave in the series (original +
 // reruns), in order, with a way to link an ad-hoc rerun to its original or
-// detach one. Sits on the project detail page.
+// detach one. Sits on the project detail page. A project with `series_id` set
+// belongs to a first-class rerun_series record — read/link through that
+// instead of the legacy rerun_series_id lineage (kept working for un-migrated
+// projects). See docs/superpowers/plans/2026-08-10-rerun-update.md Task 6.
 export function WaveHistory({ project }: { project: P }) {
+  if (project.series_id) return <FirstClassWaveHistory project={project} seriesId={project.series_id} />
+  return <LegacyWaveHistory project={project} />
+}
+
+function FirstClassWaveHistory({ project, seriesId }: { project: P; seriesId: string }) {
+  const { data, isLoading, error } = useRerunSeriesRecord(seriesId)
+
+  if (isLoading) return <p className="text-xs text-muted-foreground/50">Loading…</p>
+  if (error || !data) {
+    return <p className="text-xs text-destructive">Couldn&apos;t load the rerun series{error ? `: ${(error as Error).message}` : '.'}</p>
+  }
+
+  return (
+    <div className="flex flex-col gap-2 text-sm">
+      <WaveSeriesView waves={data.waves} currentId={project.id} compact />
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <p className="text-[11px] text-muted-foreground/70">Toggle Table / Timeline · click a wave to open it · colored by status.</p>
+        <Link href={`/reruns/series/${seriesId}`} className="text-[12px] text-primary hover:underline shrink-0">
+          ↻ Open full series record ↗
+        </Link>
+      </div>
+    </div>
+  )
+}
+
+function LegacyWaveHistory({ project }: { project: P }) {
   const { data: waves = [], isLoading } = useRerunSeries(project.id, project.rerun_series_id)
   const [picking, setPicking] = useState(false)
   const link = useLinkRerun()
