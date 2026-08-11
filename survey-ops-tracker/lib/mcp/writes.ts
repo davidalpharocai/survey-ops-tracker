@@ -138,6 +138,8 @@ export async function loadGateInput(projectId: string): Promise<GateInputData> {
  *  advance_project (and the in-app gate) to block a first delivery until confirmed. */
 export async function loadOccamGate(projectId: string): Promise<{
   requestedByContactId: string | null
+  projectUsesOccam: boolean
+  contactHasPriorDelivery: boolean
   contactOccamInvited: boolean
   contactName: string | null
   contactEmail: string | null
@@ -145,21 +147,37 @@ export async function loadOccamGate(projectId: string): Promise<{
   const supabase = createAdminClient()
   const { data: project, error: pErr } = await supabase
     .from('survey_projects')
-    .select('requested_by_contact_id')
+    .select('requested_by_contact_id, occam')
     .eq('id', projectId)
     .maybeSingle()
   if (pErr) throw new Error(pErr.message)
+  const projectUsesOccam = !!project?.occam
   const contactId = project?.requested_by_contact_id ?? null
-  if (!contactId) return { requestedByContactId: null, contactOccamInvited: false, contactName: null, contactEmail: null }
+  if (!contactId) return { requestedByContactId: null, projectUsesOccam, contactHasPriorDelivery: false, contactOccamInvited: false, contactName: null, contactEmail: null }
+
+  // Prior delivery = any OTHER delivered project for this same contact (already onboarded).
+  const { data: prior, error: priorErr } = await supabase
+    .from('survey_projects')
+    .select('id')
+    .eq('requested_by_contact_id', contactId)
+    .eq('stage_delivery', true)
+    .neq('id', projectId)
+    .is('deleted_at', null)
+    .limit(1)
+  if (priorErr) throw new Error(priorErr.message)
+  const contactHasPriorDelivery = (prior?.length ?? 0) > 0
+
   const { data: contact, error: cErr } = await supabase
     .from('client_contacts')
     .select('first_name, last_name, email, occam_invited')
     .eq('id', contactId)
     .maybeSingle()
   if (cErr) throw new Error(cErr.message)
-  if (!contact) return { requestedByContactId: contactId, contactOccamInvited: false, contactName: null, contactEmail: null }
+  if (!contact) return { requestedByContactId: contactId, projectUsesOccam, contactHasPriorDelivery, contactOccamInvited: false, contactName: null, contactEmail: null }
   return {
     requestedByContactId: contactId,
+    projectUsesOccam,
+    contactHasPriorDelivery,
     contactOccamInvited: !!contact.occam_invited,
     contactName: `${contact.first_name} ${contact.last_name}`.trim() || null,
     contactEmail: contact.email,

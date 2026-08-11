@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useReruns, useSyncReruns, type RerunRow } from '@/lib/hooks/useReruns'
 import { useRerunSeriesList } from '@/lib/hooks/useRerunSeriesRecord'
+import { useAllRerunWaves, wavesBySeriesId } from '@/lib/hooks/useRerunWaves'
 import { useProjects } from '@/lib/hooks/useProjects'
 import { useCurrentMember } from '@/lib/hooks/useCurrentMember'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
@@ -11,7 +12,12 @@ import { Skeleton } from '@/components/shared/Skeleton'
 import { RerunMetaEditor } from '@/components/reruns/RerunMetaEditor'
 import { RerunReviewBanner } from '@/components/reruns/RerunReviewBanner'
 import { RerunMonthView } from '@/components/reruns/RerunMonthView'
+import { RerunListView } from '@/components/reruns/RerunListView'
+import { RerunSeriesView } from '@/components/reruns/RerunSeriesView'
+import { RerunFilterBar } from '@/components/reruns/RerunFilterBar'
 import { OverdueStrip } from '@/components/reruns/OverdueStrip'
+import { Seg } from '@/components/reruns/Seg'
+import { EMPTY_RERUN_FILTER, seriesPasses, type RerunFilterState } from '@/lib/reruns/filterViews'
 import { formatDate, daysOverdue } from '@/lib/utils/date'
 import { isTypingTarget } from '@/lib/utils/keyboard'
 import { toast } from '@/lib/utils/toast'
@@ -30,10 +36,11 @@ type Bucket = 'overdue' | 'upcoming' | 'done' | 'unsorted'
 type SortKey = 'smart' | 'client' | 'n'
 const SORT_KEY = 'sot.rerunsSort'
 
-// Which top-level view is showing. Month (first-class model) is primary; the
-// legacy sheet-mirror Radar is demoted behind the toggle. Persisted so a
-// return visit lands where you left off.
-type RerunsView = 'month' | 'radar'
+// Which top-level view is showing — all three read the first-class model. The
+// legacy sheet-mirror Radar is no longer a primary tab (product owner's call);
+// it's reachable behind an unobtrusive link. Persisted so a return visit lands
+// where you left off; old stored 'month'/'radar' values migrate to 'calendar'.
+type RerunsView = 'calendar' | 'list' | 'series'
 const VIEW_KEY = 'sot.rerunsView'
 
 // Buckets read the view's computed flags (the "nothing-missed" logic lives in
@@ -417,33 +424,6 @@ function CollapsibleSection({
       </h3>
       {open && <CardList items={items} bucket={bucket} hrefFor={hrefFor} />}
     </section>
-  )
-}
-
-function Seg<T extends string>({
-  label, options, value, onChange,
-}: {
-  label: string
-  options: { v: T; label: string }[]
-  value: T
-  onChange: (v: T) => void
-}) {
-  return (
-    <div role="group" aria-label={label} className="inline-flex rounded-lg border border-border bg-muted p-0.5 text-xs">
-      {options.map((o) => (
-        <button
-          key={o.v}
-          type="button"
-          onClick={() => onChange(o.v)}
-          aria-pressed={value === o.v}
-          className={`px-2.5 py-1 rounded-md transition-colors ${
-            value === o.v ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          {o.label}
-        </button>
-      ))}
-    </div>
   )
 }
 
@@ -872,19 +852,31 @@ function LegacyRadar() {
   )
 }
 
-// The /reruns shell. The first-class rerun_series model is primary: a persistent
-// "needs action" strip + a Month grid by default. The legacy sheet-mirror Radar
-// is one toggle away, clearly marked. The Series list stays a separate link.
+// The /reruns shell. The first-class rerun_series model is primary and shows
+// three ways — Calendar (month grid) | List (series↔wave table) | Series
+// (grouped, expandable) — all sharing one filter + deep-search query and a
+// persistent "needs action" strip. The legacy sheet-mirror Radar is retired as
+// a primary tab; it's still reachable behind an unobtrusive link (its sync
+// button + weekly-review banner live inside it).
 export default function RerunsPage() {
-  const [view, setView] = useState<RerunsView>('month')
-  const { data: firstClassSeries = [], isLoading: fcLoading, error: fcError } = useRerunSeriesList()
+  const [view, setView] = useState<RerunsView>('calendar')
+  const [showLegacy, setShowLegacy] = useState(false)
+  const [filter, setFilter] = useState<RerunFilterState>(EMPTY_RERUN_FILTER)
 
-  // Hydrate the saved view client-side (default 'month'), so SSR always renders
-  // the default and there's no hydration mismatch — same pattern as the sort key.
+  const { data: firstClassSeries = [], isLoading: fcLoading, error: fcError } = useRerunSeriesList()
+  const { data: allWaves = [] } = useAllRerunWaves()
+
+  // Hydrate the saved view client-side (default 'calendar'), so SSR always
+  // renders the default and there's no hydration mismatch. Migrate the old
+  // 'month'/'radar' values → 'calendar'.
   useEffect(() => {
     try {
       const v = localStorage.getItem(VIEW_KEY)
-      if (v === 'month' || v === 'radar') setView(v)
+      if (v === 'calendar' || v === 'list' || v === 'series') setView(v)
+      else if (v === 'month' || v === 'radar') {
+        setView('calendar')
+        localStorage.setItem(VIEW_KEY, 'calendar')
+      }
     } catch {
       /* default is fine */
     }
@@ -898,36 +890,28 @@ export default function RerunsPage() {
     }
   }
 
+  const wavesBySeries = useMemo(() => wavesBySeriesId(allWaves), [allWaves])
+  const owners = useMemo(() => {
+    const set = new Set<string>()
+    for (const s of firstClassSeries) if (s.owner_email) set.add(s.owner_email)
+    return [...set].sort((a, b) => a.localeCompare(b))
+  }, [firstClassSeries])
+  // Calendar is fed only the series that pass the shared filter + deep search.
+  const calendarSeries = useMemo(
+    () => firstClassSeries.filter((s) => seriesPasses(s, wavesBySeries.get(s.id) ?? [], filter)),
+    [firstClassSeries, wavesBySeries, filter]
+  )
+
   return (
     <div className="max-w-5xl mx-auto flex flex-col gap-4">
-      {/* View switcher — Month (first-class) | Radar (legacy) + the Series link */}
-      <div className="flex items-center gap-2 flex-wrap text-sm">
-        <Seg
-          label="Reruns view"
-          value={view}
-          onChange={changeView}
-          options={[
-            { v: 'month', label: 'Month' },
-            { v: 'radar', label: 'Radar (legacy)' },
-          ]}
-        />
-        <Link
-          href="/reruns/series"
-          className="px-3 py-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-          title="Every rerun series — see and reorganize waves"
-        >
-          Series ↗
-        </Link>
-      </div>
-
       <div>
         <h1 className="text-2xl font-bold text-foreground">Reruns</h1>
         <p className="text-sm text-muted-foreground mt-0.5">
-          Scheduled reruns on a month grid, plus anything needing action now. Switch to Radar for the legacy sheet mirror.
+          Every rerun series three ways — Calendar, List, and Series — plus anything needing action now.
         </p>
       </div>
 
-      {/* Pinned needs-action strip (always shown) */}
+      {/* Pinned needs-action strip — always above the view tabs, all three views */}
       {fcError ? (
         <div className="bg-card border border-border rounded-xl p-3 text-sm text-destructive">
           Couldn’t load rerun series: {(fcError as Error).message}
@@ -938,19 +922,59 @@ export default function RerunsPage() {
         <OverdueStrip series={firstClassSeries} />
       )}
 
-      {/* Selected view */}
-      {view === 'month' ? (
-        fcError ? (
-          <div className="bg-card border border-border rounded-xl p-6 text-sm text-muted-foreground text-center">
-            Couldn’t load reruns.
-          </div>
-        ) : fcLoading ? (
-          <Skeleton className="h-96 w-full rounded-xl" />
-        ) : (
-          <RerunMonthView series={firstClassSeries} />
-        )
+      {showLegacy ? (
+        <>
+          <button
+            type="button"
+            onClick={() => setShowLegacy(false)}
+            className="self-start text-sm text-muted-foreground hover:text-foreground underline"
+          >
+            ← Back to Calendar / List / Series
+          </button>
+          <LegacyRadar />
+        </>
       ) : (
-        <LegacyRadar />
+        <>
+          {/* View switcher — Calendar | List | Series + the tucked-away legacy link */}
+          <div className="flex items-center gap-2 flex-wrap text-sm">
+            <Seg
+              label="Reruns view"
+              value={view}
+              onChange={changeView}
+              options={[
+                { v: 'calendar', label: 'Calendar' },
+                { v: 'list', label: 'List' },
+                { v: 'series', label: 'Series' },
+              ]}
+            />
+            <button
+              type="button"
+              onClick={() => setShowLegacy(true)}
+              title="The read-only mirror of Sree’s manual rerun sheet (sync + weekly review live here)"
+              className="ml-auto text-xs text-muted-foreground/80 hover:text-foreground underline decoration-dotted underline-offset-2"
+            >
+              Legacy sheet radar ↗
+            </button>
+          </div>
+
+          {/* Shared filter + deep search (state lives here, spans all three views) */}
+          <RerunFilterBar value={filter} onChange={setFilter} owners={owners} />
+
+          {/* Active view */}
+          {fcError ? (
+            <div className="bg-card border border-border rounded-xl p-6 text-sm text-muted-foreground text-center">
+              Couldn’t load reruns.
+            </div>
+          ) : fcLoading ? (
+            <Skeleton className="h-96 w-full rounded-xl" />
+          ) : view === 'calendar' ? (
+            <RerunMonthView series={calendarSeries} />
+          ) : view === 'list' ? (
+            <RerunListView series={firstClassSeries} waves={allWaves} filter={filter} />
+          ) : (
+            <RerunSeriesView series={firstClassSeries} wavesBySeries={wavesBySeries} filter={filter} />
+          )}
+        </>
       )}
     </div>
   )

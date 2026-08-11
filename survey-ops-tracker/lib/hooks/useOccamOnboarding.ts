@@ -8,6 +8,8 @@ export interface RequestedByContact {
   name: string
   email: string | null
   occam_invited: boolean
+  /** Whether this contact has already had a prior delivery (any delivered project). */
+  hasPriorDelivery: boolean
 }
 
 /** The project's requested-by contact + their Occam-invited state (null if none set).
@@ -24,11 +26,25 @@ export function useRequestedByContact(contactId: string | null | undefined) {
         .maybeSingle()
       if (error) throw error
       if (!data) return null
+
+      // Prior delivery = any delivered project for this contact (already onboarded).
+      // Not excluding the current project by id is fine: it isn't stage_delivery=true
+      // until AFTER this transition, so it won't match here at gate time.
+      const { data: prior, error: priorErr } = await supabase
+        .from('survey_projects')
+        .select('id')
+        .eq('requested_by_contact_id', contactId!)
+        .eq('stage_delivery', true)
+        .is('deleted_at', null)
+        .limit(1)
+      if (priorErr) throw priorErr
+
       return {
         id: data.id,
         name: `${data.first_name} ${data.last_name}`.trim(),
         email: data.email,
         occam_invited: !!data.occam_invited,
+        hasPriorDelivery: (prior?.length ?? 0) > 0,
       }
     },
     enabled: !!contactId,
