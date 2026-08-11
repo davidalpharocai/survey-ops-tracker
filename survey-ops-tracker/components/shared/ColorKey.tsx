@@ -1,3 +1,5 @@
+import { RerunChip } from '@/components/reruns/RerunChip'
+
 const URGENCY_ITEMS = [
   { classes: 'border border-border border-l-4 border-l-red-600', label: 'Overdue' },
   { classes: 'border border-border border-l-4 border-l-orange-500', label: 'Due today' },
@@ -31,12 +33,7 @@ export function ColorKey() {
           {item.label}
         </span>
       ))}
-      <span
-        className="text-[12px] px-1.5 py-0.5 rounded border border-teal-500/60 text-teal-700 dark:text-teal-300"
-        title="Rerun — a repeat wave of an earlier study, shown alongside the PS/B2B type"
-      >
-        ↻ Rerun
-      </span>
+      <RerunChip className="text-[12px] px-1.5 py-0.5" />
       <span className="text-border">|</span>
       <span className="flex items-center gap-1.5">
         <span className="text-[12px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400">⚑</span>

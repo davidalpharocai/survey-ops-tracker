@@ -12,6 +12,8 @@ import { BlastBlocks } from './BlastBlocks'
 import { BudgetWidget } from './BudgetWidget'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
 import { OccamWordmark } from '@/components/shared/OccamWordmark'
+import { isRerunProject } from '@/lib/reruns/isRerun'
+import { RerunChip } from '@/components/reruns/RerunChip'
 
 type ProjectUpdate = Database['public']['Tables']['survey_projects']['Update']
 
@@ -111,13 +113,22 @@ export function OverviewFieldGrid({ project }: { project: SurveyProject }) {
           placeholder="e.g. SV-1042, SV-1043"
           onSave={v => save({ survey_tool_id: v || null })}
         />
-        <SelectCell
-          label="Type"
-          tooltip={TIP.type}
-          value={project.project_type ?? ''}
-          options={TYPE_OPTIONS}
-          onSave={v => save({ project_type: v as 'PS' | 'B2B' | 'Rerun' })}
-        />
+        <div className="flex items-end gap-2">
+          <div className="min-w-0 flex-1">
+            <SelectCell
+              label="Type"
+              tooltip={TIP.type}
+              value={project.project_type ?? ''}
+              options={TYPE_OPTIONS}
+              onSave={v => save({ project_type: v as 'PS' | 'B2B' })}
+            />
+          </div>
+          {isRerunProject(project) && (
+            <div className="pb-1.5 shrink-0">
+              <RerunChip />
+            </div>
+          )}
+        </div>
       </FieldSection>
 
       <NSegmentsEditor project={project} />
@@ -138,7 +149,10 @@ export function OverviewFieldGrid({ project }: { project: SurveyProject }) {
             />
           )}
           {project.project_type === 'B2B' && <BlastBlocks project={project} />}
-          {project.project_type == null && (
+          {/* Legacy 'Rerun' rows predate the type/dimension split and were
+              never re-typed to PS/B2B — keep showing both widgets for them
+              (same as untyped) rather than dropping Money entirely. */}
+          {(project.project_type === 'Rerun' || project.project_type == null) && (
             <>
               <SuppliersWidget
                 projectId={project.id}

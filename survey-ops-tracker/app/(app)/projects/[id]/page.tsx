@@ -284,7 +284,7 @@ export default function ProjectDetailPage() {
             {project.project_code}
           </span>
         )}
-        <EditableType value={project.project_type} onSave={v => updateProject.mutate({ id, updates: { project_type: v as 'PS' | 'B2B' | 'Rerun' } })} />
+        <EditableType value={project.project_type} onSave={v => updateProject.mutate({ id, updates: { project_type: v as 'PS' | 'B2B' } })} />
         {isRerunProject(project) && <RerunChip />}
         <span
           className={`text-xs px-2 py-1 rounded ${
@@ -960,15 +960,20 @@ function EditableType({ value, onSave }: { value: string | null; onSave: (next: 
   }
   // Badge-dropdown: sized like the status pill (text-xs px-2 py-1 rounded),
   // tinted by type via TYPE_BADGE, with a ▾ caret signalling it opens options.
+  // 'Rerun' is no longer a valid type (it's the separate ↻ chip) — a legacy
+  // project_type='Rerun' row reads as unset here rather than showing the raw
+  // string, which would otherwise duplicate the teal chip next to it, and
+  // nudges the user to classify it as PS/B2B instead.
+  const typed = value === 'PS' || value === 'B2B' ? value : null
   return (
     <button
       onClick={() => setEditing(true)}
       title="Click to change project type"
       className={`text-xs px-2 py-1 rounded cursor-pointer hover:opacity-80 transition-opacity inline-flex items-center gap-1 ${
-        value ? (TYPE_BADGE[value] ?? 'bg-muted text-muted-foreground') : 'border border-dashed border-border text-muted-foreground'
+        typed ? TYPE_BADGE[typed] : 'border border-dashed border-border text-muted-foreground'
       }`}
     >
-      {value ?? '+ type'}
+      {typed ?? '+ type'}
       <span aria-hidden="true" className="text-[9px] opacity-70">▾</span>
     </button>
   )
