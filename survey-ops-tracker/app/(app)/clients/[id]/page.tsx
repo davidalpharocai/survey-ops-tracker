@@ -1,6 +1,6 @@
 'use client'
 import { Caret } from '@/components/shared/Caret'
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
@@ -20,6 +20,7 @@ import { fmtNum } from '@/lib/utils/number'
 import type { Tables } from '@/lib/supabase/types'
 import { isRerunProject } from '@/lib/reruns/isRerun'
 import { RerunChip } from '@/components/reruns/RerunChip'
+import { baseRerunName } from '@/lib/utils/rerun'
 
 type Client = Tables<'clients'>
 
@@ -46,10 +47,11 @@ type ClientProject = {
   n_target: number | null
   n_collected: number
   n_actual: number | null
+  is_placeholder: boolean
 }
 
 const PROJECT_COLS =
-  'id, project_code, project_name, client, status, phase, board_column, project_type, series_id, rerun_number, submitted_date, due_date, deliver_date, delivered_at, created_at, updated_at, budget, actual_spend, n_target, n_collected, n_actual'
+  'id, project_code, project_name, client, status, phase, board_column, project_type, series_id, rerun_number, submitted_date, due_date, deliver_date, delivered_at, created_at, updated_at, budget, actual_spend, n_target, n_collected, n_actual, is_placeholder'
 
 function useClientPage(clientId: string) {
   const supabase = createClient()
@@ -82,7 +84,25 @@ function useClientPage(clientId: string) {
     },
     enabled: !!clientId,
   })
-  return { client, projects }
+  // Series metadata for grouping this client's rerun waves under one label.
+  const series = useQuery({
+    queryKey: ['client-rerun-series', clientId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('rerun_series')
+        .select('id, survey_name, base_type, cadence_months')
+        .eq('client_id', clientId)
+      if (error) throw error
+      return data as unknown as {
+        id: string
+        survey_name: string
+        base_type: string | null
+        cadence_months: number | null
+      }[]
+    },
+    enabled: !!clientId,
+  })
+  return { client, projects, series }
 }
 
 function money(v: number | null): string {
@@ -180,6 +200,11 @@ const tile = 'bg-card border border-border shadow-sm rounded-xl p-3 flex flex-co
 
 type PSort = 'project_name' | 'status' | 'submitted_date' | 'n' | 'due_date' | 'spend'
 
+/** A table row is either a standalone project or a collapsed rerun-series group. */
+type RenderItem =
+  | { kind: 'single'; project: ClientProject }
+  | { kind: 'group'; seriesId: string; waves: ClientProject[] }
+
 function projectSortValue(p: ClientProject, field: PSort): string | number {
   switch (field) {
     case 'project_name':
@@ -201,12 +226,28 @@ export default function ClientPage() {
   const params = useParams()
   const router = useRouter()
   const clientId = params.id as string
-  const { client, projects } = useClientPage(clientId)
+  const { client, projects, series } = useClientPage(clientId)
   const { data: teamMembers = [] } = useTeamMembers()
   const rows = useMemo(() => projects.data ?? [], [projects.data])
   const [showNew, setShowNew] = useState(false)
   const [sortField, setSortField] = useState<PSort>('submitted_date')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+  // Which rerun series are expanded (collapsed by default).
+  const [expandedSeries, setExpandedSeries] = useState<Set<string>>(new Set())
+  const toggleSeries = (id: string) =>
+    setExpandedSeries(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+
+  // series_id -> { survey_name, base_type } for group labels.
+  const seriesMeta = useMemo(() => {
+    const m = new Map<string, { survey_name: string; base_type: string | null }>()
+    for (const s of series.data ?? []) m.set(s.id, { survey_name: s.survey_name, base_type: s.base_type })
+    return m
+  }, [series.data])
 
   function handleSort(field: PSort) {
     if (field === sortField) setSortDir(d => (d === 'asc' ? 'desc' : 'asc'))
@@ -226,6 +267,31 @@ export default function ClientPage() {
       return sortDir === 'asc' ? cmp : -cmp
     })
   }, [rows, sortField, sortDir])
+
+  // Collapse each rerun series' waves into one group, placed at the position of
+  // its top-sorted wave (so the active column sort still governs placement, and
+  // standalone rows keep their exact order). A 1-wave "series" stays a normal
+  // row — grouping a single project would add clutter, not remove it.
+  const renderItems = useMemo<RenderItem[]>(() => {
+    const items: RenderItem[] = []
+    const seen = new Set<string>()
+    for (const p of sortedRows) {
+      const sid = p.series_id
+      if (!sid) {
+        items.push({ kind: 'single', project: p })
+        continue
+      }
+      if (seen.has(sid)) continue
+      seen.add(sid)
+      const waves = sortedRows
+        .filter(w => w.series_id === sid)
+        .slice()
+        .sort((a, b) => (a.rerun_number ?? 0) - (b.rerun_number ?? 0))
+      if (waves.length <= 1) items.push({ kind: 'single', project: p })
+      else items.push({ kind: 'group', seriesId: sid, waves })
+    }
+    return items
+  }, [sortedRows])
 
   const stats = useMemo(() => {
     if (rows.length === 0) return null
@@ -258,7 +324,7 @@ export default function ClientPage() {
     }
   }, [rows])
 
-  if (client.isLoading || projects.isLoading) {
+  if (client.isLoading || projects.isLoading || series.isLoading) {
     return (
       <div className="max-w-6xl mx-auto flex flex-col gap-4">
         <Skeleton className="h-8 w-72" />
@@ -291,6 +357,161 @@ export default function ClientPage() {
   const SortIcon = ({ field }: { field: PSort }) => {
     if (sortField !== field) return <span className="text-muted-foreground ml-1">↕</span>
     return <span className="text-foreground/80 ml-1">{sortDir === 'asc' ? '↑' : '↓'}</span>
+  }
+
+  // A normal (or nested child) project row — click-through to the project.
+  const renderProjectRow = (p: ClientProject, opts: { zebra: boolean; child?: boolean }) => {
+    // Delivered = board_column 'Delivery' (status stays 'Open'). Show it
+    // as done with its delivery date instead of an overdue warning.
+    const delivered = p.board_column === 'Delivery'
+    const urgency = p.status === 'Open' && !delivered ? getDueUrgency(p.due_date) : null
+    const deliveredDate = p.deliver_date ?? p.delivered_at ?? p.due_date
+    const dueColor = delivered
+      ? 'text-emerald-600 dark:text-emerald-400'
+      : urgency === 'overdue'
+        ? 'text-red-600 dark:text-red-400'
+        : urgency === 'tomorrow' || urgency === 'twodays'
+          ? 'text-amber-600 dark:text-amber-400'
+          : 'text-muted-foreground'
+    return (
+      <tr
+        key={p.id}
+        onClick={() => router.push(`/projects/${p.id}`)}
+        className={`cursor-pointer hover:bg-accent/50 transition-colors ${
+          opts.child ? 'border-t border-border/60 bg-muted/20' : `border-t border-border ${opts.zebra ? 'bg-muted/40' : ''}`
+        }`}
+      >
+        <td
+          className={`px-4 py-3 text-xs font-mono text-muted-foreground whitespace-nowrap ${
+            opts.child ? 'pl-10 border-l-2 border-teal-500/40' : ''
+          }`}
+        >
+          {p.project_code ?? '—'}
+        </td>
+        <td className="px-4 py-3 text-sm text-foreground font-medium">
+          {p.status === 'Hold' && <span title="On hold">⏸ </span>}
+          {p.project_name}
+          {(p.project_type === 'PS' || p.project_type === 'B2B') && (
+            <span className="ml-2 text-xs text-muted-foreground">{p.project_type}</span>
+          )}
+          {isRerunProject(p) && <RerunChip className="ml-2 text-[11px] px-1.5 py-0.5" />}
+          {p.is_placeholder && (
+            <span
+              title="Assumed-delivered wave — no real data yet; Sree will backfill"
+              className="ml-2 align-middle text-[11px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground"
+            >
+              Placeholder
+            </span>
+          )}
+        </td>
+        <td className="px-4 py-3 text-sm">
+          {p.status === 'Open' ? (
+            <span className="text-xs px-2 py-1 rounded bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
+              {p.phase === 'Scoping' ? 'Scoping' : stageLabel(p.board_column)}
+            </span>
+          ) : (
+            <span className="text-xs px-2 py-1 rounded bg-muted text-muted-foreground">
+              {p.status === 'Hold' ? 'On hold' : 'Archived'}
+            </span>
+          )}
+        </td>
+        <td className="px-4 py-3 text-sm text-muted-foreground whitespace-nowrap">
+          {formatDate(p.submitted_date)}
+        </td>
+        <td className="px-4 py-3 text-sm text-muted-foreground whitespace-nowrap">
+          {fmtNum(p.n_collected)}{p.n_target != null ? ` / ${fmtNum(p.n_target)}` : ''}
+        </td>
+        <td className={`px-4 py-3 text-xs whitespace-nowrap ${dueColor}`}>
+          {delivered ? (
+            <>✓ Delivered{deliveredDate ? ` · ${formatDate(deliveredDate)}` : ''}</>
+          ) : p.due_date ? (
+            <>
+              {urgencyPrefix(urgency, p.due_date)}
+              {formatDate(p.due_date)}
+            </>
+          ) : (
+            <span className="text-muted-foreground/50">—</span>
+          )}
+        </td>
+        <td className="px-4 py-3 text-sm text-muted-foreground whitespace-nowrap">
+          {money(p.actual_spend)}
+        </td>
+      </tr>
+    )
+  }
+
+  // A collapsible series-group header row — toggles expansion, never navigates.
+  const renderGroupRow = (item: Extract<RenderItem, { kind: 'group' }>, zebra: boolean, open: boolean) => {
+    const meta = seriesMeta.get(item.seriesId)
+    const name = meta?.survey_name ?? baseRerunName(item.waves[0].project_name)
+    const baseType = meta?.base_type ?? null
+    const latest = item.waves[item.waves.length - 1] // highest rerun_number = most recent wave
+    return (
+      <tr
+        key={`grp-${item.seriesId}`}
+        onClick={() => toggleSeries(item.seriesId)}
+        className={`border-t border-border cursor-pointer hover:bg-accent/50 transition-colors ${zebra ? 'bg-muted/40' : ''}`}
+      >
+        <td className="px-4 py-3 text-xs whitespace-nowrap">
+          <button
+            type="button"
+            aria-expanded={open}
+            aria-label={`${open ? 'Collapse' : 'Expand'} ${name} rerun series`}
+            onClick={e => {
+              e.stopPropagation()
+              toggleSeries(item.seriesId)
+            }}
+            className="inline-flex items-center rounded text-muted-foreground hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <Caret open={open} />
+          </button>
+        </td>
+        <td className="px-4 py-3 text-sm text-foreground font-medium">
+          {name}
+          {(baseType === 'PS' || baseType === 'B2B') && (
+            <span className="ml-2 text-xs text-muted-foreground">{baseType}</span>
+          )}
+          <RerunChip className="ml-2 text-[11px] px-1.5 py-0.5" />
+          <span className="ml-2 text-xs text-muted-foreground font-normal">
+            · {item.waves.length} waves{open ? '' : ' · click to expand'}
+          </span>
+        </td>
+        <td className="px-4 py-3 text-sm">
+          {latest.status === 'Open' ? (
+            <span className="text-xs px-2 py-1 rounded bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
+              {latest.phase === 'Scoping' ? 'Scoping' : stageLabel(latest.board_column)}
+            </span>
+          ) : (
+            <span className="text-xs px-2 py-1 rounded bg-muted text-muted-foreground">
+              {latest.status === 'Hold' ? 'On hold' : 'Archived'}
+            </span>
+          )}
+        </td>
+        <td className="px-4 py-3 text-sm text-muted-foreground whitespace-nowrap">
+          {formatDate(latest.submitted_date)}
+        </td>
+        <td className="px-4 py-3 text-sm text-muted-foreground/50 whitespace-nowrap">—</td>
+        <td className="px-4 py-3 text-xs text-muted-foreground/50 whitespace-nowrap">—</td>
+        <td className="px-4 py-3 text-sm text-muted-foreground/50 whitespace-nowrap">—</td>
+      </tr>
+    )
+  }
+
+  // Flatten grouped items into ordered <tr> rows; zebra tracks only top-level rows.
+  const projectRows: ReactNode[] = []
+  {
+    let zi = 0
+    for (const item of renderItems) {
+      if (item.kind === 'single') {
+        projectRows.push(renderProjectRow(item.project, { zebra: zi % 2 === 1 }))
+        zi++
+      } else {
+        const open = expandedSeries.has(item.seriesId)
+        projectRows.push(renderGroupRow(item, zi % 2 === 1, open))
+        zi++
+        if (open) for (const w of item.waves) projectRows.push(renderProjectRow(w, { zebra: false, child: true }))
+      }
+    }
   }
 
   return (
@@ -427,75 +648,7 @@ export default function ClientPage() {
                         ))}
                       </tr>
                     </thead>
-                    <tbody>
-                      {sortedRows.map((p, i) => {
-                        // Delivered = board_column 'Delivery' (status stays 'Open'). Show it
-                        // as done with its delivery date instead of an overdue warning.
-                        const delivered = p.board_column === 'Delivery'
-                        const urgency = p.status === 'Open' && !delivered ? getDueUrgency(p.due_date) : null
-                        const deliveredDate = p.deliver_date ?? p.delivered_at ?? p.due_date
-                        const dueColor = delivered
-                          ? 'text-emerald-600 dark:text-emerald-400'
-                          : urgency === 'overdue'
-                            ? 'text-red-600 dark:text-red-400'
-                            : urgency === 'tomorrow' || urgency === 'twodays'
-                            ? 'text-amber-600 dark:text-amber-400'
-                            : 'text-muted-foreground'
-                        return (
-                          <tr
-                            key={p.id}
-                            onClick={() => router.push(`/projects/${p.id}`)}
-                            className={`border-t border-border cursor-pointer hover:bg-accent/50 transition-colors ${
-                              i % 2 === 1 ? 'bg-muted/40' : ''
-                            }`}
-                          >
-                            <td className="px-4 py-3 text-xs font-mono text-muted-foreground whitespace-nowrap">
-                              {p.project_code ?? '—'}
-                            </td>
-                            <td className="px-4 py-3 text-sm text-foreground font-medium">
-                              {p.status === 'Hold' && <span title="On hold">⏸ </span>}
-                              {p.project_name}
-                              {(p.project_type === 'PS' || p.project_type === 'B2B') && (
-                                <span className="ml-2 text-xs text-muted-foreground">{p.project_type}</span>
-                              )}
-                              {isRerunProject(p) && <RerunChip className="ml-2 text-[11px] px-1.5 py-0.5" />}
-                            </td>
-                            <td className="px-4 py-3 text-sm">
-                              {p.status === 'Open' ? (
-                                <span className="text-xs px-2 py-1 rounded bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
-                                  {p.phase === 'Scoping' ? 'Scoping' : stageLabel(p.board_column)}
-                                </span>
-                              ) : (
-                                <span className="text-xs px-2 py-1 rounded bg-muted text-muted-foreground">
-                                  {p.status === 'Hold' ? 'On hold' : 'Archived'}
-                                </span>
-                              )}
-                            </td>
-                            <td className="px-4 py-3 text-sm text-muted-foreground whitespace-nowrap">
-                              {formatDate(p.submitted_date)}
-                            </td>
-                            <td className="px-4 py-3 text-sm text-muted-foreground whitespace-nowrap">
-                              {fmtNum(p.n_collected)}{p.n_target != null ? ` / ${fmtNum(p.n_target)}` : ''}
-                            </td>
-                            <td className={`px-4 py-3 text-xs whitespace-nowrap ${dueColor}`}>
-                              {delivered ? (
-                                <>✓ Delivered{deliveredDate ? ` · ${formatDate(deliveredDate)}` : ''}</>
-                              ) : p.due_date ? (
-                                <>
-                                  {urgencyPrefix(urgency, p.due_date)}
-                                  {formatDate(p.due_date)}
-                                </>
-                              ) : (
-                                <span className="text-muted-foreground/50">—</span>
-                              )}
-                            </td>
-                            <td className="px-4 py-3 text-sm text-muted-foreground whitespace-nowrap">
-                              {money(p.actual_spend)}
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
+                    <tbody>{projectRows}</tbody>
                   </table>
                 </div>
               </div>
