@@ -3,10 +3,9 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { safeEqual } from '@/lib/utils/secureCompare'
 import { logSystemEvent } from '@/lib/server/observability'
 import { nextRerunName } from '@/lib/utils/rerun'
-import { nextWaveInherit, type PrevWaveForInherit } from '@/lib/reruns/series'
-import { selectDueSeries, canSpawnNextWave, isLegacyEligible, addDaysISO } from '@/lib/reruns/spawn'
-import { copySupplierLaunches, copyProjectBlasts, copyProjectSegments } from '@/lib/server/clone'
-import type { Database, TablesInsert } from '@/lib/supabase/types'
+import { selectDueSeries, isLegacyEligible, addDaysISO } from '@/lib/reruns/spawn'
+import { spawnWaveForSeries, QUIET_SPAWN_SKIP_REASONS } from '@/lib/reruns/spawnSeries'
+import type { Database } from '@/lib/supabase/types'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -30,20 +29,6 @@ function authorized(req: NextRequest): boolean {
 const LEAD_DAYS = 7
 
 type SeriesStatusRow = Database['public']['Views']['rerun_series_status']['Row']
-type WaveRow = Pick<
-  Database['public']['Tables']['survey_projects']['Row'],
-  'id' | 'project_name' | 'rerun_number' | 'rerun_date' | 'launch_date' | 'due_date' | 'deliver_date' | 'captain_id' | 'rerun_spawned_at'
->
-
-/** Resolve the default rerun captain (Sree by default, configurable via env)
- * by email, falling back to initials 'SC' if the email lookup misses. */
-async function resolveRerunCaptainId(supabase: ReturnType<typeof createAdminClient>): Promise<string | null> {
-  const email = process.env.RERUN_CAPTAIN_EMAIL ?? 'sreerag@alpharoc.ai'
-  const { data: byEmail } = await supabase.from('team_members').select('id').eq('email', email).maybeSingle()
-  if (byEmail) return byEmail.id
-  const { data: byInitials } = await supabase.from('team_members').select('id').eq('initials', 'SC').maybeSingle()
-  return byInitials?.id ?? null
-}
 
 export async function GET(req: NextRequest) {
   if (!authorized(req)) return new Response('Unauthorized', { status: 401 })
@@ -78,85 +63,19 @@ export async function GET(req: NextRequest) {
     const dueSeries = selectDueSeries(seriesRaw ?? [], todayISO, LEAD_DAYS)
     seriesChecked = dueSeries.length
 
-    let captainId: string | null | undefined // resolved lazily, once, only if a series needs it
-    const rerunCaptainId = async () => {
-      if (captainId === undefined) captainId = await resolveRerunCaptainId(supabase)
-      return captainId
-    }
-
     for (const series of dueSeries as SeriesStatusRow[]) {
       try {
-        const { data: waves, error: wavesErr } = await supabase
-          .from('survey_projects')
-          .select('id, project_name, rerun_number, rerun_date, launch_date, due_date, deliver_date, captain_id, rerun_spawned_at')
-          .eq('series_id', series.id)
-          .is('deleted_at', null)
-          .order('rerun_number', { ascending: false })
-        if (wavesErr) {
-          errors.push(`${series.client} — ${series.survey_name}: ${wavesErr.message}`)
-          continue
+        // spawnWaveForSeries re-applies its own (unit-tested) idempotency
+        // guard, builds the wave via nextWaveInherit, resolves a captain,
+        // copies child rows, and advances next_wave_no — the exact same path
+        // the manual "spawn_next" action on /api/reruns/series calls.
+        const result = await spawnWaveForSeries(supabase, series.id)
+        if (result.created) {
+          spawned.push(result.waveName ?? series.survey_name)
+        } else if (result.reason && !QUIET_SPAWN_SKIP_REASONS.has(result.reason)) {
+          errors.push(`${series.client} — ${series.survey_name}: ${result.reason}`)
         }
-
-        const liveWaves = (waves ?? []) as WaveRow[]
-        const prevWave = liveWaves[0] as WaveRow | undefined
-        const decision = canSpawnNextWave({
-          hasPrevWave: prevWave != null,
-          existingWaveNumbers: liveWaves.map((w) => w.rerun_number),
-          nextWaveNo: series.next_wave_no,
-          prevWaveSpawnedAt: prevWave?.rerun_spawned_at ?? null,
-        })
-        if (!decision.spawn || !prevWave) continue // already spawned, or no wave to spawn from — skip quietly
-
-        const prevWaveForInherit: PrevWaveForInherit = {
-          project_name: prevWave.project_name,
-          rerun_date: prevWave.rerun_date,
-          launch_date: prevWave.launch_date,
-          due_date: prevWave.due_date,
-          deliver_date: prevWave.deliver_date,
-          captain_id: prevWave.captain_id,
-        }
-        const inherited = nextWaveInherit(series, prevWaveForInherit, todayISO)
-        if (inherited.captain_id == null) {
-          inherited.captain_id = await rerunCaptainId()
-        }
-
-        const { data: newWave, error: insErr } = await supabase
-          .from('survey_projects')
-          .insert(inherited as unknown as TablesInsert<'survey_projects'>)
-          .select('id, project_name')
-          .single()
-
-        if (insErr) {
-          // 23505 = unique_violation on (series_id, rerun_number): another
-          // process already spawned this exact wave number — idempotent
-          // no-op, not an error.
-          if (insErr.code === '23505') continue
-          errors.push(`${series.client} — ${series.survey_name}: ${insErr.message}`)
-          continue
-        }
-        if (!newWave) continue
-
-        // Copy child rows so the new wave's Money section + segments land
-        // populated like the prior wave, run-data zeroed.
-        await copySupplierLaunches(supabase, prevWave.id, newWave.id, 'system')
-        await copyProjectBlasts(supabase, prevWave.id, newWave.id, 'system')
-        await copyProjectSegments(supabase, prevWave.id, newWave.id)
-
-        // Stamp the prior wave so it never spawns a second successor, and
-        // advance the series' next wave number.
-        const { error: stampErr } = await supabase
-          .from('survey_projects')
-          .update({ rerun_spawned_at: new Date().toISOString() })
-          .eq('id', prevWave.id)
-        if (stampErr) errors.push(`stamp ${prevWave.project_name}: ${stampErr.message}`)
-
-        const { error: seriesUpdateErr } = await supabase
-          .from('rerun_series')
-          .update({ next_wave_no: series.next_wave_no + 1 })
-          .eq('id', series.id)
-        if (seriesUpdateErr) errors.push(`advance next_wave_no for ${series.survey_name}: ${seriesUpdateErr.message}`)
-
-        spawned.push(newWave.project_name)
+        // else: quiet skip (already spawned / no prior wave / lost a race) — not an error.
       } catch (err) {
         errors.push(`${series.client} — ${series.survey_name}: ${err instanceof Error ? err.message : String(err)}`)
       }
