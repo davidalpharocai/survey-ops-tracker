@@ -14,6 +14,7 @@ import { useTeamMembers, assignableMembers } from '@/lib/hooks/useTeamMembers'
 import { waveStatus, type WaveStatusMeta } from '@/lib/reruns/waveStatus'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
 import { Skeleton } from '@/components/shared/Skeleton'
+import { BaseTypeTag } from '@/components/reruns/BaseTypeTag'
 import { formatDate } from '@/lib/utils/date'
 import { fmtNum } from '@/lib/utils/number'
 import { toast } from '@/lib/utils/toast'
@@ -31,11 +32,6 @@ import { toast } from '@/lib/utils/toast'
 // draggable/dataTransfer cross-series move, so the two gestures can never be
 // confused or accidentally trigger each other even if both were ever mounted
 // on the same page.
-
-const TYPE_BADGE: Record<string, string> = {
-  PS: 'bg-blue-500/20 text-blue-600 dark:text-blue-400',
-  B2B: 'bg-violet-500/20 text-violet-600 dark:text-violet-400',
-}
 
 const CADENCE_OPTS: { v: string; label: string }[] = [
   { v: '', label: 'Ad-hoc / one-off' },
@@ -586,7 +582,7 @@ export function RerunSeriesRecord({ seriesId }: { seriesId: string }) {
               {series.client} — {series.survey_name}
             </h1>
             <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
-              <span className={`text-xs px-2 py-0.5 rounded ${TYPE_BADGE[series.base_type] ?? ''}`}>{series.base_type}</span>
+              <BaseTypeTag baseType={series.base_type} rerunService={series.rerun_service} className="text-xs px-2 py-0.5" />
               <span
                 className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full border border-primary/40 text-primary bg-primary/5"
                 title="This is a first-class rerun series record — a wave belongs here via series_id."
@@ -811,7 +807,9 @@ function SeriesDetailsSection({
   const [serviceMode, setServiceMode] = useState(series.service_mode)
   const [templateId, setTemplateId] = useState(series.template_id ?? '')
   const [ownerEmail, setOwnerEmail] = useState(series.owner_email ?? '')
-  const [baseType, setBaseType] = useState(series.base_type)
+  // base_type may be blank for a legacy Rerun-Service series (migration 074);
+  // '' keeps the <select> a controlled string. Picking PS/B2B classifies it.
+  const [baseType, setBaseType] = useState(series.base_type ?? '')
   const [surveyName, setSurveyName] = useState(series.survey_name)
   const [notes, setNotes] = useState(series.notes ?? '')
 
@@ -821,7 +819,7 @@ function SeriesDetailsSection({
     setServiceMode(series.service_mode)
     setTemplateId(series.template_id ?? '')
     setOwnerEmail(series.owner_email ?? '')
-    setBaseType(series.base_type)
+    setBaseType(series.base_type ?? '')
     setSurveyName(series.survey_name)
     setNotes(series.notes ?? '')
     setEditing(true)

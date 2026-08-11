@@ -12,7 +12,9 @@ export interface RerunMonthEvent {
   seriesId: string
   client: string
   survey_name: string
-  base_type: string
+  /** null for a legacy Rerun-Service series with no base type set yet (mig 074). */
+  base_type: string | null
+  rerun_service: boolean
   /** YYYY-MM-DD — the computed next-wave date this event sits on. */
   effective_next: string
   is_overdue: boolean
@@ -40,6 +42,7 @@ export function seriesMonthEvents(series: SeriesListRow[]): Record<string, Rerun
       client: s.client,
       survey_name: s.survey_name,
       base_type: s.base_type,
+      rerun_service: s.rerun_service,
       effective_next: key,
       is_overdue: !!s.is_overdue,
       days_to_next: s.days_to_next,

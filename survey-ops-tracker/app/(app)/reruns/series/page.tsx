@@ -1,6 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { RerunSeriesBoard } from '@/components/reruns/RerunSeriesBoard'
+import { BaseTypeTag } from '@/components/reruns/BaseTypeTag'
 import { useRerunSeriesList, type SeriesListRow } from '@/lib/hooks/useRerunSeriesRecord'
 import { Skeleton } from '@/components/shared/Skeleton'
 import { formatDate } from '@/lib/utils/date'
@@ -12,11 +13,6 @@ import { formatDate } from '@/lib/utils/date'
 //     kept working and labelled "legacy" per the rerun-update spec §18
 //     ("Source-of-truth IA": new series is primary, legacy is read-only-ish
 //     and clearly marked during the migration).
-
-const TYPE_BADGE: Record<string, string> = {
-  PS: 'bg-blue-500/20 text-blue-600 dark:text-blue-400',
-  B2B: 'bg-violet-500/20 text-violet-600 dark:text-violet-400',
-}
 
 function cadenceLabel(m: number | null): string {
   if (m == null) return 'Ad-hoc'
@@ -31,7 +27,7 @@ function FirstClassSeriesRow({ s }: { s: SeriesListRow }) {
       className="flex items-center justify-between gap-3 flex-wrap bg-background border border-border rounded-lg px-3 py-2.5 hover:ring-1 hover:ring-primary/30 hover:bg-accent/40 transition"
     >
       <div className="min-w-0 flex items-center gap-2 flex-wrap">
-        <span className={`text-[11px] px-1.5 py-0.5 rounded ${TYPE_BADGE[s.base_type] ?? ''}`}>{s.base_type}</span>
+        <BaseTypeTag baseType={s.base_type} rerunService={s.rerun_service} />
         <span className="font-medium text-foreground truncate">{s.client} — {s.survey_name}</span>
         <span className="text-xs text-muted-foreground">{s.wave_count} wave{s.wave_count === 1 ? '' : 's'}</span>
       </div>

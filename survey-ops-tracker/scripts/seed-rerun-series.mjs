@@ -73,9 +73,11 @@ function cadenceMonths(raw) {
 
 function baseTypeOf(raw) {
   const s = String(raw || '').trim().toUpperCase()
-  if (s === 'PS') return 'PS'
-  if (s === 'B2B') return 'B2B'
-  return null // 'RERUN SERVICE', blank, etc. → decision
+  if (s === 'PS') return { base_type: 'PS', rerun_service: false, decision: false }
+  if (s === 'B2B') return { base_type: 'B2B', rerun_service: false, decision: false }
+  // "Rerun Service" → blank base type + rerun_service tag (classify PS/B2B later, per David).
+  if (s === 'RERUN SERVICE' || s === 'RERUN') return { base_type: null, rerun_service: true, decision: false }
+  return { base_type: null, rerun_service: false, decision: true } // blank / unknown → decision
 }
 
 function excelDate(v) {
@@ -145,7 +147,7 @@ for (const c of candidates) {
   const decisions = []
   if (!client) decisions.push(`CLIENT-UNMATCHED ("${c.client}")`)
   else if (client.ambiguous) decisions.push(`CLIENT-AMBIGUOUS (${client.ambiguous.map((x) => x.name).join(' | ')})`)
-  if (!bt) decisions.push(`BASE-TYPE ("${c.base_type_raw || 'blank'}" → pick PS or B2B)`)
+  if (bt.decision) decisions.push(`BASE-TYPE ("${c.base_type_raw || 'blank'}" → pick PS or B2B)`)
   if (!cad.ok) decisions.push(`CADENCE ("${c.cadence_raw}" → months?)`)
 
   const clientId = client && !client.ambiguous ? client.id : null
@@ -189,8 +191,9 @@ for (let i = 0; i < report.length; i++) {
   const c = r.c
   console.log(`${String(i + 1).padStart(2)}. [${r.action}]`)
   console.log(`     ${c.client} — ${c.survey_name}`)
+  const baseLabel = r.bt.decision ? `(${c.base_type_raw || 'blank'}?)` : r.bt.rerun_service ? 'Rerun Service (tag, base blank)' : r.bt.base_type
   console.log(
-    `     base=${r.bt ?? `(${c.base_type_raw || 'blank'}?)`}  cadence=${r.cad.ok ? (r.cad.adhoc ? 'ad-hoc' : r.cad.months + 'mo') : `(${c.cadence_raw}?)`}  delivery="${c.delivery_cadence ?? '—'}"  sheet-mode=${c.service_hint || '—'}  anchor=${c.anchor_date ?? '—'}`
+    `     base=${baseLabel}  cadence=${r.cad.ok ? (r.cad.adhoc ? 'ad-hoc' : r.cad.months + 'mo') : `(${c.cadence_raw}?)`}  delivery="${c.delivery_cadence ?? '—'}"  sheet-mode=${c.service_hint || '—'}  anchor=${c.anchor_date ?? '—'}`
   )
   if (c.template_id) console.log(`     template=${c.template_id.replace(/\s+/g, ' ').slice(0, 80)}`)
   console.log(`     client_id=${r.clientId ?? (r.client?.ambiguous ? 'AMBIGUOUS' : 'UNMATCHED')}`)
@@ -211,7 +214,7 @@ if (!APPLY) {
 console.log('APPLY MODE — creating unambiguous CREATE rows (skipping ALREADY-SEEDED and NEEDS-DECISION)...\n')
 let created = 0
 for (const r of report) {
-  if (r.already || r.decisions.length || !r.clientId || !r.bt) continue
+  if (r.already || r.decisions.length || !r.clientId) continue
   const c = r.c
   const origin = r.origins[0] ?? null
   const maxWave = r.origins.reduce((m, o) => Math.max(m, o.rerun_number ?? 1), 0)
@@ -219,7 +222,8 @@ for (const r of report) {
     client: c.client,
     client_id: r.clientId,
     survey_name: c.survey_name,
-    base_type: r.bt,
+    base_type: r.bt.base_type,
+    rerun_service: r.bt.rerun_service,
     origin_project_id: origin?.id ?? null,
     cadence_months: r.cad.months,
     delivery_cadence: c.delivery_cadence,

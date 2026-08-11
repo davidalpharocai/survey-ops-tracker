@@ -13,6 +13,7 @@ import {
   isSameDay,
 } from 'date-fns'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
+import { BaseTypeTag } from '@/components/reruns/BaseTypeTag'
 import { seriesMonthEvents, type RerunMonthEvent } from '@/lib/reruns/monthEvents'
 import type { SeriesListRow } from '@/lib/hooks/useRerunSeriesRecord'
 
@@ -24,14 +25,6 @@ import type { SeriesListRow } from '@/lib/hooks/useRerunSeriesRecord'
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const MAX_CHIPS = 3
-
-// Solid PS=blue / B2B=violet mini-badge — matches the type badge on the series
-// list (app/(app)/reruns/series/page.tsx) so a base type reads the same across
-// surfaces.
-const TYPE_BADGE: Record<string, string> = {
-  PS: 'bg-blue-500/20 text-blue-600 dark:text-blue-400',
-  B2B: 'bg-violet-500/20 text-violet-600 dark:text-violet-400',
-}
 
 function dayKey(d: Date): string {
   return format(d, 'yyyy-MM-dd')
@@ -53,9 +46,7 @@ function SeriesChip({ e }: { e: RerunMonthEvent }) {
           : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
       }`}
     >
-      <span className={`shrink-0 rounded px-1 text-[10px] font-medium ${TYPE_BADGE[e.base_type] ?? 'bg-muted text-muted-foreground'}`}>
-        {e.base_type}
-      </span>
+      <BaseTypeTag baseType={e.base_type} rerunService={e.rerun_service} className="shrink-0 px-1 py-0 text-[10px]" />
       <span className="truncate min-w-0">{label}</span>
     </Link>
   )

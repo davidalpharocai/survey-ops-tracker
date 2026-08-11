@@ -182,6 +182,7 @@ describe('nextWaveInherit', () => {
     client: 'BAM',
     survey_name: 'Consumer Study',
     base_type: 'B2B',
+    rerun_service: false,
     origin_project_id: 'wave-1',
     cadence_months: 1,
     delivery_cadence: null,

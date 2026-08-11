@@ -12,6 +12,7 @@ function series(overrides: Partial<SeriesListRow> = {}): SeriesListRow {
     client: 'Acme',
     survey_name: 'Q3 Tracker',
     base_type: 'PS',
+    rerun_service: false,
     origin_project_id: 'p1',
     cadence_months: 3,
     delivery_cadence: null,

@@ -1512,7 +1512,8 @@ export type Database = {
           client_id: string | null
           client: string
           survey_name: string
-          base_type: string
+          base_type: string | null
+          rerun_service: boolean
           origin_project_id: string | null
           cadence_months: number | null
           delivery_cadence: string | null
@@ -1537,7 +1538,8 @@ export type Database = {
           client_id?: string | null
           client: string
           survey_name: string
-          base_type: string
+          base_type?: string | null
+          rerun_service?: boolean
           origin_project_id?: string | null
           cadence_months?: number | null
           delivery_cadence?: string | null
@@ -1562,7 +1564,8 @@ export type Database = {
           client_id?: string | null
           client?: string
           survey_name?: string
-          base_type?: string
+          base_type?: string | null
+          rerun_service?: boolean
           origin_project_id?: string | null
           cadence_months?: number | null
           delivery_cadence?: string | null
@@ -1661,7 +1664,8 @@ export type Database = {
           client_id: string | null
           client: string
           survey_name: string
-          base_type: string
+          base_type: string | null
+          rerun_service: boolean
           origin_project_id: string | null
           cadence_months: number | null
           delivery_cadence: string | null

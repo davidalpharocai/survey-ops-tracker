@@ -754,6 +754,9 @@ function shapeSeries(r: SeriesStatusRow) {
     client: r.client,
     survey_name: r.survey_name,
     base_type: r.base_type,
+    // Legacy seeded series can carry no base type yet — surface the flag so
+    // callers can tell a blank base_type apart from a mistake (migration 074).
+    rerun_service: r.rerun_service,
     cadence: cadenceLabel(r.cadence_months),
     cadence_months: r.cadence_months,
     service_mode: r.service_mode,
