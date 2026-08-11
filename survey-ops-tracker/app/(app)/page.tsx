@@ -182,6 +182,8 @@ export default function BoardPage() {
           client: complianceMaps.clientByFirm.get(firm) ?? null,
           override: moved.compliance_override ?? null,
           submissions: complianceMaps.approvedByProject.get(moved.id) ?? [],
+          rerunNumber: moved.rerun_number,
+          complianceRequiredOverride: moved.compliance_required_override,
         })
         if (gate.blocked) {
           toast(gate.message + ' Open the project to review or override.')

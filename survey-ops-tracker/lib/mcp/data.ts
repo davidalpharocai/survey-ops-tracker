@@ -229,9 +229,15 @@ export async function getProjectDetail(id: string, userId: string) {
   const client = clientRes.data as { compliance_before_fielding: boolean; compliance_after_fielding: boolean } | null
 
   const compliance = {
-    before_fielding_required: beforeFieldingRequired(client, p.compliance_override as boolean | null),
+    before_fielding_required: beforeFieldingRequired(
+      client, p.compliance_override as boolean | null,
+      p.rerun_number as number | null ?? undefined, p.compliance_required_override as boolean | null
+    ),
     before_fielding_met: beforeFieldingMet(submissions),
-    after_fielding_required: afterFieldingRequired(client, p.compliance_override as boolean | null),
+    after_fielding_required: afterFieldingRequired(
+      client, p.compliance_override as boolean | null,
+      p.rerun_number as number | null ?? undefined, p.compliance_required_override as boolean | null
+    ),
     after_fielding_met: afterFieldingMet(submissions),
   }
 

@@ -153,8 +153,8 @@ export default function ProjectDetailPage() {
   )
   const showCompliance =
     !!compliance.data &&
-    (beforeFieldingRequired(compliance.data.client, compliance.data.override) ||
-      afterFieldingRequired(compliance.data.client, compliance.data.override) ||
+    (beforeFieldingRequired(compliance.data.client, compliance.data.override, project?.rerun_number, project?.compliance_required_override) ||
+      afterFieldingRequired(compliance.data.client, compliance.data.override, project?.rerun_number, project?.compliance_required_override) ||
       compliance.data.submissions.length > 0)
 
   // Mark the project as seen by the current user on every visit — this is

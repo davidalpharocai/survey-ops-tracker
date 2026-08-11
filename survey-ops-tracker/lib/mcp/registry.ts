@@ -1390,6 +1390,7 @@ export const TOOLS: AssistantTool[] = [
       const gate = complianceGate({
         targetColumn: stage.board_column, willMarkDelivered,
         client: gi.client, override: gi.override, submissions: gi.submissions,
+        rerunNumber: gi.rerunNumber ?? undefined, complianceRequiredOverride: gi.complianceRequiredOverride,
       })
       if (gate.blocked && !args.override_reason) return { blocked: true, gate: 'compliance', reason: gate.message }
 

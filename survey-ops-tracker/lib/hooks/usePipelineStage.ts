@@ -167,6 +167,8 @@ export function usePipelineStage(project: SurveyProject) {
       client: compliance?.client ?? null,
       override: project.compliance_override ?? null,
       submissions: compliance?.submissions ?? [],
+      rerunNumber: project.rerun_number,
+      complianceRequiredOverride: project.compliance_required_override,
     })
     if (g.blocked) {
       setGate({

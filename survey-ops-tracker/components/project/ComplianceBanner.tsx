@@ -15,9 +15,31 @@ export function ComplianceBanner({ project }: { project: SurveyProject }) {
   const { data: cs } = useComplianceState(project.id, project.client, project.compliance_override ?? null)
   if (!cs) return null
 
-  const beforeOutstanding = beforeFieldingRequired(cs.client, cs.override) && !beforeFieldingMet(cs.submissions)
-  const afterOutstanding = afterFieldingRequired(cs.client, cs.override) && !afterFieldingMet(cs.submissions)
-  if (!beforeOutstanding && !afterOutstanding) return null
+  const beforeOutstanding =
+    beforeFieldingRequired(cs.client, cs.override, project.rerun_number, project.compliance_required_override) &&
+    !beforeFieldingMet(cs.submissions)
+  const afterOutstanding =
+    afterFieldingRequired(cs.client, cs.override, project.rerun_number, project.compliance_required_override) &&
+    !afterFieldingMet(cs.submissions)
+
+  // Nothing outstanding — if that's because a rerun wave waived a review this
+  // client would otherwise require, say so explicitly so the missing gate
+  // never reads as a bug. Only the two explicit force signals win over the waiver.
+  if (!beforeOutstanding && !afterOutstanding) {
+    const waived =
+      (project.rerun_number ?? 1) >= 2 &&
+      project.compliance_override !== true &&
+      !project.compliance_required_override
+    if (!waived) return null
+    return (
+      <div className="mb-4 flex items-start gap-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl px-4 py-3">
+        <span className="text-lg leading-none mt-0.5">🛡️</span>
+        <div className="flex-1 text-sm text-muted-foreground">
+          Compliance not required — rerun wave (waived after Wave 1). Force with the per-wave override.
+        </div>
+      </div>
+    )
+  }
 
   const firm = project.client.split(' - ')[0].trim()
 

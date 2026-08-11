@@ -87,6 +87,8 @@ export interface GateInputData {
   client: ClientCompliance | null
   override: boolean | null
   submissions: SubmissionLite[]
+  rerunNumber: number | null
+  complianceRequiredOverride: boolean | null
 }
 
 /** Fetch the raw pieces complianceGate needs for a project: its compliance_override, its client's
@@ -97,7 +99,7 @@ export async function loadGateInput(projectId: string): Promise<GateInputData> {
 
   const { data: project, error: projErr } = await supabase
     .from('survey_projects')
-    .select('compliance_override, client_id')
+    .select('compliance_override, client_id, rerun_number, compliance_required_override')
     .eq('id', projectId)
     .maybeSingle()
   if (projErr) throw projErr
@@ -126,6 +128,8 @@ export async function loadGateInput(projectId: string): Promise<GateInputData> {
     client,
     override: project?.compliance_override ?? null,
     submissions: (subs ?? []) as SubmissionLite[],
+    rerunNumber: project?.rerun_number ?? null,
+    complianceRequiredOverride: project?.compliance_required_override ?? null,
   }
 }
 
