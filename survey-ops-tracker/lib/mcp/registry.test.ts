@@ -40,9 +40,12 @@ describe('TOOLS registry shape', () => {
 
   it('classifies the spec read tools as read and the rest as write', () => {
     const READ = new Set([
-      'search_projects', 'get_project', 'pipeline_summary', 'get_me',
+      'search_projects', 'get_project', 'pipeline_summary', 'survey_stats', 'survey_report',
+      'rerun_radar', 'search_reruns', 'get_rerun_series', 'rerun_calendar',
+      'ops_metrics', 'whats_at_risk', 'get_change_history', 'reconcile_project',
+      'data_health', 'pipeline_throughput', 'get_me',
       'get_client_history', 'get_project_history', 'search_clients', 'get_client',
-      'list_activity', 'get_email', 'decode_survey_id', 'list_reminders',
+      'list_activity', 'get_email', 'decode_survey_id', 'list_reminders', 'list_launches',
     ])
     for (const t of TOOLS) {
       expect(t.kind, `${t.name}`).toBe(READ.has(t.name) ? 'read' : 'write')

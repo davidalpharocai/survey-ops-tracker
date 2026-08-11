@@ -2,6 +2,7 @@ import 'server-only'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { totalBidDollars } from '@/lib/utils/blast'
 import { beforeFieldingRequired, afterFieldingRequired, beforeFieldingMet, afterFieldingMet } from '@/lib/utils/compliance'
+import type { Database } from '@/lib/supabase/types'
 
 /** Tool args are user-controlled: strip PostgREST-reserved chars, escape LIKE wildcards, cap length. */
 export function sanitizeQuery(q: string): string {
@@ -727,12 +728,237 @@ export async function getLastChangeBatch(projectId: string): Promise<
   }
 }
 
-/** Rerun Radar — reads the pre-computed rerun_status view and buckets recurring
- *  reruns into overdue / needs-definition / prep-window / upcoming (each row in
- *  one bucket by priority). Paused series excluded. Optional owner filter. */
+// ---------------------------------------------------------------------------
+// Reruns — the first-class rerun_series model (migration 073) is the new source
+// of truth. rerun_radar UNIONS it with the legacy sheet-mirror (rerun_status)
+// during the migration window; search/report/detail/calendar read the new model
+// directly. All date comparisons are date-only (YYYY-MM-DD), America/New_York.
+// ---------------------------------------------------------------------------
+
+type SeriesStatusRow = Database['public']['Views']['rerun_series_status']['Row']
+
+/** cadence_months → a human keyword for display. Inverse of seriesOps.cadenceToMonths. */
+export function cadenceLabel(months: number | null): string {
+  if (months == null) return 'adhoc'
+  if (months === 1) return 'monthly'
+  if (months === 3) return 'quarterly'
+  if (months === 6) return 'semiannual'
+  if (months === 12) return 'yearly'
+  return `${months}mo`
+}
+
+/** The compact per-series shape returned by search_reruns / rerun_calendar. */
+function shapeSeries(r: SeriesStatusRow) {
+  return {
+    id: r.id,
+    client: r.client,
+    survey_name: r.survey_name,
+    base_type: r.base_type,
+    cadence: cadenceLabel(r.cadence_months),
+    cadence_months: r.cadence_months,
+    service_mode: r.service_mode,
+    in_service: r.in_service,
+    paused: r.paused,
+    is_overdue: r.is_overdue,
+    owner_email: r.owner_email,
+    effective_next: r.effective_next,
+    days_to_next: r.days_to_next,
+  }
+}
+
+/** Resolve a rerun-series ref: a uuid matches `id` directly; otherwise a text
+ *  query matches client/survey_name on the status view. 0 → null, 1 → {id},
+ *  >1 → { ambiguous: [...] }. Mirrors resolveProject/resolveClient. */
+export async function resolveRerunSeries(
+  ref: string
+): Promise<{ id: string } | { ambiguous: { id: string; client: string; survey_name: string }[] } | null> {
+  const supabase = createAdminClient()
+  const trimmed = ref.trim()
+  // A uuid ref matches a series id exactly.
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trimmed)) {
+    const { data, error } = await supabase.from('rerun_series_status').select('id').eq('id', trimmed).maybeSingle()
+    if (error) throw error
+    if (data) return { id: data.id }
+    return null
+  }
+  const s = sanitizeQuery(trimmed)
+  const { data, error } = await supabase
+    .from('rerun_series_status')
+    .select('id, client, survey_name')
+    .or(`client.ilike.%${s}%,survey_name.ilike.%${s}%`)
+    .limit(10)
+  if (error) throw error
+  const rows = (data ?? []) as { id: string; client: string; survey_name: string }[]
+  if (rows.length === 0) return null
+  if (rows.length === 1) return { id: rows[0].id }
+  return { ambiguous: rows.map((r) => ({ id: r.id, client: r.client, survey_name: r.survey_name })) }
+}
+
+/** Search first-class rerun series with filters — the connector/assistant
+ *  reader for "which reruns are …". status maps to the view's flags:
+ *  in_service / paused / is_overdue; 'ended' = not in service. */
+export async function searchReruns(args: {
+  query?: string
+  client?: string
+  base_type?: string
+  status?: 'in_service' | 'paused' | 'ended' | 'overdue'
+  owner?: string
+  mine?: boolean
+  userEmail?: string
+  limit?: number
+}) {
+  const supabase = createAdminClient()
+  let q = supabase.from('rerun_series_status').select('*')
+  if (args.query) {
+    const s = sanitizeQuery(args.query)
+    q = q.or(`client.ilike.%${s}%,survey_name.ilike.%${s}%`)
+  }
+  if (args.client) q = q.ilike('client', `%${sanitizeQuery(args.client)}%`)
+  if (args.base_type) q = q.eq('base_type', args.base_type)
+  if (args.status === 'in_service') q = q.eq('in_service', true)
+  else if (args.status === 'paused') q = q.eq('paused', true)
+  else if (args.status === 'ended') q = q.eq('in_service', false)
+  else if (args.status === 'overdue') q = q.eq('is_overdue', true)
+  // mine (own email) wins over an explicit owner substring filter.
+  if (args.mine && args.userEmail) q = q.eq('owner_email', args.userEmail)
+  else if (args.owner) q = q.ilike('owner_email', `%${sanitizeQuery(args.owner)}%`)
+
+  const { data, error } = await q
+    .order('effective_next', { ascending: true, nullsFirst: false })
+    .limit(Math.min(args.limit ?? 50, 100))
+  if (error) throw error
+  const series = ((data ?? []) as SeriesStatusRow[]).map(shapeSeries)
+  const overdue = series.filter((s) => s.is_overdue).length
+  const paused = series.filter((s) => s.paused).length
+  const summary =
+    series.length === 0
+      ? 'No rerun series match.'
+      : `${series.length} rerun series — ${overdue} overdue, ${paused} paused.`
+  return { ok: true, count: series.length, series, summary }
+}
+
+/** One rerun series' status row + its waves (as normal survey_projects rows),
+ *  ordered by wave number. Mirrors useRerunSeriesRecord's read. */
+export async function getRerunSeries(seriesId: string) {
+  const supabase = createAdminClient()
+  const { data: series, error: sErr } = await supabase
+    .from('rerun_series_status')
+    .select('*')
+    .eq('id', seriesId)
+    .maybeSingle()
+  if (sErr) throw sErr
+  if (!series) return { error: 'No rerun series with that id.' }
+  const { data: waves, error: wErr } = await supabase
+    .from('survey_projects')
+    .select(
+      'id, project_code, project_name, rerun_number, submitted_date, launch_date, deliver_date, delivered_at, n_target, n_collected, n_actual, survey_tool_id, status, board_column'
+    )
+    .eq('series_id', seriesId)
+    .is('deleted_at', null)
+    .order('rerun_number', { ascending: true })
+  if (wErr) throw wErr
+  const s = series as SeriesStatusRow
+  const waveList = waves ?? []
+  const summary =
+    `${s.client} — ${s.survey_name}: ${waveList.length} wave(s), ` +
+    `next ${s.effective_next ?? '—'}, ${s.owner_email ?? 'unassigned'}` +
+    (s.paused ? ' (paused)' : !s.in_service ? ' (ended)' : '')
+  return { series: s, waves: waveList, summary }
+}
+
+/** Rerun calendar — in-service, non-paused series bucketed by effective_next
+ *  relative to today (ET): overdue / due within the window horizon / upcoming.
+ *  window is week (7d) / month (30d) / quarter (90d). */
+export async function rerunCalendar(args: { window?: 'week' | 'month' | 'quarter'; mine?: boolean; userEmail?: string }) {
+  const supabase = createAdminClient()
+  let q = supabase.from('rerun_series_status').select('*').eq('paused', false).eq('in_service', true)
+  if (args.mine && args.userEmail) q = q.eq('owner_email', args.userEmail)
+  const { data, error } = await q
+  if (error) throw error
+
+  const window = args.window ?? 'week'
+  const windowDays = window === 'week' ? 7 : window === 'month' ? 30 : 90
+  const today = todayET()
+  const horizon = addDays(today, windowDays)
+
+  type Item = ReturnType<typeof shapeSeries>
+  const overdue: Item[] = []
+  const due_in_window: Item[] = []
+  const upcoming: Item[] = []
+  for (const r of (data ?? []) as SeriesStatusRow[]) {
+    const item = shapeSeries(r)
+    if (r.is_overdue) overdue.push(item)
+    else if (r.effective_next && r.effective_next <= horizon) due_in_window.push(item)
+    else if (r.effective_next) upcoming.push(item)
+  }
+  const byNext = (a: Item, b: Item) => String(a.effective_next ?? '').localeCompare(String(b.effective_next ?? ''))
+  overdue.sort(byNext)
+  due_in_window.sort(byNext)
+  upcoming.sort(byNext)
+
+  const counts = { overdue: overdue.length, due_in_window: due_in_window.length, upcoming: upcoming.length }
+  const summary =
+    `Reruns (${window}) — ${counts.overdue} overdue, ${counts.due_in_window} due this ${window}, ` +
+    `${counts.upcoming} upcoming.`
+  return { ok: true, window, counts, overdue, due_in_window, upcoming, summary }
+}
+
+/** Days of lead time before a first-class series' effective_next at which it
+ *  enters rerun_radar's "prep window" bucket. The legacy view carries a
+ *  per-row lead_days; the series view doesn't, so the radar uses this default. */
+const SERIES_PREP_LEAD_DAYS = 14
+
+/** Rerun Radar — recurring reruns that need attention, bucketed into overdue /
+ *  needs-definition / prep-window / upcoming (each in ONE bucket by priority).
+ *  UNIONS the legacy sheet-mirror (rerun_status) with the first-class
+ *  rerun_series model (rerun_series_status), de-duped on client + survey name
+ *  so a study present in both appears once — the first-class row wins. Paused /
+ *  ended series are excluded (they don't need attention). Optional owner filter. */
 export async function rerunRadar(opts: { ownerEmail?: string } = {}) {
   const supabase = createAdminClient()
-  let q = supabase
+
+  type Item = {
+    id: unknown; name: string | null; client: unknown; platform: unknown; cadence: unknown
+    last_wave_on: unknown; due: unknown; days_to_due: unknown; owner: unknown; survey_ids: unknown
+  }
+  const buckets = {
+    overdue: [] as Item[],
+    needs_definition: [] as Item[],
+    prep_window: [] as Item[],
+    upcoming: [] as Item[],
+  }
+  // client|name key so a study mirrored in both models is counted once.
+  const dedupeKey = (client: unknown, name: unknown) =>
+    `${String(client ?? '').trim().toLowerCase()}|${String(name ?? '').trim().toLowerCase()}`
+  const seen = new Set<string>()
+
+  // ---- First-class series first (they win any dedupe tie) ----
+  let sq = supabase
+    .from('rerun_series_status')
+    .select('*')
+    .eq('paused', false)
+    .eq('in_service', true)
+  if (opts.ownerEmail) sq = sq.eq('owner_email', opts.ownerEmail)
+  const { data: seriesRows, error: sErr } = await sq
+  if (sErr) throw sErr
+  for (const r of (seriesRows ?? []) as SeriesStatusRow[]) {
+    const item: Item = {
+      id: r.id, name: r.survey_name, client: r.client, platform: r.base_type,
+      cadence: cadenceLabel(r.cadence_months), last_wave_on: r.last_on, due: r.effective_next,
+      days_to_due: r.days_to_next, owner: r.owner_email, survey_ids: null,
+    }
+    seen.add(dedupeKey(r.client, r.survey_name))
+    if (r.is_overdue) buckets.overdue.push(item)
+    else if (r.cadence_months == null) buckets.needs_definition.push(item)
+    else if (r.effective_next && r.days_to_next != null && r.days_to_next <= SERIES_PREP_LEAD_DAYS)
+      buckets.prep_window.push(item)
+    else if (r.effective_next) buckets.upcoming.push(item)
+    // else: cadence set but no computable due date and not overdue → not shown
+    // (matches the guard: only "upcoming" when it actually has a due date).
+  }
+
+  // ---- Legacy sheet-mirror, skipping anything already surfaced above ----
+  let lq = supabase
     .from('rerun_status')
     .select(
       'id, display_name, client, work, platform, cadence, cadence_months, last_wave_on, ' +
@@ -740,30 +966,28 @@ export async function rerunRadar(opts: { ownerEmail?: string } = {}) {
       'owner_email, backup_owner_email, survey_ids'
     )
     .or('is_paused.is.null,is_paused.eq.false')
-  if (opts.ownerEmail) q = q.eq('owner_email', opts.ownerEmail)
-  const { data, error } = await q
-  if (error) throw error
+  if (opts.ownerEmail) lq = lq.eq('owner_email', opts.ownerEmail)
+  const { data: legacyRows, error: lErr } = await lq
+  if (lErr) throw lErr
 
   type R = Record<string, unknown>
-  const shape = (r: R) => ({
+  const shapeLegacy = (r: R): Item => ({
     id: r.id,
     name: (r.display_name ?? r.work ?? r.client) as string | null,
     client: r.client, platform: r.platform, cadence: r.cadence,
     last_wave_on: r.last_wave_on, due: r.effective_due, days_to_due: r.days_to_due,
     owner: r.owner_email, survey_ids: r.survey_ids,
   })
-  const buckets = {
-    overdue: [] as ReturnType<typeof shape>[],
-    needs_definition: [] as ReturnType<typeof shape>[],
-    prep_window: [] as ReturnType<typeof shape>[],
-    upcoming: [] as ReturnType<typeof shape>[],
+  for (const r of (legacyRows ?? []) as unknown as R[]) {
+    const name = (r.display_name ?? r.work ?? r.client) as string | null
+    if (seen.has(dedupeKey(r.client, name))) continue
+    const item = shapeLegacy(r)
+    if (r.is_overdue) buckets.overdue.push(item)
+    else if (r.needs_definition) buckets.needs_definition.push(item)
+    else if (r.in_prep_window) buckets.prep_window.push(item)
+    else if (r.effective_due) buckets.upcoming.push(item)
   }
-  for (const r of (data ?? []) as unknown as R[]) {
-    if (r.is_overdue) buckets.overdue.push(shape(r))
-    else if (r.needs_definition) buckets.needs_definition.push(shape(r))
-    else if (r.in_prep_window) buckets.prep_window.push(shape(r))
-    else if (r.effective_due) buckets.upcoming.push(shape(r))
-  }
+
   // Soonest-first within the date-bearing buckets.
   const byDue = (a: { due: unknown }, b: { due: unknown }) => String(a.due ?? '').localeCompare(String(b.due ?? ''))
   buckets.overdue.sort(byDue); buckets.prep_window.sort(byDue); buckets.upcoming.sort(byDue)
