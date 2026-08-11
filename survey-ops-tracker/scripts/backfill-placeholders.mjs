@@ -21,17 +21,30 @@ const APPLY = process.argv.slice(2).includes('--apply')
 const env = Object.fromEntries(readFileSync('.env.local', 'utf8').split(/\r?\n/).filter((l) => l.includes('=') && !l.trim().startsWith('#')).map((l) => { const i = l.indexOf('='); return [l.slice(0, i).trim(), l.slice(i + 1).trim()] }))
 const db = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { autoRefreshToken: false, persistSession: false } })
 
-// Inlined copy of placeholderWaveDates from lib/reruns/placeholders.ts — a plain
-// .mjs can't import a .ts, so this is duplicated. SOURCE OF TRUTH is that file;
-// keep this identical to it if the stepping logic ever changes.
+// Inlined copy of lib/reruns/placeholders.ts — a plain .mjs can't import a .ts,
+// so addMonthsClampedUTC + placeholderWaveDates are duplicated here. SOURCE OF
+// TRUTH is that file; keep this BYTE-IDENTICAL in behavior. Day-of-month is
+// clamped to the target month's last day (Jan 31 + 1mo → Feb 28, not Mar 3) to
+// match Postgres make_interval, which the rerun_series_status view uses — so a
+// 29–31-anchored series can't drift out of step with the view. Each wave is
+// computed from the ORIGINAL base (base + i·n) so the 31st is restored wherever
+// the month allows (Feb 28, Mar 31, Apr 30, …), exactly like anchor + interval.
+function addMonthsClampedUTC(d, n) {
+  const day = d.getUTCDate()
+  const t = new Date(d)
+  t.setUTCDate(1)
+  t.setUTCMonth(t.getUTCMonth() + n)
+  const lastDay = new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth() + 1, 0)).getUTCDate()
+  t.setUTCDate(Math.min(day, lastDay))
+  return t
+}
 function placeholderWaveDates(baseISO, cadenceMonths, todayISO) {
   if (!baseISO || !cadenceMonths) return []
-  const cursor = new Date(baseISO + 'T00:00:00Z')
-  if (isNaN(cursor.getTime())) return []
+  const base = new Date(baseISO + 'T00:00:00Z')
+  if (isNaN(base.getTime())) return []
   const out = []
-  for (let i = 0; i < 600; i++) {
-    cursor.setUTCMonth(cursor.getUTCMonth() + cadenceMonths)
-    const iso = cursor.toISOString().slice(0, 10)
+  for (let i = 1; i <= 600; i++) {
+    const iso = addMonthsClampedUTC(base, cadenceMonths * i).toISOString().slice(0, 10)
     if (iso <= todayISO) out.push(iso)
     else break
   }
@@ -49,11 +62,20 @@ const { data: seriesRows, error: sErr } = await db
 if (sErr) { console.error('Failed to read rerun_series_status:', sErr.message); process.exit(1) }
 const overdue = (seriesRows || []).filter((s) => s.is_overdue === true && s.cadence_months != null)
 
-// 2. client_id per series (from the base rerun_series table — the view is scalar
-//    status fields; join on id to carry client_id onto each placeholder wave).
-const { data: baseRows, error: bErr } = await db.from('rerun_series').select('id, client_id, survey_name')
-if (bErr) { console.error('Failed to read rerun_series:', bErr.message); process.exit(1) }
-const clientIdById = new Map((baseRows || []).map((r) => [r.id, r.client_id]))
+// 2. Existing client names — a GATE against the survey_projects_sync_client
+//    BEFORE-INSERT trigger (migration 035): it ignores any client_id we pass and
+//    instead upserts clients on client_firm_name(new.client) = trim(split_part(
+//    client,' - ',1)) with a case-sensitive `on conflict (name)`. So if a
+//    series' denormalized `client` text has no exact firm-name match here, the
+//    trigger SILENTLY CREATES A NEW (duplicate) client as a side effect of the
+//    insert. We predict that exactly (same firm-name split, same case-sensitive
+//    match) and refuse to write anything if it would happen. (client_id is
+//    therefore intentionally NOT set on the inserts — the trigger sets it.)
+const { data: clientRows, error: cErr } = await db.from('clients').select('id, name')
+if (cErr) { console.error('Failed to read clients:', cErr.message); process.exit(1) }
+const clientFirmName = (raw) => String(raw || '').split(' - ')[0].trim() // mirrors public.client_firm_name
+const clientNames = new Set((clientRows || []).map((c) => String(c.name || '').trim())) // case-sensitive, as stored
+const clientMatches = (raw) => clientNames.has(clientFirmName(raw))
 
 // 3. Current max rerun_number per series (existing, non-deleted waves) so new
 //    placeholders number sequentially AFTER them.
@@ -80,10 +102,12 @@ for (const s of overdue) {
   const curMax = maxWaveById.get(s.id) ?? 0
   const startNo = curMax + 1
   const newMax = curMax + dates.length
-  const nd = new Date(dates[dates.length - 1] + 'T00:00:00Z')
-  nd.setUTCMonth(nd.getUTCMonth() + s.cadence_months)
-  const newNextDue = nd.toISOString().slice(0, 10)
-  plan.push({ series: s, client_id: clientIdById.get(s.id) ?? null, dates, startNo, newMax, newNextDue })
+  // Informational new next-due = last placeholder + cadence (clamped, so it
+  // matches what the rerun_series_status view will recompute post-backfill).
+  const newNextDue = addMonthsClampedUTC(new Date(dates[dates.length - 1] + 'T00:00:00Z'), s.cadence_months)
+    .toISOString()
+    .slice(0, 10)
+  plan.push({ series: s, clientOk: clientMatches(s.client), dates, startNo, newMax, newNextDue })
 }
 
 // ---- report ----
@@ -93,21 +117,36 @@ let idx = 0
 for (const p of plan) {
   idx++
   const s = p.series
+  const clientFlag = p.clientOk
+    ? 'client check: OK'
+    : `⚠ client "${s.client}" has no exact match in clients — insert trigger would CREATE a new client`
   console.log(`${idx}. ${s.client} — ${s.survey_name}`)
-  console.log(`     overdue: effective_next ${s.effective_next ?? '—'} · anchor ${s.cadence_anchor ?? '—'} · ${s.cadence_months}mo cadence${p.client_id ? '' : '  ⚠ NO client_id'}`)
+  console.log(`     overdue: effective_next ${s.effective_next ?? '—'} · anchor ${s.cadence_anchor ?? '—'} · ${s.cadence_months}mo cadence`)
+  console.log(`     ${clientFlag}`)
   console.log(`     + ${p.dates.length} placeholder wave(s) #${p.startNo}..#${p.newMax}: ${p.dates.join(', ')}`)
   console.log(`     → new next-due ${p.newNextDue} (last placeholder + cadence) · next_wave_no → ${p.newMax + 1}`)
 }
 
 const totalPlaceholders = plan.reduce((n, p) => n + p.dates.length, 0)
+const badClients = plan.filter((p) => !p.clientOk)
 
 if (!APPLY) {
   console.log(`\nDRY RUN — nothing written. Would touch ${plan.length} series and create ${totalPlaceholders} placeholder(s).`)
+  if (badClients.length) console.log(`⚠ ${badClients.length} series FAIL the client-name check — --apply would ABORT until resolved.`)
   console.log('Re-run with --apply after migration 075 is applied.')
   process.exit(0)
 }
 
 // ---- APPLY ----
+// Safety gate: never write rows that would make the sync-client trigger spawn a
+// duplicate client. Abort wholesale (before ANY insert) if any series fails.
+if (badClients.length) {
+  console.error(`\nABORT — ${badClients.length} series' client text has no firm-name match in clients (the insert trigger would create duplicate clients):`)
+  for (const p of badClients) console.error(`  • ${p.series.client} — ${p.series.survey_name}`)
+  console.error('Resolve the client names (or create the clients) first, then re-run. Nothing was written.')
+  process.exit(1)
+}
+
 console.log('\nAPPLYING...\n')
 let seriesTouched = 0
 let placeholdersCreated = 0
@@ -116,7 +155,9 @@ for (const p of plan) {
   const inserts = p.dates.map((date, k) => ({
     project_name: `${s.survey_name} - Wave ${p.startNo + k}`,
     client: s.client,
-    client_id: p.client_id,
+    // client_id intentionally omitted — the survey_projects_sync_client trigger
+    // stamps it from client_firm_name(client); the pre-apply gate above proves
+    // that resolves to an existing client, so no duplicate is created.
     project_type: s.base_type, // may be null (Rerun-Service series carry no base type)
     series_id: s.id,
     rerun_number: p.startNo + k,

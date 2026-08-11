@@ -62,8 +62,9 @@ describe('placeholderWaveDates', () => {
     expect(nextDue > today).toBe(true)
   })
 
-  it('handles a quarterly year+ rollover keeping day-of-month', () => {
-    // base 2024-10-10, quarterly, today 2026-01-15
+  it('steps a quarterly series across a year+ span (day 10 never needs clamping)', () => {
+    // base 2024-10-10, quarterly, today 2026-01-15 — day 10 exists in every
+    // month, so this exercises long-range stepping without any month-end clamp.
     expect(placeholderWaveDates('2024-10-10', 3, '2026-01-15')).toEqual([
       '2025-01-10',
       '2025-04-10',
@@ -71,5 +72,22 @@ describe('placeholderWaveDates', () => {
       '2025-10-10',
       '2026-01-10',
     ])
+  })
+
+  it('clamps a month-end (31st) monthly anchor like Postgres make_interval', () => {
+    // base 2026-01-31, monthly, today 2026-05-01: Feb clamps to 28, then the
+    // 31st is RESTORED in March (base-anchored), April clamps to 30. May 31 is
+    // > today, so excluded. Crucially NOT the JS-overflow ['2026-03-03', …].
+    expect(placeholderWaveDates('2026-01-31', 1, '2026-05-01')).toEqual([
+      '2026-02-28',
+      '2026-03-31',
+      '2026-04-30',
+    ])
+  })
+
+  it('does not skip February for a 31st anchor (no month-end overflow)', () => {
+    // base 2026-01-31, today 2026-03-01: only Feb 28 qualifies — must be
+    // 2026-02-28, NOT the overflowed 2026-03-03, and February is not skipped.
+    expect(placeholderWaveDates('2026-01-31', 1, '2026-03-01')).toEqual(['2026-02-28'])
   })
 })
