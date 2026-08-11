@@ -1,3 +1,5 @@
+import { RerunChip } from '@/components/reruns/RerunChip'
+
 const URGENCY_ITEMS = [
   { classes: 'border border-border border-l-4 border-l-red-600', label: 'Overdue' },
   { classes: 'border border-border border-l-4 border-l-orange-500', label: 'Due today' },
@@ -8,7 +10,6 @@ const URGENCY_ITEMS = [
 const TYPE_ITEMS = [
   { classes: 'bg-blue-500/20 text-blue-600 dark:text-blue-400', label: 'PS' },
   { classes: 'bg-violet-500/20 text-violet-600 dark:text-violet-400', label: 'B2B' },
-  { classes: 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400', label: 'Rerun' },
 ]
 
 export function ColorKey() {
@@ -32,6 +33,7 @@ export function ColorKey() {
           {item.label}
         </span>
       ))}
+      <RerunChip className="text-[12px] px-1.5 py-0.5" />
       <span className="text-border">|</span>
       <span className="flex items-center gap-1.5">
         <span className="text-[12px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400">⚑</span>

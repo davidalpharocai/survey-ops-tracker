@@ -57,11 +57,17 @@ export function TopNav() {
   const { data: rerunOverdue = 0 } = useQuery({
     queryKey: ['rerun-overdue-count'],
     queryFn: async () => {
-      const { count } = await createClient()
-        .from('rerun_status')
-        .select('id', { count: 'exact', head: true })
-        .eq('is_overdue', true)
-      return count ?? 0
+      const supabase = createClient()
+      // Count overdue in BOTH rerun models: the legacy sheet mirror (rerun_status)
+      // and the first-class series (rerun_series_status). During the migration a
+      // study can exist in both, so this sum may slightly double-count — that's
+      // an acceptable over-count (never under-count), and it collapses to the
+      // first-class count once the sheet mirror is retired.
+      const [legacy, firstClass] = await Promise.all([
+        supabase.from('rerun_status').select('id', { count: 'exact', head: true }).eq('is_overdue', true),
+        supabase.from('rerun_series_status').select('id', { count: 'exact', head: true }).eq('is_overdue', true),
+      ])
+      return (legacy.count ?? 0) + (firstClass.count ?? 0)
     },
     staleTime: 60_000,
   })

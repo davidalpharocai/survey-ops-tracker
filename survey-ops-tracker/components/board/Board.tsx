@@ -14,6 +14,7 @@ import { useComplianceMaps } from '@/lib/hooks/useComplianceState'
 import { complianceGate } from '@/lib/utils/compliance'
 import { toast } from '@/lib/utils/toast'
 import { boardOrder, sortOrderBetween } from '@/lib/utils/ordering'
+import { isRerunProject } from '@/lib/reruns/isRerun'
 import type { SlimProject } from '@/lib/hooks/useProjects'
 import type { TeamMember } from '@/lib/hooks/useTeamMembers'
 
@@ -45,6 +46,7 @@ export function Board({ projects, teamMembers, onMoveProject, wrapInContext = tr
   const [captainFilter, setCaptainFilter] = useState<string | null>(null)
   const [filterReady, setFilterReady] = useState(false)
   const [salespersonFilter, setSalespersonFilter] = useState<string | null>(null)
+  const [rerunFilter, setRerunFilter] = useState<string | null>(null)
   const [typeFilter, setTypeFilter] = useState<string | null>(null)
   const [dueFilter, setDueFilter] = useState<string | null>(null)
   const [dueFrom, setDueFrom] = useState<string | null>(null)
@@ -87,6 +89,8 @@ export function Board({ projects, teamMembers, onMoveProject, wrapInContext = tr
     const q = search.trim().toLowerCase()
     return projects.filter(p => {
       if (salespersonFilter && p.salesperson !== salespersonFilter) return false
+      if (rerunFilter === 'only' && !isRerunProject(p)) return false
+      if (rerunFilter === 'non' && isRerunProject(p)) return false
       if (captainFilter) {
         if (captainFilter === 'unassigned') {
           if (p.captain != null) return false
@@ -121,12 +125,13 @@ export function Board({ projects, teamMembers, onMoveProject, wrapInContext = tr
       }
       return true
     })
-  }, [projects, captainFilter, salespersonFilter, typeFilter, dueFilter, dueFrom, dueTo, stageFilter, clientFilter, search])
+  }, [projects, captainFilter, salespersonFilter, rerunFilter, typeFilter, dueFilter, dueFrom, dueTo, stageFilter, clientFilter, search])
 
-  const hasActiveFilters = !!(captainFilter || salespersonFilter || typeFilter || dueFilter || stageFilter || clientFilter || search)
+  const hasActiveFilters = !!(captainFilter || salespersonFilter || rerunFilter || typeFilter || dueFilter || stageFilter || clientFilter || search)
   function clearAllFilters() {
     handleCaptainChange(null)
     setSalespersonFilter(null)
+    setRerunFilter(null)
     setTypeFilter(null)
     setDueFilter(null)
     setDueFrom(null)
@@ -167,6 +172,8 @@ export function Board({ projects, teamMembers, onMoveProject, wrapInContext = tr
         client: complianceMaps.clientByFirm.get(firm) ?? null,
         override: moved.compliance_override ?? null,
         submissions: complianceMaps.approvedByProject.get(moved.id) ?? [],
+        rerunNumber: moved.rerun_number,
+        complianceRequiredOverride: moved.compliance_required_override,
       })
       if (gate.blocked) {
         toast(gate.message + ' Open the project to review or override.')
@@ -212,6 +219,7 @@ export function Board({ projects, teamMembers, onMoveProject, wrapInContext = tr
   type BoardViewConfig = {
     captain: string | null
     salesperson?: string | null
+    rerun?: string | null
     type: string | null
     due: string | null
     dueFrom?: string | null
@@ -221,7 +229,14 @@ export function Board({ projects, teamMembers, onMoveProject, wrapInContext = tr
   function applyView(c: BoardViewConfig) {
     handleCaptainChange(c.captain)
     setSalespersonFilter(c.salesperson ?? null)
-    setTypeFilter(c.type)
+    setRerunFilter(c.rerun ?? null)
+    setTypeFilter(c.type ?? null)
+    // Legacy saved views may still carry type: 'Rerun' from before the split —
+    // migrate them to the rerun filter instead of the (now Rerun-less) type one.
+    if (c.type === 'Rerun') {
+      setTypeFilter(null)
+      setRerunFilter('only')
+    }
     setDueFilter(c.due)
     setDueFrom(c.dueFrom ?? null)
     setDueTo(c.dueTo ?? null)
@@ -238,6 +253,8 @@ export function Board({ projects, teamMembers, onMoveProject, wrapInContext = tr
           salespeople={salespeople}
           salespersonFilter={salespersonFilter}
           onSalespersonChange={setSalespersonFilter}
+          rerunFilter={rerunFilter}
+          onRerunChange={setRerunFilter}
           typeFilter={typeFilter}
           dueFilter={dueFilter}
           dueFrom={dueFrom}
@@ -256,9 +273,9 @@ export function Board({ projects, teamMembers, onMoveProject, wrapInContext = tr
         />
         <SavedViews<BoardViewConfig>
           storageKey="sot.savedViews"
-          current={{ captain: captainFilter, salesperson: salespersonFilter, type: typeFilter, due: dueFilter, dueFrom, dueTo, stage: stageFilter }}
+          current={{ captain: captainFilter, salesperson: salespersonFilter, rerun: rerunFilter, type: typeFilter, due: dueFilter, dueFrom, dueTo, stage: stageFilter }}
           onApply={applyView}
-          tooltip="Save the current board filters (captain, type, due, stage) as a named view and jump back in one click. Personal to you. Pick one, then Update / Rename / Delete."
+          tooltip="Save the current board filters (captain, type, rerun, due, stage) as a named view and jump back in one click. Personal to you. Pick one, then Update / Rename / Delete."
         />
       </div>
       {filtered.length === 0 && projects.length > 0 && hasActiveFilters && (

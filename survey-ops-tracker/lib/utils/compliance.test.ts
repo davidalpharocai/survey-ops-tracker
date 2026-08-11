@@ -30,6 +30,35 @@ describe('compliance requirement', () => {
   })
 })
 
+describe('rerun-wave compliance waiver', () => {
+  const strict = client({ compliance_before_fielding: true, compliance_after_fielding: true })
+
+  it('waives a strict client on a rerun wave (rerunNumber >= 2) with no force-required override', () => {
+    expect(beforeFieldingRequired(strict, null, 2, null)).toBe(false)
+    expect(afterFieldingRequired(strict, null, 2, null)).toBe(false)
+  })
+  it('per-WAVE requiredOverride:true forces it back on for a rerun wave', () => {
+    expect(beforeFieldingRequired(strict, null, 2, true)).toBe(true)
+    expect(afterFieldingRequired(strict, null, 2, true)).toBe(true)
+  })
+  it('per-project override:true forces it back on for a rerun wave (wins over the waiver)', () => {
+    expect(beforeFieldingRequired(strict, true, 2, null)).toBe(true)
+    expect(afterFieldingRequired(strict, true, 2, null)).toBe(true)
+  })
+  it('rerunNumber 1 (or absent) is unaffected — still blocks a strict client', () => {
+    expect(beforeFieldingRequired(strict, null, 1, null)).toBe(true)
+    expect(afterFieldingRequired(strict, null, 1, null)).toBe(true)
+    expect(beforeFieldingRequired(strict, null, undefined, null)).toBe(true)
+    expect(afterFieldingRequired(strict, null, undefined, null)).toBe(true)
+  })
+  it('override:false always skips, on any wave, regardless of requiredOverride', () => {
+    expect(beforeFieldingRequired(strict, false, 1, true)).toBe(false)
+    expect(afterFieldingRequired(strict, false, 1, true)).toBe(false)
+    expect(beforeFieldingRequired(strict, false, 2, true)).toBe(false)
+    expect(afterFieldingRequired(strict, false, 2, true)).toBe(false)
+  })
+})
+
 describe('requirement met', () => {
   it('met only when an approved submission of that phase exists', () => {
     expect(beforeFieldingMet([sub('before_fielding', 'approved')])).toBe(true)
@@ -63,5 +92,19 @@ describe('complianceGate', () => {
   it('never blocks when nothing is required', () => {
     const g = complianceGate({ targetColumn: 'Delivery', willMarkDelivered: true, client: client(), override: null, submissions: [] })
     expect(g.blocked).toBe(false)
+  })
+  it('waives the gate on a rerun wave even for a strict client with no approval', () => {
+    const g = complianceGate({
+      targetColumn: 'Fielding', willMarkDelivered: false, client: reqBoth, override: null, submissions: [], rerunNumber: 2,
+    })
+    expect(g.blocked).toBe(false)
+  })
+  it('per-wave complianceRequiredOverride forces the gate back on for a rerun wave', () => {
+    const g = complianceGate({
+      targetColumn: 'Fielding', willMarkDelivered: false, client: reqBoth, override: null, submissions: [],
+      rerunNumber: 2, complianceRequiredOverride: true,
+    })
+    expect(g.blocked).toBe(true)
+    expect(g.phase).toBe('before_fielding')
   })
 })

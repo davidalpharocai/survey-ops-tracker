@@ -11,6 +11,7 @@ import { PipelineSpine } from '@/components/project/PipelineSpine'
 import { ScopingSpine } from '@/components/project/ScopingSpine'
 import { WaveHistory } from '@/components/project/WaveHistory'
 import { CloneProjectModal } from '@/components/project/CloneProjectModal'
+import { PutIntoRerunServiceModal } from '@/components/project/PutIntoRerunServiceModal'
 import { OverviewFieldGrid } from '@/components/project/OverviewFieldGrid'
 import { ActivityLog } from '@/components/project/ActivityLog'
 import { DataChangeLog } from '@/components/project/DataChangeLog'
@@ -31,6 +32,8 @@ import { DeliverablesPanel } from '@/components/deliverables/DeliverablesPanel'
 import { salespersonOptions } from '@/lib/utils/salespeople'
 import { MergeButton } from '@/components/merge/MergeButton'
 import { ProjectSummaryStrip } from '@/components/project/summary/ProjectSummaryStrip'
+import { isRerunProject } from '@/lib/reruns/isRerun'
+import { RerunChip } from '@/components/reruns/RerunChip'
 
 type ActiveTab = 'overview' | 'insights' | 'activity' | 'compliance' | 'deliverables' | 'links' | 'logs'
 
@@ -73,7 +76,6 @@ const TOOLTIPS: Record<string, string> = {
 const TYPE_BADGE: Record<string, string> = {
   'PS': 'bg-blue-500/20 text-blue-600 dark:text-blue-400',
   'B2B': 'bg-violet-500/20 text-violet-600 dark:text-violet-400',
-  'Rerun': 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400',
 }
 
 // Rewrite a web ".../archives/<CHANNEL>" Slack link into a slack:// deep link so
@@ -114,6 +116,7 @@ export default function ProjectDetailPage() {
   const [cloning, setCloning] = useState(false)
   const [merging, setMerging] = useState(false)
   const [cancelling, setCancelling] = useState(false)
+  const [puttingIntoService, setPuttingIntoService] = useState(false)
   const [actionsOpen, setActionsOpen] = useState(false)
   const actionsRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -153,8 +156,8 @@ export default function ProjectDetailPage() {
   )
   const showCompliance =
     !!compliance.data &&
-    (beforeFieldingRequired(compliance.data.client, compliance.data.override) ||
-      afterFieldingRequired(compliance.data.client, compliance.data.override) ||
+    (beforeFieldingRequired(compliance.data.client, compliance.data.override, project?.rerun_number, project?.compliance_required_override) ||
+      afterFieldingRequired(compliance.data.client, compliance.data.override, project?.rerun_number, project?.compliance_required_override) ||
       compliance.data.submissions.length > 0)
 
   // Mark the project as seen by the current user on every visit — this is
@@ -281,7 +284,8 @@ export default function ProjectDetailPage() {
             {project.project_code}
           </span>
         )}
-        <EditableType value={project.project_type} onSave={v => updateProject.mutate({ id, updates: { project_type: v as 'PS' | 'B2B' | 'Rerun' } })} />
+        <EditableType value={project.project_type} onSave={v => updateProject.mutate({ id, updates: { project_type: v as 'PS' | 'B2B' } })} />
+        {isRerunProject(project) && <RerunChip />}
         <span
           className={`text-xs px-2 py-1 rounded ${
             project.status === 'Open'
@@ -369,6 +373,24 @@ export default function ProjectDetailPage() {
                 >
                   <span aria-hidden="true">⧉</span> Merge with a duplicate…
                 </button>
+                {project.series_id ? (
+                  <Link
+                    href={`/reruns/series/${project.series_id}`}
+                    onClick={() => setActionsOpen(false)}
+                    title="Open this survey's first-class rerun series record"
+                    className="flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm text-foreground/90 hover:bg-accent transition-colors text-left w-full"
+                  >
+                    <span aria-hidden="true">↻</span> View rerun series
+                  </Link>
+                ) : (
+                  <button
+                    onClick={() => { setActionsOpen(false); setPuttingIntoService(true) }}
+                    title="Start a cadence: this project becomes Wave 1 of a new rerun series that spawns future waves for you"
+                    className="flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm text-foreground/90 hover:bg-accent transition-colors text-left w-full"
+                  >
+                    <span aria-hidden="true">↻</span> Put into rerun service
+                  </button>
+                )}
                 <div className="border-t border-border my-1" />
                 <div className="px-2.5 py-1">
                   {'co_captain_ids' in project && (
@@ -482,6 +504,21 @@ export default function ProjectDetailPage() {
           sourceName={project.project_name}
           sourceCode={project.project_code}
           onClose={() => setCloning(false)}
+        />
+      )}
+
+      {puttingIntoService && (
+        <PutIntoRerunServiceModal
+          project={{
+            id: project.id,
+            project_name: project.project_name,
+            project_code: project.project_code,
+            project_type: project.project_type,
+            client: project.client,
+            rerun_date: project.rerun_date,
+            launch_date: project.launch_date,
+          }}
+          onClose={() => setPuttingIntoService(false)}
         />
       )}
 
@@ -918,21 +955,25 @@ function EditableType({ value, onSave }: { value: string | null; onSave: (next: 
         <option value="" disabled>Type…</option>
         <option value="PS">PS</option>
         <option value="B2B">B2B</option>
-        <option value="Rerun">Rerun</option>
       </select>
     )
   }
   // Badge-dropdown: sized like the status pill (text-xs px-2 py-1 rounded),
   // tinted by type via TYPE_BADGE, with a ▾ caret signalling it opens options.
+  // 'Rerun' is no longer a valid type (it's the separate ↻ chip) — a legacy
+  // project_type='Rerun' row reads as unset here rather than showing the raw
+  // string, which would otherwise duplicate the teal chip next to it, and
+  // nudges the user to classify it as PS/B2B instead.
+  const typed = value === 'PS' || value === 'B2B' ? value : null
   return (
     <button
       onClick={() => setEditing(true)}
       title="Click to change project type"
       className={`text-xs px-2 py-1 rounded cursor-pointer hover:opacity-80 transition-opacity inline-flex items-center gap-1 ${
-        value ? (TYPE_BADGE[value] ?? 'bg-muted text-muted-foreground') : 'border border-dashed border-border text-muted-foreground'
+        typed ? TYPE_BADGE[typed] : 'border border-dashed border-border text-muted-foreground'
       }`}
     >
-      {value ?? '+ type'}
+      {typed ?? '+ type'}
       <span aria-hidden="true" className="text-[9px] opacity-70">▾</span>
     </button>
   )

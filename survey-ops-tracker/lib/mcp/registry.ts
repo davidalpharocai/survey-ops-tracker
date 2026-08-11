@@ -37,6 +37,10 @@ import * as health from '@/lib/mcp/health'
 const REPORT_BASE = 'https://survey-ops-tracker.vercel.app'
 import { cloneProject } from '@/lib/server/clone'
 import {
+  cadenceToMonths, createSeriesFromProject, setSeriesDefaults,
+  pauseSeries, endSeries, resumeSeries, spawnNextWave,
+} from '@/lib/reruns/seriesOps'
+import {
   confirmable, describeChanges, fmtChangeVal, fieldLabel, describeUnrevertible, todayEastern, fetchDocTitle,
   DUE_DATE_RE, CLIENT_WRITE_FIELDS, CONTACT_WRITE_FIELDS,
 } from '@/lib/mcp/toolHelpers'
@@ -245,6 +249,288 @@ export const TOOLS: AssistantTool[] = [
     handler: async (rawArgs, ctx) => {
       const args = rawArgs as { mine?: boolean }
       return data.rerunRadar({ ownerEmail: args.mine ? ctx.userEmail : undefined })
+    },
+  },
+
+  // -------------------------------------------------------------------------
+  // reruns: first-class rerun_series model (migration 073). search/report/ask
+  // are reads; the lifecycle tools below are confirmable writes. The new model
+  // is the source of truth; rerun_radar unions it with the legacy sheet mirror.
+  // -------------------------------------------------------------------------
+  {
+    name: 'search_reruns',
+    description:
+      "Search first-class rerun series (the new source of truth for recurring/longitudinal studies) by client / survey name, with optional filters: base_type (PS/B2B), status (in_service / paused / ended / overdue), and owner. Pass mine:true to scope to the reruns you own. Each hit returns the series id, client, survey name, cadence, service mode, whether it's in service / paused / overdue, the owner, and the next due date. Use for “which reruns are overdue / paused / in service”, “list this client's reruns”. For a single triage of what's due this week/month use rerun_calendar; for one series' waves use get_rerun_series.",
+    kind: 'read',
+    schema: {
+      query: z.string().optional(),
+      client: z.string().optional(),
+      base_type: z.enum(['PS', 'B2B']).optional(),
+      status: z.enum(['in_service', 'paused', 'ended', 'overdue']).optional(),
+      owner: z.string().optional(),
+      mine: z.boolean().optional(),
+      limit: z.number().optional(),
+    },
+    handler: async (rawArgs, ctx) => {
+      const args = rawArgs as {
+        query?: string; client?: string; base_type?: 'PS' | 'B2B'
+        status?: 'in_service' | 'paused' | 'ended' | 'overdue'; owner?: string; mine?: boolean; limit?: number
+      }
+      return data.searchReruns({ ...args, userEmail: ctx.userEmail })
+    },
+  },
+  {
+    name: 'get_rerun_series',
+    description:
+      "Get one rerun series' detail plus all its waves (each wave is a normal survey project: code, dates, N target/collected/actual, survey-tool id, stage/status), ordered by wave number. Identify the series by its id (from search_reruns / rerun_calendar) or by a client / survey-name query. Use for “show me the <survey> rerun series”, “how many waves has <survey> had”, “what's the history of this rerun”.",
+    kind: 'read',
+    schema: { series: z.string() },
+    handler: async (rawArgs) => {
+      const args = rawArgs as { series: string }
+      const resolved = await data.resolveRerunSeries(args.series)
+      if (resolved === null) return { error: `No rerun series found matching "${args.series}".` }
+      if ('ambiguous' in resolved) {
+        return { note: 'Multiple rerun series match — specify the series id.', candidates: resolved.ambiguous }
+      }
+      return data.getRerunSeries(resolved.id)
+    },
+  },
+  {
+    name: 'rerun_calendar',
+    description:
+      "Reruns due within a window, bucketed relative to today (America/New_York): overdue, due within the window, and upcoming (beyond it). window is week (default) / month / quarter. Only in-service, non-paused series are considered. Pass mine:true to scope to the reruns you own. Use for “what reruns are due this week / this month / this quarter”.",
+    kind: 'read',
+    schema: { window: z.enum(['week', 'month', 'quarter']).optional(), mine: z.boolean().optional() },
+    handler: async (rawArgs, ctx) => {
+      const args = rawArgs as { window?: 'week' | 'month' | 'quarter'; mine?: boolean }
+      return data.rerunCalendar({ ...args, userEmail: ctx.userEmail })
+    },
+  },
+  {
+    name: 'put_in_rerun_service',
+    description:
+      "Put a project into rerun service — promote it to Wave 1 of a new first-class rerun series so future waves are tracked (and auto-spawned in 'auto' mode). Needs the project, its base_type (PS/B2B), and a cadence (monthly / quarterly / semiannual / yearly / adhoc — adhoc = no fixed cadence). Optional service_mode (auto = spawn automatically, manual = create each wave by hand; default auto) and delivery_cadence note. Preview first; confirm to apply.",
+    kind: 'write',
+    schema: {
+      project: z.string(),
+      base_type: z.enum(['PS', 'B2B']),
+      cadence: z.enum(['monthly', 'quarterly', 'semiannual', 'yearly', 'adhoc']),
+      service_mode: z.enum(['auto', 'manual']).optional(),
+      delivery_cadence: z.string().optional(),
+      confirm: z.boolean().optional(),
+    },
+    handler: async (rawArgs, ctx, meta) => {
+      const args = rawArgs as {
+        project: string; base_type: 'PS' | 'B2B'
+        cadence: 'monthly' | 'quarterly' | 'semiannual' | 'yearly' | 'adhoc'
+        service_mode?: 'auto' | 'manual'; delivery_cadence?: string; confirm?: boolean
+      }
+      const { userEmail } = ctx
+      const p = await resolveProjectWritable(args.project)
+      if (!p) return { error: 'Project not found.' }
+      if ('error' in p) return p
+      if ('ambiguous' in p) return p
+      meta.project_id = p.id as string
+      // Re-promotion guard: createSeriesFromProject sweeps a legacy
+      // rerun_series_id lineage but NOT an existing first-class series_id, so
+      // promoting an already-in-service project would mint a DUPLICATE series.
+      if (p.series_id) {
+        return { error: 'This project is already in a rerun series.', series_id: p.series_id as string }
+      }
+      const serviceMode = args.service_mode ?? 'auto'
+      const cadenceMonths = cadenceToMonths(args.cadence)
+      return confirmable(
+        args,
+        async () => ({
+          summary: `Put ${p.project_code} into ${args.cadence} rerun service (${args.base_type}, ${serviceMode})`,
+        }),
+        async () => {
+          const admin = createAdminClient()
+          const { series, waves } = await createSeriesFromProject(
+            admin,
+            {
+              projectId: p.id as string,
+              base_type: args.base_type,
+              cadence_months: cadenceMonths,
+              service_mode: serviceMode,
+              delivery_cadence: args.delivery_cadence ?? null,
+            },
+            `${userEmail} via Claude`
+          )
+          meta.detail = { created_series: { id: series.id, base_type: args.base_type, cadence: args.cadence, service_mode: serviceMode } }
+          return { ok: true, series_id: series.id, client: series.client, survey_name: series.survey_name, wave_count: waves.length }
+        }
+      )
+    },
+  },
+  {
+    name: 'set_rerun_defaults',
+    description:
+      "Set the defaults every FUTURE wave of a rerun series inherits — N target, audience, money model, template, and the per-series compliance-required override. Only the fields you pass are changed; the rest are left as-is. Identify the series by id or a client / survey-name query. Preview first; confirm to apply.",
+    kind: 'write',
+    schema: {
+      series: z.string(),
+      n_target: z.number().optional(),
+      audience: z.string().optional(),
+      money_model: z.string().optional(),
+      template_id: z.string().optional(),
+      compliance_required_override: z.boolean().optional(),
+      confirm: z.boolean().optional(),
+    },
+    handler: async (rawArgs, ctx, meta) => {
+      const args = rawArgs as {
+        series: string; n_target?: number; audience?: string; money_model?: string
+        template_id?: string; compliance_required_override?: boolean; confirm?: boolean
+      }
+      const { userEmail } = ctx
+      const resolved = await data.resolveSeriesForWrite(args.series)
+      if ('error' in resolved) return resolved
+      if ('note' in resolved) return resolved
+      const { seriesId, label, series: statusRow } = resolved
+      const admin = createAdminClient()
+      const provided: Record<string, unknown> = {}
+      if (args.n_target !== undefined) provided.n_target = args.n_target
+      if (args.audience !== undefined) provided.audience = args.audience
+      if (args.money_model !== undefined) provided.money_model = args.money_model
+      if (args.template_id !== undefined) provided.template_id = args.template_id
+      if (args.compliance_required_override !== undefined) provided.compliance_required_override = args.compliance_required_override
+      if (Object.keys(provided).length === 0) {
+        return { needs: 'a change', message: 'Specify at least one default to set: n_target, audience, money_model, template_id, or compliance_required_override.' }
+      }
+      const merged = { ...((statusRow.future_defaults ?? {}) as Record<string, unknown>), ...provided }
+      const changeDesc = Object.entries(provided).map(([k, v]) => `${k} → ${v ?? '—'}`).join(', ')
+      return confirmable(
+        args,
+        async () => ({ summary: `Set rerun defaults for ${label}: ${changeDesc}`, changes: provided }),
+        async () => {
+          const { series } = await setSeriesDefaults(admin, seriesId, merged, `${userEmail} via Claude`)
+          meta.detail = { series_id: seriesId, defaults: provided }
+          return { ok: true, series_id: series.id, future_defaults: series.future_defaults }
+        }
+      )
+    },
+  },
+  {
+    name: 'pause_rerun',
+    description:
+      "Pause a rerun series — auto-spawn stops and it drops off the due calendar until resumed. Identify the series by id or a client / survey-name query. If a next wave was already spawned but hasn't started fielding, the preview flags it; pass cancel_pending:true to cancel that wave too (else it's left as-is). Preview first; confirm to apply.",
+    kind: 'write',
+    schema: { series: z.string(), cancel_pending: z.boolean().optional(), confirm: z.boolean().optional() },
+    handler: async (rawArgs, ctx, meta) => {
+      const args = rawArgs as { series: string; cancel_pending?: boolean; confirm?: boolean }
+      const { userEmail } = ctx
+      const resolved = await data.resolveSeriesForWrite(args.series)
+      if ('error' in resolved) return resolved
+      if ('note' in resolved) return resolved
+      const { seriesId, label } = resolved
+      const admin = createAdminClient()
+      return confirmable(
+        args,
+        async () => {
+          const dry = await pauseSeries(admin, seriesId, { dryRun: true }, `${userEmail} via Claude`)
+          const pw = dry.pendingWave
+          return {
+            summary:
+              `Pause rerun service for ${label}` +
+              (pw ? ` — a pending un-fielded wave (${pw.project_code ?? pw.project_name}) exists; pass cancel_pending:true to cancel it too, else it's left as-is` : ''),
+            pending_wave: pw,
+          }
+        },
+        async () => {
+          const { series, pendingWave } = await pauseSeries(admin, seriesId, { cancelPending: args.cancel_pending === true }, `${userEmail} via Claude`)
+          meta.detail = { series_id: seriesId, action: 'pause', cancelled_pending: args.cancel_pending === true && !!pendingWave }
+          return { ok: true, series_id: series?.id, paused: series?.paused, pending_wave: pendingWave }
+        }
+      )
+    },
+  },
+  {
+    name: 'resume_rerun',
+    description:
+      "Resume a paused rerun series — auto-spawn restarts and it rejoins the due calendar. The next due date is rebased off today so it isn't instantly overdue. Identify the series by id or a client / survey-name query. Preview first; confirm to apply.",
+    kind: 'write',
+    schema: { series: z.string(), confirm: z.boolean().optional() },
+    handler: async (rawArgs, ctx, meta) => {
+      const args = rawArgs as { series: string; confirm?: boolean }
+      const { userEmail } = ctx
+      const resolved = await data.resolveSeriesForWrite(args.series)
+      if ('error' in resolved) return resolved
+      if ('note' in resolved) return resolved
+      const { seriesId, label } = resolved
+      const admin = createAdminClient()
+      return confirmable(
+        args,
+        async () => ({ summary: `Resume rerun service for ${label}` }),
+        async () => {
+          const { series } = await resumeSeries(admin, seriesId, `${userEmail} via Claude`)
+          meta.detail = { series_id: seriesId, action: 'resume' }
+          return { ok: true, series_id: series.id, paused: series.paused }
+        }
+      )
+    },
+  },
+  {
+    name: 'end_rerun',
+    description:
+      "End a rerun series — it's taken out of service permanently (no more waves, off the due calendar). Use resume_rerun for a temporary stop instead. Identify the series by id or a client / survey-name query. If a next wave was already spawned but hasn't started fielding, the preview flags it; pass cancel_pending:true to cancel that wave too. Preview first; confirm to apply.",
+    kind: 'write',
+    schema: { series: z.string(), cancel_pending: z.boolean().optional(), confirm: z.boolean().optional() },
+    handler: async (rawArgs, ctx, meta) => {
+      const args = rawArgs as { series: string; cancel_pending?: boolean; confirm?: boolean }
+      const { userEmail } = ctx
+      const resolved = await data.resolveSeriesForWrite(args.series)
+      if ('error' in resolved) return resolved
+      if ('note' in resolved) return resolved
+      const { seriesId, label } = resolved
+      const admin = createAdminClient()
+      return confirmable(
+        args,
+        async () => {
+          const dry = await endSeries(admin, seriesId, { dryRun: true }, `${userEmail} via Claude`)
+          const pw = dry.pendingWave
+          return {
+            summary:
+              `End rerun service for ${label}` +
+              (pw ? ` — a pending un-fielded wave (${pw.project_code ?? pw.project_name}) exists; pass cancel_pending:true to cancel it too, else it's left as-is` : ''),
+            pending_wave: pw,
+          }
+        },
+        async () => {
+          const { series, pendingWave } = await endSeries(admin, seriesId, { cancelPending: args.cancel_pending === true }, `${userEmail} via Claude`)
+          meta.detail = { series_id: seriesId, action: 'end', cancelled_pending: args.cancel_pending === true && !!pendingWave }
+          return { ok: true, series_id: series?.id, in_service: series?.in_service, pending_wave: pendingWave }
+        }
+      )
+    },
+  },
+  {
+    name: 'create_next_wave',
+    description:
+      "Manually create (spawn) the next wave of a rerun series now — the new wave inherits the series' future defaults (N target, audience, captain, etc.) with run data reset. This also arms auto-spawn going forward. Identify the series by id or a client / survey-name query. If a wave can't be created (e.g. one is already pending), the result explains why. Preview first; confirm to apply.",
+    kind: 'write',
+    schema: { series: z.string(), confirm: z.boolean().optional() },
+    handler: async (rawArgs, ctx, meta) => {
+      const args = rawArgs as { series: string; confirm?: boolean }
+      const { userEmail } = ctx
+      const resolved = await data.resolveSeriesForWrite(args.series)
+      if ('error' in resolved) return resolved
+      if ('note' in resolved) return resolved
+      const { seriesId, label, series: statusRow } = resolved
+      const admin = createAdminClient()
+      const nextNo = statusRow.next_wave_no
+      return confirmable(
+        args,
+        async () => ({ summary: `Create wave ${nextNo} for ${label} now` }),
+        async () => {
+          const { series, spawn } = await spawnNextWave(admin, seriesId, `${userEmail} via Claude`)
+          meta.detail = { series_id: seriesId, action: 'create_next_wave', spawn }
+          if (!spawn.created) return { ok: false, series_id: series.id, skipped: true, reason: spawn.reason }
+          // Link the audit/telemetry row to the newly-created wave (consistent
+          // with the other project-scoped writes).
+          if (spawn.waveId) meta.project_id = spawn.waveId
+          return { ok: true, series_id: series.id, wave: { id: spawn.waveId, name: spawn.waveName } }
+        }
+      )
     },
   },
   {
@@ -1390,6 +1676,7 @@ export const TOOLS: AssistantTool[] = [
       const gate = complianceGate({
         targetColumn: stage.board_column, willMarkDelivered,
         client: gi.client, override: gi.override, submissions: gi.submissions,
+        rerunNumber: gi.rerunNumber ?? undefined, complianceRequiredOverride: gi.complianceRequiredOverride,
       })
       if (gate.blocked && !args.override_reason) return { blocked: true, gate: 'compliance', reason: gate.message }
 

@@ -13,6 +13,8 @@ import { isStale } from '@/lib/utils/stale'
 import { NProgressBar } from '@/components/shared/NProgressBar'
 import type { SlimProject } from '@/lib/hooks/useProjects'
 import { useLatestSubmissionStatuses } from '@/lib/hooks/useSubmissions'
+import { isRerunProject } from '@/lib/reruns/isRerun'
+import { RerunChip } from '@/components/reruns/RerunChip'
 
 // Due-date urgency: a neutral card box plus a strong colored LEFT bar (so a
 // board full of overdue cards doesn't become an undifferentiated wall of red).
@@ -30,13 +32,11 @@ const BADLY_OVERDUE_BORDER = 'border-2 border-red-500 border-l-4 border-l-red-60
 const TYPE_BADGE: Record<string, string> = {
   'PS': 'bg-blue-500/20 text-blue-600 dark:text-blue-400',
   'B2B': 'bg-violet-500/20 text-violet-600 dark:text-violet-400',
-  'Rerun': 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400',
 }
 
 const TYPE_TITLE: Record<string, string> = {
   'PS': 'PureSpectrum — consumer panel via the PureSpectrum tool',
   'B2B': 'B2B — expert/business panel',
-  'Rerun': 'Rerun — repeat wave of an earlier study',
 }
 
 const PRIORITY_CHIP: Record<string, { symbol: string; classes: string; label: string }> = {
@@ -165,7 +165,7 @@ export function ProjectCard({ project, onClick, isNew }: ProjectCardProps) {
               {priorityChip.symbol}
             </span>
           )}
-          {project.project_type && (
+          {(project.project_type === 'PS' || project.project_type === 'B2B') && (
             <span
               className={`text-[12px] px-2 py-0.5 rounded ${TYPE_BADGE[project.project_type] ?? ''}`}
               title={TYPE_TITLE[project.project_type]}
@@ -173,6 +173,7 @@ export function ProjectCard({ project, onClick, isNew }: ProjectCardProps) {
               {project.project_type}
             </span>
           )}
+          {isRerunProject(project) && <RerunChip className="text-[12px] px-2 py-0.5" />}
           {complianceStatus && (
             <span
               title={`Compliance: ${complianceStatus.replace('_', ' ')}`}

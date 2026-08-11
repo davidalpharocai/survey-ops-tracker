@@ -65,6 +65,8 @@ interface BoardFiltersProps {
   salespeople?: string[]
   salespersonFilter?: string | null
   onSalespersonChange?: (s: string | null) => void
+  rerunFilter?: string | null
+  onRerunChange?: (v: string | null) => void
   typeFilter: string | null
   dueFilter: string | null
   dueFrom: string | null
@@ -89,6 +91,8 @@ export function BoardFilters({
   salespeople = [],
   salespersonFilter = null,
   onSalespersonChange,
+  rerunFilter = null,
+  onRerunChange,
   typeFilter,
   dueFilter,
   dueFrom,
@@ -132,7 +136,7 @@ export function BoardFilters({
       ? 'Unassigned'
       : captains.find(c => c.id === captainFilter)?.name ?? '—'
     : null
-  const activeCount = [captainFilter, salespersonFilter, clientFilter, typeFilter, dueFilter, stageFilter].filter(
+  const activeCount = [captainFilter, salespersonFilter, rerunFilter, clientFilter, typeFilter, dueFilter, stageFilter].filter(
     Boolean
   ).length
   const anyActive = activeCount > 0 || !!search
@@ -145,6 +149,7 @@ export function BoardFilters({
   function clearAll() {
     onCaptainChange(null)
     onSalespersonChange?.(null)
+    onRerunChange?.(null)
     onClientChange(null)
     onTypeChange(null)
     clearDue()
@@ -160,7 +165,7 @@ export function BoardFilters({
           <button
             onClick={() => setOpen(o => !o)}
             aria-expanded={open}
-            title="Filter the board by captain, client, type, due date, or stage"
+            title="Filter the board by captain, client, type, rerun status, due date, or stage"
             className="inline-flex items-center gap-1.5 text-xs bg-muted border border-border text-foreground/80 rounded-lg px-3 py-1.5 hover:border-ring transition-colors"
           >
             <span aria-hidden="true">⧩</span> Filters
@@ -226,7 +231,7 @@ export function BoardFilters({
                   <option value={NEW_CLIENT_VALUE}>+ New Client</option>
                 </select>
               </Field>
-              <Field label="Type" tooltip="Filter by project type: PS (PureSpectrum consumer panel), B2B (expert/business panel), or Rerun (repeat wave of an earlier study).">
+              <Field label="Type" tooltip="Filter by base survey type: PS (PureSpectrum consumer panel) or B2B (expert/business panel).">
                 <select
                   value={typeFilter ?? ''}
                   onChange={e => onTypeChange(e.target.value || null)}
@@ -235,9 +240,21 @@ export function BoardFilters({
                   <option value="">All Types</option>
                   <option value="PS">PS</option>
                   <option value="B2B">B2B</option>
-                  <option value="Rerun">Rerun</option>
                 </select>
               </Field>
+              {onRerunChange && (
+                <Field label="Rerun" tooltip="Show reruns only, non-reruns only, or all. A rerun is any wave in a rerun series (or a later wave of a study).">
+                  <select
+                    value={rerunFilter ?? ''}
+                    onChange={e => onRerunChange(e.target.value || null)}
+                    className={`${SELECT_CLASSES} w-full`}
+                  >
+                    <option value="">All projects</option>
+                    <option value="only">Reruns only</option>
+                    <option value="non">Non-reruns</option>
+                  </select>
+                </Field>
+              )}
               <Field label="Due" tooltip="Filter by due date — a preset window, or a custom range.">
                 <select
                   value={dueFilter ?? ''}
@@ -299,6 +316,7 @@ export function BoardFilters({
         {salespersonFilter && <Chip label={`Sales: ${salespersonFilter}`} onClear={() => onSalespersonChange?.(null)} />}
         {clientFilter && <Chip label={`Client: ${clientFilter}`} onClear={() => onClientChange(null)} />}
         {typeFilter && <Chip label={`Type: ${typeFilter}`} onClear={() => onTypeChange(null)} />}
+        {rerunFilter && <Chip label={rerunFilter === 'only' ? 'Reruns only' : 'Non-reruns'} onClear={() => onRerunChange?.(null)} />}
         {dueFilter && <Chip label={`Due: ${DUE_LABELS[dueFilter] ?? dueFilter}`} onClear={clearDue} />}
         {stageFilter && <Chip label={`Stage: ${stageFilter}`} onClear={() => onStageChange(null)} />}
 

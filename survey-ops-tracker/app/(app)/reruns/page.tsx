@@ -3,12 +3,15 @@ import { Caret } from '@/components/shared/Caret'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useReruns, useSyncReruns, type RerunRow } from '@/lib/hooks/useReruns'
+import { useRerunSeriesList } from '@/lib/hooks/useRerunSeriesRecord'
 import { useProjects } from '@/lib/hooks/useProjects'
 import { useCurrentMember } from '@/lib/hooks/useCurrentMember'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
 import { Skeleton } from '@/components/shared/Skeleton'
 import { RerunMetaEditor } from '@/components/reruns/RerunMetaEditor'
 import { RerunReviewBanner } from '@/components/reruns/RerunReviewBanner'
+import { RerunMonthView } from '@/components/reruns/RerunMonthView'
+import { OverdueStrip } from '@/components/reruns/OverdueStrip'
 import { formatDate, daysOverdue } from '@/lib/utils/date'
 import { isTypingTarget } from '@/lib/utils/keyboard'
 import { toast } from '@/lib/utils/toast'
@@ -26,6 +29,12 @@ const cadenceLabel = (m: number | null): string | null =>
 type Bucket = 'overdue' | 'upcoming' | 'done' | 'unsorted'
 type SortKey = 'smart' | 'client' | 'n'
 const SORT_KEY = 'sot.rerunsSort'
+
+// Which top-level view is showing. Month (first-class model) is primary; the
+// legacy sheet-mirror Radar is demoted behind the toggle. Persisted so a
+// return visit lands where you left off.
+type RerunsView = 'month' | 'radar'
+const VIEW_KEY = 'sot.rerunsView'
 
 // Buckets read the view's computed flags (the "nothing-missed" logic lives in
 // SQL, shared with the badge + digest). is_overdue already ignores a completed
@@ -438,7 +447,11 @@ function Seg<T extends string>({
   )
 }
 
-export default function RerunsPage() {
+// The legacy sheet-mirror "Rerun Radar" — the whole original page body, moved
+// behind the Radar toggle and relabelled read-only. Nothing here changed except
+// the outer page shell (title / tablist / max-w wrapper) which the new
+// RerunsPage below now owns.
+function LegacyRadar() {
   const { data: rows = [], isLoading, error } = useReruns()
   const [q, setQ] = useState('')
   const [work, setWork] = useState<'all' | 'Cadence' | 'Ad-Hoc'>('all')
@@ -553,7 +566,7 @@ export default function RerunsPage() {
 
   if (isLoading) {
     return (
-      <div className="max-w-5xl mx-auto flex flex-col gap-4">
+      <div className="flex flex-col gap-4">
         <Skeleton className="h-8 w-52" />
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {Array.from({ length: 4 }).map((_, i) => (
@@ -575,8 +588,7 @@ export default function RerunsPage() {
 
   if (error) {
     return (
-      <div className="max-w-5xl mx-auto">
-        <h1 className="text-2xl font-bold text-foreground mb-2">Rerun Radar</h1>
+      <div>
         <p className="text-sm text-destructive">Couldn’t load reruns: {String((error as Error).message)}</p>
         <p className="text-sm text-muted-foreground mt-2">
           If this is the first run, the mirror may not be synced yet — trigger a sync from the sheet.
@@ -598,13 +610,14 @@ export default function RerunsPage() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto flex flex-col gap-4">
-      <div className="flex items-center gap-1 text-sm" role="tablist" aria-label="Reruns views">
-        <span className="px-3 py-1 rounded-lg bg-accent text-foreground font-medium" title="Sree’s rerun tracker, bucketed by overdue / upcoming / done">Radar</span>
-        <Link href="/reruns/series" className="px-3 py-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors" title="Every rerun series — see and reorganize waves">Series</Link>
-      </div>
+    <div className="flex flex-col gap-4">
       <div>
-        <h1 className="text-2xl font-bold text-foreground">Rerun Radar</h1>
+        <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
+          Rerun Radar
+          <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground border border-border font-normal">
+            legacy (migrating) · read-only
+          </span>
+        </h2>
         <p className="text-sm text-muted-foreground mt-0.5">
           {total === 0 ? (
             'Sree’s rerun tracker, read as overdue / upcoming / done.'
@@ -854,6 +867,90 @@ export default function RerunsPage() {
             </>
           )}
         </>
+      )}
+    </div>
+  )
+}
+
+// The /reruns shell. The first-class rerun_series model is primary: a persistent
+// "needs action" strip + a Month grid by default. The legacy sheet-mirror Radar
+// is one toggle away, clearly marked. The Series list stays a separate link.
+export default function RerunsPage() {
+  const [view, setView] = useState<RerunsView>('month')
+  const { data: firstClassSeries = [], isLoading: fcLoading, error: fcError } = useRerunSeriesList()
+
+  // Hydrate the saved view client-side (default 'month'), so SSR always renders
+  // the default and there's no hydration mismatch — same pattern as the sort key.
+  useEffect(() => {
+    try {
+      const v = localStorage.getItem(VIEW_KEY)
+      if (v === 'month' || v === 'radar') setView(v)
+    } catch {
+      /* default is fine */
+    }
+  }, [])
+  function changeView(v: RerunsView) {
+    setView(v)
+    try {
+      localStorage.setItem(VIEW_KEY, v)
+    } catch {
+      /* ignore */
+    }
+  }
+
+  return (
+    <div className="max-w-5xl mx-auto flex flex-col gap-4">
+      {/* View switcher — Month (first-class) | Radar (legacy) + the Series link */}
+      <div className="flex items-center gap-2 flex-wrap text-sm">
+        <Seg
+          label="Reruns view"
+          value={view}
+          onChange={changeView}
+          options={[
+            { v: 'month', label: 'Month' },
+            { v: 'radar', label: 'Radar (legacy)' },
+          ]}
+        />
+        <Link
+          href="/reruns/series"
+          className="px-3 py-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+          title="Every rerun series — see and reorganize waves"
+        >
+          Series ↗
+        </Link>
+      </div>
+
+      <div>
+        <h1 className="text-2xl font-bold text-foreground">Reruns</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">
+          Scheduled reruns on a month grid, plus anything needing action now. Switch to Radar for the legacy sheet mirror.
+        </p>
+      </div>
+
+      {/* Pinned needs-action strip (always shown) */}
+      {fcError ? (
+        <div className="bg-card border border-border rounded-xl p-3 text-sm text-destructive">
+          Couldn’t load rerun series: {(fcError as Error).message}
+        </div>
+      ) : fcLoading ? (
+        <Skeleton className="h-16 w-full rounded-xl" />
+      ) : (
+        <OverdueStrip series={firstClassSeries} />
+      )}
+
+      {/* Selected view */}
+      {view === 'month' ? (
+        fcError ? (
+          <div className="bg-card border border-border rounded-xl p-6 text-sm text-muted-foreground text-center">
+            Couldn’t load reruns.
+          </div>
+        ) : fcLoading ? (
+          <Skeleton className="h-96 w-full rounded-xl" />
+        ) : (
+          <RerunMonthView series={firstClassSeries} />
+        )
+      ) : (
+        <LegacyRadar />
       )}
     </div>
   )

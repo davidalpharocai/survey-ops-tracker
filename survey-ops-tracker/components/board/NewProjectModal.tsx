@@ -237,7 +237,7 @@ export function NewProjectModal({ teamMembers, initialClient, onClose }: NewProj
           <label className="flex flex-col gap-1 text-xs text-muted-foreground">
             <span className="flex items-center">
               Type
-              <InfoTooltip text="PS = PureSpectrum consumer panel, B2B = expert/business panel, Rerun = repeat wave of an earlier study." />
+              <InfoTooltip text="PS = PureSpectrum consumer panel, B2B = expert/business panel." />
             </span>
             <select
               value={projectType}
@@ -247,7 +247,6 @@ export function NewProjectModal({ teamMembers, initialClient, onClose }: NewProj
               <option value="">—</option>
               <option value="PS">PS</option>
               <option value="B2B">B2B</option>
-              <option value="Rerun">Rerun</option>
             </select>
           </label>
 

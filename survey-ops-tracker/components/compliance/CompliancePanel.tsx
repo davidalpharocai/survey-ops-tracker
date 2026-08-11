@@ -3,7 +3,7 @@ import { Caret } from '@/components/shared/Caret'
 import { useState, useEffect, useRef } from 'react'
 import { useSubmissions, useRecipients, useInvalidateCompliance } from '@/lib/hooks/useSubmissions'
 import { useComplianceState } from '@/lib/hooks/useComplianceState'
-import { afterFieldingRequired } from '@/lib/utils/compliance'
+import { beforeFieldingRequired, afterFieldingRequired } from '@/lib/utils/compliance'
 import { RecipientsManager } from './RecipientsManager'
 import { SubmitQuestionsModal } from './SubmitQuestionsModal'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
@@ -209,7 +209,23 @@ export function CompliancePanel({
   // After-fielding (results) review affordance — only when the client requires
   // it. Enabled once results exist (N Actual set) and a contact is on file.
   const cs = useComplianceState(project?.id ?? '', project?.client ?? '', project?.compliance_override ?? null)
-  const requiresAfter = !!project && afterFieldingRequired(cs.data?.client ?? null, project.compliance_override ?? null)
+  const requiresAfter = !!project && afterFieldingRequired(
+    cs.data?.client ?? null, project.compliance_override ?? null,
+    project.rerun_number, project.compliance_required_override
+  )
+  const requiresBefore = !!project && beforeFieldingRequired(
+    cs.data?.client ?? null, project.compliance_override ?? null,
+    project.rerun_number, project.compliance_required_override
+  )
+  // A rerun wave (>= 2) waives the compliance gate unless a force-required
+  // override wins it back — surface that here too, so a missing "required"
+  // affordance never reads as a bug.
+  const waivedByRerun =
+    !!project &&
+    (project.rerun_number ?? 1) >= 2 &&
+    project.compliance_override !== true &&
+    !project.compliance_required_override &&
+    !requiresBefore && !requiresAfter
   const hasAfterSubmission = submissions.some(
     s => s.phase === 'after_fielding' && (s.status === 'pending_review' || s.status === 'approved')
   )
@@ -229,9 +245,11 @@ export function CompliancePanel({
   // where the review stands without expanding.
   const previewText = latest
     ? `Latest: v${latest.version} · ${latestIsUndispatched ? 'Sending…' : STATUS_LABEL[latest.status]}`
-    : requiresAfter
-      ? 'After-fielding review — not sent yet'
-      : 'Not yet submitted for review'
+    : waivedByRerun
+      ? 'Not required — rerun wave (waived)'
+      : requiresAfter
+        ? 'After-fielding review — not sent yet'
+        : 'Not yet submitted for review'
 
   // Auto-expand the latest row when it's rejected so the note is visible
   const defaultExpanded =
@@ -282,6 +300,12 @@ export function CompliancePanel({
       )}
 
       {!collapsed && (<>
+
+      {waivedByRerun && (
+        <p className="text-xs text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-3 py-2 mb-3">
+          Compliance not required — rerun wave (waived after Wave 1). Force with the per-wave override.
+        </p>
+      )}
 
       {latestIsUndispatched && (
         <CountdownRow

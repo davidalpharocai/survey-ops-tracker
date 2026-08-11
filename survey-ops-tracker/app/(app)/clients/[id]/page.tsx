@@ -18,6 +18,8 @@ import { formatDate, getDueUrgency, urgencyPrefix } from '@/lib/utils/date'
 import { stageLabel } from '@/lib/utils/stage'
 import { fmtNum } from '@/lib/utils/number'
 import type { Tables } from '@/lib/supabase/types'
+import { isRerunProject } from '@/lib/reruns/isRerun'
+import { RerunChip } from '@/components/reruns/RerunChip'
 
 type Client = Tables<'clients'>
 
@@ -31,6 +33,8 @@ type ClientProject = {
   phase: string
   board_column: string
   project_type: string | null
+  series_id: string | null
+  rerun_number: number | null
   submitted_date: string | null
   due_date: string | null
   deliver_date: string | null
@@ -45,7 +49,7 @@ type ClientProject = {
 }
 
 const PROJECT_COLS =
-  'id, project_code, project_name, client, status, phase, board_column, project_type, submitted_date, due_date, deliver_date, delivered_at, created_at, updated_at, budget, actual_spend, n_target, n_collected, n_actual'
+  'id, project_code, project_name, client, status, phase, board_column, project_type, series_id, rerun_number, submitted_date, due_date, deliver_date, delivered_at, created_at, updated_at, budget, actual_spend, n_target, n_collected, n_actual'
 
 function useClientPage(clientId: string) {
   const supabase = createClient()
@@ -451,9 +455,10 @@ export default function ClientPage() {
                             <td className="px-4 py-3 text-sm text-foreground font-medium">
                               {p.status === 'Hold' && <span title="On hold">⏸ </span>}
                               {p.project_name}
-                              {p.project_type && (
+                              {(p.project_type === 'PS' || p.project_type === 'B2B') && (
                                 <span className="ml-2 text-xs text-muted-foreground">{p.project_type}</span>
                               )}
+                              {isRerunProject(p) && <RerunChip className="ml-2 text-[11px] px-1.5 py-0.5" />}
                             </td>
                             <td className="px-4 py-3 text-sm">
                               {p.status === 'Open' ? (
