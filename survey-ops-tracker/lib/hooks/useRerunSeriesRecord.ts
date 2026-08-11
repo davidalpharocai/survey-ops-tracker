@@ -186,6 +186,10 @@ export function useRerunSeriesActions() {
       queryClient.invalidateQueries({ queryKey: ['rerun-series-list'] })
       queryClient.invalidateQueries({ queryKey: ['projects'] })
       queryClient.invalidateQueries({ queryKey: ['rerun-snapshot'] })
+      // The nav Reruns badge sums first-class + legacy overdue counts; a
+      // lifecycle action (pause/resume/end/spawn/…) can flip a series' overdue
+      // state, so refresh it too.
+      queryClient.invalidateQueries({ queryKey: ['rerun-overdue-count'] })
     },
   })
 }
