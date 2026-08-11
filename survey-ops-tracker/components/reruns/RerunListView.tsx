@@ -1,8 +1,9 @@
 'use client'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { BaseTypeTag } from '@/components/reruns/BaseTypeTag'
 import { Seg } from '@/components/reruns/Seg'
+import { ColumnsMenu } from '@/components/shared/ColumnsMenu'
 import { formatDate } from '@/lib/utils/date'
 import { fmtNum } from '@/lib/utils/number'
 import { waveStatus } from '@/lib/reruns/waveStatus'
@@ -23,6 +24,12 @@ import type { SeriesWaveRow } from '@/lib/hooks/useRerunWaves'
 // Series mode = one row per rerun series (→ the series record); Waves mode = one
 // row per wave (→ the project). Both honour the shared filter + deep search
 // (lib/reruns/filterViews.ts) and persist their own sort in localStorage.
+//
+// Columns are user-configurable per granularity (show/hide + reorder) via the
+// shared "⚙ Columns" popover (components/shared/ColumnsMenu.tsx — the same
+// control the Rerun Series record's Waves table uses), persisted separately
+// per granularity so a user's List-view column choices don't collide with
+// their Series-record column choices.
 
 type Dir = 'asc' | 'desc'
 type Granularity = 'series' | 'waves'
@@ -30,6 +37,8 @@ type Granularity = 'series' | 'waves'
 const GRAN_KEY = 'sot.rerunListGranularity'
 const SERIES_SORT_KEY = 'sot.rerunListSort'
 const WAVE_SORT_KEY = 'sot.rerunWaveSort'
+const SERIES_COLUMNS_KEY = 'sot.rerunListSeriesColumns'
+const WAVE_COLUMNS_KEY = 'sot.rerunListWaveColumns'
 
 type SeriesSortField = 'client' | 'survey' | 'cadence' | 'owner' | 'waves' | 'next' | 'status'
 type WaveSortField = 'client' | 'survey' | 'wave' | 'fielded' | 'delivered' | 'n' | 'nActual' | 'status' | 'surveyId'
@@ -79,6 +88,24 @@ function useStoredSort<F extends string>(
       return next
     })
   return [sort, change] as const
+}
+
+/** If the active sort field's column has been hidden, fall back to the
+ * canonical default sort (or, failing that — the default field is ALSO
+ * hidden — the first still-visible column in registry order) so there's
+ * always a sensible, visibly-active sort rather than one silently applied to
+ * data the user can't see. Pure/derived — doesn't touch persisted state, so
+ * re-showing the original column seamlessly restores the user's real choice. */
+function withFallbackSort<F extends string>(
+  sort: SortState<F>,
+  visible: F[],
+  columnsInOrder: { key: F }[],
+  defaultSort: SortState<F>,
+): SortState<F> {
+  if (visible.includes(sort.field)) return sort
+  if (visible.includes(defaultSort.field)) return defaultSort
+  const firstVisible = columnsInOrder.find((c) => visible.includes(c.key))?.key
+  return firstVisible ? { field: firstVisible, dir: 'asc' } : sort
 }
 
 const isSeriesField = (f: string): f is SeriesSortField =>
@@ -154,6 +181,223 @@ function SortIcon({ active, dir }: { active: boolean; dir: Dir }) {
   return <span className="text-foreground/80 ml-1">{dir === 'asc' ? '↑' : '↓'}</span>
 }
 
+// ---------------------------------------------------------------------------
+// Column registries — one per granularity. Each covers exactly the columns
+// the view renders today; the default order below matches the pre-existing
+// fixed layout. Configurability (show/hide + reorder) is layered on top via
+// visibleSeriesColumns / visibleWaveColumns state, persisted separately from
+// the registries themselves.
+// ---------------------------------------------------------------------------
+
+interface SeriesColumnDef {
+  key: SeriesSortField
+  label: string
+  tooltip: string
+  cellClassName?: string
+  render: (s: SeriesListRow) => ReactNode
+}
+
+const SERIES_COLUMNS: SeriesColumnDef[] = [
+  {
+    key: 'client',
+    label: 'Client',
+    tooltip: 'The client this rerun series is for.',
+    cellClassName: 'text-foreground font-medium',
+    render: (s) => s.client,
+  },
+  {
+    key: 'survey',
+    label: 'Survey',
+    tooltip: 'Survey name, with its base type (PS / B2B / Rerun Service).',
+    render: (s) => (
+      <span className="inline-flex items-center gap-1.5">
+        <BaseTypeTag baseType={s.base_type} rerunService={s.rerun_service} />
+        <span className="text-foreground">{s.survey_name}</span>
+      </span>
+    ),
+  },
+  {
+    key: 'cadence',
+    label: 'Cadence',
+    tooltip: 'How often the next wave is scheduled.',
+    cellClassName: 'text-muted-foreground',
+    render: (s) => cadenceLabel(s.cadence_months),
+  },
+  {
+    key: 'owner',
+    label: 'Owner',
+    tooltip: 'Who owns keeping this series on cadence.',
+    cellClassName: 'text-muted-foreground',
+    render: (s) => s.owner_email ?? <span className="text-muted-foreground/50">—</span>,
+  },
+  {
+    key: 'waves',
+    label: '# Waves',
+    tooltip: 'How many waves this series has so far.',
+    cellClassName: 'text-muted-foreground tabular-nums',
+    render: (s) => fmtNum(s.wave_count),
+  },
+  {
+    key: 'next',
+    label: 'Next due',
+    tooltip: 'Computed next-wave collection date.',
+    cellClassName: 'text-muted-foreground whitespace-nowrap',
+    render: (s) => (s.effective_next ? formatDate(s.effective_next) : <span className="text-muted-foreground/50">—</span>),
+  },
+  {
+    key: 'status',
+    label: 'Status',
+    tooltip: 'Overdue / in service / paused / ended.',
+    render: (s) => {
+      const status = SERIES_STATUS_META[seriesStatusKey(s)]
+      return <span className={`text-xs px-2 py-0.5 rounded ${status.chip}`}>{status.label}</span>
+    },
+  },
+]
+
+const SERIES_COLUMN_KEYS: SeriesSortField[] = SERIES_COLUMNS.map((c) => c.key)
+const DEFAULT_SERIES_COLUMNS: SeriesSortField[] = ['client', 'survey', 'cadence', 'owner', 'waves', 'next', 'status']
+const DEFAULT_SERIES_SORT: SortState<SeriesSortField> = { field: 'next', dir: 'asc' }
+
+interface WaveColumnCtx {
+  seriesMap: Map<string, SeriesListRow>
+  t: string
+}
+
+interface WaveColumnDef {
+  key: WaveSortField
+  label: string
+  tooltip: string
+  cellClassName?: string
+  render: (w: SeriesWaveRow, ctx: WaveColumnCtx) => ReactNode
+}
+
+const WAVE_COLUMNS: WaveColumnDef[] = [
+  {
+    key: 'client',
+    label: 'Client',
+    tooltip: 'The client this wave is for.',
+    cellClassName: 'text-muted-foreground',
+    render: (w) => w.client ?? '—',
+  },
+  {
+    key: 'survey',
+    label: 'Series / Survey',
+    tooltip: 'The series this wave belongs to.',
+    render: (w, { seriesMap }) => {
+      const parent = seriesMap.get(w.series_id)
+      return (
+        <span className="inline-flex items-center gap-1.5">
+          <BaseTypeTag baseType={parent?.base_type ?? null} rerunService={parent?.rerun_service ?? false} />
+          <span className="text-foreground">{parent?.survey_name ?? w.project_name}</span>
+        </span>
+      )
+    },
+  },
+  {
+    key: 'wave',
+    label: 'Wave #',
+    tooltip: 'Position of this wave within the series.',
+    cellClassName: 'text-muted-foreground tabular-nums',
+    render: (w) => w.rerun_number,
+  },
+  {
+    key: 'fielded',
+    label: 'Fielded / rerun date',
+    tooltip: 'When the wave fielded (launch, else submitted).',
+    cellClassName: 'text-muted-foreground whitespace-nowrap',
+    render: (w) => (waveFielded(w) ? formatDate(waveFielded(w)) : <span className="text-muted-foreground/50">—</span>),
+  },
+  {
+    key: 'delivered',
+    label: 'Delivered',
+    tooltip: 'When the wave was delivered.',
+    cellClassName: 'text-muted-foreground whitespace-nowrap',
+    render: (w) => (waveDelivered(w) ? formatDate(waveDelivered(w)) : <span className="text-muted-foreground/50">—</span>),
+  },
+  {
+    key: 'n',
+    label: 'N collected',
+    tooltip: 'Responses collected.',
+    cellClassName: 'text-muted-foreground tabular-nums',
+    render: (w) => fmtNum(w.n_collected),
+  },
+  {
+    key: 'nActual',
+    label: 'N actual',
+    tooltip: 'Usable responses after cleaning.',
+    cellClassName: 'text-muted-foreground tabular-nums',
+    render: (w) => fmtNum(w.n_actual),
+  },
+  {
+    key: 'status',
+    label: 'Status',
+    tooltip: 'Delivered / in field / upcoming (+ placeholder).',
+    render: (w, { t }) => {
+      const st = waveStatus(w, t)
+      return (
+        <span className="inline-flex items-center gap-1.5">
+          <span className={`text-xs px-2 py-0.5 rounded ${st.chip}`}>{st.label}</span>
+          {w.is_placeholder && (
+            <span
+              title="Assumed-delivered wave — no real data yet; Sree will backfill"
+              className="text-[11px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground"
+            >
+              Placeholder
+            </span>
+          )}
+        </span>
+      )
+    },
+  },
+  {
+    key: 'surveyId',
+    label: 'Survey ID',
+    tooltip: 'The survey tool ID for this wave.',
+    cellClassName: 'font-mono text-xs text-muted-foreground',
+    render: (w) => w.survey_tool_id ?? <span className="text-muted-foreground/50">—</span>,
+  },
+]
+
+const WAVE_COLUMN_KEYS: WaveSortField[] = WAVE_COLUMNS.map((c) => c.key)
+const DEFAULT_WAVE_COLUMNS: WaveSortField[] = [
+  'client',
+  'survey',
+  'wave',
+  'fielded',
+  'delivered',
+  'n',
+  'nActual',
+  'status',
+  'surveyId',
+]
+const DEFAULT_WAVE_SORT: SortState<WaveSortField> = { field: 'fielded', dir: 'desc' }
+
+/** Personal-to-browser column prefs, like RerunSeriesRecord's wave-columns
+ * localStorage pattern. Guards against unknown/stale keys (e.g. a prior
+ * registry shape) by filtering to keys that still exist, falling back to
+ * null (→ caller uses its default) if nothing valid survives. */
+function loadStoredColumnKeys<K extends string>(storageKey: string, validKeys: readonly K[]): K[] | null {
+  try {
+    const raw = localStorage.getItem(storageKey)
+    if (!raw) return null
+    const parsed: unknown = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return null
+    const valid = parsed.filter((k): k is K => validKeys.includes(k as K))
+    return valid.length > 0 ? valid : null
+  } catch {
+    return null
+  }
+}
+
+function saveStoredColumnKeys(storageKey: string, keys: string[]) {
+  try {
+    localStorage.setItem(storageKey, JSON.stringify(keys))
+  } catch {
+    // storage unavailable/full — the in-memory choice still works this visit
+  }
+}
+
 export function RerunListView({
   series,
   waves,
@@ -182,15 +426,53 @@ export function RerunListView({
     }
   }
 
-  const [seriesSort, changeSeriesSort] = useStoredSort<SeriesSortField>(
-    SERIES_SORT_KEY,
-    { field: 'next', dir: 'asc' },
-    isSeriesField,
+  const [seriesSort, changeSeriesSort] = useStoredSort<SeriesSortField>(SERIES_SORT_KEY, DEFAULT_SERIES_SORT, isSeriesField)
+  const [waveSort, changeWaveSort] = useStoredSort<WaveSortField>(WAVE_SORT_KEY, DEFAULT_WAVE_SORT, isWaveField)
+
+  const [visibleSeriesColumns, setVisibleSeriesColumnsState] = useState<SeriesSortField[]>(DEFAULT_SERIES_COLUMNS)
+  const [visibleWaveColumns, setVisibleWaveColumnsState] = useState<WaveSortField[]>(DEFAULT_WAVE_COLUMNS)
+
+  // Hydrate column prefs from localStorage on mount (client-only — avoids an
+  // SSR/client mismatch, same convention as the granularity/sort hydration above).
+  useEffect(() => {
+    const stored = loadStoredColumnKeys(SERIES_COLUMNS_KEY, SERIES_COLUMN_KEYS)
+    if (stored) setVisibleSeriesColumnsState(stored)
+  }, [])
+  useEffect(() => {
+    const stored = loadStoredColumnKeys(WAVE_COLUMNS_KEY, WAVE_COLUMN_KEYS)
+    if (stored) setVisibleWaveColumnsState(stored)
+  }, [])
+
+  function setVisibleSeriesColumns(next: string[]) {
+    const filtered = next.filter((k): k is SeriesSortField => SERIES_COLUMN_KEYS.includes(k as SeriesSortField))
+    setVisibleSeriesColumnsState(filtered)
+    saveStoredColumnKeys(SERIES_COLUMNS_KEY, filtered)
+  }
+  function setVisibleWaveColumns(next: string[]) {
+    const filtered = next.filter((k): k is WaveSortField => WAVE_COLUMN_KEYS.includes(k as WaveSortField))
+    setVisibleWaveColumnsState(filtered)
+    saveStoredColumnKeys(WAVE_COLUMNS_KEY, filtered)
+  }
+
+  // The sort actually used for ordering + the header's active-arrow — falls
+  // back off a hidden column without mutating the user's persisted sort
+  // preference (see withFallbackSort above).
+  const effectiveSeriesSort = useMemo(
+    () => withFallbackSort(seriesSort, visibleSeriesColumns, SERIES_COLUMNS, DEFAULT_SERIES_SORT),
+    [seriesSort, visibleSeriesColumns],
   )
-  const [waveSort, changeWaveSort] = useStoredSort<WaveSortField>(
-    WAVE_SORT_KEY,
-    { field: 'fielded', dir: 'desc' },
-    isWaveField,
+  const effectiveWaveSort = useMemo(
+    () => withFallbackSort(waveSort, visibleWaveColumns, WAVE_COLUMNS, DEFAULT_WAVE_SORT),
+    [waveSort, visibleWaveColumns],
+  )
+
+  const visibleSeriesCols = useMemo(
+    () => visibleSeriesColumns.map((k) => SERIES_COLUMNS.find((c) => c.key === k)).filter((c): c is SeriesColumnDef => !!c),
+    [visibleSeriesColumns],
+  )
+  const visibleWaveCols = useMemo(
+    () => visibleWaveColumns.map((k) => WAVE_COLUMNS.find((c) => c.key === k)).filter((c): c is WaveColumnDef => !!c),
+    [visibleWaveColumns],
   )
 
   const seriesMap = useMemo(() => new Map(series.map((s) => [s.id, s])), [series])
@@ -210,8 +492,10 @@ export function RerunListView({
 
   const filteredSeries = useMemo(() => {
     const rows = series.filter((s) => seriesPasses(s, wavesForSeries.get(s.id) ?? [], filter))
-    return rows.sort((a, b) => compare(seriesSortValue(a, seriesSort.field), seriesSortValue(b, seriesSort.field), seriesSort.dir))
-  }, [series, wavesForSeries, filter, seriesSort])
+    return rows.sort((a, b) =>
+      compare(seriesSortValue(a, effectiveSeriesSort.field), seriesSortValue(b, effectiveSeriesSort.field), effectiveSeriesSort.dir),
+    )
+  }, [series, wavesForSeries, filter, effectiveSeriesSort])
 
   const filteredWaves = useMemo(() => {
     // A minimal parent for a wave whose series row is missing from the view
@@ -230,31 +514,16 @@ export function RerunListView({
         is_overdue: false,
       }
     const rows = waves.filter((w) => wavePasses(w, parentOf(w), filter))
-    return rows.sort((a, b) => compare(waveSortValue(a, seriesMap, t, waveSort.field), waveSortValue(b, seriesMap, t, waveSort.field), waveSort.dir))
-  }, [waves, seriesMap, filter, waveSort, t])
+    return rows.sort((a, b) =>
+      compare(
+        waveSortValue(a, seriesMap, t, effectiveWaveSort.field),
+        waveSortValue(b, seriesMap, t, effectiveWaveSort.field),
+        effectiveWaveSort.dir,
+      ),
+    )
+  }, [waves, seriesMap, filter, effectiveWaveSort, t])
 
   const count = granularity === 'series' ? filteredSeries.length : filteredWaves.length
-
-  const seriesHeaders: { field: SeriesSortField; label: string; title: string }[] = [
-    { field: 'client', label: 'Client', title: 'The client this rerun series is for.' },
-    { field: 'survey', label: 'Survey', title: 'Survey name, with its base type (PS / B2B / Rerun Service).' },
-    { field: 'cadence', label: 'Cadence', title: 'How often the next wave is scheduled.' },
-    { field: 'owner', label: 'Owner', title: 'Who owns keeping this series on cadence.' },
-    { field: 'waves', label: '# Waves', title: 'How many waves this series has so far.' },
-    { field: 'next', label: 'Next due', title: 'Computed next-wave collection date.' },
-    { field: 'status', label: 'Status', title: 'Overdue / in service / paused / ended.' },
-  ]
-  const waveHeaders: { field: WaveSortField; label: string; title: string }[] = [
-    { field: 'client', label: 'Client', title: 'The client this wave is for.' },
-    { field: 'survey', label: 'Series / Survey', title: 'The series this wave belongs to.' },
-    { field: 'wave', label: 'Wave #', title: 'Position of this wave within the series.' },
-    { field: 'fielded', label: 'Fielded / rerun date', title: 'When the wave fielded (launch, else submitted).' },
-    { field: 'delivered', label: 'Delivered', title: 'When the wave was delivered.' },
-    { field: 'n', label: 'N collected', title: 'Responses collected.' },
-    { field: 'nActual', label: 'N actual', title: 'Usable responses after cleaning.' },
-    { field: 'status', label: 'Status', title: 'Delivered / in field / upcoming (+ placeholder).' },
-    { field: 'surveyId', label: 'Survey ID', title: 'The survey tool ID for this wave.' },
-  ]
 
   return (
     <div className="bg-card border border-border shadow-sm rounded-xl overflow-hidden">
@@ -263,15 +532,34 @@ export function RerunListView({
           <span className="text-foreground font-medium">{fmtNum(count)}</span>{' '}
           {granularity === 'series' ? 'series' : `wave${count === 1 ? '' : 's'}`}
         </span>
-        <Seg
-          label="List granularity"
-          value={granularity}
-          onChange={changeGranularity}
-          options={[
-            { v: 'series', label: 'Series' },
-            { v: 'waves', label: 'Waves' },
-          ]}
-        />
+        <div className="flex items-center gap-2">
+          <Seg
+            label="List granularity"
+            value={granularity}
+            onChange={changeGranularity}
+            options={[
+              { v: 'series', label: 'Series' },
+              { v: 'waves', label: 'Waves' },
+            ]}
+          />
+          {granularity === 'series' ? (
+            <ColumnsMenu
+              visibleKeys={visibleSeriesColumns}
+              allColumns={SERIES_COLUMNS}
+              defaultKeys={DEFAULT_SERIES_COLUMNS}
+              onChange={setVisibleSeriesColumns}
+              buttonTitle="Choose which series columns you see, and their order — personal to you, remembered in this browser"
+            />
+          ) : (
+            <ColumnsMenu
+              visibleKeys={visibleWaveColumns}
+              allColumns={WAVE_COLUMNS}
+              defaultKeys={DEFAULT_WAVE_COLUMNS}
+              onChange={setVisibleWaveColumns}
+              buttonTitle="Choose which wave columns you see, and their order — personal to you, remembered in this browser"
+            />
+          )}
+        </div>
       </div>
 
       <div className="overflow-auto thin-scroll max-h-[calc(100vh-20rem)]">
@@ -279,15 +567,15 @@ export function RerunListView({
           <table className="w-full">
             <thead>
               <tr className="border-b border-border">
-                {seriesHeaders.map((h) => (
+                {visibleSeriesCols.map((c) => (
                   <th
-                    key={h.field}
-                    title={`${h.title} Click to sort.`}
-                    onClick={() => changeSeriesSort(h.field)}
+                    key={c.key}
+                    title={`${c.tooltip} Click to sort.`}
+                    onClick={() => changeSeriesSort(c.key)}
                     className={`${th} cursor-pointer hover:text-foreground`}
                   >
-                    {h.label}
-                    <SortIcon active={seriesSort.field === h.field} dir={seriesSort.dir} />
+                    {c.label}
+                    <SortIcon active={effectiveSeriesSort.field === c.key} dir={effectiveSeriesSort.dir} />
                   </th>
                 ))}
               </tr>
@@ -295,64 +583,50 @@ export function RerunListView({
             <tbody>
               {filteredSeries.length === 0 && (
                 <tr>
-                  <td colSpan={seriesHeaders.length} className="px-3 py-8 text-center text-muted-foreground text-sm">
+                  <td colSpan={visibleSeriesCols.length} className="px-3 py-8 text-center text-muted-foreground text-sm">
                     No rerun series match the current search / filters.
                   </td>
                 </tr>
               )}
-              {filteredSeries.map((s, i) => {
-                const status = SERIES_STATUS_META[seriesStatusKey(s)]
-                return (
-                  <tr
-                    key={s.id}
-                    role="button"
-                    tabIndex={0}
-                    aria-label={`Open the ${s.client} — ${s.survey_name} rerun series`}
-                    onClick={() => router.push(`/reruns/series/${s.id}`)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault()
-                        router.push(`/reruns/series/${s.id}`)
-                      }
-                    }}
-                    className={`border-t border-border cursor-pointer hover:bg-accent/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring transition-colors ${
-                      i % 2 === 1 ? 'bg-muted/40' : ''
-                    }`}
-                  >
-                    <td className={`${td} text-foreground font-medium`}>{s.client}</td>
-                    <td className={td}>
-                      <span className="inline-flex items-center gap-1.5">
-                        <BaseTypeTag baseType={s.base_type} rerunService={s.rerun_service} />
-                        <span className="text-foreground">{s.survey_name}</span>
-                      </span>
+              {filteredSeries.map((s, i) => (
+                <tr
+                  key={s.id}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Open the ${s.client} — ${s.survey_name} rerun series`}
+                  onClick={() => router.push(`/reruns/series/${s.id}`)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      router.push(`/reruns/series/${s.id}`)
+                    }
+                  }}
+                  className={`border-t border-border cursor-pointer hover:bg-accent/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring transition-colors ${
+                    i % 2 === 1 ? 'bg-muted/40' : ''
+                  }`}
+                >
+                  {visibleSeriesCols.map((c) => (
+                    <td key={c.key} className={`${td} ${c.cellClassName ?? ''}`}>
+                      {c.render(s)}
                     </td>
-                    <td className={`${td} text-muted-foreground`}>{cadenceLabel(s.cadence_months)}</td>
-                    <td className={`${td} text-muted-foreground`}>{s.owner_email ?? <span className="text-muted-foreground/50">—</span>}</td>
-                    <td className={`${td} text-muted-foreground tabular-nums`}>{fmtNum(s.wave_count)}</td>
-                    <td className={`${td} text-muted-foreground whitespace-nowrap`}>
-                      {s.effective_next ? formatDate(s.effective_next) : <span className="text-muted-foreground/50">—</span>}
-                    </td>
-                    <td className={td}>
-                      <span className={`text-xs px-2 py-0.5 rounded ${status.chip}`}>{status.label}</span>
-                    </td>
-                  </tr>
-                )
-              })}
+                  ))}
+                </tr>
+              ))}
             </tbody>
           </table>
         ) : (
           <table className="w-full">
             <thead>
               <tr className="border-b border-border">
-                {waveHeaders.map((h) => (
+                {visibleWaveCols.map((c) => (
                   <th
-                    key={h.field}
-                    title={`${h.title} Click to sort.`}
-                    onClick={() => changeWaveSort(h.field)}
+                    key={c.key}
+                    title={`${c.tooltip} Click to sort.`}
+                    onClick={() => changeWaveSort(c.key)}
                     className={`${th} cursor-pointer hover:text-foreground`}
                   >
-                    {h.label}
-                    <SortIcon active={waveSort.field === h.field} dir={waveSort.dir} />
+                    {c.label}
+                    <SortIcon active={effectiveWaveSort.field === c.key} dir={effectiveWaveSort.dir} />
                   </th>
                 ))}
               </tr>
@@ -360,68 +634,35 @@ export function RerunListView({
             <tbody>
               {filteredWaves.length === 0 && (
                 <tr>
-                  <td colSpan={waveHeaders.length} className="px-3 py-8 text-center text-muted-foreground text-sm">
+                  <td colSpan={visibleWaveCols.length} className="px-3 py-8 text-center text-muted-foreground text-sm">
                     No waves match the current search / filters.
                   </td>
                 </tr>
               )}
-              {filteredWaves.map((w, i) => {
-                const st = waveStatus(w, t)
-                const parentName = seriesMap.get(w.series_id)?.survey_name ?? w.project_name
-                const parentBase = seriesMap.get(w.series_id)?.base_type ?? null
-                const parentRerunService = seriesMap.get(w.series_id)?.rerun_service ?? false
-                return (
-                  <tr
-                    key={w.id}
-                    role="button"
-                    tabIndex={0}
-                    aria-label={`Open ${w.project_name}`}
-                    onClick={() => router.push(`/projects/${w.id}`)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault()
-                        router.push(`/projects/${w.id}`)
-                      }
-                    }}
-                    className={`border-t border-border cursor-pointer hover:bg-accent/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring transition-colors ${
-                      i % 2 === 1 ? 'bg-muted/40' : ''
-                    }`}
-                  >
-                    <td className={`${td} text-muted-foreground`}>{w.client ?? '—'}</td>
-                    <td className={td}>
-                      <span className="inline-flex items-center gap-1.5">
-                        <BaseTypeTag baseType={parentBase} rerunService={parentRerunService} />
-                        <span className="text-foreground">{parentName}</span>
-                      </span>
+              {filteredWaves.map((w, i) => (
+                <tr
+                  key={w.id}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Open ${w.project_name}`}
+                  onClick={() => router.push(`/projects/${w.id}`)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      router.push(`/projects/${w.id}`)
+                    }
+                  }}
+                  className={`border-t border-border cursor-pointer hover:bg-accent/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring transition-colors ${
+                    i % 2 === 1 ? 'bg-muted/40' : ''
+                  }`}
+                >
+                  {visibleWaveCols.map((c) => (
+                    <td key={c.key} className={`${td} ${c.cellClassName ?? ''}`}>
+                      {c.render(w, { seriesMap, t })}
                     </td>
-                    <td className={`${td} text-muted-foreground tabular-nums`}>{w.rerun_number}</td>
-                    <td className={`${td} text-muted-foreground whitespace-nowrap`}>
-                      {waveFielded(w) ? formatDate(waveFielded(w)) : <span className="text-muted-foreground/50">—</span>}
-                    </td>
-                    <td className={`${td} text-muted-foreground whitespace-nowrap`}>
-                      {waveDelivered(w) ? formatDate(waveDelivered(w)) : <span className="text-muted-foreground/50">—</span>}
-                    </td>
-                    <td className={`${td} text-muted-foreground tabular-nums`}>{fmtNum(w.n_collected)}</td>
-                    <td className={`${td} text-muted-foreground tabular-nums`}>{fmtNum(w.n_actual)}</td>
-                    <td className={td}>
-                      <span className="inline-flex items-center gap-1.5">
-                        <span className={`text-xs px-2 py-0.5 rounded ${st.chip}`}>{st.label}</span>
-                        {w.is_placeholder && (
-                          <span
-                            title="Assumed-delivered wave — no real data yet; Sree will backfill"
-                            className="text-[11px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground"
-                          >
-                            Placeholder
-                          </span>
-                        )}
-                      </span>
-                    </td>
-                    <td className={`${td} font-mono text-xs text-muted-foreground`}>
-                      {w.survey_tool_id ?? <span className="text-muted-foreground/50">—</span>}
-                    </td>
-                  </tr>
-                )
-              })}
+                  ))}
+                </tr>
+              ))}
             </tbody>
           </table>
         )}
