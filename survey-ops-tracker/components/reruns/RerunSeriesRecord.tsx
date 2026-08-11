@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useRef, useState, cloneElement, type ReactElement } from 'react'
+import { useEffect, useRef, useState, cloneElement, type ReactElement, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd'
 import {
@@ -850,14 +850,14 @@ function SeriesDetailsSection({
 
       {!editing ? (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <Field label="Cadence" value={cadenceLabel(series.cadence_months)} />
-          <Field label="Delivery cadence" value={series.delivery_cadence ?? '—'} />
-          <Field label="Source template" value={series.template_id ?? '—'} />
-          <Field label="Owner" value={series.owner_email ?? '—'} />
+          <Field label="Cadence" value={cadenceLabel(series.cadence_months)} tip="How often a new wave runs (monthly, quarterly, etc.). Drives the next-wave due date." />
+          <Field label="Delivery cadence" value={series.delivery_cadence ?? '—'} tip="When each wave is delivered to the client (free text, e.g. “Beginning of month”)." />
+          <Field label="Source template" value={series.template_id ?? '—'} tip="The survey template the original wave was built from. Later waves can use different survey IDs — see the Waves table." />
+          <Field label="Owner" value={series.owner_email ?? '—'} tip="Who owns this rerun series — receives the weekly rerun digest and is the go-to person for it." />
           <Field label="Fielding start (anchor)" value={formatDate(series.anchor_date)} tip="Fallback due-date anchor for a seeded/fresh series with no wave dates yet." />
-          <Field label="Next due" value={series.effective_next ? formatDate(series.effective_next) : '—'} />
-          <Field label="In service" value={!series.in_service ? 'Ended' : series.paused ? 'Paused' : 'Yes'} />
-          <Field label="Mode" value={series.service_mode === 'auto' ? 'Auto' : 'Manual'} />
+          <Field label="Next due" value={series.effective_next ? formatDate(series.effective_next) : '—'} tip="When the next wave is due to field — computed from the last wave’s date plus the cadence." />
+          <Field label="In service" value={!series.in_service ? 'Ended' : series.paused ? 'Paused' : 'Yes'} tip="Whether the series is actively running. Ended = no more waves; Paused = temporarily stopped; Yes = live." />
+          <Field label="Mode" value={series.service_mode === 'auto' ? 'Auto' : 'Manual'} tip="Auto = waves are created automatically before they’re due. Manual = you create each wave by hand." />
         </div>
       ) : (
         <div className="flex flex-col gap-2.5">
@@ -994,6 +994,16 @@ function FutureDefaultsSection({
   const coNames = (fd.co_captain_ids ?? []).map((cid) => byId.get(cid)?.name ?? 'Unknown')
   const available = assignableMembers(teamMembers).filter((m) => m.id !== captainId && !coCaptainIds.includes(m.id))
 
+  const DField = ({ label, tip, children }: { label: string; tip: string; children: ReactNode }) => (
+    <div>
+      <div className="text-[11px] text-muted-foreground flex items-center">
+        {label}
+        <InfoTooltip text={tip} />
+      </div>
+      <div className="text-foreground truncate">{children}</div>
+    </div>
+  )
+
   return (
     <div className="bg-card border border-border shadow-sm rounded-xl p-4 flex flex-col gap-3">
       <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -1010,33 +1020,25 @@ function FutureDefaultsSection({
 
       {!editing ? (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-          <div>
-            <div className="text-[11px] text-muted-foreground">N target</div>
-            <div className="text-foreground">{fmtNum(fd.n_target)}</div>
-          </div>
-          <div>
-            <div className="text-[11px] text-muted-foreground">Audience</div>
-            <div className="text-foreground truncate">{fd.audience || '—'}</div>
-          </div>
-          <div>
-            <div className="text-[11px] text-muted-foreground">Money model</div>
-            <div className="text-foreground">{fd.money_model || '—'}</div>
-          </div>
-          <div>
-            <div className="text-[11px] text-muted-foreground" title="New waves start from this template. Each wave's actual survey IDs can differ — see the Waves table.">Default template</div>
-            <div className="text-foreground truncate">{fd.template_id || '—'}</div>
-          </div>
-          <div>
-            <div className="text-[11px] text-muted-foreground">Compliance</div>
-            <div className="text-foreground">{fd.compliance_required_override === true ? 'Required on every wave' : 'Waived (wave ≥ 2)'}</div>
-          </div>
-          <div>
-            <div className="text-[11px] text-muted-foreground">Captain</div>
-            <div className="text-foreground truncate">
-              {primaryName}
-              {coNames.length > 0 && <span className="text-muted-foreground"> · {coNames.join(', ')}</span>}
-            </div>
-          </div>
+          <DField label="N target" tip="Default target response count applied to each new wave.">
+            {fmtNum(fd.n_target)}
+          </DField>
+          <DField label="Audience" tip="Default audience / sample description applied to each new wave.">
+            {fd.audience || '—'}
+          </DField>
+          <DField label="Money model" tip="Default cost model for new waves — PS suppliers or B2B blasts.">
+            {fd.money_model || '—'}
+          </DField>
+          <DField label="Default template" tip="New waves start from this template. Each wave’s actual survey IDs can differ — see the Waves table.">
+            {fd.template_id || '—'}
+          </DField>
+          <DField label="Compliance" tip="A rerun inherits wave 1’s compliance approval, so review is waived from wave 2 on — unless you require it on every wave here.">
+            {fd.compliance_required_override === true ? 'Required on every wave' : 'Waived (wave ≥ 2)'}
+          </DField>
+          <DField label="Captain" tip="Default captain (and co-captains) assigned to each new wave.">
+            {primaryName}
+            {coNames.length > 0 && <span className="text-muted-foreground"> · {coNames.join(', ')}</span>}
+          </DField>
         </div>
       ) : (
         <div className="flex flex-col gap-2.5">

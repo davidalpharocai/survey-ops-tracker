@@ -5,6 +5,7 @@ import { logSystemEvent } from '@/lib/server/observability'
 import { nextRerunName } from '@/lib/utils/rerun'
 import { selectDueSeries, isLegacyEligible, addDaysISO } from '@/lib/reruns/spawn'
 import { spawnWaveForSeries, QUIET_SPAWN_SKIP_REASONS } from '@/lib/reruns/spawnSeries'
+import { renumberLegacyLineage } from '@/lib/reruns/renumberLineage'
 import type { Database } from '@/lib/supabase/types'
 
 export const dynamic = 'force-dynamic'
@@ -174,6 +175,14 @@ export async function GET(req: NextRequest) {
         .update({ rerun_spawned_at: new Date().toISOString() })
         .eq('id', p.id)
       if (stampErr) errors.push(`stamp ${p.project_name}: ${stampErr.message}`)
+      // Renumber the whole lineage by chronological position so the new wave
+      // takes its true number and any pre-existing gap (legacy naive max+1)
+      // self-heals — never the "1,3,4" drift this used to produce.
+      try {
+        await renumberLegacyLineage(supabase, p.rerun_series_id ?? p.id)
+      } catch (renumErr) {
+        errors.push(`renumber ${p.project_name}: ${renumErr instanceof Error ? renumErr.message : String(renumErr)}`)
+      }
       spawned.push(name)
     }
   }
