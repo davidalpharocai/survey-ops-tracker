@@ -97,9 +97,15 @@ if (overdueIds.length) {
 // 4. Plan per series.
 const plan = []
 for (const s of overdue) {
-  const dates = placeholderWaveDates(s.cadence_anchor, s.cadence_months, todayET)
-  if (dates.length === 0) continue
   const curMax = maxWaveById.get(s.id) ?? 0
+  let dates = placeholderWaveDates(s.cadence_anchor, s.cadence_months, todayET)
+  // Bare series (no real Wave 1): treat the anchor / fielding-start date as the
+  // first assumed-delivered wave (#1) per David, so prepend it. Series that
+  // already have a real Wave 1 (a linked origin) keep only the post-anchor gap.
+  if (curMax === 0 && s.cadence_anchor && s.cadence_anchor <= todayET) {
+    dates = [s.cadence_anchor, ...dates]
+  }
+  if (dates.length === 0) continue
   const startNo = curMax + 1
   const newMax = curMax + dates.length
   // Informational new next-due = last placeholder + cadence (clamped, so it
