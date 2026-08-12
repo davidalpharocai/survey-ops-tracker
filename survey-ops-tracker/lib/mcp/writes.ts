@@ -155,12 +155,16 @@ export async function loadOccamGate(projectId: string): Promise<{
   const contactId = project?.requested_by_contact_id ?? null
   if (!contactId) return { requestedByContactId: null, projectUsesOccam, contactHasPriorDelivery: false, contactOccamInvited: false, contactName: null, contactEmail: null }
 
-  // Prior delivery = any OTHER delivered project for this same contact (already onboarded).
+  // Prior delivery = any OTHER delivered OCCAM project for this same contact
+  // (i.e. they already got an Occam account on that delivery). MUST be scoped to
+  // occam=true: a contact whose earlier delivery was a NON-Occam study has no
+  // Occam account, so their first Occam delivery must still trigger the invite.
   const { data: prior, error: priorErr } = await supabase
     .from('survey_projects')
     .select('id')
     .eq('requested_by_contact_id', contactId)
     .eq('stage_delivery', true)
+    .eq('occam', true)
     .neq('id', projectId)
     .is('deleted_at', null)
     .limit(1)

@@ -260,8 +260,11 @@ export function pickSeriesUpdatePatch(
   for (const key of UPDATE_FIELD_WHITELIST) {
     if (key in fields) (patch as Record<string, unknown>)[key] = fields[key]
   }
-  if ('base_type' in patch && patch.base_type !== 'B2B' && patch.base_type !== 'PS') {
-    return { error: "base_type must be 'B2B' or 'PS'." }
+  // Allow base_type null: a migration-074 "Rerun Service" series has no base
+  // type, and editing it (owner, cadence, notes, …) must not be blocked just
+  // because base_type stays null. Setting it to PS/B2B still reclassifies it.
+  if ('base_type' in patch && patch.base_type != null && patch.base_type !== 'B2B' && patch.base_type !== 'PS') {
+    return { error: "base_type must be 'B2B', 'PS', or null." }
   }
   return { patch }
 }

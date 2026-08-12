@@ -90,11 +90,18 @@ describe('needsActionSeries', () => {
     expect(out.map((s) => s.id)).toEqual(['late'])
   })
 
-  it('flags an in-service, non-paused series with no cadence as needs-a-cadence', () => {
+  it('does NOT flag an in-service, non-paused ad-hoc (null-cadence) series — ad-hoc is a deliberate choice', () => {
     const out = needsActionSeries([
       series({ id: 'adhoc', cadence_months: null, effective_next: null, days_to_next: null, is_overdue: false }),
     ])
-    expect(out.map((s) => s.id)).toEqual(['adhoc'])
+    expect(out).toHaveLength(0)
+  })
+
+  it('flags an ad-hoc series only once it actually goes overdue', () => {
+    const out = needsActionSeries([
+      series({ id: 'adhoc-late', cadence_months: null, effective_next: null, days_to_next: null, is_overdue: true }),
+    ])
+    expect(out.map((s) => s.id)).toEqual(['adhoc-late'])
   })
 
   it('excludes on-track cadenced series, and paused/ended no-cadence series', () => {
@@ -108,10 +115,9 @@ describe('needsActionSeries', () => {
 
   it('sorts overdue-first, then by days_to_next ascending (most overdue first)', () => {
     const out = needsActionSeries([
-      series({ id: 'adhoc', cadence_months: null, effective_next: null, days_to_next: null, is_overdue: false }),
       series({ id: 'late-a-little', is_overdue: true, days_to_next: -2 }),
       series({ id: 'late-a-lot', is_overdue: true, days_to_next: -30 }),
     ])
-    expect(out.map((s) => s.id)).toEqual(['late-a-lot', 'late-a-little', 'adhoc'])
+    expect(out.map((s) => s.id)).toEqual(['late-a-lot', 'late-a-little'])
   })
 })

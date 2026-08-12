@@ -84,7 +84,12 @@ const BASE_SELECT =
   'budget, actual_spend, longitudinal, survey_tool_id, slack_channel_url, latest_next_steps, ' +
   'captain:team_members(name, initials)'
 
-/** Rows whose `event` date falls within [from,to]. Excludes Internal + deleted. */
+/** Rows whose `event` date falls within [from,to]. Excludes Internal + deleted +
+ *  placeholder rerun waves (migration 075 delivered/Closed stubs pending data —
+ *  they'd otherwise count as real delivered/archived surveys in reports). The
+ *  count of excluded placeholders is surfaced separately via
+ *  countScopedPlaceholders() so the omission stays transparent. Null-safe for
+ *  pre-075 rows. */
 export async function surveyRows(opts: { event: SurveyEvent; from: string; to: string; type?: SurveyType }): Promise<Row[]> {
   const col = EVENT_DATE[opts.event]
   const supabase = createAdminClient()
@@ -93,6 +98,7 @@ export async function surveyRows(opts: { event: SurveyEvent; from: string; to: s
     .select(BASE_SELECT)
     .is('deleted_at', null)
     .or('project_type.is.null,project_type.neq.Internal')
+    .or('is_placeholder.is.null,is_placeholder.eq.false')
     .not(col, 'is', null)
     .gte(col, opts.from)
     .lte(col, opts.to)
@@ -103,7 +109,36 @@ export async function surveyRows(opts: { event: SurveyEvent; from: string; to: s
   return (data ?? []) as unknown as Row[]
 }
 
-/** Counts for the period+event, broken down by type (PS/B2B/Rerun) + total. */
+/** How many placeholder rerun waves (is_placeholder=true) fall in the SAME
+ *  event+period+type scope as surveyRows — i.e. the number excluded from the
+ *  report. Surfaced as a footnote so a period's totals never silently omit rows. */
+export async function countScopedPlaceholders(opts: { event: SurveyEvent; from: string; to: string; type?: SurveyType }): Promise<number> {
+  const col = EVENT_DATE[opts.event]
+  const supabase = createAdminClient()
+  let q = supabase
+    .from('survey_projects')
+    .select('id', { count: 'exact', head: true })
+    .is('deleted_at', null)
+    .or('project_type.is.null,project_type.neq.Internal')
+    .eq('is_placeholder', true)
+    .not(col, 'is', null)
+    .gte(col, opts.from)
+    .lte(col, opts.to)
+  if (opts.type) q = q.eq('project_type', opts.type)
+  const { count, error } = await q
+  if (error) throw new Error(error.message)
+  return count ?? 0
+}
+
+/** Footnote string for a report when N placeholder waves were excluded (undefined
+ *  when none, so it drops out of JSON output). */
+export function placeholderNote(n: number): string | undefined {
+  return n > 0 ? `Excludes ${n} placeholder wave(s) pending data.` : undefined
+}
+
+/** Counts for the period+event, broken down by type (PS/B2B/Rerun) + total.
+ *  Placeholder waves are excluded (see surveyRows); `placeholders_excluded` +
+ *  `note` report how many were left out. */
 export async function surveyStats(opts: { event: SurveyEvent; from: string; to: string; type?: SurveyType }) {
   const rows = await surveyRows(opts)
   const byType: Record<string, number> = { PS: 0, B2B: 0, Rerun: 0 }
@@ -111,7 +146,8 @@ export async function surveyStats(opts: { event: SurveyEvent; from: string; to: 
     const t = String(r.project_type ?? 'Other')
     byType[t] = (byType[t] ?? 0) + 1
   }
-  return { total: rows.length, by_type: byType }
+  const placeholders_excluded = await countScopedPlaceholders(opts)
+  return { total: rows.length, by_type: byType, placeholders_excluded, note: placeholderNote(placeholders_excluded) }
 }
 
 function fmt(v: unknown): string | number {
@@ -194,5 +230,8 @@ export async function opsMetrics(opts: { event: SurveyEvent; from: string; to: s
     const pAgg = aggregate(await surveyRows({ event: opts.event, from: pFrom, to: pTo, type: opts.type }))
     prior = { from: pFrom, to: pTo, count: pAgg.count, on_time_pct: pAgg.on_time_pct, actual_spend: pAgg.actual_spend }
   }
-  return { ...agg, prior }
+  // Placeholder waves are excluded from the aggregate (see surveyRows); surface
+  // how many were left out of the CURRENT period so the metrics stay transparent.
+  const placeholders_excluded = await countScopedPlaceholders({ event: opts.event, from: opts.from, to: opts.to, type: opts.type })
+  return { ...agg, prior, placeholders_excluded, note: placeholderNote(placeholders_excluded) }
 }

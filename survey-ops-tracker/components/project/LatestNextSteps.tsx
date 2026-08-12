@@ -247,20 +247,25 @@ export function LatestNextSteps({ projectId, notes }: LatestNextStepsProps) {
                       title="Mark done"
                     />
                     {editingStepId === step.id ? (
-                      <input
+                      <textarea
                         autoFocus
                         value={stepDraft}
                         onChange={e => setStepDraft(e.target.value)}
+                        rows={Math.min(16, Math.max(2, stepDraft.split('\n').length + 1))}
                         onKeyDown={e => {
-                          if (e.key === 'Enter') saveStepEdit()
+                          // Enter adds a newline (multi-line steps); Ctrl/Cmd+Enter saves.
+                          if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                            e.preventDefault()
+                            saveStepEdit()
+                          }
                           if (e.key === 'Escape') cancelStepEdit()
                         }}
                         onBlur={saveStepEdit}
-                        className="flex-1 bg-muted border border-border rounded px-2 py-0.5 text-sm text-foreground focus:outline-none focus:border-ring"
+                        className="flex-1 bg-muted border border-border rounded px-2 py-1 text-sm text-foreground leading-snug resize-y focus:outline-none focus:border-ring"
                       />
                     ) : (
                       <>
-                        <span className="flex-1 text-sm text-foreground/90 leading-snug">
+                        <span className="flex-1 text-sm text-foreground/90 leading-snug whitespace-pre-wrap">
                           {step.text}{' '}
                           <span className="text-xs text-muted-foreground whitespace-nowrap">
                             · {formatStepDate(step.created_at)}
@@ -302,7 +307,7 @@ export function LatestNextSteps({ projectId, notes }: LatestNextStepsProps) {
                     {/* Completed items are a log, not to-dos — a single done-marker
                         (no checkbox), with a hover control to move back if needed. */}
                     <span className="mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-400 text-xs" aria-hidden>✓</span>
-                    <span className="flex-1 text-sm text-muted-foreground leading-snug">
+                    <span className="flex-1 text-sm text-muted-foreground leading-snug whitespace-pre-wrap">
                       {step.text}
                       <span className="text-xs text-muted-foreground/60">
                         {' '}

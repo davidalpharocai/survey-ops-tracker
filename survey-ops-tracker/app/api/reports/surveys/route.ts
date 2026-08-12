@@ -3,6 +3,7 @@ import * as XLSX from 'xlsx'
 import { createClient } from '@/lib/supabase/server'
 import {
   EVENT_DATE, resolvePeriod, surveyRows, projectRow,
+  countScopedPlaceholders, placeholderNote,
   REPORT_FIELD_KEYS, DEFAULT_REPORT_FIELDS,
   type SurveyEvent, type SurveyType,
 } from '@/lib/mcp/reports'
@@ -44,6 +45,14 @@ export async function GET(req: NextRequest) {
   const ws = json.length
     ? XLSX.utils.json_to_sheet(json)
     : XLSX.utils.aoa_to_sheet([useFields]) // headers-only when empty
+
+  // Footnote: placeholder waves (pending data) are excluded from the rows above —
+  // append the same note the connector surfaces so a downloaded report never
+  // silently omits them. Two rows below the data (blank spacer + note).
+  const placeholders_excluded = await countScopedPlaceholders({ event, from: period.from, to: period.to, type })
+  const placeholderClause = placeholderNote(placeholders_excluded)
+  if (placeholderClause) XLSX.utils.sheet_add_aoa(ws, [[], [placeholderClause]], { origin: -1 })
+
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, ws, 'Surveys')
   const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) as Buffer

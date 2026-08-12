@@ -89,6 +89,11 @@ export function useProjects() {
         .from('survey_projects')
         .select(SLIM_SELECT)
         .is('deleted_at', null)
+        // Placeholder rerun waves (migration 075) are delivered/Closed stubs
+        // pending data — they belong to the rerun views only, not the general
+        // board/list. Exclude them (null-safe for pre-075 rows). Rerun surfaces
+        // query survey_projects by series_id directly, so they're unaffected.
+        .or('is_placeholder.is.null,is_placeholder.eq.false')
         .order('created_at', { ascending: false })
       if (error) throw error
       // Survey surfaces only — internal projects live in their own section.

@@ -59,16 +59,15 @@ export function seriesMonthEvents(series: SeriesListRow[]): Record<string, Rerun
 }
 
 /**
- * The series needing action now: overdue (the view's is_overdue already ignores
- * a completed wave and excludes paused) OR an in-service, non-paused series
- * with no cadence set (it can't schedule a next wave until someone defines one).
- * Sorted overdue-first, then by days_to_next ascending so the most-overdue lead
- * (needs-a-cadence rows have null days_to_next and sort last).
+ * The series needing action now: strictly the overdue ones (the view's
+ * is_overdue already ignores a completed wave and excludes paused). An ad-hoc
+ * (null-cadence) in-service series is NOT flagged — running ad-hoc is a
+ * deliberate first-class choice, so nagging it forever is wrong; it only needs
+ * action once it actually goes overdue. Sorted overdue-first, then by
+ * days_to_next ascending so the most-overdue lead comes first.
  */
 export function needsActionSeries(series: SeriesListRow[]): SeriesListRow[] {
-  const needing = series.filter(
-    (s) => s.is_overdue || (s.in_service && !s.paused && s.cadence_months == null)
-  )
+  const needing = series.filter((s) => s.is_overdue)
   return needing.sort((a, b) => {
     const ra = a.is_overdue ? 0 : 1
     const rb = b.is_overdue ? 0 : 1

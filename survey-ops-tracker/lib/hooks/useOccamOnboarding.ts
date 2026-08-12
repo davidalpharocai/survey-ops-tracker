@@ -8,7 +8,8 @@ export interface RequestedByContact {
   name: string
   email: string | null
   occam_invited: boolean
-  /** Whether this contact has already had a prior delivery (any delivered project). */
+  /** Whether this contact has already had a prior delivered OCCAM project (so they
+   *  already have an Occam account — a non-Occam prior delivery does NOT count). */
   hasPriorDelivery: boolean
 }
 
@@ -27,7 +28,10 @@ export function useRequestedByContact(contactId: string | null | undefined) {
       if (error) throw error
       if (!data) return null
 
-      // Prior delivery = any delivered project for this contact (already onboarded).
+      // Prior delivery = any delivered OCCAM project for this contact (i.e. they
+      // already got an Occam account on that delivery). MUST be scoped to
+      // occam=true: a contact whose earlier delivery was a NON-Occam study has no
+      // Occam account, so their first Occam delivery must still trigger the invite.
       // Not excluding the current project by id is fine: it isn't stage_delivery=true
       // until AFTER this transition, so it won't match here at gate time.
       const { data: prior, error: priorErr } = await supabase
@@ -35,6 +39,7 @@ export function useRequestedByContact(contactId: string | null | undefined) {
         .select('id')
         .eq('requested_by_contact_id', contactId!)
         .eq('stage_delivery', true)
+        .eq('occam', true)
         .is('deleted_at', null)
         .limit(1)
       if (priorErr) throw priorErr

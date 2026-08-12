@@ -164,17 +164,36 @@ export async function GET(req: NextRequest) {
         rerun_number: nextNum,
         rerun_series_id: p.rerun_series_id ?? p.id,
       }
-      const { error: insErr } = await supabase.from('survey_projects').insert(copy)
-      if (insErr) {
-        errors.push(`${p.project_name}: ${insErr.message}`)
+      // Capture the new wave's id so a failed source-stamp below can roll it back.
+      const { data: inserted, error: insErr } = await supabase
+        .from('survey_projects')
+        .insert(copy)
+        .select('id')
+        .single()
+      if (insErr || !inserted) {
+        errors.push(`${p.project_name}: ${insErr?.message ?? 'insert returned no row'}`)
         continue
       }
-      // Stamp the source so it never re-spawns this wave.
+      // Stamp the source so it never re-spawns this wave. If that UPDATE fails we
+      // must NOT leave the source eligible — the legacy lineage has no unique
+      // backstop, so the next cron run would insert a DUPLICATE next wave. Roll
+      // back by soft-deleting the wave we just inserted (recoverable from Admin)
+      // and skip this source; a later run can retry cleanly.
       const { error: stampErr } = await supabase
         .from('survey_projects')
         .update({ rerun_spawned_at: new Date().toISOString() })
         .eq('id', p.id)
-      if (stampErr) errors.push(`stamp ${p.project_name}: ${stampErr.message}`)
+      if (stampErr) {
+        const { error: rbErr } = await supabase
+          .from('survey_projects')
+          .update({ deleted_at: new Date().toISOString() })
+          .eq('id', inserted.id)
+        errors.push(
+          `stamp ${p.project_name}: ${stampErr.message}` +
+          (rbErr ? ` (rollback of inserted wave ALSO failed: ${rbErr.message})` : ' — rolled back the inserted wave')
+        )
+        continue
+      }
       // Renumber the whole lineage by chronological position so the new wave
       // takes its true number and any pre-existing gap (legacy naive max+1)
       // self-heals — never the "1,3,4" drift this used to produce.

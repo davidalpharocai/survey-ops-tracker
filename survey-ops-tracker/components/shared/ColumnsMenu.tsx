@@ -46,7 +46,12 @@ export function ColumnsMenu({
   const menuOrder = [...visibleKeys, ...hiddenKeys]
 
   function toggle(key: string) {
-    onChange(visibleKeys.includes(key) ? visibleKeys.filter((k) => k !== key) : [...visibleKeys, key])
+    const isVisible = visibleKeys.includes(key)
+    // Never allow zero visible columns — unchecking the last one would render a
+    // headerless/blank table (colSpan 0). No-op instead (the checkbox is also
+    // disabled below when it's the only one left).
+    if (isVisible && visibleKeys.length === 1) return
+    onChange(isVisible ? visibleKeys.filter((k) => k !== key) : [...visibleKeys, key])
   }
   function move(key: string, dir: -1 | 1) {
     const idx = visibleKeys.indexOf(key)
@@ -73,14 +78,23 @@ export function ColumnsMenu({
             if (!col) return null
             const visible = visibleKeys.includes(key)
             const idx = visibleKeys.indexOf(key)
+            // The single remaining visible column is required — disable its
+            // checkbox so the table can never be emptied to zero columns.
+            const isLastVisible = visible && visibleKeys.length === 1
             return (
               <div
                 key={key}
                 className="flex items-center gap-1 text-sm text-foreground/90 hover:bg-accent rounded px-1.5 py-1"
-                title={col.tooltip}
+                title={isLastVisible ? 'At least one column must stay visible' : col.tooltip}
               >
-                <label className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer">
-                  <input type="checkbox" checked={visible} onChange={() => toggle(key)} className="accent-blue-600 shrink-0" />
+                <label className={`flex items-center gap-2 flex-1 min-w-0 ${isLastVisible ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+                  <input
+                    type="checkbox"
+                    checked={visible}
+                    disabled={isLastVisible}
+                    onChange={() => toggle(key)}
+                    className="accent-blue-600 shrink-0 disabled:opacity-50"
+                  />
                   <span className="truncate">{col.label}</span>
                 </label>
                 {visible && (
