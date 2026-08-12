@@ -3,6 +3,10 @@
 // is unit-testable in isolation (see filterViews.test.ts). The page owns the
 // RerunFilterState (so switching views keeps the query); every view runs its
 // series (and, for List's wave granularity, its waves) through these helpers.
+// (matchesDuePreset is a pure date-fns helper — the same one the main board's
+// Due filter uses — so the reruns Next-due filter agrees with the board.)
+
+import { matchesDuePreset } from '@/lib/utils/date'
 
 // ---------------------------------------------------------------------------
 // Filter state
@@ -20,6 +24,16 @@ export interface RerunFilterState {
   cadence: RerunCadenceFilter
   /** 'all' or a specific owner_email. */
   owner: string
+  /** 'all' or a specific client (the series' denormalized client string). */
+  client: string
+  /** 'all' or a specific salesperson — matched against the series' waves. */
+  salesperson: string
+  /** Next-due (effective_next) filter: '' = all, else a matchesDuePreset key
+   *  ('overdue' | 'today' | 'tomorrow' | 'twodays' | 'week' | 'month' | 'none'
+   *  | 'custom'). 'custom' uses dueFrom/dueTo (ISO yyyy-mm-dd, '' = open end). */
+  due: string
+  dueFrom: string
+  dueTo: string
 }
 
 export const EMPTY_RERUN_FILTER: RerunFilterState = {
@@ -28,6 +42,11 @@ export const EMPTY_RERUN_FILTER: RerunFilterState = {
   status: 'all',
   cadence: 'all',
   owner: 'all',
+  client: 'all',
+  salesperson: 'all',
+  due: '',
+  dueFrom: '',
+  dueTo: '',
 }
 
 /** True when any filter or the search box is narrowing the result set. */
@@ -37,7 +56,10 @@ export function isFilterActive(f: RerunFilterState): boolean {
     f.type !== 'all' ||
     f.status !== 'all' ||
     f.cadence !== 'all' ||
-    f.owner !== 'all'
+    f.owner !== 'all' ||
+    f.client !== 'all' ||
+    f.salesperson !== 'all' ||
+    f.due !== ''
   )
 }
 
@@ -53,6 +75,10 @@ export interface SeriesFilterFields {
   paused: boolean
   is_overdue: boolean | null
   owner_email: string | null
+  /** Denormalized client string on the series (for the Client filter). */
+  client: string
+  /** Computed next-due date (for the Next-due filter). */
+  effective_next: string | null
 }
 
 export interface SeriesSearchFields {
@@ -67,6 +93,9 @@ export interface WaveSearchFields {
   project_code: string | null
   project_name: string | null
   survey_tool_id: string | null
+  /** Salesperson on this wave (survey_projects.salesperson) — for the
+   *  Salesperson filter, matched at the series level (any wave) or per-wave. */
+  salesperson: string | null
 }
 
 // ---------------------------------------------------------------------------
@@ -129,7 +158,26 @@ export function seriesMatchesFilters(s: SeriesFilterFields, f: RerunFilterState)
   // Owner
   if (f.owner !== 'all' && (s.owner_email ?? '') !== f.owner) return false
 
+  // Client — exact match on the series' denormalized client string.
+  if (f.client !== 'all' && s.client !== f.client) return false
+
+  // Next-due — reuse the board's Due-preset predicate against effective_next
+  // ('' preset matches everything; 'none' matches series with no next date).
+  if (!matchesDuePreset(s.effective_next, f.due || null, f.dueFrom || null, f.dueTo || null)) return false
+
   return true
+}
+
+/** Salesperson lives on the waves, not the series. A series matches the
+ *  Salesperson filter when ANY of its waves was sold by that salesperson.
+ *  'all' short-circuits to true (and a series with no waves can't match a
+ *  specific salesperson). */
+export function seriesMatchesSalesperson(
+  waves: readonly Pick<WaveSearchFields, 'salesperson'>[],
+  f: RerunFilterState,
+): boolean {
+  if (f.salesperson === 'all') return true
+  return waves.some((w) => (w.salesperson ?? '') === f.salesperson)
 }
 
 function tokens(query: string): string[] {
@@ -186,21 +234,32 @@ export function waveMatchesSearch(
   return ts.every((t) => h.includes(t))
 }
 
-/** A series passes when it clears the dropdown filters AND the deep search. */
+/** A series passes when it clears the dropdown filters (incl. Salesperson,
+ * matched across its waves) AND the deep search. */
 export function seriesPasses(
   s: SeriesFilterFields & SeriesSearchFields,
   waves: readonly WaveSearchFields[],
   f: RerunFilterState,
 ): boolean {
-  return seriesMatchesFilters(s, f) && seriesMatchesSearch(s, waves, f.search)
+  return (
+    seriesMatchesFilters(s, f) &&
+    seriesMatchesSalesperson(waves, f) &&
+    seriesMatchesSearch(s, waves, f.search)
+  )
 }
 
-/** A wave row passes when its parent series clears the dropdown filters AND the
- * deep search matches the wave (in its series context). */
+/** A wave row passes when its parent series clears the dropdown filters, THIS
+ * wave matches the Salesperson filter (a wave row is a single wave, so it's the
+ * wave's own salesperson — not "any wave in the series"), AND the deep search
+ * matches the wave (in its series context). */
 export function wavePasses(
   w: WaveSearchFields,
   s: SeriesFilterFields & SeriesSearchFields,
   f: RerunFilterState,
 ): boolean {
-  return seriesMatchesFilters(s, f) && waveMatchesSearch(w, s, f.search)
+  return (
+    seriesMatchesFilters(s, f) &&
+    seriesMatchesSalesperson([w], f) &&
+    waveMatchesSearch(w, s, f.search)
+  )
 }

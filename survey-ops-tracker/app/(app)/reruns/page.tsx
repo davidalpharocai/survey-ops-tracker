@@ -896,6 +896,19 @@ export default function RerunsPage() {
     for (const s of firstClassSeries) if (s.owner_email) set.add(s.owner_email)
     return [...set].sort((a, b) => a.localeCompare(b))
   }, [firstClassSeries])
+  const clients = useMemo(() => {
+    const set = new Set<string>()
+    for (const s of firstClassSeries) if (s.client) set.add(s.client)
+    return [...set].sort((a, b) => a.localeCompare(b))
+  }, [firstClassSeries])
+  // Salesperson lives on the waves, not the series — derive the distinct set
+  // across every wave so the Salesperson filter (matched across a series' waves)
+  // has its options.
+  const salespeople = useMemo(() => {
+    const set = new Set<string>()
+    for (const w of allWaves) if (w.salesperson) set.add(w.salesperson)
+    return [...set].sort((a, b) => a.localeCompare(b))
+  }, [allWaves])
   // Calendar is fed only the series that pass the shared filter + deep search.
   const calendarSeries = useMemo(
     () => firstClassSeries.filter((s) => seriesPasses(s, wavesBySeries.get(s.id) ?? [], filter)),
@@ -958,7 +971,7 @@ export default function RerunsPage() {
           </div>
 
           {/* Shared filter + deep search (state lives here, spans all three views) */}
-          <RerunFilterBar value={filter} onChange={setFilter} owners={owners} />
+          <RerunFilterBar value={filter} onChange={setFilter} owners={owners} clients={clients} salespeople={salespeople} />
 
           {/* Active view */}
           {fcError ? (

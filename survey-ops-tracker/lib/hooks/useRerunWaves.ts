@@ -21,7 +21,7 @@ export interface SeriesWaveRow extends SeriesWave {
 // WAVE_COLS (see useRerunSeriesRecord.ts) + series_id + client. is_placeholder
 // is already in WAVE_COLS; listed here to match the query the record hook uses.
 const WAVE_COLS_ALL =
-  'id, project_code, project_name, rerun_number, wave_order, submitted_date, launch_date, due_date, deliver_date, delivered_at, n_target, n_collected, n_actual, survey_tool_id, status, board_column, is_placeholder, series_id, client'
+  'id, project_code, project_name, rerun_number, wave_order, submitted_date, launch_date, due_date, deliver_date, delivered_at, n_target, n_collected, n_actual, survey_tool_id, status, board_column, is_placeholder, salesperson, series_id, client'
 
 export function useAllRerunWaves() {
   const supabase = createClient()

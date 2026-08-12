@@ -517,6 +517,7 @@ export function RerunListView({
         in_service: true,
         paused: false,
         is_overdue: false,
+        effective_next: null,
       }
     const rows = waves.filter((w) => wavePasses(w, parentOf(w), filter))
     return rows.sort((a, b) =>
