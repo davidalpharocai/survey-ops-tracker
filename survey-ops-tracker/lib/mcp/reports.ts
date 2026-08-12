@@ -132,7 +132,7 @@ export async function countScopedPlaceholders(opts: { event: SurveyEvent; from: 
 
 /** Footnote string for a report when N placeholder waves were excluded (undefined
  *  when none, so it drops out of JSON output). */
-function placeholderNote(n: number): string | undefined {
+export function placeholderNote(n: number): string | undefined {
   return n > 0 ? `Excludes ${n} placeholder wave(s) pending data.` : undefined
 }
 

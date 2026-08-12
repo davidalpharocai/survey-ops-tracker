@@ -28,6 +28,7 @@ import {
 import { fmtNum } from '@/lib/utils/number'
 import {
   resolvePeriod, surveyStats, surveyRows, projectRow, opsMetrics,
+  countScopedPlaceholders, placeholderNote,
   REPORT_FIELD_KEYS, DEFAULT_REPORT_FIELDS,
   type SurveyEvent, type SurveyType,
 } from '@/lib/mcp/reports'
@@ -185,10 +186,15 @@ export const TOOLS: AssistantTool[] = [
       const period = resolvePeriod(args)
       if ('error' in period) return { error: period.error }
       const stats = await surveyStats({ event: args.event, from: period.from, to: period.to, type: args.type })
-      const summary = args.type
+      const base = args.type
         ? `${stats.total} ${args.type} survey(s) ${args.event} in ${period.label}.`
         : `${stats.total} survey(s) ${args.event} in ${period.label} — PS ${stats.by_type.PS}, B2B ${stats.by_type.B2B}, Rerun ${stats.by_type.Rerun}.`
-      return { ok: true, event: args.event, type: args.type ?? 'all', period, total: stats.total, by_type: stats.by_type, summary }
+      const summary = stats.note ? `${base} ${stats.note}` : base
+      return {
+        ok: true, event: args.event, type: args.type ?? 'all', period,
+        total: stats.total, by_type: stats.by_type,
+        placeholders_excluded: stats.placeholders_excluded, note: stats.note, summary,
+      }
     },
   },
   {
@@ -216,6 +222,8 @@ export const TOOLS: AssistantTool[] = [
       const chosen = (args.fields ?? []).filter(k => REPORT_FIELD_KEYS.includes(k))
       const fields = chosen.length ? chosen : DEFAULT_REPORT_FIELDS
       const rows = await surveyRows({ event: args.event, from: period.from, to: period.to, type: args.type })
+      const placeholders_excluded = await countScopedPlaceholders({ event: args.event, from: period.from, to: period.to, type: args.type })
+      const placeholderClause = placeholderNote(placeholders_excluded)
       const projected = rows.map(r => projectRow(r, fields))
 
       const qs = new URLSearchParams()
@@ -234,16 +242,17 @@ export const TOOLS: AssistantTool[] = [
         event: args.event, type: args.type ?? 'all', period, count: rows.length,
         fields_used: fields, available_fields: REPORT_FIELD_KEYS, default_fields: DEFAULT_REPORT_FIELDS,
         rows_preview: projected.slice(0, 50), truncated: projected.length > 50,
-        download_url,
+        download_url, placeholders_excluded,
         note: (chosen.length ? '' : 'Used the default columns — re-call with a subset of available_fields to choose. ') +
-          `${rows.length} row(s) for ${period.label}. Download the Excel (.xlsx): ${download_url}`,
+          `${rows.length} row(s) for ${period.label}. Download the Excel (.xlsx): ${download_url}` +
+          (placeholderClause ? ` ${placeholderClause}` : ''),
       }
     },
   },
   {
     name: 'rerun_radar',
     description:
-      "Recurring reruns that need attention, bucketed: overdue (past their effective due date), needs_definition (no cadence/owner set yet), prep_window (due within the lead time), and upcoming. Reads the live rerun_status view (paused series excluded); each item lists client, platform, cadence, last wave, due date, and owner. Pass mine:true to scope to reruns you own. Use for “what reruns are overdue / coming up / still need a cadence”.",
+      "Recurring reruns that need attention, bucketed: overdue (past their next-wave date), prep_window (due within the lead time), and upcoming. Reads the first-class rerun_series_status model (paused/ended series excluded); each item lists client, survey, cadence, last wave, due date, and owner. Pass mine:true to scope to reruns you own. Use for “what reruns are overdue / coming up”.",
     kind: 'read',
     schema: { mine: z.boolean().optional() },
     handler: async (rawArgs, ctx) => {
@@ -254,8 +263,9 @@ export const TOOLS: AssistantTool[] = [
 
   // -------------------------------------------------------------------------
   // reruns: first-class rerun_series model (migration 073). search/report/ask
-  // are reads; the lifecycle tools below are confirmable writes. The new model
-  // is the source of truth; rerun_radar unions it with the legacy sheet mirror.
+  // are reads; the lifecycle tools below are confirmable writes. The first-class
+  // model is the source of truth; rerun_radar reads it exclusively (the legacy
+  // sheet mirror is retired as a rerun view).
   // -------------------------------------------------------------------------
   {
     name: 'search_reruns',

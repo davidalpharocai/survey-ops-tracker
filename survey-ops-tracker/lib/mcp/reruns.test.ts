@@ -134,8 +134,8 @@ describe('rerunCalendar output shape', () => {
   })
 })
 
-describe('rerunRadar union: adhoc bucketing + dedupe-surface behavior', () => {
-  it('never puts a first-class adhoc/no-cadence series in needs_definition, and an OMITTED first-class row does not hide its legacy twin; a SURFACED one dedupes it', async () => {
+describe('rerunRadar (first-class only)', () => {
+  it('buckets first-class series by due state; adhoc/no-cadence is omitted (never needs_definition), and the retired legacy sheet mirror does not contribute', async () => {
     const res = (await data.rerunRadar()) as {
       ok: boolean
       counts: { overdue: number; needs_definition: number; prep_window: number; upcoming: number }
@@ -144,23 +144,23 @@ describe('rerunRadar union: adhoc bucketing + dedupe-surface behavior', () => {
       prep_window: { name: string | null }[]
       upcoming: { name: string | null }[]
     }
-    // #2: first-class model has no needs_definition state (adhoc is by choice).
+    // adhoc (null cadence) is a deliberate choice → the first-class model has no
+    // needs_definition state, so it is always 0/empty.
     expect(res.counts.needs_definition).toBe(0)
 
     const all = [...res.overdue, ...res.needs_definition, ...res.prep_window, ...res.upcoming].map((x) => x.name)
 
-    // The first-class Acme (overdue) and Beta (upcoming) surfaced.
+    // Acme (overdue) and Beta (upcoming) surface from the first-class model.
     expect(res.overdue.map((x) => x.name)).toContain('Acme Tracker')
     expect(res.upcoming.map((x) => x.name)).toContain('Beta Wave')
 
-    // #4: Gamma's first-class row was omitted (adhoc/no due date), so its legacy
-    // twin (which HAS a due date) still shows — the study never disappears.
-    expect(res.overdue.map((x) => x.name)).toContain('Gamma Study')
+    // Gamma is adhoc / no computable due date → omitted from every bucket.
+    expect(all).not.toContain('Gamma Study')
 
-    // Beta was surfaced from the first-class model, so its legacy twin is deduped
-    // away — it appears exactly once.
+    // The legacy sheet mirror is retired as a rerun source: its rows never appear
+    // (no double-counting), and each first-class study shows exactly once.
+    expect(res.overdue).toHaveLength(1)
+    expect(res.upcoming).toHaveLength(1)
     expect(all.filter((n) => n === 'Beta Wave')).toHaveLength(1)
-    // Gamma appears exactly once too (only the legacy twin, since first-class omitted).
-    expect(all.filter((n) => n === 'Gamma Study')).toHaveLength(1)
   })
 })
