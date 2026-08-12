@@ -49,6 +49,12 @@ function cadenceLabel(m: number | null): string {
 
 const MONEY_MODEL_OPTS = ['', 'PS suppliers', 'B2B blasts']
 
+// The series-details edit form must be able to SAVE a base_type of null (a
+// migration-074 "Rerun Service" series that never had a PS/B2B base type) — the
+// hook's RerunSeriesFieldsPatch types base_type as 'B2B'|'PS', so we widen it
+// locally to let null flow through. The API + pickSeriesUpdatePatch accept null.
+type SeriesEditFields = Omit<RerunSeriesFieldsPatch, 'base_type'> & { base_type?: 'B2B' | 'PS' | null }
+
 type FutureDefaultsUI = FutureDefaults & { money_model?: string | null }
 
 const inputCls =
@@ -213,7 +219,10 @@ const WAVE_COLUMNS_STORAGE_KEY = 'sot.rerunWaveColumns'
 /** Personal-to-browser column prefs, like the List view's hiddenCols. Guards
  * against unknown/renamed keys (a stale localStorage entry from a prior
  * registry shape) by filtering to keys that still exist in the registry, and
- * falls back to the default order if nothing valid survives. */
+ * falls back to the default order if nothing valid survives. Also APPENDS any
+ * registry columns missing from the stored list — so a column added to the
+ * registry after a user saved their prefs shows up (at the end, order otherwise
+ * preserved) instead of staying hidden until they hit Reset. */
 function loadStoredWaveColumns(): WaveColumnKey[] | null {
   try {
     const raw = localStorage.getItem(WAVE_COLUMNS_STORAGE_KEY)
@@ -221,7 +230,9 @@ function loadStoredWaveColumns(): WaveColumnKey[] | null {
     const parsed: unknown = JSON.parse(raw)
     if (!Array.isArray(parsed)) return null
     const valid = parsed.filter((k): k is WaveColumnKey => WAVE_COLUMN_KEYS.includes(k as WaveColumnKey))
-    return valid.length > 0 ? valid : null
+    if (valid.length === 0) return null
+    const missing = WAVE_COLUMN_KEYS.filter((k) => !valid.includes(k))
+    return [...valid, ...missing]
   } catch {
     return null
   }
@@ -651,7 +662,10 @@ export function RerunSeriesRecord({ seriesId }: { seriesId: string }) {
       {/* Series details */}
       <SeriesDetailsSection series={series} onSave={(fields) => {
         actions.mutate(
-          { action: 'update', seriesId, fields },
+          // base_type may be null (Rerun-Service series); the wire + server
+          // accept it, but RerunSeriesFieldsPatch types it 'B2B'|'PS', so this
+          // cast is the type-only bridge across that (hook-owned) narrowing.
+          { action: 'update', seriesId, fields: fields as RerunSeriesFieldsPatch },
           {
             onSuccess: () => { toast('Series details updated ✓', 'success'); setEditingDetails(false) },
             onError: (e) => toast((e as Error).message),
@@ -721,7 +735,7 @@ function SeriesDetailsSection({
   saving,
 }: {
   series: import('@/lib/hooks/useRerunSeriesRecord').SeriesStatusRow
-  onSave: (fields: RerunSeriesFieldsPatch) => void
+  onSave: (fields: SeriesEditFields) => void
   editing: boolean
   setEditing: (v: boolean) => void
   saving: boolean
@@ -791,6 +805,7 @@ function SeriesDetailsSection({
             <label className="flex items-center gap-1 text-[12px] text-muted-foreground">
               Base type
               <select value={baseType} onChange={(e) => setBaseType(e.target.value)} className={inputCls}>
+                <option value="">🔁 Rerun Service (base type not set)</option>
                 <option value="PS">PS</option>
                 <option value="B2B">B2B</option>
               </select>
@@ -849,7 +864,9 @@ function SeriesDetailsSection({
               onClick={() =>
                 onSave({
                   survey_name: surveyName.trim() || series.survey_name,
-                  base_type: baseType as 'PS' | 'B2B',
+                  // Keep null null — a Rerun-Service series stays base-type-less;
+                  // don't coerce '' to PS. Picking PS/B2B reclassifies it.
+                  base_type: baseType === '' ? null : (baseType as 'PS' | 'B2B'),
                   cadence_months: cadence ? Number(cadence) : null,
                   delivery_cadence: deliveryCadence.trim() || null,
                   service_mode: serviceMode,

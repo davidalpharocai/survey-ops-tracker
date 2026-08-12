@@ -21,6 +21,15 @@ export async function POST(req: NextRequest) {
   if (!user || !isAllowedEmail(user.email)) {
     return new Response('Unauthorized', { status: 401 })
   }
+  // Analyst-role gate: commitWrite runs the same admin/service-role registry
+  // handlers the connector + REST + RLS all restrict to role='analyst'. Everyone
+  // is an analyst today (zero behavior change), but this closes the gap before
+  // any non-analyst role ships. Mirrors requireAnalyst() in
+  // app/api/reruns/series/route.ts.
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  if (profile?.role !== 'analyst') {
+    return Response.json({ error: 'Forbidden — analyst role required.' }, { status: 403 })
+  }
   const userEmail = user.email as string
 
   const body = (await req.json().catch(() => null)) as { token?: unknown } | null

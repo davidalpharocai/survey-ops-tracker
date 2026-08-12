@@ -376,7 +376,10 @@ const DEFAULT_WAVE_SORT: SortState<WaveSortField> = { field: 'fielded', dir: 'de
 /** Personal-to-browser column prefs, like RerunSeriesRecord's wave-columns
  * localStorage pattern. Guards against unknown/stale keys (e.g. a prior
  * registry shape) by filtering to keys that still exist, falling back to
- * null (→ caller uses its default) if nothing valid survives. */
+ * null (→ caller uses its default) if nothing valid survives. Also APPENDS any
+ * registry columns missing from the stored list — so a column added to the
+ * registry after a user saved their prefs shows up (at the end, order otherwise
+ * preserved) instead of staying hidden until they hit Reset. */
 function loadStoredColumnKeys<K extends string>(storageKey: string, validKeys: readonly K[]): K[] | null {
   try {
     const raw = localStorage.getItem(storageKey)
@@ -384,7 +387,9 @@ function loadStoredColumnKeys<K extends string>(storageKey: string, validKeys: r
     const parsed: unknown = JSON.parse(raw)
     if (!Array.isArray(parsed)) return null
     const valid = parsed.filter((k): k is K => validKeys.includes(k as K))
-    return valid.length > 0 ? valid : null
+    if (valid.length === 0) return null
+    const missing = validKeys.filter((k) => !valid.includes(k))
+    return [...valid, ...missing]
   } catch {
     return null
   }
