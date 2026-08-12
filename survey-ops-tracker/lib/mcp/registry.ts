@@ -7,12 +7,13 @@ import { complianceGate } from '@/lib/utils/compliance'
 import { occamOnboardingGate } from '@/lib/utils/occam'
 import { autoStamp } from '@/lib/utils/date'
 import { normalizeClientText, firmNameFrom } from '@/lib/utils/clientName'
-import { blastTotal } from '@/lib/utils/blast'
+import { blastTotal, totalBidDollars } from '@/lib/utils/blast'
 import type { Database } from '@/lib/supabase/types'
 import * as data from '@/lib/mcp/data'
 import {
   resolveProjectWritable, resolveStep, resolveContact, resolveSegment, loadGateInput,
   runAddStep, runCompleteStep, runEditStep, runProjectWrite, runLogBlast,
+  resolveBlast, listBlastsForProject, runUpdateBlast, runRemoveBlast,
   runAddSegment, runUpdateSegment, runRemoveSegment,
   runRenameClient, runCreateProject,
   pickProjectPatch, diffSummary, stageColumnsFor,
@@ -1383,7 +1384,7 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'log_blast',
     description:
-      "Log a B2B blast against a project — its $/bid (the per-completion reward), the # of people it went to, the # of those who COMPLETED the survey, when it ran (optional), and an optional description of the audience. Its cost is $/bid × # of completes (we only pay people who completed, not everyone reached), and that counts toward the project's spend. If $/bid or # of people is missing, ask. If completes aren't known yet, pass 0 (spend stays $0 for this blast) and the user can fill them in later in the app. You can also ingest a blast-platform campaign screenshot: per blast, map Reward→bid, that blast's Sent→people, Rewards Count→completes (so spend matches the platform's Total Issued; NOT the higher \"Completed\" count), its Scheduled date/time→blast_at, and channel/audience/template→description; resolve the project by campaign name or Survey ID, and set idem_key to \"<SurveyID>#<BlastLabel>\" so re-importing the same screenshot doesn't double-log. Preview first; confirm to apply.",
+      "Log (or update) a B2B blast against a project — its $/bid (the per-completion reward), the # of people it went to, the # of those who COMPLETED the survey, when it ran (optional), and an optional description of the audience. Its cost is $/bid × # of completes (we only pay people who completed, not everyone reached), and that counts toward the project's spend. If $/bid or # of people is missing, ask. If completes aren't known yet, pass 0 (spend stays $0 for this blast) — then fill them in later by re-calling with the SAME idem_key (it upserts, like log_launch), or via update_blast. You can also ingest a blast-platform campaign screenshot: per blast, map Reward→bid, that blast's Sent→people, Rewards Count→completes (so spend matches the platform's Total Issued; NOT the higher \"Completed\" count), its Scheduled date/time→blast_at, and channel/audience/template→description; resolve the project by campaign name or Survey ID, and set idem_key to \"<SurveyID>#<BlastLabel>\" so re-importing the same screenshot updates that same blast instead of double-logging. Preview first (shows create vs update); confirm to apply.",
     kind: 'write',
     schema: {
       project: z.string(),
@@ -1410,12 +1411,24 @@ export const TOOLS: AssistantTool[] = [
       const completes = args.completes ?? 0
       const thisBlastTotal = blastTotal({ bid: args.bid, completes })
       const currentSpend = (p.actual_spend as number | null) ?? 0
-      const projectedSpend = currentSpend + thisBlastTotal
+
+      // Upsert on idem_key: if a blast with this idem_key already exists on the
+      // project, re-logging UPDATES it (bid/people/completes/blast_at/description)
+      // instead of no-op'ing — parity with log_launch's label upsert. Only an
+      // explicit idem_key can collide; a bare call gets a fresh UUID → always new.
+      const existing = args.idem_key ? await resolveBlast(p.id as string, args.idem_key) : null
+      // Projected project spend: on update, swap this blast's OLD contribution for
+      // the new one; on create, add it.
+      const priorContribution = existing ? blastTotal({ bid: existing.bid, completes: existing.completes }) : 0
+      const projectedSpend = currentSpend - priorContribution + thisBlastTotal
 
       return confirmable(
         args,
         async () => ({
-          summary: `Log blast: ${completes} completes / ${args.people} people @ $${args.bid}/bid = $${thisBlastTotal} → projected spend $${projectedSpend}`,
+          summary:
+            `${existing ? 'Update' : 'Log'} blast on ${p.project_code}: ${completes} completes / ${args.people} people @ $${args.bid}/bid = ${money(thisBlastTotal)} → projected spend ${money(projectedSpend)}` +
+            (existing ? ' (updates the existing blast with this idem_key — no duplicate)' : ''),
+          mode: existing ? 'update' : 'create',
           people: args.people, completes, bid: args.bid, blast_at: args.blast_at ?? null,
           projected_actual_spend: projectedSpend,
         }),
@@ -1426,8 +1439,13 @@ export const TOOLS: AssistantTool[] = [
             createdBy: userEmail.split('@')[0], idemKey: args.idem_key ?? randomUUID(),
             actor: `${userEmail} via Claude`,
           })
-          meta.detail = { created: { id: row.id, people: row.people, completes: row.completes, bid: row.bid } }
-          return { ok: true, blast: { id: row.id, people: row.people, completes: row.completes, bid: row.bid, blast_at: row.blast_at } }
+          const blast_spend_total = totalBidDollars(await listBlastsForProject(p.id as string) as never)
+          meta.detail = { [existing ? 'updated' : 'created']: { id: row.id, people: row.people, completes: row.completes, bid: row.bid } }
+          return {
+            ok: true, mode: existing ? 'updated' : 'created',
+            blast: { id: row.id, people: row.people, completes: row.completes, bid: row.bid, blast_at: row.blast_at },
+            blast_spend_total,
+          }
         }
       )
     },
@@ -1633,6 +1651,98 @@ export const TOOLS: AssistantTool[] = [
           await runRemoveLaunch(launch.id as string)
           meta.detail = { removed_launch: { id: launch.id, label: launch.label ?? null }, by: userEmail }
           return { ok: true, removed: String(launch.label ?? launch.id) }
+        }
+      )
+    },
+  },
+  {
+    name: 'update_blast',
+    description:
+      "Update a B2B blast on a project — any of its $/bid, # of people, # of completes, when it ran (blast_at), or description. Identify it by `blast_ref` = its idem_key (e.g. \"<SurveyID>#<BlastLabel>\") or its id. Only the fields you pass change (idempotent). Cost = $/bid × completes recomputes into the project's spend. Use this to fill in completes on a blast logged from a campaign Overview tab. Preview first; confirm to apply.",
+    kind: 'write',
+    schema: {
+      project: z.string(),
+      blast_ref: z.string(),
+      bid: z.number().min(0).optional(),
+      people: z.number().int().min(0).optional(),
+      completes: z.number().int().min(0).optional(),
+      blast_at: z.string().nullable().optional(),
+      description: z.string().max(1000).nullable().optional(),
+      confirm: z.boolean().optional(),
+    },
+    handler: async (rawArgs, ctx, meta) => {
+      const args = rawArgs as {
+        project: string; blast_ref: string; bid?: number; people?: number; completes?: number
+        blast_at?: string | null; description?: string | null; confirm?: boolean
+      }
+      const { userEmail } = ctx
+      const p = await resolveProjectWritable(args.project)
+      if (!p) return { error: 'Project not found.' }
+      if ('error' in p) return p
+      if ('ambiguous' in p) return p
+      meta.project_id = p.id as string
+      const blast = await resolveBlast(p.id as string, args.blast_ref)
+      if (!blast) return { error: `No blast found matching "${args.blast_ref}" on this project.` }
+
+      // jsonb patch — only the fields passed (description maps to the note column).
+      const patch: Record<string, unknown> = {}
+      if (args.bid !== undefined) patch.bid = args.bid
+      if (args.people !== undefined) patch.people = args.people
+      if (args.completes !== undefined) patch.completes = args.completes
+      if (args.blast_at !== undefined) patch.blast_at = args.blast_at
+      if (args.description !== undefined) patch.note = args.description
+      if (Object.keys(patch).length === 0) {
+        return { needs: 'a change', message: 'Specify at least one of: bid, people, completes, blast_at, description.' }
+      }
+      const desc = [
+        args.bid !== undefined ? `bid → $${args.bid}` : null,
+        args.people !== undefined ? `people → ${args.people}` : null,
+        args.completes !== undefined ? `completes → ${args.completes}` : null,
+        args.blast_at !== undefined ? `blast_at → ${args.blast_at ?? '—'}` : null,
+        args.description !== undefined ? `description → "${args.description ?? ''}"` : null,
+      ].filter(Boolean).join(', ')
+
+      return confirmable(
+        args,
+        async () => ({ summary: `Update blast ${blast.idem_key ? `"${blast.idem_key}"` : blast.id} on ${p.project_code}: ${desc}` }),
+        async () => {
+          const row = await runUpdateBlast({ blastId: blast.id, patch, actor: `${userEmail} via Claude` })
+          const blast_spend_total = totalBidDollars(await listBlastsForProject(p.id as string) as never)
+          meta.detail = { updated_blast: { id: row.id, people: row.people, completes: row.completes, bid: row.bid } }
+          return {
+            ok: true,
+            blast: { id: row.id, people: row.people, completes: row.completes, bid: row.bid, blast_at: row.blast_at },
+            blast_spend_total,
+          }
+        }
+      )
+    },
+  },
+  {
+    name: 'remove_blast',
+    description:
+      "Remove a B2B blast from a project. Identify it by `blast_ref` = its idem_key or id. Destructive — the project's blast spend recomputes without it. Preview first; confirm to apply.",
+    kind: 'write',
+    schema: { project: z.string(), blast_ref: z.string(), confirm: z.boolean().optional() },
+    handler: async (rawArgs, ctx, meta) => {
+      const args = rawArgs as { project: string; blast_ref: string; confirm?: boolean }
+      const { userEmail } = ctx
+      const p = await resolveProjectWritable(args.project)
+      if (!p) return { error: 'Project not found.' }
+      if ('error' in p) return p
+      if ('ambiguous' in p) return p
+      meta.project_id = p.id as string
+      const blast = await resolveBlast(p.id as string, args.blast_ref)
+      if (!blast) return { error: `No blast found matching "${args.blast_ref}" on this project.` }
+
+      return confirmable(
+        args,
+        async () => ({ summary: `Remove blast ${blast.idem_key ? `"${blast.idem_key}"` : blast.id} (${blast.completes} completes @ $${blast.bid}/bid) from ${p.project_code}` }),
+        async () => {
+          await runRemoveBlast(blast.id, `${userEmail} via Claude`)
+          const blast_spend_total = totalBidDollars(await listBlastsForProject(p.id as string) as never)
+          meta.detail = { removed_blast: { id: blast.id, idem_key: blast.idem_key ?? null }, by: userEmail }
+          return { ok: true, removed: blast.idem_key ?? blast.id, blast_spend_total }
         }
       )
     },

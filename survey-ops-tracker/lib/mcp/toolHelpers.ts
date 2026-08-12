@@ -64,7 +64,8 @@ export function describeUnrevertible(field: string): string {
   if (field === '(deleted)') return 'a deletion — restore it via Recently Deleted in the app'
   if (field === '(restored)') return 'a restore'
   if (['status', 'phase', 'scoping_stage', 'board_column'].includes(field)) return 'a status/stage change — use advance_project or set_project_status'
-  if (field.startsWith('blast') || field.startsWith('bid') || field.startsWith('supplier') || field.startsWith('launch') || field.startsWith('segment')) return 'a money/segment line — correct it in the app'
+  if (field.startsWith('blast')) return 'a blast — correct it with update_blast / remove_blast (or re-log_blast with the same idem_key)'
+  if (field.startsWith('bid') || field.startsWith('supplier') || field.startsWith('launch') || field.startsWith('segment')) return 'a money/segment line — use update_launch / remove_launch for launches, or the app'
   if (field === 'captain' || field.startsWith('co_captain') || field.startsWith('requested_by')) return 'a people/relational field — set it via the app or the connector'
   if (['client', 'project_type'].includes(field)) return 'an identity field — change it with update_project'
   if (['n_target', 'n_collected', 'n_actual', 'n_internal_target'].includes(field)) return "a segmented project's N total — edit the segments with update_segment"
@@ -116,7 +117,7 @@ Resolving "me"/"my": call get_me to resolve the caller's own name/initials/role,
 
 Recording interactions: to log that something happened outside the app (e.g. "we emailed the client about timeline"), use add_note (project-scoped) or add_client_note (client-scoped) — there is deliberately no tool to write a project_activity entry directly.
 
-Corrections: logged blasts and bids can't be edited or deleted via the connector. If a user needs to correct one, tell them to do it in the app.
+Corrections: logged BLASTS are editable via the connector — re-call log_blast with the SAME idem_key to upsert (updates bid/people/completes/blast_at/description), or use update_blast (only the fields you pass change) / remove_blast; all preview-then-confirm, and the project's blast spend recomputes. This is how you fill in completes on a blast logged with completes=0. Bids still can't be edited/deleted via the connector — for those, tell the user to use the app.
 
 Money idempotency: log_blast affects spend, so a retried confirm must not double-count. Pass a stable idem_key for each blast you intend to log (e.g. derived from the conversation turn) and reuse that same idem_key if you retry the same confirm call — don't generate a new one on retry. Only use a different idem_key when the user genuinely means a new, separate blast.
 
