@@ -6,6 +6,7 @@ import {
   cadenceLabel,
   seriesStatusKey,
   seriesMatchesFilters,
+  seriesMatchesSalesperson,
   seriesMatchesSearch,
   waveMatchesSearch,
   seriesPasses,
@@ -27,6 +28,7 @@ function series(overrides: Partial<SeriesFilterFields & SeriesSearchFields> = {}
     in_service: true,
     paused: false,
     is_overdue: false,
+    effective_next: null,
     ...overrides,
   }
 }
@@ -36,6 +38,7 @@ function wave(overrides: Partial<WaveSearchFields> = {}): WaveSearchFields {
     project_code: 'PR00123',
     project_name: 'Brand Tracker Wave 3',
     survey_tool_id: 'ps-abc-999',
+    salesperson: 'Alex',
     ...overrides,
   }
 }
@@ -81,6 +84,9 @@ describe('isFilterActive', () => {
     expect(isFilterActive(filter({ status: 'overdue' }))).toBe(true)
     expect(isFilterActive(filter({ cadence: 'adhoc' }))).toBe(true)
     expect(isFilterActive(filter({ owner: 'sam@alpharoc.ai' }))).toBe(true)
+    expect(isFilterActive(filter({ client: 'Acme' }))).toBe(true)
+    expect(isFilterActive(filter({ salesperson: 'Alex' }))).toBe(true)
+    expect(isFilterActive(filter({ due: 'overdue' }))).toBe(true)
   })
 })
 
@@ -127,6 +133,61 @@ describe('seriesMatchesFilters — cadence & owner', () => {
     expect(seriesMatchesFilters(series({ owner_email: 'sam@alpharoc.ai' }), filter({ owner: 'sam@alpharoc.ai' }))).toBe(true)
     expect(seriesMatchesFilters(series({ owner_email: 'jo@alpharoc.ai' }), filter({ owner: 'sam@alpharoc.ai' }))).toBe(false)
     expect(seriesMatchesFilters(series({ owner_email: null }), filter({ owner: 'sam@alpharoc.ai' }))).toBe(false)
+  })
+})
+
+describe('seriesMatchesFilters — client', () => {
+  it('matches an exact client, else fails; all passes everything', () => {
+    expect(seriesMatchesFilters(series({ client: 'Acme' }), filter({ client: 'Acme' }))).toBe(true)
+    expect(seriesMatchesFilters(series({ client: 'Beta Corp' }), filter({ client: 'Acme' }))).toBe(false)
+    expect(seriesMatchesFilters(series({ client: 'Beta Corp' }), filter({ client: 'all' }))).toBe(true)
+  })
+})
+
+describe('seriesMatchesFilters — next-due', () => {
+  it("'all' (empty) passes any next date, incl. none", () => {
+    expect(seriesMatchesFilters(series({ effective_next: '2030-01-01' }), filter({ due: '' }))).toBe(true)
+    expect(seriesMatchesFilters(series({ effective_next: null }), filter({ due: '' }))).toBe(true)
+  })
+  it("'none' matches only a series with no next date", () => {
+    expect(seriesMatchesFilters(series({ effective_next: null }), filter({ due: 'none' }))).toBe(true)
+    expect(seriesMatchesFilters(series({ effective_next: '2030-01-01' }), filter({ due: 'none' }))).toBe(false)
+  })
+  it("'custom' respects an inclusive [from, to] range on effective_next", () => {
+    const f = filter({ due: 'custom', dueFrom: '2030-01-01', dueTo: '2030-01-31' })
+    expect(seriesMatchesFilters(series({ effective_next: '2030-01-15' }), f)).toBe(true)
+    expect(seriesMatchesFilters(series({ effective_next: '2030-01-01' }), f)).toBe(true)
+    expect(seriesMatchesFilters(series({ effective_next: '2030-02-01' }), f)).toBe(false)
+    expect(seriesMatchesFilters(series({ effective_next: null }), f)).toBe(false)
+    // Open-ended range (only a lower bound)
+    const fromOnly = filter({ due: 'custom', dueFrom: '2030-01-10', dueTo: '' })
+    expect(seriesMatchesFilters(series({ effective_next: '2030-01-05' }), fromOnly)).toBe(false)
+    expect(seriesMatchesFilters(series({ effective_next: '2030-06-05' }), fromOnly)).toBe(true)
+  })
+})
+
+describe('seriesMatchesSalesperson (across a series’ waves)', () => {
+  it("'all' passes regardless of waves; else a series matches when ANY wave has that salesperson", () => {
+    expect(seriesMatchesSalesperson([], filter({ salesperson: 'all' }))).toBe(true)
+    const waves = [wave({ salesperson: 'Alex' }), wave({ salesperson: 'Jenna' })]
+    expect(seriesMatchesSalesperson(waves, filter({ salesperson: 'Jenna' }))).toBe(true)
+    expect(seriesMatchesSalesperson(waves, filter({ salesperson: 'Steven' }))).toBe(false)
+    // A series with no waves can't match a specific salesperson.
+    expect(seriesMatchesSalesperson([], filter({ salesperson: 'Alex' }))).toBe(false)
+  })
+})
+
+describe('seriesPasses / wavePasses — salesperson wiring', () => {
+  it('seriesPasses matches when ANY wave has the salesperson', () => {
+    const s = series()
+    const waves = [wave({ salesperson: 'Alex' }), wave({ salesperson: 'Jenna' })]
+    expect(seriesPasses(s, waves, filter({ salesperson: 'Jenna' }))).toBe(true)
+    expect(seriesPasses(s, waves, filter({ salesperson: 'Steven' }))).toBe(false)
+  })
+  it("wavePasses matches on THIS wave's own salesperson only", () => {
+    const s = series()
+    expect(wavePasses(wave({ salesperson: 'Alex' }), s, filter({ salesperson: 'Alex' }))).toBe(true)
+    expect(wavePasses(wave({ salesperson: 'Alex' }), s, filter({ salesperson: 'Jenna' }))).toBe(false)
   })
 })
 

@@ -13,19 +13,42 @@ import { isFilterActive, EMPTY_RERUN_FILTER, type RerunFilterState } from '@/lib
 const selectCls =
   'bg-muted border border-border text-foreground/80 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-ring'
 
+// Next-due presets — the same set the main board's Due filter uses, applied to
+// each series' next-collection date (effective_next). See matchesDuePreset.
+const DUE_OPTIONS: { value: string; label: string }[] = [
+  { value: '', label: 'Any next-due' },
+  { value: 'overdue', label: 'Overdue' },
+  { value: 'today', label: 'Due today' },
+  { value: 'tomorrow', label: 'Due tomorrow' },
+  { value: 'twodays', label: 'Due in 2 days' },
+  { value: 'week', label: 'Due this week' },
+  { value: 'month', label: 'Due this month' },
+  { value: 'none', label: 'No next date' },
+  { value: 'custom', label: 'Custom range…' },
+]
+
 export function RerunFilterBar({
   value,
   onChange,
   owners,
+  clients,
+  salespeople,
 }: {
   value: RerunFilterState
   onChange: (next: RerunFilterState) => void
   /** Distinct owner emails across the series, for the Owner select. */
   owners: string[]
+  /** Distinct client strings across the series, for the Client select. */
+  clients: string[]
+  /** Distinct salespeople across the series' waves, for the Salesperson select. */
+  salespeople: string[]
 }) {
   const searchRef = useRef<HTMLInputElement>(null)
   const set = <K extends keyof RerunFilterState>(key: K, v: RerunFilterState[K]) =>
     onChange({ ...value, [key]: v })
+  // Changing the Next-due preset away from custom clears any stale range.
+  const setDue = (due: string) =>
+    onChange({ ...value, due, ...(due === 'custom' ? {} : { dueFrom: '', dueTo: '' }) })
 
   // "/" focuses the search box (unless already typing) — same affordance as the
   // legacy radar's search.
@@ -117,6 +140,79 @@ export function RerunFilterBar({
             </option>
           ))}
         </select>
+
+        <label className="sr-only" htmlFor="rerun-filter-client">Client</label>
+        <select
+          id="rerun-filter-client"
+          aria-label="Filter by client"
+          value={value.client}
+          onChange={(e) => set('client', e.target.value)}
+          className={selectCls}
+        >
+          <option value="all">All clients</option>
+          {clients.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+        </select>
+
+        <label className="sr-only" htmlFor="rerun-filter-salesperson">Salesperson</label>
+        <select
+          id="rerun-filter-salesperson"
+          aria-label="Filter by salesperson"
+          value={value.salesperson}
+          onChange={(e) => set('salesperson', e.target.value)}
+          className={selectCls}
+          title="A series matches when any of its waves was sold by this salesperson."
+        >
+          <option value="all">All salespeople</option>
+          {salespeople.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </select>
+
+        <label className="sr-only" htmlFor="rerun-filter-due">Next due</label>
+        <select
+          id="rerun-filter-due"
+          aria-label="Filter by next-due date"
+          value={value.due}
+          onChange={(e) => setDue(e.target.value)}
+          className={selectCls}
+          title="Filter by the series' next-collection date (effective next-due)."
+        >
+          {DUE_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+
+        {value.due === 'custom' && (
+          <span className="flex items-center gap-1.5">
+            <label className="sr-only" htmlFor="rerun-filter-due-from">Next due from</label>
+            <input
+              id="rerun-filter-due-from"
+              type="date"
+              aria-label="Next due from"
+              value={value.dueFrom}
+              onChange={(e) => set('dueFrom', e.target.value)}
+              className={selectCls}
+            />
+            <span className="text-xs text-muted-foreground">→</span>
+            <label className="sr-only" htmlFor="rerun-filter-due-to">Next due to</label>
+            <input
+              id="rerun-filter-due-to"
+              type="date"
+              aria-label="Next due to"
+              value={value.dueTo}
+              onChange={(e) => set('dueTo', e.target.value)}
+              className={selectCls}
+            />
+          </span>
+        )}
 
         {active && (
           <button
