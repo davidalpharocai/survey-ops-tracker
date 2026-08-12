@@ -158,35 +158,46 @@ let seriesTouched = 0
 let placeholdersCreated = 0
 for (const p of plan) {
   const s = p.series
-  const inserts = p.dates.map((date, k) => ({
-    project_name: `${s.survey_name} - Wave ${p.startNo + k}`,
-    client: s.client,
-    // client_id intentionally omitted — the survey_projects_sync_client trigger
-    // stamps it from client_firm_name(client); the pre-apply gate above proves
-    // that resolves to an existing client, so no duplicate is created.
-    project_type: s.base_type, // may be null (Rerun-Service series carry no base type)
-    series_id: s.id,
-    rerun_number: p.startNo + k,
-    is_placeholder: true,
-    board_column: 'Delivery',
-    status: 'Closed',
-    phase: 'Active',
-    stage_doc_programming: true,
-    stage_survey_programming: true,
-    stage_edwin_qa: true,
-    stage_fielding: true,
-    stage_data_qa: true,
-    stage_delivery: true,
-    launch_date: date,
-    deliver_date: date,
-    delivered_at: date + 'T12:00:00Z',
-    rerun_date: date,
-    rerun_spawned_at: date + 'T12:00:00Z',
-    n_target: null,
-    n_collected: null,
-    n_actual: null,
-    longitudinal: false,
-  }))
+  const inserts = p.dates.map((date, k) => {
+    // The LAST date is the NEWEST placeholder (highest rerun_number) — the
+    // series' current latest wave. It has NOT yet produced a successor, so it
+    // must be left UNSTAMPED (rerun_spawned_at: null); otherwise
+    // canSpawnNextWave sees a non-null prevWaveSpawnedAt and the series never
+    // spawns its next real wave. Only the intermediate placeholders (#1..#k-1),
+    // which each already have the next placeholder as their successor, get
+    // stamped. (rerun_date / delivered_at / deliver_date / launch_date are the
+    // same on every placeholder.)
+    const isNewest = k === p.dates.length - 1
+    return {
+      project_name: `${s.survey_name} - Wave ${p.startNo + k}`,
+      client: s.client,
+      // client_id intentionally omitted — the survey_projects_sync_client trigger
+      // stamps it from client_firm_name(client); the pre-apply gate above proves
+      // that resolves to an existing client, so no duplicate is created.
+      project_type: s.base_type, // may be null (Rerun-Service series carry no base type)
+      series_id: s.id,
+      rerun_number: p.startNo + k,
+      is_placeholder: true,
+      board_column: 'Delivery',
+      status: 'Closed',
+      phase: 'Active',
+      stage_doc_programming: true,
+      stage_survey_programming: true,
+      stage_edwin_qa: true,
+      stage_fielding: true,
+      stage_data_qa: true,
+      stage_delivery: true,
+      launch_date: date,
+      deliver_date: date,
+      delivered_at: date + 'T12:00:00Z',
+      rerun_date: date,
+      rerun_spawned_at: isNewest ? null : date + 'T12:00:00Z',
+      n_target: null,
+      n_collected: null,
+      n_actual: null,
+      longitudinal: false,
+    }
+  })
   const { error: insErr } = await db.from('survey_projects').insert(inserts)
   if (insErr) { console.error(`  ✗ ${s.client} — ${s.survey_name}: ${insErr.message}`); continue }
   const { error: updErr } = await db.from('rerun_series').update({ next_wave_no: p.newMax + 1 }).eq('id', s.id)

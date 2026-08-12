@@ -108,6 +108,10 @@ export async function searchProjects(args: {
     .select('project_code, project_name, client, status, phase, scoping_stage, board_column, due_date, n_collected, n_target, salesperson, captain:team_members(name, initials)')
     .is('deleted_at', null)
     .or('project_type.is.null,project_type.neq.Internal')
+    // Placeholder rerun waves (migration 075) are delivered/Closed stubs pending
+    // data — they aren't real searchable projects, so keep them out of connector
+    // search results (they live in the rerun views only). Null-safe for pre-075 rows.
+    .or('is_placeholder.is.null,is_placeholder.eq.false')
   // Default to only in-flight operational projects (see isActiveOperational) so
   // "due this week", "open surveys for <captain>", etc. never surface Closed,
   // On-Hold, Delivered, or pre-sale Scoping work. If the caller explicitly asks
@@ -592,7 +596,7 @@ function projectShortfall(p: Row, today: string): {
  *   - fielding_behind: in Fielding, under target, due within the window, with a
  *     projected final N + shortfall extrapolated from the collection rate so far
  *   - over_budget: actual_spend > budget (with the overage)
- *   - reruns_overdue: recurring reruns past due (from the rerun_status view via rerunRadar)
+ *   - reruns_overdue: recurring reruns past due (from the first-class rerun_series_status via rerunRadar)
  *  at_risk_count is the DISTINCT project count across the four project buckets, so the
  *  headline isn't inflated by a project that's in several. mine:true scopes projects to
  *  your captained work and reruns to the ones you own. */
@@ -729,10 +733,10 @@ export async function getLastChangeBatch(projectId: string): Promise<
 }
 
 // ---------------------------------------------------------------------------
-// Reruns — the first-class rerun_series model (migration 073) is the new source
-// of truth. rerun_radar UNIONS it with the legacy sheet-mirror (rerun_status)
-// during the migration window; search/report/detail/calendar read the new model
-// directly. All date comparisons are date-only (YYYY-MM-DD), America/New_York.
+// Reruns — the first-class rerun_series model (migration 073) is the source of
+// truth. rerun_radar and search/report/detail/calendar all read it directly;
+// the legacy sheet-mirror (rerun_status) has been RETIRED as a rerun view. All
+// date comparisons are date-only (YYYY-MM-DD), America/New_York.
 // ---------------------------------------------------------------------------
 
 type SeriesStatusRow = Database['public']['Views']['rerun_series_status']['Row']
@@ -937,16 +941,23 @@ export async function rerunCalendar(args: { window?: 'week' | 'month' | 'quarter
 }
 
 /** Days of lead time before a first-class series' effective_next at which it
- *  enters rerun_radar's "prep window" bucket. The legacy view carries a
- *  per-row lead_days; the series view doesn't, so the radar uses this default. */
+ *  enters rerun_radar's "prep window" bucket. The series view carries no
+ *  per-row lead_days, so the radar applies this single default. */
 const SERIES_PREP_LEAD_DAYS = 14
 
 /** Rerun Radar — recurring reruns that need attention, bucketed into overdue /
  *  needs-definition / prep-window / upcoming (each in ONE bucket by priority).
- *  UNIONS the legacy sheet-mirror (rerun_status) with the first-class
- *  rerun_series model (rerun_series_status), de-duped on client + survey name
- *  so a study present in both appears once — the first-class row wins. Paused /
- *  ended series are excluded (they don't need attention). Optional owner filter. */
+ *  Reads the FIRST-CLASS rerun_series model (rerun_series_status) ONLY. The
+ *  legacy sheet-mirror (rerun_status) has been RETIRED as a rerun view (the nav
+ *  badge + every other rerun surface already count first-class only); unioning
+ *  it back in here only double-showed studies and inflated the buckets with
+ *  phantom-overdue rows. Paused / ended series are excluded (they don't need
+ *  attention). needs_definition is always empty: a first-class series always
+ *  makes a DELIBERATE cadence choice at creation (adhoc → null cadence is "by
+ *  choice", not "undefined"), so an adhoc / no-anchor series simply carries no
+ *  due date and isn't surfaced on a due-date radar. The bucket is kept in the
+ *  output shape (as 0/[]) so callers don't have to branch. Optional owner
+ *  filter. */
 export async function rerunRadar(opts: { ownerEmail?: string } = {}) {
   const supabase = createAdminClient()
 
@@ -960,12 +971,7 @@ export async function rerunRadar(opts: { ownerEmail?: string } = {}) {
     prep_window: [] as Item[],
     upcoming: [] as Item[],
   }
-  // client|name key so a study mirrored in both models is counted once.
-  const dedupeKey = (client: unknown, name: unknown) =>
-    `${String(client ?? '').trim().toLowerCase()}|${String(name ?? '').trim().toLowerCase()}`
-  const seen = new Set<string>()
 
-  // ---- First-class series first (they win any dedupe tie) ----
   let sq = supabase
     .from('rerun_series_status')
     .select('*')
@@ -980,51 +986,11 @@ export async function rerunRadar(opts: { ownerEmail?: string } = {}) {
       cadence: cadenceLabel(r.cadence_months), last_wave_on: r.last_on, due: r.effective_next,
       days_to_due: r.days_to_next, owner: r.owner_email, survey_ids: null,
     }
-    // The first-class model always has a DELIBERATE cadence choice at creation
-    // (adhoc → null cadence is "by choice", not "undefined"), so there is NO
-    // needs_definition state here — an adhoc / no-anchor series simply has no
-    // due date and isn't surfaced on a due-date radar (same as the no-anchor
-    // fall-through). Only mark the dedupe key when the row is actually SURFACED,
-    // so an omitted first-class row never suppresses its legacy-mirror twin
-    // (which may carry a real due date and must still show).
-    let surfaced = true
     if (r.is_overdue) buckets.overdue.push(item)
     else if (r.effective_next && r.days_to_next != null && r.days_to_next <= SERIES_PREP_LEAD_DAYS)
       buckets.prep_window.push(item)
     else if (r.effective_next) buckets.upcoming.push(item)
-    else surfaced = false
-    if (surfaced) seen.add(dedupeKey(r.client, r.survey_name))
-  }
-
-  // ---- Legacy sheet-mirror, skipping anything already surfaced above ----
-  let lq = supabase
-    .from('rerun_status')
-    .select(
-      'id, display_name, client, work, platform, cadence, cadence_months, last_wave_on, ' +
-      'expected_next_on, effective_due, days_to_due, is_overdue, in_prep_window, needs_definition, ' +
-      'owner_email, backup_owner_email, survey_ids'
-    )
-    .or('is_paused.is.null,is_paused.eq.false')
-  if (opts.ownerEmail) lq = lq.eq('owner_email', opts.ownerEmail)
-  const { data: legacyRows, error: lErr } = await lq
-  if (lErr) throw lErr
-
-  type R = Record<string, unknown>
-  const shapeLegacy = (r: R): Item => ({
-    id: r.id,
-    name: (r.display_name ?? r.work ?? r.client) as string | null,
-    client: r.client, platform: r.platform, cadence: r.cadence,
-    last_wave_on: r.last_wave_on, due: r.effective_due, days_to_due: r.days_to_due,
-    owner: r.owner_email, survey_ids: r.survey_ids,
-  })
-  for (const r of (legacyRows ?? []) as unknown as R[]) {
-    const name = (r.display_name ?? r.work ?? r.client) as string | null
-    if (seen.has(dedupeKey(r.client, name))) continue
-    const item = shapeLegacy(r)
-    if (r.is_overdue) buckets.overdue.push(item)
-    else if (r.needs_definition) buckets.needs_definition.push(item)
-    else if (r.in_prep_window) buckets.prep_window.push(item)
-    else if (r.effective_due) buckets.upcoming.push(item)
+    // else: adhoc / no-anchor (no due date) → not surfaced; no needs_definition state.
   }
 
   // Soonest-first within the date-bearing buckets.
@@ -1038,8 +1004,8 @@ export async function rerunRadar(opts: { ownerEmail?: string } = {}) {
     upcoming: buckets.upcoming.length,
   }
   const summary =
-    `Reruns — ${counts.overdue} overdue, ${counts.needs_definition} need a cadence/owner, ` +
-    `${counts.prep_window} in the prep window, ${counts.upcoming} upcoming.`
+    `Reruns — ${counts.overdue} overdue, ${counts.prep_window} in the prep window, ` +
+    `${counts.upcoming} upcoming.`
   return { ok: true, counts, ...buckets, summary }
 }
 
