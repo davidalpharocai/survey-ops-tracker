@@ -392,6 +392,48 @@ export async function runLogBlast(opts: {
   return data as ProjectBlastRow
 }
 
+/** Resolve a blast on a project by its id or (exact) idem_key. Both are unique
+ *  per project (project_blasts_idem_uq), so there's no ambiguity — returns the
+ *  row or null. Mirrors resolveLaunch, but blasts have no label so the ref is an
+ *  id or an idem_key. */
+export async function resolveBlast(projectId: string, ref: string): Promise<ProjectBlastRow | null> {
+  const supabase = createAdminClient()
+  const { data, error } = await supabase.from('project_blasts').select('*').eq('project_id', projectId)
+  if (error) throw new Error(error.message)
+  const rows = (data ?? []) as ProjectBlastRow[]
+  const r = ref.trim()
+  return rows.find((b) => b.id === r) ?? rows.find((b) => (b.idem_key ?? '') === r) ?? null
+}
+
+/** A project's blasts (for the spend rollup + tool results). */
+export async function listBlastsForProject(projectId: string): Promise<ProjectBlastRow[]> {
+  const supabase = createAdminClient()
+  const { data, error } = await supabase
+    .from('project_blasts').select('*').eq('project_id', projectId).order('created_at')
+  if (error) throw new Error(error.message)
+  return (data ?? []) as ProjectBlastRow[]
+}
+
+/** Patch a blast by id — only keys present in `patch` change (jsonb-patch RPC,
+ *  mirrors runUpdateSegment). Sets app.actor; the spend + audit triggers fire. */
+export async function runUpdateBlast(opts: {
+  blastId: string; patch: Record<string, unknown>; actor: string
+}): Promise<ProjectBlastRow> {
+  const supabase = createAdminClient()
+  const { data, error } = await supabase.rpc('mcp_update_blast', {
+    p_blast: opts.blastId, p_patch: opts.patch as unknown as Json, p_actor: opts.actor,
+  })
+  if (error) throw new Error(error.message)
+  return data as ProjectBlastRow
+}
+
+/** Delete a blast by id (mirrors runRemoveSegment). Sets app.actor; triggers fire. */
+export async function runRemoveBlast(blastId: string, actor: string): Promise<void> {
+  const supabase = createAdminClient()
+  const { error } = await supabase.rpc('mcp_remove_blast', { p_blast: blastId, p_actor: actor })
+  if (error) throw new Error(error.message)
+}
+
 // ---- Segment runners (project_segments; parent N totals kept by trigger) ----
 
 export async function runAddSegment(

@@ -1766,6 +1766,14 @@ export type Database = {
         Args: { p_segment: string; p_actor: string }
         Returns: undefined
       }
+      mcp_update_blast: {
+        Args: { p_blast: string; p_patch: Json; p_actor: string }
+        Returns: unknown
+      }
+      mcp_remove_blast: {
+        Args: { p_blast: string; p_actor: string }
+        Returns: undefined
+      }
       mcp_set_bid_budget: {
         Args: {
           p_project: string
