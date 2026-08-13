@@ -1,4 +1,4 @@
-import { differenceInCalendarDays, parseISO, isAfter, isBefore, startOfDay, endOfMonth } from 'date-fns'
+import { differenceInCalendarDays, parseISO, isAfter, isBefore, startOfDay, endOfMonth, startOfWeek, startOfMonth } from 'date-fns'
 
 /** Relative age for queue items: "today" / "1d ago" / "6d ago". */
 export function daysAgoLabel(iso: string | null | undefined): string {
@@ -108,6 +108,45 @@ export function matchesDuePreset(
       if (to && isAfter(due, startOfDay(parseISO(to)))) return false
       return true
     }
+    default:
+      return true
+  }
+}
+
+// --- Delivered look-back window (board "Delivered in X" filter) ---
+export type DeliveredWindow = 'all' | 'week' | 'month' | '30d' | '90d'
+
+export const DELIVERED_WINDOW_LABELS: Record<DeliveredWindow, string> = {
+  all: 'All time',
+  week: 'This week',
+  month: 'This month',
+  '30d': 'Last 30 days',
+  '90d': 'Last 90 days',
+}
+
+/** True when `date` (a project's delivery date) falls within the chosen
+ *  look-BACK window relative to `now`. 'all' matches everything (incl. no date).
+ *  A future date never matches a bounded window — you can't have delivered
+ *  something ahead of today. `now` is injectable so the buckets are testable. */
+export function matchesDeliveredWindow(
+  date: string | null | undefined,
+  window: DeliveredWindow,
+  now: Date = new Date()
+): boolean {
+  if (window === 'all') return true
+  if (!date) return false
+  const today = startOfDay(now)
+  const d = startOfDay(parseISO(date))
+  if (isAfter(d, today)) return false
+  switch (window) {
+    case 'week':
+      return !isBefore(d, startOfWeek(today, { weekStartsOn: 1 }))
+    case 'month':
+      return !isBefore(d, startOfMonth(today))
+    case '30d':
+      return differenceInCalendarDays(today, d) <= 30
+    case '90d':
+      return differenceInCalendarDays(today, d) <= 90
     default:
       return true
   }

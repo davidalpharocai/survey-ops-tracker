@@ -23,6 +23,7 @@ import { STAGE_ORDER, getCheckboxesForColumn, type BoardColumn as BoardColumnTyp
 import { useComplianceMaps } from '@/lib/hooks/useComplianceState'
 import { complianceGate } from '@/lib/utils/compliance'
 import { toast } from '@/lib/utils/toast'
+import { matchesDeliveredWindow, DELIVERED_WINDOW_LABELS, type DeliveredWindow } from '@/lib/utils/date'
 import type { Database } from '@/lib/supabase/types'
 import Link from 'next/link'
 
@@ -38,6 +39,13 @@ export default function BoardPage() {
   const { mode, setMode } = useViewMode()
   const [showNewProject, setShowNewProject] = useState(false)
   const [showClosed, setShowClosed] = useState(false)
+  // "Delivered in X" window — shared by the board filter bar and the Archived
+  // section below (delivered work lives there). Picking a window auto-opens the
+  // section; the two controls stay in sync because they read/write this one state.
+  const [deliveredWithin, setDeliveredWithin] = useState<DeliveredWindow>('all')
+  useEffect(() => {
+    if (deliveredWithin !== 'all') setShowClosed(true)
+  }, [deliveredWithin])
   const [pipelineCollapsed, setPipelineCollapsed] = useStoredFlag('sot.collapse.pipeline', false)
   // Remember this as the origin so a project's "← Back" returns here
   useEffect(() => {
@@ -94,6 +102,13 @@ export default function BoardPage() {
   const closedProjects = projects.filter(
     p => (p.phase === 'Active' && p.status === 'Closed') || p.status === 'Cancelled'
   )
+  // When a "Delivered in X" window is active, scope the Archived section to
+  // projects DELIVERED within it (status Closed = delivered/archived; excludes
+  // Cancelled), by deliver_date. 'all' shows everything archived, as before.
+  const archivedShown =
+    deliveredWithin === 'all'
+      ? closedProjects
+      : closedProjects.filter(p => p.status === 'Closed' && matchesDeliveredWindow(p.deliver_date, deliveredWithin))
   const exportableProjects =
     mode === 'full'
       ? [...scopingProjects, ...activeProjects, ...closedProjects]
@@ -310,6 +325,8 @@ export default function BoardPage() {
               teamMembers={teamMembers}
               onMoveProject={moveProject}
               wrapInContext={false}
+              deliveredWithin={deliveredWithin}
+              onDeliveredWithinChange={setDeliveredWithin}
             />
           )}
         </DragDropContext>
@@ -318,6 +335,8 @@ export default function BoardPage() {
           projects={activeProjects}
           teamMembers={teamMembers}
           onMoveProject={moveProject}
+          deliveredWithin={deliveredWithin}
+          onDeliveredWithinChange={setDeliveredWithin}
         />
       )}
 
@@ -325,22 +344,40 @@ export default function BoardPage() {
           default). Delivered projects auto-archive into here (delivered ⇒ closed),
           and every archived project stays findable via the top search. */}
       <div className="flex flex-col gap-3">
-          <button
-            onClick={() => setShowClosed(v => !v)}
-            className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground uppercase tracking-widest font-semibold transition-colors self-start"
-          >
-            <Caret open={showClosed} className="text-foreground" />
-            Archived
-            <span className="bg-muted text-muted-foreground px-2 py-0.5 rounded-full normal-case tracking-normal">
-              {closedProjects.length}
-            </span>
-          </button>
+          <div className="flex items-center gap-3 flex-wrap self-start">
+            <button
+              onClick={() => setShowClosed(v => !v)}
+              className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground uppercase tracking-widest font-semibold transition-colors"
+            >
+              <Caret open={showClosed} className="text-foreground" />
+              Archived
+              <span className="bg-muted text-muted-foreground px-2 py-0.5 rounded-full normal-case tracking-normal">
+                {archivedShown.length}
+              </span>
+            </button>
+            {/* Delivered-window scoper — synced with the board's Delivered filter. */}
+            <label className="flex items-center gap-1.5 text-xs text-muted-foreground normal-case tracking-normal">
+              <span>Delivered:</span>
+              <select
+                value={deliveredWithin}
+                onChange={e => setDeliveredWithin(e.target.value as DeliveredWindow)}
+                title="Show projects delivered within this window (kept in sync with the board's Delivered filter)."
+                className="bg-muted border border-border text-foreground/80 text-xs rounded-lg px-2 py-1 focus:outline-none focus:border-ring"
+              >
+                {(Object.keys(DELIVERED_WINDOW_LABELS) as DeliveredWindow[]).map(w => (
+                  <option key={w} value={w}>{DELIVERED_WINDOW_LABELS[w]}</option>
+                ))}
+              </select>
+            </label>
+          </div>
           {showClosed && (
-            closedProjects.length === 0 ? (
-              <p className="text-muted-foreground/50 text-xs">No archived projects</p>
+            archivedShown.length === 0 ? (
+              <p className="text-muted-foreground/50 text-xs">
+                {deliveredWithin === 'all' ? 'No archived projects' : `Nothing delivered ${DELIVERED_WINDOW_LABELS[deliveredWithin].toLowerCase()}`}
+              </p>
             ) : (
               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2">
-                {closedProjects.map(p => (
+                {archivedShown.map(p => (
                   <ProjectCard
                     key={p.id}
                     project={p}

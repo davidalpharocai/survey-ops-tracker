@@ -9,7 +9,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useCurrentMember } from '@/lib/hooks/useCurrentMember'
 import { useIsNewForMe } from '@/lib/hooks/useSeenProjects'
 import { STAGE_ORDER, getCheckboxesForColumn, type BoardColumn as BoardColumnType } from '@/lib/utils/stage'
-import { matchesDuePreset } from '@/lib/utils/date'
+import { matchesDuePreset, type DeliveredWindow } from '@/lib/utils/date'
 import { useComplianceMaps } from '@/lib/hooks/useComplianceState'
 import { complianceGate } from '@/lib/utils/compliance'
 import { toast } from '@/lib/utils/toast'
@@ -25,6 +25,11 @@ interface BoardProps {
   // Full View provides a page-level DragDropContext (so cards can be dragged
   // from scoping into the pipeline); the board then skips its own context
   wrapInContext?: boolean
+  // "Delivered in X" window — lifted to the page (shared with the Archived
+  // section). The board only passes it through to the filter bar; it doesn't
+  // affect the kanban columns (delivered projects aren't on the board).
+  deliveredWithin?: DeliveredWindow
+  onDeliveredWithinChange?: (w: DeliveredWindow) => void
 }
 
 const CAPTAIN_FILTER_KEY = 'sot.captainFilter'
@@ -37,7 +42,7 @@ export function columnSortRank(p: SlimProject): number {
   return PRIORITY_RANK[p.priority ?? ''] ?? 2
 }
 
-export function Board({ projects, teamMembers, onMoveProject, wrapInContext = true }: BoardProps) {
+export function Board({ projects, teamMembers, onMoveProject, wrapInContext = true, deliveredWithin = 'all', onDeliveredWithinChange }: BoardProps) {
   const router = useRouter()
   const queryClient = useQueryClient()
   const { data: currentMember, isLoading: memberLoading } = useCurrentMember()
@@ -197,15 +202,26 @@ export function Board({ projects, teamMembers, onMoveProject, wrapInContext = tr
     window.__sotDragging = true
   }
 
+  // The board shows the active pipeline only — the 'Delivery' column is retired
+  // (delivery is marked from the project record; delivered work auto-archives
+  // into the Archived section, and the "Delivered in X" filter surfaces it
+  // there). Any project still sitting in 'Delivery' but not yet delivered
+  // (Open/Hold delivery-prep) folds into the last visible column, Data QA, so
+  // it never disappears.
+  const VISIBLE_STAGES = STAGE_ORDER.filter(s => s !== 'Delivery')
+  const columnMatch = (p: SlimProject, stage: BoardColumnType) =>
+    stage === 'Data QA'
+      ? p.board_column === 'Data QA' || p.board_column === 'Delivery'
+      : p.board_column === stage
   const columns = (
     <div className="flex gap-2 overflow-x-auto pb-4">
-      {STAGE_ORDER.map(stage => (
+      {VISIBLE_STAGES.map(stage => (
         <BoardColumn
           key={stage}
           id={stage}
           title={stage}
           projects={filtered
-            .filter(p => p.board_column === stage)
+            .filter(p => columnMatch(p, stage))
             .sort((a, b) => columnSortRank(a) - columnSortRank(b) || boardOrder(a, b))}
           isNewFor={isNewForMe}
           onCardClick={id => router.push(`/projects/${id}`)}
@@ -261,6 +277,8 @@ export function Board({ projects, teamMembers, onMoveProject, wrapInContext = tr
           dueTo={dueTo}
           stageFilter={stageFilter}
           clientFilter={clientFilter}
+          deliveredFilter={deliveredWithin}
+          onDeliveredChange={onDeliveredWithinChange}
           search={search}
           onCaptainChange={handleCaptainChange}
           onTypeChange={setTypeFilter}

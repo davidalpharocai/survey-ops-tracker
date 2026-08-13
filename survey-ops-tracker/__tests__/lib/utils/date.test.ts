@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { getDueDateStatus, getDueUrgency, formatDate, autoStamp, matchesDuePreset } from '@/lib/utils/date'
+import { getDueDateStatus, getDueUrgency, formatDate, autoStamp, matchesDuePreset, matchesDeliveredWindow } from '@/lib/utils/date'
 
 // Format in *local* time — toISOString() shifts to UTC, which is a different
 // calendar day in the evening/morning depending on the machine's timezone,
@@ -148,5 +148,39 @@ describe('autoStamp', () => {
     const result = autoStamp('David', 'Old note', 'New note')
     expect(result).toContain('Old note')
     expect(result).toContain('New note')
+  })
+})
+
+describe('matchesDeliveredWindow', () => {
+  // Fixed "now": Thursday, 2026-08-13. Week starts Monday 2026-08-10.
+  const now = new Date(2026, 7, 13, 9, 0, 0)
+  const m = (date: string | null, w: Parameters<typeof matchesDeliveredWindow>[1]) =>
+    matchesDeliveredWindow(date, w, now)
+
+  it("'all' matches everything, including no date", () => {
+    expect(m('2020-01-01', 'all')).toBe(true)
+    expect(m(null, 'all')).toBe(true)
+    expect(m('2999-01-01', 'all')).toBe(true)
+  })
+  it('bounded windows never match a missing or future date', () => {
+    expect(m(null, 'month')).toBe(false)
+    expect(m('2026-09-01', 'week')).toBe(false)   // future
+    expect(m('2026-08-14', '30d')).toBe(false)    // tomorrow
+  })
+  it("'week' = since Monday of this week", () => {
+    expect(m('2026-08-10', 'week')).toBe(true)    // Monday
+    expect(m('2026-08-13', 'week')).toBe(true)    // today
+    expect(m('2026-08-09', 'week')).toBe(false)   // last Sunday
+  })
+  it("'month' = since the 1st of this month", () => {
+    expect(m('2026-08-01', 'month')).toBe(true)
+    expect(m('2026-08-13', 'month')).toBe(true)
+    expect(m('2026-07-31', 'month')).toBe(false)
+  })
+  it("'30d' / '90d' are rolling look-backs (inclusive)", () => {
+    expect(m('2026-07-14', '30d')).toBe(true)     // exactly 30 days back
+    expect(m('2026-07-13', '30d')).toBe(false)    // 31 days back
+    expect(m('2026-05-15', '90d')).toBe(true)     // exactly 90 days back
+    expect(m('2026-05-14', '90d')).toBe(false)    // 91 days back
   })
 })
