@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
 import { STAGE_ORDER } from '@/lib/utils/stage'
+import { DELIVERED_WINDOW_LABELS, type DeliveredWindow } from '@/lib/utils/date'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
 import { useClients } from '@/lib/hooks/useClients'
 import { NewClientModal } from '@/components/client/NewClientModal'
@@ -73,6 +74,8 @@ interface BoardFiltersProps {
   dueTo: string | null
   stageFilter: string | null
   clientFilter: string | null
+  deliveredFilter?: DeliveredWindow
+  onDeliveredChange?: (w: DeliveredWindow) => void
   search: string
   onCaptainChange: (id: string | null) => void
   onTypeChange: (type: string | null) => void
@@ -99,6 +102,8 @@ export function BoardFilters({
   dueTo,
   stageFilter,
   clientFilter,
+  deliveredFilter = 'all',
+  onDeliveredChange,
   search,
   onCaptainChange,
   onTypeChange,
@@ -136,9 +141,10 @@ export function BoardFilters({
       ? 'Unassigned'
       : captains.find(c => c.id === captainFilter)?.name ?? '—'
     : null
-  const activeCount = [captainFilter, salespersonFilter, rerunFilter, clientFilter, typeFilter, dueFilter, stageFilter].filter(
-    Boolean
-  ).length
+  const activeCount = [
+    captainFilter, salespersonFilter, rerunFilter, clientFilter, typeFilter, dueFilter, stageFilter,
+    deliveredFilter !== 'all' ? deliveredFilter : null,
+  ].filter(Boolean).length
   const anyActive = activeCount > 0 || !!search
 
   function clearDue() {
@@ -154,6 +160,7 @@ export function BoardFilters({
     onTypeChange(null)
     clearDue()
     onStageChange(null)
+    onDeliveredChange?.('all')
     onSearchChange('')
   }
 
@@ -307,6 +314,19 @@ export function BoardFilters({
                   <option value="Closed">Archived</option>
                 </select>
               </Field>
+              <Field label="Delivered" tooltip="Show projects delivered within a recent window. Delivered projects live in the Archived section below — this reveals just the recent ones, and stays in sync with the Delivered control on that section.">
+                <select
+                  value={deliveredFilter}
+                  onChange={e => onDeliveredChange?.(e.target.value as DeliveredWindow)}
+                  className={`${SELECT_CLASSES} w-full`}
+                >
+                  {(Object.keys(DELIVERED_WINDOW_LABELS) as DeliveredWindow[]).map(w => (
+                    <option key={w} value={w}>
+                      {DELIVERED_WINDOW_LABELS[w]}
+                    </option>
+                  ))}
+                </select>
+              </Field>
             </div>
           )}
         </div>
@@ -319,6 +339,9 @@ export function BoardFilters({
         {rerunFilter && <Chip label={rerunFilter === 'only' ? 'Reruns only' : 'Non-reruns'} onClear={() => onRerunChange?.(null)} />}
         {dueFilter && <Chip label={`Due: ${DUE_LABELS[dueFilter] ?? dueFilter}`} onClear={clearDue} />}
         {stageFilter && <Chip label={`Stage: ${stageFilter}`} onClear={() => onStageChange(null)} />}
+        {deliveredFilter !== 'all' && (
+          <Chip label={`Delivered: ${DELIVERED_WINDOW_LABELS[deliveredFilter]}`} onClear={() => onDeliveredChange?.('all')} />
+        )}
 
         {anyActive && (
           <button
