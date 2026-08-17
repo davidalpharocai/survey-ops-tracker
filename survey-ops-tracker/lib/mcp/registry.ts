@@ -1454,13 +1454,14 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'log_launch',
     description:
-      "Log a PS launch (a fielding wave) on a project with its sample-supplier rows — each supplier's name, $/complete (CPI, in dollars e.g. 0.75), an optional per-supplier cap, and # collected so far. A PS project can have several launches; call once per launch. Actual spend = Σ(CPI × collected) — pay per complete, like blasts — and rolls up to the project automatically. Pass a target (goal N for the launch) so the pre-fielding estimate range shows. Supplier names not already in the roster are added. If the source has a Survey# (e.g. from a supplier-panel screenshot), pass it as `label` — it then serves as the stable unique key to update this same launch later (re-import = upsert, not a duplicate). Preview first; confirm to apply.",
+      "Log a PS launch (a fielding wave) on a project with its sample-supplier rows — each supplier's name, $/complete (CPI, in dollars e.g. 0.75), an optional per-supplier cap, and # collected so far. A PS project can have several launches; call once per launch. Actual spend = Σ(CPI × collected) — pay per complete, like blasts — and rolls up to the project automatically. Pass a target (goal N for the launch) so the pre-fielding estimate range shows, and an optional `note` (freeform — e.g. why this wave, supplier issues, timing). Supplier names not already in the roster are added. If the source has a Survey# (e.g. from a supplier-panel screenshot), pass it as `label` — it then serves as the stable unique key to update this same launch later (re-import = upsert, not a duplicate). Preview first; confirm to apply.",
     kind: 'write',
     schema: {
       project: z.string(),
       label: z.string().max(120).optional(),
       launch_date: z.string().optional(),
       target: z.number().int().positive().optional(),
+      note: z.string().max(1000).optional(),
       suppliers: z.array(z.object({
         name: z.string().min(1),
         cpi: z.number().min(0),
@@ -1471,7 +1472,7 @@ export const TOOLS: AssistantTool[] = [
     },
     handler: async (rawArgs, ctx, meta) => {
       const args = rawArgs as {
-        project: string; label?: string; launch_date?: string; target?: number
+        project: string; label?: string; launch_date?: string; target?: number; note?: string
         suppliers: { name: string; cpi: number; cap?: number; n_collected?: number }[]; confirm?: boolean
       }
       const { userEmail } = ctx
@@ -1521,6 +1522,7 @@ export const TOOLS: AssistantTool[] = [
               label: args.label,
               launchDate: args.launch_date,                          // undefined ⇒ unchanged
               target: args.target != null ? args.target : undefined, // undefined ⇒ unchanged
+              note: args.note,                                       // undefined ⇒ unchanged
               suppliers, createdBy: userEmail.split('@')[0],
             })
             const fresh = (await listLaunchesForProject(p.id as string)).find(l => l.id === existingId) ?? null
@@ -1529,7 +1531,7 @@ export const TOOLS: AssistantTool[] = [
           }
           const launch = await runLogLaunch({
             projectId: p.id as string, label: args.label ?? null, launchDate: args.launch_date ?? null,
-            target, suppliers, createdBy: userEmail.split('@')[0],
+            target, note: args.note ?? null, suppliers, createdBy: userEmail.split('@')[0],
           })
           meta.detail = { created_launch: { id: launch.id, label: launch.label, suppliers: launch.suppliers.length } }
           return { ok: true, mode: 'created', launch, economics: launchEconOut(launch) }
@@ -1571,7 +1573,7 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'update_launch',
     description:
-      "Update a PS launch — its label / launch_date / target, and/or upsert supplier rows by name (only the fields you pass change; supplier names not present are added). Identify the launch by its label or id — an exact label match wins, so the Survey# used as the launch's label works as a stable key (re-importing a supplier screenshot updates the same launch). Preview first; confirm to apply.",
+      "Update a PS launch — its label / launch_date / target / note, and/or upsert supplier rows by name (only the fields you pass change; supplier names not present are added). Identify the launch by its label or id — an exact label match wins, so the Survey# used as the launch's label works as a stable key (re-importing a supplier screenshot updates the same launch). Preview first; confirm to apply.",
     kind: 'write',
     schema: {
       project: z.string(),
@@ -1579,6 +1581,7 @@ export const TOOLS: AssistantTool[] = [
       label: z.string().max(120).optional(),
       launch_date: z.string().optional(),
       target: z.number().int().positive().nullable().optional(),
+      note: z.string().max(1000).nullable().optional(),
       suppliers: z.array(z.object({
         name: z.string().min(1),
         cpi: z.number().min(0).optional(),
@@ -1589,7 +1592,7 @@ export const TOOLS: AssistantTool[] = [
     },
     handler: async (rawArgs, ctx, meta) => {
       const args = rawArgs as {
-        project: string; launch_ref: string; label?: string; launch_date?: string; target?: number | null
+        project: string; launch_ref: string; label?: string; launch_date?: string; target?: number | null; note?: string | null
         suppliers?: { name: string; cpi?: number; cap?: number | null; n_collected?: number }[]; confirm?: boolean
       }
       const { userEmail } = ctx
@@ -1606,9 +1609,10 @@ export const TOOLS: AssistantTool[] = [
         args.label !== undefined ? `label → "${args.label}"` : null,
         args.launch_date !== undefined ? `date → ${args.launch_date}` : null,
         args.target !== undefined ? `target → ${args.target ?? '—'}` : null,
+        args.note !== undefined ? `note → "${args.note ?? ''}"` : null,
         args.suppliers?.length ? `${args.suppliers.length} supplier row(s) upserted` : null,
       ].filter(Boolean).join(', ')
-      if (!desc) return { needs: 'a change', message: 'Specify at least one of: label, launch_date, target, suppliers.' }
+      if (!desc) return { needs: 'a change', message: 'Specify at least one of: label, launch_date, target, note, suppliers.' }
 
       return confirmable(
         args,
@@ -1616,7 +1620,7 @@ export const TOOLS: AssistantTool[] = [
         async () => {
           await runUpdateLaunch({
             launchId: launch.id as string, projectId: p.id as string,
-            label: args.label, launchDate: args.launch_date, target: args.target,
+            label: args.label, launchDate: args.launch_date, target: args.target, note: args.note,
             suppliers: args.suppliers as LaunchSupplierPatch[] | undefined, createdBy: userEmail.split('@')[0],
           })
           const fresh = (await listLaunchesForProject(p.id as string)).find(l => l.id === launch.id) ?? null

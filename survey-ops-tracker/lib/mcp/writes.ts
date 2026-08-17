@@ -510,6 +510,7 @@ export interface LaunchView {
   label: string | null
   launch_date: string | null
   target: number | null
+  note: string | null
   suppliers: LaunchSupplierView[]
 }
 
@@ -538,7 +539,7 @@ async function supplierNames(supabase: SupabaseClient<Database>, ids: string[]):
 
 export async function runLogLaunch(opts: {
   projectId: string; label: string | null; launchDate: string | null; target: number | null
-  suppliers: LaunchSupplierInput[]; createdBy: string
+  note?: string | null; suppliers: LaunchSupplierInput[]; createdBy: string
 }): Promise<LaunchView> {
   const supabase = createAdminClient()
   // Resolve/create every supplier id up front (before the launch row exists).
@@ -547,8 +548,8 @@ export async function runLogLaunch(opts: {
 
   const { data: launch, error: lErr } = await supabase
     .from('project_launches')
-    .insert({ project_id: opts.projectId, label: opts.label, launch_date: opts.launchDate, target: opts.target, created_by: opts.createdBy })
-    .select('id, project_id, label, launch_date, target')
+    .insert({ project_id: opts.projectId, label: opts.label, launch_date: opts.launchDate, target: opts.target, note: opts.note ?? null, created_by: opts.createdBy })
+    .select('id, project_id, label, launch_date, target, note')
     .single()
   if (lErr) throw new Error(lErr.message)
 
@@ -564,7 +565,7 @@ export async function runLogLaunch(opts: {
   }
   const names = await supplierNames(supabase, supplierIds)
   return {
-    id: launch.id, project_id: launch.project_id, label: launch.label, launch_date: launch.launch_date, target: launch.target,
+    id: launch.id, project_id: launch.project_id, label: launch.label, launch_date: launch.launch_date, target: launch.target, note: launch.note,
     suppliers: (sup ?? []).map(r => ({ id: r.id, supplier_id: r.supplier_id, name: names.get(r.supplier_id) ?? '', cpi: r.cpi, cap: r.completes_cap, n_collected: r.n_collected })),
   }
 }
@@ -595,7 +596,7 @@ export async function resolveLaunch(
 export async function listLaunchesForProject(projectId: string): Promise<LaunchView[]> {
   const supabase = createAdminClient()
   const { data: launches, error } = await supabase
-    .from('project_launches').select('id, project_id, label, launch_date, target').eq('project_id', projectId).order('created_at')
+    .from('project_launches').select('id, project_id, label, launch_date, target, note').eq('project_id', projectId).order('created_at')
   if (error) throw error
   const ls = launches ?? []
   if (ls.length === 0) return []
@@ -605,7 +606,7 @@ export async function listLaunchesForProject(projectId: string): Promise<LaunchV
   if (sErr) throw sErr
   const names = await supplierNames(supabase, (sup ?? []).map(r => r.supplier_id))
   return ls.map(l => ({
-    id: l.id, project_id: l.project_id, label: l.label, launch_date: l.launch_date, target: l.target,
+    id: l.id, project_id: l.project_id, label: l.label, launch_date: l.launch_date, target: l.target, note: l.note,
     suppliers: (sup ?? []).filter(r => r.launch_id === l.id).map(r => ({
       id: r.id, supplier_id: r.supplier_id, name: names.get(r.supplier_id) ?? '', cpi: r.cpi, cap: r.completes_cap, n_collected: r.n_collected,
     })),
@@ -614,13 +615,14 @@ export async function listLaunchesForProject(projectId: string): Promise<LaunchV
 
 export async function runUpdateLaunch(opts: {
   launchId: string; projectId: string; label?: string | null; launchDate?: string | null
-  target?: number | null; suppliers?: LaunchSupplierPatch[]; createdBy: string
+  target?: number | null; note?: string | null; suppliers?: LaunchSupplierPatch[]; createdBy: string
 }): Promise<void> {
   const supabase = createAdminClient()
   const patch: Database['public']['Tables']['project_launches']['Update'] = {}
   if (opts.label !== undefined) patch.label = opts.label
   if (opts.launchDate !== undefined) patch.launch_date = opts.launchDate
   if (opts.target !== undefined) patch.target = opts.target
+  if (opts.note !== undefined) patch.note = opts.note
   if (Object.keys(patch).length > 0) {
     const { error } = await supabase.from('project_launches').update(patch).eq('id', opts.launchId)
     if (error) throw new Error(error.message)

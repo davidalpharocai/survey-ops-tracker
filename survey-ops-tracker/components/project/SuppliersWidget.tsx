@@ -181,6 +181,15 @@ function LaunchBlock({
 
       {expanded && (
         <div className="px-2 pb-2 flex flex-col gap-1.5">
+          {/* Freeform note for this launch (parity with a blast's description). */}
+          <textarea
+            key={`note-${launch.id}`}
+            rows={2}
+            defaultValue={launch.note ?? ''}
+            placeholder="Notes (optional) — e.g. why this wave, supplier issues, timing"
+            onBlur={(e) => { const v = e.target.value.trim() || null; if (v !== (launch.note ?? null)) updateLaunch.mutate({ id: launch.id, updates: { note: v } }) }}
+            className={`${inputCls} w-full resize-none`}
+          />
           {/* Supplier table */}
           {rows.length > 0 && (
             <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-x-2 text-[12px] text-muted-foreground">

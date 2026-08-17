@@ -37,7 +37,7 @@ export function useAddLaunch(projectId: string) {
   return useMutation({
     // Returns the created launch so the caller can copy the previous launch's
     // supplier rows into it (Add-launch pre-fills the panel).
-    mutationFn: async (launch: { label?: string | null; launch_date?: string | null; target?: number | null; created_by: string }) => {
+    mutationFn: async (launch: { label?: string | null; launch_date?: string | null; target?: number | null; note?: string | null; created_by: string }) => {
       const { data, error } = await supabase
         .from('project_launches')
         .insert({ ...launch, project_id: projectId })
@@ -55,7 +55,7 @@ export function useUpdateLaunch(projectId: string) {
   const supabase = createClient()
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async ({ id, updates }: { id: string; updates: { label?: string | null; launch_date?: string | null; target?: number | null } }) => {
+    mutationFn: async ({ id, updates }: { id: string; updates: { label?: string | null; launch_date?: string | null; target?: number | null; note?: string | null } }) => {
       const { error } = await supabase.from('project_launches').update(updates).eq('id', id)
       if (error) throw error
     },

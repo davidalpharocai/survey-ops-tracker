@@ -848,6 +848,7 @@ export type Database = {
           label: string | null
           launch_date: string | null
           target: number | null
+          note: string | null
           created_by: string | null
           created_at: string
         }
@@ -857,6 +858,7 @@ export type Database = {
           label?: string | null
           launch_date?: string | null
           target?: number | null
+          note?: string | null
           created_by?: string | null
           created_at?: string
         }
@@ -866,6 +868,7 @@ export type Database = {
           label?: string | null
           launch_date?: string | null
           target?: number | null
+          note?: string | null
           created_by?: string | null
           created_at?: string
         }
