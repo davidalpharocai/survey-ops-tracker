@@ -111,6 +111,7 @@ export function OverviewFieldGrid({ project }: { project: SurveyProject }) {
           tooltip={TIP.surveyIds}
           value={project.survey_tool_id}
           placeholder="e.g. SV-1042, SV-1043"
+          copyable
           onSave={v => save({ survey_tool_id: v || null })}
         />
         <div className="flex items-end gap-2">
