@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { FieldCell, useSavedFlash } from './FieldCell'
+import { CopyableText } from '@/components/shared/CopyableText'
 
 export interface TextCellProps {
   label: string
@@ -19,6 +20,9 @@ export interface TextCellProps {
   /** Render the value as a text-primary link (following it calls onClickValue). */
   isLink?: boolean
   onClickValue?: () => void
+  /** Show the value with a hover tooltip (full text) + one-click copy — for long
+   *  identifiers like Survey IDs that get cut off. Editing moves to the pencil. */
+  copyable?: boolean
 }
 
 /**
@@ -36,6 +40,7 @@ export function TextCell({
   suffix,
   isLink = false,
   onClickValue,
+  copyable = false,
 }: TextCellProps) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
@@ -102,9 +107,19 @@ export function TextCell({
         {suffix}
       </button>
     )
+  } else if (copyable) {
+    // Full value on hover + one-click copy; edit via the pencil (FieldCell skips
+    // its click-to-edit wrap when valueInteractive, so no nested buttons).
+    display = (
+      <CopyableText
+        value={value}
+        className={cn('text-[14.3px]', warn && 'text-amber-600 dark:text-amber-400')}
+      />
+    )
   } else {
     display = (
-      <span className={cn('truncate', warn && 'text-amber-600 dark:text-amber-400')}>
+      // title = the full value, so a cut-off value is always readable on hover.
+      <span className={cn('truncate', warn && 'text-amber-600 dark:text-amber-400')} title={value ?? undefined}>
         {value}
         {suffix && <span className="text-muted-foreground">{suffix}</span>}
       </span>
@@ -116,7 +131,7 @@ export function TextCell({
       label={label}
       tooltip={tooltip}
       editable={!readOnly}
-      valueInteractive={isLink}
+      valueInteractive={isLink || (copyable && hasValue)}
       onEdit={begin}
       saved={saved}
     >
