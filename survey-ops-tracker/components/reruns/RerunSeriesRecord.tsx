@@ -13,6 +13,7 @@ import type { FutureDefaults } from '@/lib/reruns/series'
 import { useTeamMembers, assignableMembers } from '@/lib/hooks/useTeamMembers'
 import { waveStatus, type WaveStatusMeta } from '@/lib/reruns/waveStatus'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
+import { CopyableText } from '@/components/shared/CopyableText'
 import { Skeleton } from '@/components/shared/Skeleton'
 import { ColumnsMenu } from '@/components/shared/ColumnsMenu'
 import { BaseTypeTag } from '@/components/reruns/BaseTypeTag'
@@ -169,11 +170,7 @@ const WAVE_COLUMN_REGISTRY: WaveColumnDef[] = [
     label: 'Survey IDs',
     tooltip: 'Survey IDs used in this wave (comma-separated). Can differ per wave.',
     width: 'minmax(130px,1.1fr)',
-    render: (w) => (
-      <span className="text-xs font-mono text-muted-foreground truncate" title={w.survey_tool_id ?? undefined}>
-        {w.survey_tool_id || '—'}
-      </span>
-    ),
+    render: (w) => <CopyableText value={w.survey_tool_id} mono className="text-xs text-muted-foreground" />,
   },
   {
     key: 'n_target',

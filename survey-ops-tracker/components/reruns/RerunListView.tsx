@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { BaseTypeTag } from '@/components/reruns/BaseTypeTag'
 import { Seg } from '@/components/reruns/Seg'
 import { ColumnsMenu } from '@/components/shared/ColumnsMenu'
+import { CopyableText } from '@/components/shared/CopyableText'
 import { formatDate } from '@/lib/utils/date'
 import { fmtNum } from '@/lib/utils/number'
 import { waveStatus } from '@/lib/reruns/waveStatus'
@@ -354,8 +355,8 @@ const WAVE_COLUMNS: WaveColumnDef[] = [
     key: 'surveyId',
     label: 'Survey ID',
     tooltip: 'The survey tool ID for this wave.',
-    cellClassName: 'font-mono text-xs text-muted-foreground',
-    render: (w) => w.survey_tool_id ?? <span className="text-muted-foreground/50">—</span>,
+    cellClassName: 'text-xs text-muted-foreground',
+    render: (w) => <CopyableText value={w.survey_tool_id} mono className="text-xs" />,
   },
 ]
 
