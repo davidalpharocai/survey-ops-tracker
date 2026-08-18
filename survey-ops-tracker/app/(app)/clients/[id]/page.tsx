@@ -303,7 +303,8 @@ export default function ClientPage() {
     const overdue = open.filter(p => p.board_column !== 'Delivery' && p.due_date && p.due_date <= today).length
     const withSpend = rows.filter(p => p.actual_spend != null && p.actual_spend > 0)
     const totalSpend = withSpend.reduce((s, p) => s + (p.actual_spend ?? 0), 0)
-    const totalBudget = rows.reduce((s, p) => s + (p.budget ?? 0), 0)
+    const withBudget = rows.filter(p => p.budget != null && p.budget > 0)
+    const totalBudget = withBudget.reduce((s, p) => s + (p.budget ?? 0), 0)
     let avgGapDays: number | null = null
     if (dates.length > 1) {
       const ms = dates.map(d => new Date(d).getTime())
@@ -320,6 +321,8 @@ export default function ClientPage() {
       avgSpend: withSpend.length > 0 ? totalSpend / withSpend.length : null,
       spendCount: withSpend.length,
       totalBudget,
+      avgBudget: withBudget.length > 0 ? totalBudget / withBudget.length : null,
+      budgetCount: withBudget.length,
       avgGapDays,
     }
   }, [rows])
@@ -583,16 +586,23 @@ export default function ClientPage() {
                 </div>
                 <div className={tile}>
                   <span className="text-xs text-muted-foreground flex items-center">
-                    Avg spend / project
-                    <InfoTooltip text="Average of Actual Spend across projects where spend was recorded — internal cost, not client billing." />
+                    Avg spend vs budget
+                    <InfoTooltip text="Per project: our average Actual Spend (AlphaROC's internal cost) vs the average Budget (what the client is paying us). A fuller spend / budget / client-revenue breakdown is coming." />
                   </span>
                   <span className="text-2xl font-semibold text-foreground leading-tight">
                     {money(stats!.avgSpend != null ? Math.round(stats!.avgSpend) : null)}
+                    <span className="text-xl font-normal text-muted-foreground"> / {money(stats!.avgBudget != null ? Math.round(stats!.avgBudget) : null)}</span>
                   </span>
                   <span className="text-xs text-muted-foreground">
-                    {stats!.spendCount > 0
-                      ? `${money(stats!.totalSpend)} total · ${stats!.spendCount} project${stats!.spendCount > 1 ? 's' : ''} with spend`
-                      : 'no spend recorded yet'}
+                    {stats!.spendCount === 0 && stats!.budgetCount === 0
+                      ? 'no spend or budget recorded yet'
+                      : (
+                        <>
+                          our spend vs client budget
+                          {stats!.avgSpend != null && stats!.avgBudget != null && stats!.avgBudget > 0 &&
+                            ` · spend is ${Math.round((stats!.avgSpend / stats!.avgBudget) * 100)}% of budget`}
+                        </>
+                      )}
                   </span>
                 </div>
                 <div className={tile}>
