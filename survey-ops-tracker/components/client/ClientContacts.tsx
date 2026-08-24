@@ -1,5 +1,6 @@
 'use client'
 import { useState } from 'react'
+import Link from 'next/link'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
 import {
   useClientContacts,
@@ -94,7 +95,16 @@ export function ClientContacts({ clientId }: { clientId: string }) {
               <div key={c.id} className="flex items-center justify-between gap-2 py-2 group">
                 <div className="min-w-0">
                   <p className="text-sm text-foreground truncate flex items-center gap-1.5">
-                    <span className="truncate">{contactName(c)}</span>
+                    {/* The name is the way into the contact's own page (every survey
+                        they asked for). It covers the name only — the Occam badge and
+                        the hover actions to the right stay their own click targets. */}
+                    <Link
+                      href={`/contacts/${c.id}`}
+                      className="truncate text-primary hover:underline"
+                      title={`Open ${contactName(c)}'s page — every survey they requested`}
+                    >
+                      {contactName(c)}
+                    </Link>
                     {c.occam_invited && (
                       <span
                         className="shrink-0 text-[10px] leading-none px-1.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20"
@@ -144,7 +154,17 @@ export function ClientContacts({ clientId }: { clientId: string }) {
               {archived.map(c => (
                 <div key={c.id} className="flex items-center justify-between gap-2 py-2">
                   <div className="min-w-0">
-                    <p className="text-sm text-muted-foreground truncate">{contactName(c)}</p>
+                    {/* An archived contact keeps their page — past projects still
+                        resolve to them — so the name stays a link, just muted. */}
+                    <p className="text-sm text-muted-foreground truncate">
+                      <Link
+                        href={`/contacts/${c.id}`}
+                        className="hover:text-foreground hover:underline transition-colors"
+                        title={`Open ${contactName(c)}'s page — every survey they requested`}
+                      >
+                        {contactName(c)}
+                      </Link>
+                    </p>
                     {contactSubtitle(c) && (
                       <p className="text-xs text-muted-foreground/70 truncate">{contactSubtitle(c)}</p>
                     )}
