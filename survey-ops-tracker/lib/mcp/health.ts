@@ -1,4 +1,5 @@
 import 'server-only'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { resolveProject, isActiveOperational, getMe } from './data'
 import { stageDurations } from '@/lib/utils/stageTiming'
@@ -8,13 +9,20 @@ import { stageDurations } from '@/lib/utils/stageTiming'
 //   - dataHealth: portfolio-wide anomaly scan (bulk, no N+1)
 //   - pipelineThroughput: per-stage cycle time / WIP / aging from project_stage_history
 //
-// The canonical spend formula (recompute_project_spend, migration 060) is
+// The canonical spend formula (recompute_project_spend, migration 060 + the third
+// term added by 080) is
 //   actual_spend = Σ(blast.bid × blast.completes) + Σ(supplier.cpi × supplier.n_collected)
+//                                                + Σ(cost.amount)
 // so a stored actual_spend that disagrees means the recompute trigger didn't fire.
+// This MUST stay in lockstep with the SQL: when 060 added the blast term, one read
+// that hadn't been updated with it reported $0 spend on every blast project until a
+// hotfix. Here the failure is louder still — a missing term makes the integrity
+// checker itself accuse a perfectly-consistent project of a trigger failure.
 
 type Row = Record<string, unknown>
 type SupRow = { cpi: number | null; n_collected: number | null }
 type BlastRow = { bid: number | null; completes: number | null }
+type CostRow = { amount: number | null }
 type SegRow = { n_target: number | null; n_collected: number | null; n_actual: number | null }
 
 const num = (v: unknown): number => (v == null ? 0 : Number(v))
@@ -38,29 +46,32 @@ export interface Check {
 
 /** The consistency checks for one project, given its child rows. Pure — no I/O —
  *  so reconcileProject and dataHealth share exactly one definition. */
-function buildChecks(p: Row, sup: SupRow[], blasts: BlastRow[], segs: SegRow[]): Check[] {
+function buildChecks(p: Row, sup: SupRow[], blasts: BlastRow[], costs: CostRow[], segs: SegRow[]): Check[] {
   const checks: Check[] = []
 
   // 1) actual_spend vs the canonical recompute formula — only when there's a
-  //    supplier/blast source to reconcile against. A stored spend with NO source rows
-  //    is legacy ($/bid model, pre-054) or manual, not a trigger failure, so it's an
-  //    advisory, not a false "issue".
+  //    supplier/blast/cost source to reconcile against. A stored spend with NO source
+  //    rows is legacy ($/bid model, pre-054) or manual, not a trigger failure, so it's
+  //    an advisory, not a false "issue". Cost lines are a source like any other: leave
+  //    them out of the gate and a costs-only project gets told its money is
+  //    "not reconcilable against the current model" when in fact it reconciles exactly.
   const supSpend = sup.reduce((s, r) => s + num(r.cpi) * num(r.n_collected), 0)
   const blastSpend = blasts.reduce((s, r) => s + num(r.bid) * num(r.completes), 0)
-  const expectedSpend = Math.round(supSpend + blastSpend)
+  const costSpend = costs.reduce((s, r) => s + num(r.amount), 0)
+  const expectedSpend = Math.round(supSpend + blastSpend + costSpend)
   const actualSpend = Math.round(num(p.actual_spend))
-  if (sup.length || blasts.length) {
+  if (sup.length || blasts.length || costs.length) {
     const ok = Math.abs(expectedSpend - actualSpend) <= 1
     checks.push({
       check: 'spend', ok, advisory: false, expected: expectedSpend, actual: actualSpend,
       detail: ok
-        ? 'actual_spend matches Σ(cpi×collected)+Σ(bid×completes)'
+        ? 'actual_spend matches Σ(cpi×collected)+Σ(bid×completes)+Σ(cost amount)'
         : `stored actual_spend $${actualSpend.toLocaleString('en-US')} ≠ computed $${expectedSpend.toLocaleString('en-US')} — the recompute trigger may not have fired`,
     })
   } else if (num(p.actual_spend) > 0) {
     checks.push({
       check: 'spend_no_source', ok: false, advisory: true, actual: actualSpend,
-      detail: `actual_spend $${actualSpend.toLocaleString('en-US')} recorded with no supplier/blast rows — legacy ($/bid) or manual spend, not reconcilable against the current model`,
+      detail: `actual_spend $${actualSpend.toLocaleString('en-US')} recorded with no supplier/blast/cost rows — legacy ($/bid) or manual spend, not reconcilable against the current model`,
     })
   }
 
@@ -133,6 +144,36 @@ function buildChecks(p: Row, sup: SupRow[], blasts: BlastRow[], segs: SegRow[]):
   return checks
 }
 
+/** The flat vendor cost lines for one or many projects (migration 080). Read through an
+ *  UNTYPED handle, with the failure swallowed, deliberately on both counts:
+ *   - David applies the SQL BY HAND, hours or days after the code deploys, so there is a
+ *     window in which project_costs doesn't exist. inChunks throws on error and neither
+ *     caller catches, so an untolerated read would 500 data_health AND reconcile_project
+ *     for everyone until the migration lands. Same trade as lib/auth/capabilities.ts:
+ *     swallow it and answer "no cost lines". Nothing is actually lost in that window —
+ *     with no table there are no cost rows, so the pre-080 two-term formula is still the
+ *     correct expectation. (A swallowed failure for any OTHER reason would under-count
+ *     the expected spend, so it's logged rather than silent; the sibling reads in the
+ *     same Promise.all share fate with a real outage anyway, and this is a re-runnable
+ *     read-only report.)
+ *   - project_costs isn't in the generated Database type yet (types are regenerated in
+ *     their own pass), so the rows are narrowed by hand the way the data hooks do. */
+async function fetchCosts(
+  supabase: ReturnType<typeof createAdminClient>,
+  projectIds: string[],
+): Promise<(CostRow & { project_id: string })[]> {
+  const db = supabase as unknown as SupabaseClient
+  try {
+    return await inChunks<CostRow & { project_id: string }>(
+      projectIds,
+      c => db.from('project_costs').select('project_id, amount').in('project_id', c),
+    )
+  } catch (err) {
+    console.error('[health] project_costs read failed — treating as no cost lines:', err)
+    return []
+  }
+}
+
 /** Full consistency report for one project (all checks + the failing subset). */
 export async function reconcileProject(projectRef: string) {
   const resolved = await resolveProject(projectRef)
@@ -143,15 +184,17 @@ export async function reconcileProject(projectRef: string) {
   const p = resolved as Row
   const pid = p.id as string
   const supabase = createAdminClient()
-  const [supRes, blastRes, segRes] = await Promise.all([
+  const [supRes, blastRes, costRows, segRes] = await Promise.all([
     supabase.from('project_suppliers').select('cpi, n_collected').eq('project_id', pid),
     supabase.from('project_blasts').select('bid, completes').eq('project_id', pid),
+    fetchCosts(supabase, [pid]),
     supabase.from('project_segments').select('n_target, n_collected, n_actual').eq('project_id', pid),
   ])
   const checks = buildChecks(
     p,
     (supRes.data ?? []) as unknown as SupRow[],
     (blastRes.data ?? []) as unknown as BlastRow[],
+    costRows,
     (segRes.data ?? []) as unknown as SegRow[],
   )
   const issues = checks.filter(c => !c.ok && !c.advisory)
@@ -210,13 +253,15 @@ export async function dataHealth(args: { active_only?: boolean; limit?: number }
   const ids = projects.map(p => p.id as string)
   if (ids.length === 0) return { scanned: 0, with_issues: 0, counts_by_check: {}, advisory_counts: {}, projects: [], summary: 'No projects to scan.' }
 
-  const [supRows, blastRows, segRows] = await Promise.all([
+  const [supRows, blastRows, costRows, segRows] = await Promise.all([
     inChunks<SupRow & { project_id: string }>(ids, c => supabase.from('project_suppliers').select('project_id, cpi, n_collected').in('project_id', c)),
     inChunks<BlastRow & { project_id: string }>(ids, c => supabase.from('project_blasts').select('project_id, bid, completes').in('project_id', c)),
+    fetchCosts(supabase, ids),
     inChunks<SegRow & { project_id: string }>(ids, c => supabase.from('project_segments').select('project_id, n_target, n_collected, n_actual').in('project_id', c)),
   ])
   const supMap = groupByProject(supRows)
   const blastMap = groupByProject(blastRows)
+  const costMap = groupByProject(costRows)
   const segMap = groupByProject(segRows)
 
   const countsByCheck: Record<string, number> = {}
@@ -224,7 +269,7 @@ export async function dataHealth(args: { active_only?: boolean; limit?: number }
   const flagged: { project_code: unknown; project_name: unknown; issues: { check: string; detail: string }[] }[] = []
   for (const p of projects) {
     const pid = p.id as string
-    const checks = buildChecks(p, supMap.get(pid) ?? [], blastMap.get(pid) ?? [], segMap.get(pid) ?? [])
+    const checks = buildChecks(p, supMap.get(pid) ?? [], blastMap.get(pid) ?? [], costMap.get(pid) ?? [], segMap.get(pid) ?? [])
     const issues = checks.filter(c => !c.ok && !c.advisory)
     for (const a of checks.filter(c => !c.ok && c.advisory)) advisoryCounts[a.check] = (advisoryCounts[a.check] ?? 0) + 1
     if (issues.length) {
