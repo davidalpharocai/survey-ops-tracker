@@ -107,4 +107,48 @@ describe('SelectCell', () => {
 
     expect(onSave).toHaveBeenCalledWith('B2B')
   })
+
+  it('an unset value opens on a placeholder, not the first option, so picking the first option still saves', () => {
+    const onSave = vi.fn()
+    render(
+      <SelectCell
+        label="Type"
+        value=""
+        options={[
+          { value: 'PS', label: 'PS' },
+          { value: 'B2B', label: 'B2B' },
+        ]}
+        onSave={onSave}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /edit type/i }))
+    const select = screen.getByRole('combobox') as HTMLSelectElement
+
+    // Regression: without the placeholder option the browser falls back to the
+    // first option, so the select reads 'PS' while the field shows "— set" —
+    // and choosing PS fires no change event, silently saving nothing.
+    expect(select.value).toBe('')
+
+    fireEvent.change(select, { target: { value: 'PS' } })
+    expect(onSave).toHaveBeenCalledWith('PS')
+  })
+
+  it('choosing the placeholder closes without saving', () => {
+    const onSave = vi.fn()
+    render(
+      <SelectCell
+        label="Type"
+        value=""
+        options={[{ value: 'PS', label: 'PS' }]}
+        onSave={onSave}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /edit type/i }))
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: '' } })
+
+    expect(onSave).not.toHaveBeenCalled()
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
+  })
 })
