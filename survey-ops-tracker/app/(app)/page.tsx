@@ -1,9 +1,9 @@
 'use client'
 import { Caret } from '@/components/shared/Caret'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { DragDropContext, type DropResult } from '@hello-pangea/dnd'
-import { Board, columnSortRank } from '@/components/board/Board'
+import { Board, type DropResolver } from '@/components/board/Board'
 import { ScopingBoard, SCOPING_STAGES } from '@/components/board/ScopingBoard'
 import { NewProjectModal } from '@/components/board/NewProjectModal'
 import { ProjectCard } from '@/components/board/ProjectCard'
@@ -18,7 +18,7 @@ import { useViewMode } from '@/lib/hooks/useViewMode'
 import { useStoredFlag } from '@/lib/hooks/useStoredFlag'
 import { exportProjectsCsv } from '@/lib/utils/exportCsv'
 import { isTypingTarget } from '@/lib/utils/keyboard'
-import { boardOrder, sortOrderBetween } from '@/lib/utils/ordering'
+import { cardOrder, dropSortOrder, type BoardSortMode } from '@/lib/utils/ordering'
 import { STAGE_ORDER, getCheckboxesForColumn, type BoardColumn as BoardColumnType } from '@/lib/utils/stage'
 import { useComplianceMaps } from '@/lib/hooks/useComplianceState'
 import { complianceGate } from '@/lib/utils/compliance'
@@ -26,6 +26,8 @@ import { toast } from '@/lib/utils/toast'
 import { matchesDeliveredWindow, DELIVERED_WINDOW_LABELS, type DeliveredWindow } from '@/lib/utils/date'
 import type { Database } from '@/lib/supabase/types'
 import Link from 'next/link'
+
+const BOARD_SORT_KEY = 'sot.boardSort'
 
 export default function BoardPage() {
   const router = useRouter()
@@ -47,6 +49,28 @@ export default function BoardPage() {
     if (deliveredWithin !== 'all') setShowClosed(true)
   }, [deliveredWithin])
   const [pipelineCollapsed, setPipelineCollapsed] = useStoredFlag('sot.collapse.pipeline', false)
+  // Card sort mode for both lanes. It lives here (not in Board) because Full
+  // View's drag handler below has to compute drop positions against the same
+  // order the columns render in. Defaults to the soonest delivery date; a
+  // stored choice wins. Read after mount so the server render matches.
+  const [boardSort, setBoardSort] = useState<BoardSortMode>('due')
+  useEffect(() => {
+    const stored = localStorage.getItem(BOARD_SORT_KEY)
+    if (stored === 'manual' || stored === 'due') setBoardSort(stored)
+  }, [])
+  function changeBoardSort(m: BoardSortMode) {
+    setBoardSort(m)
+    localStorage.setItem(BOARD_SORT_KEY, m)
+  }
+  // A drop's sort_order has to be computed against the cards the destination
+  // column is SHOWING, and for the pipeline that's the board's business (the
+  // captain filter and search live in <Board/>). It lends us its resolver;
+  // a ref because it changes with every filter keystroke and this handler only
+  // reads it at drop time. Null while the pipeline is collapsed/unmounted.
+  const pipelineDrop = useRef<DropResolver | null>(null)
+  const takeDropResolver = useCallback((resolve: DropResolver | null) => {
+    pipelineDrop.current = resolve
+  }, [])
   // Remember this as the origin so a project's "← Back" returns here
   useEffect(() => {
     sessionStorage.setItem('sot.cameFrom', '/')
@@ -105,10 +129,15 @@ export default function BoardPage() {
   // When a "Delivered in X" window is active, scope the Archived section to
   // projects DELIVERED within it (status Closed = delivered/archived; excludes
   // Cancelled), by deliver_date. 'all' shows everything archived, as before.
-  const archivedShown =
+  const archivedInWindow =
     deliveredWithin === 'all'
       ? closedProjects
       : closedProjects.filter(p => p.status === 'Closed' && matchesDeliveredWindow(p.deliver_date, deliveredWithin))
+  // Finished work reads newest-delivered-first: "soonest due" says nothing once
+  // it's out the door. These cards aren't draggable, so there's no hand-arranged
+  // order to protect and the board's sort mode doesn't apply here (see cardOrder).
+  // .slice() because sort() mutates and closedProjects also feeds the CSV export.
+  const archivedShown = archivedInWindow.slice().sort(cardOrder('delivered', boardSort))
   const exportableProjects =
     mode === 'full'
       ? [...scopingProjects, ...activeProjects, ...closedProjects]
@@ -136,19 +165,45 @@ export default function BoardPage() {
     const id = result.draggableId
     const moved = projects.find(p => p.id === id)
     if (from === to && result.destination.index === result.source.index) return
+    // Re-ordering inside one column is hand-arranging, and sort_order — the
+    // column it writes — is shared by the whole team while the sort mode is
+    // this browser's localStorage. Dragging in date order would snap the card
+    // back and quietly re-shuffle a teammate's hand-arranged column, so stop
+    // and say which switch to flip. (Same rule as the board's own handler.)
+    if (from === to && boardSort !== 'manual') {
+      toast('Set Sort to "Manual (drag)" to hand-arrange this column.')
+      return
+    }
     const toScoping = (SCOPING_STAGES as string[]).includes(to)
     const fromScoping = (SCOPING_STAGES as string[]).includes(from)
     const toPipeline = (STAGE_ORDER as string[]).includes(to)
 
-    // Persisted position: the dropped card lands between its new neighbors
-    const destList = toPipeline
-      ? activeProjects.filter(p => p.board_column === to && p.id !== id)
-      : scopingProjects.filter(p => (p.scoping_stage ?? 'New Inquiry') === to && p.id !== id)
-    const destSorted = destList.sort(
-      (a, b) => columnSortRank(a) - columnSortRank(b) || boardOrder(a, b)
-    )
+    // Persisted position: the dropped card lands between the neighbours it was
+    // dropped between ON SCREEN (destination.index counts rendered cards), with
+    // the value itself placed in hand-arranged order — see dropSortOrder.
+    // The pipeline's rendered list is the board's to know (it owns the captain
+    // filter and folds the retired Delivery column into Data QA), so we use the
+    // resolver it lends us. The scoping lane renders straight from
+    // scopingProjects, unfiltered, so here it's the same cards in two orders —
+    // and it renders flat, without the pipeline's priority ranking.
     const i = result.destination.index
-    const sortOrder = sortOrderBetween(destSorted[i - 1]?.sort_order, destSorted[i]?.sort_order)
+    let sortOrder: number
+    if (toPipeline) {
+      // No resolver = no pipeline columns on screen, so nothing could have been
+      // dropped on one. Bail rather than invent a position.
+      if (!pipelineDrop.current) return
+      sortOrder = pipelineDrop.current(to as BoardColumnType, i, id)
+    } else {
+      const inStage = (order: (a: SlimProject, b: SlimProject) => number) =>
+        scopingProjects
+          .filter(p => (p.scoping_stage ?? 'New Inquiry') === to && p.id !== id)
+          .sort(order)
+      sortOrder = dropSortOrder(
+        inStage(cardOrder('scoping', boardSort)),
+        inStage(cardOrder('scoping', 'manual')),
+        i
+      )
+    }
 
     // Same-tick cache apply so the drop animation targets the new home
     function applyNow(patch: Partial<SlimProject>) {
@@ -305,7 +360,7 @@ export default function BoardPage() {
           scoping card dropped on a pipeline column gets promoted on the spot */}
       {mode === 'full' ? (
         <DragDropContext onDragStart={() => { window.__sotDragging = true }} onDragEnd={handleFullViewDragEnd}>
-          <ScopingBoard projects={scopingProjects} wrapInContext={false} />
+          <ScopingBoard projects={scopingProjects} wrapInContext={false} sortMode={boardSort} />
           <button
             onClick={() => setPipelineCollapsed(!pipelineCollapsed)}
             title={pipelineCollapsed ? 'Expand the pipeline' : 'Collapse the pipeline (your choice is remembered)'}
@@ -327,6 +382,11 @@ export default function BoardPage() {
               wrapInContext={false}
               deliveredWithin={deliveredWithin}
               onDeliveredWithinChange={setDeliveredWithin}
+              sortMode={boardSort}
+              onSortModeChange={changeBoardSort}
+              // Full View drops are handled up here, so borrow the board's
+              // drop math — only it knows what its columns are showing.
+              onDropResolver={takeDropResolver}
             />
           )}
         </DragDropContext>
@@ -337,6 +397,8 @@ export default function BoardPage() {
           onMoveProject={moveProject}
           deliveredWithin={deliveredWithin}
           onDeliveredWithinChange={setDeliveredWithin}
+          sortMode={boardSort}
+          onSortModeChange={changeBoardSort}
         />
       )}
 
