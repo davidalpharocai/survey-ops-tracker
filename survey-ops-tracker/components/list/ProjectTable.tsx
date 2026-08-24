@@ -163,7 +163,6 @@ export function ProjectTable({
     { key: 'n', field: 'n', label: 'N / Target', title: 'Responses collected so far vs the goal. Click to sort by N collected.' },
     { key: 'nActual', field: 'nActual', label: 'N Actual', title: 'Usable responses after data cleaning. Click to sort.' },
     { key: 'long', field: null, label: 'Long.', title: 'Longitudinal — study tracked across multiple waves.' },
-    { key: 'voterQA', field: null, label: 'Voter QA', title: 'Whether the project needs the extra voter-survey QA pass.' },
     { key: 'citation', field: null, label: 'Citation', title: 'Whether deliverables need citation language.' },
     { key: 'due', field: 'due_date', label: 'Due', title: 'Internal deadline — when our work must be done.' },
   ]
@@ -368,7 +367,6 @@ export function ProjectTable({
                   </td>
                 )}
                 {show('long') && <FlagCell value={p.longitudinal ?? false} pad={pad} />}
-                {show('voterQA') && <FlagCell value={p.voter_survey_qa ?? false} warn pad={pad} />}
                 {show('citation') && <FlagCell value={p.citation_language_needed ?? false} warn pad={pad} />}
                 {show('due') && (
                   <td className={`px-4 ${pad} text-xs whitespace-nowrap ${dueColor}`}>

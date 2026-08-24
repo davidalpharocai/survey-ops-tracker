@@ -18,8 +18,6 @@ export const FIELD_LABELS: Record<string, string> = {
   deliver_date: 'Deliver Date',
   longitudinal: 'Longitudinal',
   row_level_data: 'Row-Level Data',
-  terminations: 'Terminations',
-  voter_survey_qa: 'Voter Survey QA',
   citation_language_needed: 'Citation Language',
   survey_tool_id: 'Survey IDs',
   slack_channel_url: 'Slack Channel',

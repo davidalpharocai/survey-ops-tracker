@@ -34,12 +34,9 @@ const TIP = {
   surveyIds:
     "IDs of this project's surveys, comma separated. Auto-filled from the attached Google Sheet by the scheduled sync; manual edits stick unless the sheet changes.",
   longitudinal: 'Whether this is a longitudinal study tracked across multiple waves.',
-  voterQa:
-    'Voter surveys need an additional QA pass. Auto-set to Yes when the salesperson is Jenna or the project/client mentions "vote". Click to override.',
   citation:
-    'Whether deliverables need citation language. Auto-set the same way as Voter Survey QA. Click to override.',
+    'Whether deliverables need citation language. Auto-set to Yes when the salesperson is Jenna or the project/client mentions "vote". Click to override.',
   rowLevel: 'Whether individual respondent-level data is included in the deliverable.',
-  terminations: 'Whether any survey participants have been terminated (screened out) from the study.',
   occam: 'Whether this project uses Occam (our internal survey tool).',
 }
 
@@ -189,14 +186,6 @@ export function OverviewFieldGrid({ project }: { project: SurveyProject }) {
             onToggle={v => save({ longitudinal: v })}
           />
           <FlagChip
-            label="Voter Survey QA"
-            icon="🗳️"
-            value={project.voter_survey_qa ?? false}
-            tone="amber"
-            tooltip={TIP.voterQa}
-            onToggle={v => save({ voter_survey_qa: v })}
-          />
-          <FlagChip
             label="Citation Language"
             icon="❝"
             value={project.citation_language_needed ?? false}
@@ -211,14 +200,6 @@ export function OverviewFieldGrid({ project }: { project: SurveyProject }) {
             tone="emerald"
             tooltip={TIP.rowLevel}
             onToggle={v => save({ row_level_data: v })}
-          />
-          <FlagChip
-            label="Terminations"
-            icon="⛔"
-            value={project.terminations}
-            tone="red"
-            tooltip={TIP.terminations}
-            onToggle={v => save({ terminations: v })}
           />
           <FlagChip
             label={<OccamWordmark className="h-3 w-auto" />}
