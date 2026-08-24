@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { useUpdateProject } from '@/lib/hooks/useProjects'
 import { useIsNewForMe } from '@/lib/hooks/useSeenProjects'
 import { useStoredFlag } from '@/lib/hooks/useStoredFlag'
-import { boardOrder } from '@/lib/utils/ordering'
+import { cardOrder, type BoardSortMode } from '@/lib/utils/ordering'
 import type { SlimProject } from '@/lib/hooks/useProjects'
 import type { Database } from '@/lib/supabase/types'
 
@@ -24,9 +24,12 @@ interface ScopingBoardProps {
   // Full View provides a page-level DragDropContext shared with the pipeline
   // so cards can be dragged from scoping straight into a pipeline column
   wrapInContext?: boolean
+  // Card sort mode — shared with the pipeline board so both lanes on the page
+  // obey one control, and so Full View's drop math matches what's rendered here.
+  sortMode?: BoardSortMode
 }
 
-export function ScopingBoard({ projects, wrapInContext = true }: ScopingBoardProps) {
+export function ScopingBoard({ projects, wrapInContext = true, sortMode = 'due' }: ScopingBoardProps) {
   const router = useRouter()
   const updateProject = useUpdateProject()
   const isNewForMe = useIsNewForMe()
@@ -52,7 +55,7 @@ export function ScopingBoard({ projects, wrapInContext = true }: ScopingBoardPro
           title={stage}
           projects={projects
             .filter(p => (p.scoping_stage ?? 'New Inquiry') === stage)
-            .sort(boardOrder)}
+            .sort(cardOrder('scoping', sortMode))}
           onCardClick={id => router.push(`/projects/${id}`)}
           isNewFor={isNewForMe}
         />

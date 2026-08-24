@@ -5,13 +5,12 @@ import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-p
 import { useInternalProjects, useUpdateProject } from '@/lib/hooks/useProjects'
 import { useTeamMembers } from '@/lib/hooks/useTeamMembers'
 import { useSprintConfig } from '@/lib/hooks/useSprintConfig'
-import { columnSortRank } from '@/components/board/Board'
 import { InternalCard } from '@/components/internal/InternalCard'
 import { NewInternalProjectModal } from '@/components/internal/NewInternalProjectModal'
 import { SkeletonCard } from '@/components/shared/Skeleton'
 import { INTERNAL_STAGES } from '@/lib/utils/internal'
 import { sprintLabel, currentSprintNumber } from '@/lib/utils/sprints'
-import { boardOrder, sortOrderBetween } from '@/lib/utils/ordering'
+import { cardOrder, sortOrderBetween } from '@/lib/utils/ordering'
 import type { Database } from '@/lib/supabase/types'
 
 declare global {
@@ -28,6 +27,12 @@ export default function InternalProjectsPage() {
 
   const active = projects.filter(p => p.status !== 'Closed')
 
+  // Internal work is sprint-planned and hand-ordered in Backlog, so this board
+  // stays on the manual order — the survey board's delivery-date sort would
+  // shuffle a deliberately stacked sprint. Same comparator as the survey board
+  // (just a different mode) so the columns and the drop math can't drift apart.
+  const internalOrder = cardOrder('pipeline', 'manual')
+
   function handleDragEnd(result: DropResult) {
     window.__sotDragging = false
     if (!result.destination) return
@@ -38,7 +43,7 @@ export default function InternalProjectsPage() {
 
     const destCards = active
       .filter(p => p.board_column === to && p.id !== id)
-      .sort((a, b) => columnSortRank(a) - columnSortRank(b) || boardOrder(a, b))
+      .sort(internalOrder)
     const i = result.destination.index
     const sortOrder = sortOrderBetween(destCards[i - 1]?.sort_order, destCards[i]?.sort_order)
 
@@ -84,7 +89,7 @@ export default function InternalProjectsPage() {
             {INTERNAL_STAGES.map(stage => {
               const cards = active
                 .filter(p => p.board_column === stage)
-                .sort((a, b) => columnSortRank(a) - columnSortRank(b) || boardOrder(a, b))
+                .sort(internalOrder)
               return (
                 <div key={stage} className="bg-card border border-border rounded-xl p-2 min-w-[180px] flex-1 basis-0 flex flex-col gap-2">
                   <div className="flex items-center justify-between">
