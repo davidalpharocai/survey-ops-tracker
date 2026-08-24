@@ -49,12 +49,14 @@ export interface SummaryFacts {
   watchouts: string[]
 }
 
+// voter_survey_qa and terminations are deliberately absent: both were retired
+// from the UI on 2026-08-24. The columns and their history are kept so either
+// can be resurfaced, but nothing user-facing should name them — and this list
+// feeds prose the user reads.
 const FLAG_LABELS: { key: keyof SurveyProject; label: string }[] = [
   { key: 'longitudinal', label: 'Longitudinal' },
-  { key: 'voter_survey_qa', label: 'Voter Survey QA' },
   { key: 'citation_language_needed', label: 'Citation Language' },
   { key: 'row_level_data', label: 'Row-Level Data' },
-  { key: 'terminations', label: 'Terminations' },
   { key: 'occam', label: 'Occam' },
 ]
 

@@ -227,7 +227,10 @@ describe('buildSummaryFacts — happy path shape', () => {
     expect(facts.spendPct).toBe(25)
     expect(facts.costPerComplete).toBe(4)
     expect(facts.compliance).toBe('n/a')
-    expect(facts.flagsOn).toEqual(['Longitudinal', 'Voter Survey QA', 'Row-Level Data'])
+    // Voter Survey QA is intentionally NOT listed: retired from the UI 2026-08-24,
+    // column retained. The fixture still sets it true, so this also guards against
+    // it creeping back into user-facing prose.
+    expect(facts.flagsOn).toEqual(['Longitudinal', 'Row-Level Data'])
     expect(facts.rerun).toBe('Wave 2')
     expect(facts.nextSteps).toEqual(['Send reminder email'])
     // No due_date, and spend% (25) is behind N% (50), and no blasts → no watch-outs.

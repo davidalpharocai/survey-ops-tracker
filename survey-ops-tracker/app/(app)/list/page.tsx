@@ -77,7 +77,7 @@ export default function ListView() {
         // default table is clean (Project, Client, Type, Stage, Captain,
         // N/Target, Due). Fully reversible via the ⚙ Columns menu, and any
         // explicit choice (including showing them) is honored thereafter.
-        const seed = ['nActual', 'long', 'voterQA', 'citation']
+        const seed = ['nActual', 'long', 'citation']
         setHiddenCols(new Set(seed))
         localStorage.setItem(HIDDEN_COLS_KEY, JSON.stringify(seed))
       } else {

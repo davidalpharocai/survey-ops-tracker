@@ -7,7 +7,7 @@ import { toast } from '@/lib/utils/toast'
 const GROUPS: { key: keyof CloneCarry; label: string; desc: string }[] = [
   { key: 'people', label: 'People', desc: 'captain, co-captains, salesperson, requested-by' },
   { key: 'audienceN', label: 'Audience + N targets', desc: 'audience, N target, internal target, audience size' },
-  { key: 'flags', label: 'Flags', desc: 'longitudinal, voter QA, citation, row-level, terminations' },
+  { key: 'flags', label: 'Flags', desc: 'longitudinal, citation, row-level' },
   { key: 'suppliers', label: 'Suppliers', desc: 'CPIs + caps (N collected reset to 0)' },
   { key: 'budget', label: 'Budget', desc: 'total budget' },
 ]

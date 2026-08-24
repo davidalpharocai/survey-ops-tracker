@@ -10,7 +10,10 @@ import { runCreateProject, runProjectWrite } from '@/lib/mcp/writes'
 export interface CloneCarry {
   people?: boolean // captain + co-captains, salesperson, requested-by
   audienceN?: boolean // audience, N target, N internal target, audience size
-  flags?: boolean // longitudinal, voter QA, citation, row-level, terminations
+  // longitudinal, voter QA, citation, row-level, terminations. Voter QA and
+  // terminations are retired from the UI (2026-08-24) but still carried here
+  // deliberately, so the data stays continuous if either is ever resurfaced.
+  flags?: boolean
   suppliers?: boolean // copy PS suppliers (CPIs + caps; N collected reset to 0)
   budget?: boolean // total budget
 }

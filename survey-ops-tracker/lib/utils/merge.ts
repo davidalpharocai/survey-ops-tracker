@@ -1,6 +1,9 @@
 export type MergeField = { key: string; label: string }
 
 // Scalar fields a user resolves in the preview (only differing ones surface).
+// voter_survey_qa and terminations are absent on purpose — retired from the UI
+// 2026-08-24, so there is nothing for a human to reason about; the survivor
+// simply keeps its own value and both columns are retained in the DB.
 export const PROJECT_MERGE_FIELDS: MergeField[] = [
   { key: 'project_name', label: 'Project name' },
   { key: 'project_type', label: 'Type' },
@@ -20,10 +23,8 @@ export const PROJECT_MERGE_FIELDS: MergeField[] = [
   { key: 'category', label: 'Category' },
   { key: 'objective', label: 'Objective' },
   { key: 'longitudinal', label: 'Longitudinal' },
-  { key: 'voter_survey_qa', label: 'Voter survey QA' },
   { key: 'citation_language_needed', label: 'Citation language' },
   { key: 'row_level_data', label: 'Row-level data' },
-  { key: 'terminations', label: 'Terminations' },
 ]
 
 export const CLIENT_MERGE_FIELDS: MergeField[] = [
