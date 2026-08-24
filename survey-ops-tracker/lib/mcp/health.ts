@@ -1,5 +1,4 @@
 import 'server-only'
-import type { SupabaseClient } from '@supabase/supabase-js'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { resolveProject, isActiveOperational, getMe } from './data'
 import { stageDurations } from '@/lib/utils/stageTiming'
@@ -156,17 +155,16 @@ function buildChecks(p: Row, sup: SupRow[], blasts: BlastRow[], costs: CostRow[]
  *     the expected spend, so it's logged rather than silent; the sibling reads in the
  *     same Promise.all share fate with a real outage anyway, and this is a re-runnable
  *     read-only report.)
- *   - project_costs isn't in the generated Database type yet (types are regenerated in
- *     their own pass), so the rows are narrowed by hand the way the data hooks do. */
+ *  The table IS in the Database type now (added when 078 landed), so this reads through
+ *  the normal typed client — only the failure tolerance above is still deliberate. */
 async function fetchCosts(
   supabase: ReturnType<typeof createAdminClient>,
   projectIds: string[],
 ): Promise<(CostRow & { project_id: string })[]> {
-  const db = supabase as unknown as SupabaseClient
   try {
     return await inChunks<CostRow & { project_id: string }>(
       projectIds,
-      c => db.from('project_costs').select('project_id, amount').in('project_id', c),
+      c => supabase.from('project_costs').select('project_id, amount').in('project_id', c),
     )
   } catch (err) {
     console.error('[health] project_costs read failed — treating as no cost lines:', err)

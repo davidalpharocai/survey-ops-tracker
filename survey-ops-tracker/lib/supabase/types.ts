@@ -21,6 +21,7 @@ export type Database = {
           project_id: string
           label: string
           n_target: number | null
+          n_target_max: number | null
           n_internal_target: number | null
           n_collected: number
           n_actual: number | null
@@ -34,6 +35,7 @@ export type Database = {
           project_id: string
           label: string
           n_target?: number | null
+          n_target_max?: number | null
           n_internal_target?: number | null
           n_collected?: number
           n_actual?: number | null
@@ -47,6 +49,7 @@ export type Database = {
           project_id?: string
           label?: string
           n_target?: number | null
+          n_target_max?: number | null
           n_internal_target?: number | null
           n_collected?: number
           n_actual?: number | null
@@ -198,6 +201,7 @@ export type Database = {
           due_date: string | null
           deliver_date: string | null
           n_target: number | null
+          n_target_max: number | null
           n_collected: number
           n_last_synced: string | null
           audience_size: number | null
@@ -277,6 +281,7 @@ export type Database = {
           due_date?: string | null
           deliver_date?: string | null
           n_target?: number | null
+          n_target_max?: number | null
           n_collected?: number
           n_last_synced?: string | null
           audience_size?: number | null
@@ -356,6 +361,7 @@ export type Database = {
           due_date?: string | null
           deliver_date?: string | null
           n_target?: number | null
+          n_target_max?: number | null
           n_collected?: number
           n_last_synced?: string | null
           audience_size?: number | null
@@ -430,6 +436,90 @@ export type Database = {
             referencedColumns: ['id']
           }
         ]
+      }
+      project_costs: {
+        Row: {
+          id: string
+          project_id: string
+          kind: string
+          amount: number
+          description: string | null
+          incurred_on: string | null
+          created_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          project_id: string
+          kind: string
+          amount?: number
+          description?: string | null
+          incurred_on?: string | null
+          created_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          project_id?: string
+          kind?: string
+          amount?: number
+          description?: string | null
+          incurred_on?: string | null
+          created_by?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      data_exports: {
+        Row: {
+          id: string
+          actor_email: string
+          route: string
+          row_count: number
+          filters: Json | null
+          included_restricted: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          actor_email: string
+          route: string
+          row_count?: number
+          filters?: Json | null
+          included_restricted?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          actor_email?: string
+          route?: string
+          row_count?: number
+          filters?: Json | null
+          included_restricted?: boolean
+          created_at?: string
+        }
+        Relationships: []
+      }
+      profile_capabilities: {
+        Row: {
+          profile_id: string
+          capability: string
+          granted_by: string | null
+          granted_at: string
+        }
+        Insert: {
+          profile_id: string
+          capability: string
+          granted_by?: string | null
+          granted_at?: string
+        }
+        Update: {
+          profile_id?: string
+          capability?: string
+          granted_by?: string | null
+          granted_at?: string
+        }
+        Relationships: []
       }
       clients: {
         Row: {
