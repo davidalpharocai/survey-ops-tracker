@@ -943,16 +943,26 @@ function EditableTitle({ value, onSave }: { value: string; onSave: (next: string
 
 function EditableType({ value, onSave }: { value: string | null; onSave: (next: string) => void }) {
   const [editing, setEditing] = useState(false)
+  // 'Rerun' is no longer a valid type (it's the separate ↻ chip) — a legacy
+  // project_type='Rerun' row reads as unset here rather than showing the raw
+  // string, which would otherwise duplicate the teal chip next to it, and
+  // nudges the user to classify it as PS/B2B instead.
+  const typed = value === 'PS' || value === 'B2B' ? value : null
+
   if (editing) {
     return (
       <select
         autoFocus
-        defaultValue={value ?? ''}
+        // Normalised to `typed`, and the placeholder is NOT disabled: a <select>
+        // whose value matches no enabled option falls back to showing the first
+        // one (PS), so an unset or legacy-'Rerun' project opened already sitting
+        // on PS — picking PS fired no change event and saved nothing.
+        defaultValue={typed ?? ''}
         onChange={e => { if (e.target.value) onSave(e.target.value); setEditing(false) }}
         onBlur={() => setEditing(false)}
         className="text-xs px-2 py-1 rounded border border-border bg-background focus:outline-none focus:border-ring"
       >
-        <option value="" disabled>Type…</option>
+        <option value="">Type…</option>
         <option value="PS">PS</option>
         <option value="B2B">B2B</option>
       </select>
@@ -960,11 +970,6 @@ function EditableType({ value, onSave }: { value: string | null; onSave: (next: 
   }
   // Badge-dropdown: sized like the status pill (text-xs px-2 py-1 rounded),
   // tinted by type via TYPE_BADGE, with a ▾ caret signalling it opens options.
-  // 'Rerun' is no longer a valid type (it's the separate ↻ chip) — a legacy
-  // project_type='Rerun' row reads as unset here rather than showing the raw
-  // string, which would otherwise duplicate the teal chip next to it, and
-  // nudges the user to classify it as PS/B2B instead.
-  const typed = value === 'PS' || value === 'B2B' ? value : null
   return (
     <button
       onClick={() => setEditing(true)}
