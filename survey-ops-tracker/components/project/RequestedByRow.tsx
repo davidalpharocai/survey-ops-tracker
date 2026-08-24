@@ -88,7 +88,20 @@ export function RequestedByRow({ clientId, contactId, snapshotName, tooltip, onC
               <div className="flex flex-col gap-2">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-foreground">{contactName(current)}</p>
+                    {/* The name opens the requester's own page. It lives in the
+                        popover, not in the trigger button above, so it is a plain
+                        link (no anchor inside a button); closing the popover first
+                        stops it hanging over the page during the navigation. */}
+                    <p className="text-sm font-medium">
+                      <Link
+                        href={`/contacts/${current.id}`}
+                        onClick={() => setMode('closed')}
+                        className="text-primary hover:underline"
+                        title={`Open ${contactName(current)}'s page — every survey they requested`}
+                      >
+                        {contactName(current)}
+                      </Link>
+                    </p>
                     {current.title && <p className="text-xs text-muted-foreground">{current.title}</p>}
                     {current.email && (
                       <a
