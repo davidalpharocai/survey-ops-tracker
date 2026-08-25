@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { auditLabel, formatAuditValue, actorName } from './auditFormat'
+import { auditLabel, formatAuditValue, actorName, isRestrictedAuditField } from './auditFormat'
 
 describe('auditFormat', () => {
   it('labels known fields and falls back to the raw key', () => {
@@ -25,5 +25,39 @@ describe('auditFormat', () => {
   it('shows the email prefix as the actor, keeping system as-is', () => {
     expect(actorName('david@alpharoc.ai')).toBe('david')
     expect(actorName('system')).toBe('system')
+  })
+})
+
+describe('isRestrictedAuditField', () => {
+  it('restricts the budget ceiling', () => {
+    expect(isRestrictedAuditField('budget')).toBe(true)
+  })
+
+  it('leaves actual_spend alone — cost to run is public', () => {
+    expect(isRestrictedAuditField('actual_spend')).toBe(false)
+  })
+
+  it('restricts every price field 082 writes, by prefix', () => {
+    // The four real trigger names, plus a fifth that does not exist yet: the
+    // prefix match is the point, so a name added in SQL is covered on day one.
+    expect(isRestrictedAuditField('price_per_n_set')).toBe(true)
+    expect(isRestrictedAuditField('price_per_n_changed')).toBe(true)
+    expect(isRestrictedAuditField('segment_price_set')).toBe(true)
+    expect(isRestrictedAuditField('segment_price_changed')).toBe(true)
+    expect(isRestrictedAuditField('price_per_n_cleared')).toBe(true)
+  })
+
+  it('lets ordinary ops fields through', () => {
+    expect(isRestrictedAuditField('n_target')).toBe(false)
+    expect(isRestrictedAuditField('due_date')).toBe(false)
+    expect(isRestrictedAuditField('supplier_changed')).toBe(false)
+    expect(isRestrictedAuditField('(created)')).toBe(false)
+  })
+
+  it('anchors the prefix so a lookalike suffix is not caught', () => {
+    // Only a field that STARTS with the prefix is money; 'client_price_per_n_note'
+    // would be someone's free text, not a rate.
+    expect(isRestrictedAuditField('client_price_per_n_note')).toBe(false)
+    expect(isRestrictedAuditField('budget_note')).toBe(false)
   })
 })

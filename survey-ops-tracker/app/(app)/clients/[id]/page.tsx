@@ -7,6 +7,7 @@ import { useQuery } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { useUpdateClient } from '@/lib/hooks/useClients'
 import { useTeamMembers } from '@/lib/hooks/useTeamMembers'
+import { useCanViewFinancials } from '@/lib/hooks/useCapabilities'
 import { ClientContacts } from '@/components/client/ClientContacts'
 import { ClientNotes } from '@/components/client/ClientNotes'
 import { ClientNameHeading } from '@/components/client/ClientNameHeading'
@@ -17,6 +18,7 @@ import { Skeleton } from '@/components/shared/Skeleton'
 import { formatDate, getDueUrgency, urgencyPrefix } from '@/lib/utils/date'
 import { stageLabel } from '@/lib/utils/stage'
 import { fmtNum } from '@/lib/utils/number'
+import { formatNRange } from '@/lib/utils/nRange'
 import type { Tables } from '@/lib/supabase/types'
 import { isRerunProject } from '@/lib/reruns/isRerun'
 import { RerunChip } from '@/components/reruns/RerunChip'
@@ -45,13 +47,20 @@ type ClientProject = {
   budget: number | null
   actual_spend: number | null
   n_target: number | null
+  n_target_max: number | null
   n_collected: number
   n_actual: number | null
   is_placeholder: boolean
 }
 
+// n_target_max is here because since migration 078 `n_target` is only the FLOOR
+// of the agreed range, and showing the floor on its own as "the target"
+// understates what we owe the client — the same rule the connector is held to
+// (MCP_INSTRUCTIONS in lib/mcp/toolHelpers.ts). Safe to name: 078 is applied.
+// price_per_n is deliberately absent — 082 is not, and one unknown column in an
+// explicit select fails the WHOLE request and blanks this page's project list.
 const PROJECT_COLS =
-  'id, project_code, project_name, client, status, phase, board_column, project_type, series_id, rerun_number, submitted_date, due_date, deliver_date, delivered_at, created_at, updated_at, budget, actual_spend, n_target, n_collected, n_actual, is_placeholder'
+  'id, project_code, project_name, client, status, phase, board_column, project_type, series_id, rerun_number, submitted_date, due_date, deliver_date, delivered_at, created_at, updated_at, budget, actual_spend, n_target, n_target_max, n_collected, n_actual, is_placeholder'
 
 function useClientPage(clientId: string) {
   const supabase = createClient()
@@ -228,6 +237,11 @@ export default function ClientPage() {
   const clientId = params.id as string
   const { client, projects, series } = useClientPage(clientId)
   const { data: teamMembers = [] } = useTeamMembers()
+  // Money that isn't cost-to-run (the budget ceiling, and later price/margin) is
+  // limited to view_financials holders. The hook answers false until the grant is
+  // confirmed, so the restricted half is hidden while loading rather than
+  // flashing on and then disappearing.
+  const canViewFinancials = useCanViewFinancials()
   const rows = useMemo(() => projects.data ?? [], [projects.data])
   const [showNew, setShowNew] = useState(false)
   const [sortField, setSortField] = useState<PSort>('submitted_date')
@@ -422,7 +436,13 @@ export default function ClientPage() {
           {formatDate(p.submitted_date)}
         </td>
         <td className="px-4 py-3 text-sm text-muted-foreground whitespace-nowrap">
-          {fmtNum(p.n_collected)}{p.n_target != null ? ` / ${fmtNum(p.n_target)}` : ''}
+          {/* "collected / target" where the target is the agreed RANGE — one
+              number when both ends match (the common case), "1,350 – 1,600"
+              when they don't. */}
+          {fmtNum(p.n_collected)}
+          {p.n_target != null || p.n_target_max != null
+            ? ` / ${formatNRange(p.n_target, p.n_target_max)}`
+            : ''}
         </td>
         <td className={`px-4 py-3 text-xs whitespace-nowrap ${dueColor}`}>
           {delivered ? (
@@ -584,27 +604,49 @@ export default function ClientPage() {
                     {stats!.overdue > 0 && <span className="text-red-600 dark:text-red-400"> · {stats!.overdue} overdue</span>}
                   </span>
                 </div>
-                <div className={tile}>
-                  <span className="text-xs text-muted-foreground flex items-center">
-                    Avg spend vs budget
-                    <InfoTooltip text="Per project: our average Actual Spend (AlphaROC's internal cost) vs the average Budget (what the client is paying us). A fuller spend / budget / client-revenue breakdown is coming." />
-                  </span>
-                  <span className="text-2xl font-semibold text-foreground leading-tight">
-                    {money(stats!.avgSpend != null ? Math.round(stats!.avgSpend) : null)}
-                    <span className="text-xl font-normal text-muted-foreground"> / {money(stats!.avgBudget != null ? Math.round(stats!.avgBudget) : null)}</span>
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    {stats!.spendCount === 0 && stats!.budgetCount === 0
-                      ? 'no spend or budget recorded yet'
-                      : (
-                        <>
-                          our spend vs client budget
-                          {stats!.avgSpend != null && stats!.avgBudget != null && stats!.avgBudget > 0 &&
-                            ` · spend is ${Math.round((stats!.avgSpend / stats!.avgBudget) * 100)}% of budget`}
-                        </>
-                      )}
-                  </span>
-                </div>
+                {/* Spend is cost-to-run and public; the BUDGET half is the cost
+                    ceiling, so the comparison only renders for view_financials
+                    holders. Same tile either way — dropping it entirely would
+                    leave a hole in a 4-up grid and hide a number everyone is
+                    allowed to see. */}
+                {canViewFinancials ? (
+                  <div className={tile}>
+                    <span className="text-xs text-muted-foreground flex items-center">
+                      Avg spend vs budget
+                      <InfoTooltip text="Per project: our average Actual Spend (what it cost AlphaROC to run the work) vs the average Budget. Budget is a COST CEILING — the most we intended to spend — NOT what the client pays us; client revenue is priced per N and lives on the project." />
+                    </span>
+                    <span className="text-2xl font-semibold text-foreground leading-tight">
+                      {money(stats!.avgSpend != null ? Math.round(stats!.avgSpend) : null)}
+                      <span className="text-xl font-normal text-muted-foreground"> / {money(stats!.avgBudget != null ? Math.round(stats!.avgBudget) : null)}</span>
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {stats!.spendCount === 0 && stats!.budgetCount === 0
+                        ? 'no spend or budget recorded yet'
+                        : (
+                          <>
+                            our cost vs the ceiling we set
+                            {stats!.avgSpend != null && stats!.avgBudget != null && stats!.avgBudget > 0 &&
+                              ` · spend is ${Math.round((stats!.avgSpend / stats!.avgBudget) * 100)}% of the ceiling`}
+                          </>
+                        )}
+                    </span>
+                  </div>
+                ) : (
+                  <div className={tile}>
+                    <span className="text-xs text-muted-foreground flex items-center">
+                      Avg spend
+                      <InfoTooltip text="Per project: our average Actual Spend — what it cost AlphaROC to run the work (suppliers, blasts, and any flat cost lines)." />
+                    </span>
+                    <span className="text-2xl font-semibold text-foreground leading-tight">
+                      {money(stats!.avgSpend != null ? Math.round(stats!.avgSpend) : null)}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {stats!.spendCount === 0
+                        ? 'no spend recorded yet'
+                        : `across ${fmtNum(stats!.spendCount)} project${stats!.spendCount === 1 ? '' : 's'} with spend`}
+                    </span>
+                  </div>
+                )}
                 <div className={tile}>
                   <span className="text-xs text-muted-foreground flex items-center">
                     Comes back every
@@ -641,7 +683,7 @@ export default function ClientPage() {
                             ['project_name', 'Project', 'Click any row to open the project'],
                             ['status', 'Status', 'Open / Hold / Archived, with the pipeline stage for open projects'],
                             ['submitted_date', 'Submitted', 'When the project entered the pipeline'],
-                            ['n', 'N', 'Responses collected vs target'],
+                            ['n', 'N', 'Responses collected vs the target range agreed with the client (minimum – maximum)'],
                             ['due_date', 'Due', 'Internal deadline'],
                             ['spend', 'Spend', 'Actual spend (internal)'],
                           ] as [PSort, string, string][]

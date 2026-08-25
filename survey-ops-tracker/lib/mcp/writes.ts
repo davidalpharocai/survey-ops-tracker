@@ -10,7 +10,10 @@ import { resolveProject } from './data'
 export const PROJECT_WRITE_FIELDS = [
   'project_name','client','project_type','captain_id','co_captain_ids','salesperson','priority','blocked_by',
   'submitted_date','launch_date','due_date','deliver_date','rerun_date',
-  'n_target','n_collected','n_actual','n_internal_target','audience_size','budget',
+  // n_target is the BOTTOM of the N range and n_target_max the top (migration
+  // 078). Both are writable, and alignNRangePatch() below is why a caller may
+  // name just one of them.
+  'n_target','n_target_max','n_collected','n_actual','n_internal_target','audience_size','budget',
   'longitudinal','voter_survey_qa','citation_language_needed','row_level_data','terminations',
   'survey_tool_id','slack_channel_url','latest_next_steps',
   // Added 2026-07-20 (migration 057): plain fields the connector couldn't set before.
@@ -31,7 +34,7 @@ export const PROJECT_WRITE_FIELDS = [
 export const UNDOABLE_FIELDS = new Set<string>([
   'project_name', 'salesperson', 'priority', 'blocked_by',
   'submitted_date', 'launch_date', 'due_date', 'deliver_date', 'rerun_date',
-  'n_target', 'n_actual', 'n_internal_target', 'audience_size', 'budget',
+  'n_target', 'n_target_max', 'n_actual', 'n_internal_target', 'audience_size', 'budget',
   'audience', 'category', 'objective', 'sprint_number',
   'longitudinal', 'voter_survey_qa', 'citation_language_needed', 'row_level_data', 'terminations',
   'latest_next_steps', 'survey_tool_id', 'slack_channel_url',
@@ -49,6 +52,41 @@ export function pickProjectPatch(input: Patch): { patch: Patch; rejected: string
     else rejected.push(k)
   }
   return { patch, rejected }
+}
+
+/**
+ * Keep a one-ended N-range write from inverting the range.
+ *
+ * Since migration 078 `n_target` is the MINIMUM and `n_target_max` the maximum,
+ * and enforce_n_target_range RAISES on max < min while seeing only the columns
+ * the patch carries. So "set N target to 2000" on a 1,000–1,200 project used to
+ * come back as a DB error instead of doing what the user asked — the connector
+ * could not widen a range at all.
+ *
+ * When the caller names ONE end and it crosses the stored other end, the other
+ * end is pulled along to MATCH: the range collapses to the single number they
+ * named, which is exactly the pre-078 "one agreed N" case. Nothing is silent —
+ * update_project previews the extra line ("N target max 1,200 → 2,000") and only
+ * writes on confirm. A caller who names BOTH ends owns the result, inverted or
+ * not, so the trigger can still refuse a genuinely transposed pair.
+ */
+export function alignNRangePatch(before: Patch, patch: Patch): Patch {
+  const hasMin = 'n_target' in patch
+  const hasMax = 'n_target_max' in patch
+  if (hasMin === hasMax) return patch
+  const num = (v: unknown) => {
+    if (v == null || v === '') return null
+    const n = Number(v)
+    return Number.isFinite(n) ? n : null
+  }
+  const min = num(hasMin ? patch.n_target : before.n_target)
+  const max = num(hasMax ? patch.n_target_max : before.n_target_max)
+  // Either end null means there's no range to invert (a null max is "no upper end
+  // agreed"), and the trigger only fires when both are set.
+  if (min == null || max == null || max >= min) return patch
+  return hasMin
+    ? { ...patch, n_target_max: patch.n_target }
+    : { ...patch, n_target: patch.n_target_max }
 }
 
 /** Coupled stage columns. For a normal advance use getCheckboxesForColumn; for delivery set all six true. */
@@ -436,8 +474,15 @@ export async function runRemoveBlast(blastId: string, actor: string): Promise<vo
 
 // ---- Segment runners (project_segments; parent N totals kept by trigger) ----
 
+/** Add a segment. `targetMax` is the top of the segment's N range (migration 078
+ *  added mcp_add_segment's p_target_max as a trailing defaulted arg); it is
+ *  required here rather than defaulted so a new call site can't quietly create a
+ *  segment with a floor and no ceiling. Pass null for a single agreed number. */
 export async function runAddSegment(
-  opts: { projectId: string; label: string; target: number | null; collected: number | null; actual: number | null; actor: string }
+  opts: {
+    projectId: string; label: string; target: number | null; targetMax: number | null
+    collected: number | null; actual: number | null; actor: string
+  }
 ): Promise<ProjectSegmentRow> {
   const supabase = createAdminClient()
   const { data, error } = await supabase.rpc('mcp_add_segment', {
@@ -445,9 +490,14 @@ export async function runAddSegment(
     p_label: opts.label,
     p_actor: opts.actor,
     p_target: opts.target,
+    p_target_max: opts.targetMax,
     p_collected: opts.collected,
     p_actual: opts.actual,
-  })
+    // Migration 078 is applied in prod but lib/supabase/types.ts is regenerated
+    // separately, so p_target_max isn't in the generated Args yet. Asserting the
+    // one added arg keeps the rest of the call type-checked; drop the cast when
+    // the regenerated types land.
+  } as Database['public']['Functions']['mcp_add_segment']['Args'] & { p_target_max: number | null })
   if (error) throw new Error(error.message)
   return data as ProjectSegmentRow
 }

@@ -1,4 +1,6 @@
 import 'server-only'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import type { TablesInsert } from '@/lib/supabase/types'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { runCreateProject, runProjectWrite } from '@/lib/mcp/writes'
 
@@ -6,6 +8,11 @@ import { runCreateProject, runProjectWrite } from '@/lib/mcp/writes'
 // run-data resets (dates, N collected/actual, survey IDs, pipeline stage → lands
 // in Submitted). Blasts / deliverables / activity are NOT copied (those belong to
 // the source). The new project records a "cloned_from" entry in its audit log.
+//
+// Two things travel that used to be dropped: the N range's CEILING
+// (`n_target_max`, migration 078 — copying `n_target` alone reset an agreed
+// maximum to nothing) and the client's price per N (migration 082). Both are
+// handled below with the reason spelled out at each site.
 
 export interface CloneCarry {
   people?: boolean // captain + co-captains, salesperson, requested-by
@@ -16,11 +23,92 @@ export interface CloneCarry {
   flags?: boolean
   suppliers?: boolean // copy PS suppliers (CPIs + caps; N collected reset to 0)
   budget?: boolean // total budget
+  // The client's price per N (project_financials, migration 082). Carried by
+  // default like everything else here: a clone is normally the same commercial
+  // deal for the same client, and a wave with no rate reads as $0 revenue in
+  // every margin figure — which is worse than blank, because $0 looks like an
+  // answer somebody gave. Turn it off for a clone being re-quoted.
+  pricing?: boolean
 }
 
 const on = (v: boolean | undefined) => v !== false // default: carry unless explicitly false
 
 type Admin = ReturnType<typeof createAdminClient>
+
+// Migration 082 (project_financials + project_segments.price_per_n) is applied by
+// hand, and the generated Database type is regenerated in its own pass, so
+// nothing below can name price_per_n through the typed client. Same untyped
+// handle + narrow-here shape as lib/hooks/useProjectFinancials.ts.
+const untyped = (admin: Admin) => admin as unknown as SupabaseClient
+
+/**
+ * Per-segment price overrides for one project, keyed by segment id.
+ *
+ * Its OWN query on purpose — never folded into the segment select below. Pre-082
+ * `price_per_n` is a missing COLUMN, and PostgREST fails the ENTIRE request when
+ * an explicit select list names one, so a single widened select would 400 every
+ * clone and every spawned rerun wave the moment this code deployed ahead of the
+ * SQL (082's own apply-order note calls out this exact function). Isolated, a
+ * missing column costs us the prices and nothing else.
+ *
+ * Returns null when the column isn't there yet — the signal to leave the key out
+ * of the INSERT entirely, since sending an unknown column 400s just as hard.
+ */
+async function readSegmentRates(
+  admin: Admin,
+  projectId: string
+): Promise<Map<string, number | null> | null> {
+  const { data, error } = await untyped(admin)
+    .from('project_segments')
+    .select('id, price_per_n')
+    .eq('project_id', projectId)
+  if (error || !data) return null
+  const rows = data as { id: string; price_per_n: number | null }[]
+  return new Map(rows.map((r) => [r.id, r.price_per_n]))
+}
+
+/** What happened to the price on a copy path — reported rather than thrown, so a
+ *  clone or a spawned wave is never lost over a rate. */
+export type PricingCopyResult =
+  /** The source had a rate and the target now has the same one. */
+  | 'copied'
+  /** The source was never priced — the target stays unpriced, which reads as
+   *  UNKNOWN ('—'), never as zero. */
+  | 'none'
+  /** project_financials isn't there yet (082 not applied). The target is
+   *  unpriced for the same reason, and someone has to type the rate in once the
+   *  migration lands. */
+  | 'unavailable'
+
+/**
+ * Copy the project-level client rate from one project to another.
+ *
+ * Isolated from every other copy for the reason above: a missing TABLE 400s too,
+ * and neither a clone nor a rerun wave may fail because revenue hasn't shipped
+ * yet. UPSERT rather than insert — 082 makes `project_id` the primary key and
+ * backfills nothing, so the target normally has no row at all, and a re-run of a
+ * partially-completed copy must not collide.
+ */
+export async function copyProjectPricing(
+  admin: Admin,
+  sourceProjectId: string,
+  targetProjectId: string,
+  actor: string
+): Promise<PricingCopyResult> {
+  const db = untyped(admin)
+  const { data, error } = await db
+    .from('project_financials')
+    .select('price_per_n')
+    .eq('project_id', sourceProjectId)
+    .maybeSingle()
+  if (error) return 'unavailable'
+  const rate = (data as { price_per_n: number | null } | null)?.price_per_n ?? null
+  if (rate == null) return 'none'
+  const { error: upErr } = await db
+    .from('project_financials')
+    .upsert({ project_id: targetProjectId, price_per_n: rate, created_by: actor }, { onConflict: 'project_id' })
+  return upErr ? 'unavailable' : 'copied'
+}
 
 /** Copy the PS launch structure (launches + supplier rows) from one project
  * to another. Run-data resets: `launch_date` is left blank (a fresh plan) and
@@ -109,7 +197,18 @@ export async function copyProjectBlasts(
 /** Copy multi-segment N rows from one project to another, resetting
  * `n_collected` to 0 and `n_actual` to null — the segment structure/targets
  * carry over, the collection run-data doesn't. Used ONLY by the rerun
- * auto-spawn cron (same rationale as `copyProjectBlasts` above). */
+ * auto-spawn cron (same rationale as `copyProjectBlasts` above).
+ *
+ * BOTH ends of the N range travel together. `n_target` has been the MINIMUM
+ * since migration 078, so copying it alone silently reset every segment's
+ * agreed ceiling — and it has to go in the same statement as the min, because
+ * 078's enforce_n_target_range trigger only sees the fields the write carries.
+ * An INSERT carries both by construction, which is why this is safe here and
+ * why the range must never be split across two writes.
+ *
+ * The per-segment client rate rides along too when 082 is applied (see
+ * `readSegmentRates`) — a rerun wave is the same study at the same price, and an
+ * unpriced wave reads as $0 revenue rather than as unknown. */
 export async function copyProjectSegments(
   admin: Admin,
   sourceProjectId: string,
@@ -117,23 +216,29 @@ export async function copyProjectSegments(
 ): Promise<void> {
   const { data: srcSegments } = await admin
     .from('project_segments')
-    .select('label, n_target, n_internal_target, audience, audience_size, sort_order')
+    .select('id, label, n_target, n_target_max, n_internal_target, audience, audience_size, sort_order')
     .eq('project_id', sourceProjectId)
     .order('sort_order', { ascending: true })
   if (!srcSegments || srcSegments.length === 0) return
-  await admin.from('project_segments').insert(
-    srcSegments.map((s) => ({
-      project_id: targetProjectId,
-      label: s.label,
-      n_target: s.n_target,
-      n_internal_target: s.n_internal_target,
-      n_collected: 0,
-      n_actual: null,
-      audience: s.audience,
-      audience_size: s.audience_size,
-      sort_order: s.sort_order,
-    }))
-  )
+  // Keyed by segment id, not label or sort_order — two segments may share
+  // either, and pairing a price with the wrong segment is worse than no price.
+  const rates = await readSegmentRates(admin, sourceProjectId)
+  const rows = srcSegments.map((s) => ({
+    project_id: targetProjectId,
+    label: s.label,
+    n_target: s.n_target,
+    n_target_max: s.n_target_max,
+    n_internal_target: s.n_internal_target,
+    n_collected: 0,
+    n_actual: null,
+    audience: s.audience,
+    audience_size: s.audience_size,
+    sort_order: s.sort_order,
+    // The key is omitted ENTIRELY pre-082 — naming a column that doesn't exist
+    // fails the insert, so "no prices" has to mean no key, not a null.
+    ...(rates ? { price_per_n: rates.get(s.id) ?? null } : {}),
+  }))
+  await admin.from('project_segments').insert(rows as unknown as TablesInsert<'project_segments'>[])
 }
 
 export async function cloneProject(opts: {
@@ -141,7 +246,15 @@ export async function cloneProject(opts: {
   newName: string
   carry: CloneCarry
   actor: string
-}): Promise<{ id: string; project_code: string | null; project_name: string; cloned_from: string | null }> {
+}): Promise<{
+  id: string
+  project_code: string | null
+  project_name: string
+  cloned_from: string | null
+  /** What became of the client rate — so a caller can say "priced like the
+   *  original" or "you'll need to set the price" instead of guessing. */
+  pricing: PricingCopyResult | 'skipped'
+}> {
   const admin = createAdminClient()
   const { data: src, error } = await admin
     .from('survey_projects')
@@ -180,6 +293,18 @@ export async function cloneProject(opts: {
     if (src.audience != null) patch.audience = src.audience
     if (src.n_internal_target != null) patch.n_internal_target = src.n_internal_target
     if (src.audience_size != null) patch.audience_size = src.audience_size
+    // The N range's ceiling can only be carried HERE, not in the create above:
+    // mcp_create_project (migration 070) inserts a hand-listed column set that
+    // 078 never extended, so an `n_target_max` in that patch is silently
+    // dropped — the clone would come out with the min alone and a ceiling
+    // agreed with a client would vanish without an error. mcp_write_project
+    // does have the arm. Both ends go in ONE patch because 078's
+    // enforce_n_target_range trigger only sees the fields the write carries;
+    // re-sending the unchanged min costs nothing (audit_field skips equal values).
+    if (src.n_target_max != null) {
+      patch.n_target = src.n_target
+      patch.n_target_max = src.n_target_max
+    }
   }
   if (on(c.flags)) {
     patch.longitudinal = src.longitudinal
@@ -203,6 +328,14 @@ export async function cloneProject(opts: {
     await copySupplierLaunches(admin, opts.sourceId, created.id, creator)
   }
 
+  // 3b) Carry the client rate. Never fatal: 082 is applied by hand, so 'unavailable'
+  //     is the normal answer until it lands, and a clone must not fail over a
+  //     number the schema doesn't have yet. Either way the new project is
+  //     UNPRICED, which every reader renders as '—' (unknown), never as $0.
+  const pricing: PricingCopyResult | 'skipped' = on(c.pricing)
+    ? await copyProjectPricing(admin, opts.sourceId, created.id, opts.actor)
+    : 'skipped'
+
   // 4) Record in the audit log what this is a clone of.
   await admin.from('project_audit').insert({
     project_id: created.id,
@@ -216,5 +349,6 @@ export async function cloneProject(opts: {
     project_code: created.project_code,
     project_name: created.project_name,
     cloned_from: src.project_code,
+    pricing,
   }
 }

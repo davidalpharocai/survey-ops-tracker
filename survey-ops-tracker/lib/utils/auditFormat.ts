@@ -22,10 +22,33 @@ export const AUDIT_LABELS: Record<string, string> = {
   supplier_added: 'Supplier added',
   supplier_changed: 'Supplier changed',
   supplier_removed: 'Supplier removed',
+  price_per_n_set: 'Price per N set',
+  price_per_n_changed: 'Price per N',
+  segment_price_set: 'Segment price set',
+  segment_price_changed: 'Segment price',
 }
 
 export function auditLabel(field: string): string {
   return AUDIT_LABELS[field] ?? field
+}
+
+/** Every audit `field` whose value carries restricted money: the price-per-N
+ *  rate (project default and per-segment override alike) and the budget ceiling.
+ *
+ *  Matched on the PREFIX, not a name list, because that is what 082 designed for
+ *  — its triggers write price_per_n_set / price_per_n_changed / segment_price_set
+ *  / segment_price_changed precisely so one predicate covers all four, and so a
+ *  fifth name added in SQL is caught the day it lands rather than the day someone
+ *  spots a rate in the feed. `budget` has been in project_audit since 078 and is
+ *  restricted under the same decision, so it joins them here.
+ *
+ *  `actual_spend` is deliberately absent: cost to run is public, same as blasts,
+ *  launches, supplier CPI and cost lines. Only revenue-shaped money hides.
+ *
+ *  The single source of truth for that question — every reader of project_audit
+ *  (both audit hooks, and the connector's history tools) asks it here. */
+export function isRestrictedAuditField(field: string): boolean {
+  return field === 'budget' || /^(price_per_n|segment_price)/.test(field)
 }
 
 const MONEY = new Set(['budget', 'actual_spend'])

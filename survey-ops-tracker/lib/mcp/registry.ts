@@ -16,7 +16,7 @@ import {
   resolveBlast, listBlastsForProject, runUpdateBlast, runRemoveBlast,
   runAddSegment, runUpdateSegment, runRemoveSegment,
   runRenameClient, runCreateProject,
-  pickProjectPatch, diffSummary, stageColumnsFor,
+  pickProjectPatch, diffSummary, stageColumnsFor, alignNRangePatch,
   runLogLaunch, resolveLaunch, listLaunchesForProject, runUpdateLaunch, runRemoveLaunch,
   UNDOABLE_FIELDS, loadOccamGate, markContactOccamInvited,
   type LaunchView, type LaunchSupplierInput, type LaunchSupplierPatch,
@@ -27,10 +27,11 @@ import {
   type SupplierLine,
 } from '@/lib/utils/suppliers'
 import { fmtNum } from '@/lib/utils/number'
+import { formatNRange, isInvertedNRange } from '@/lib/utils/nRange'
 import {
   resolvePeriod, surveyStats, surveyRows, projectRow, opsMetrics,
   countScopedPlaceholders, placeholderNote,
-  REPORT_FIELD_KEYS, DEFAULT_REPORT_FIELDS,
+  REPORT_FIELD_KEYS, reportFieldsFor, reportFieldKeysFor, defaultReportFieldsFor,
   type SurveyEvent, type SurveyType,
 } from '@/lib/mcp/reports'
 import * as health from '@/lib/mcp/health'
@@ -213,19 +214,31 @@ export const TOOLS: AssistantTool[] = [
       to: z.string().optional(),
       fields: z.array(z.string()).optional(),
     },
-    handler: async (rawArgs) => {
+    handler: async (rawArgs, ctx) => {
       const args = rawArgs as {
         event: SurveyEvent; type?: SurveyType; month?: number; year?: number
         date?: string; from?: string; to?: string; fields?: string[]
       }
       const period = resolvePeriod(args)
       if ('error' in period) return { error: period.error }
-      const chosen = (args.fields ?? []).filter(k => REPORT_FIELD_KEYS.includes(k))
-      const fields = chosen.length ? chosen : DEFAULT_REPORT_FIELDS
+      // Reports are the highest-volume way money leaves this connector, so the
+      // field list this caller may have is resolved BEFORE anything is projected —
+      // and it's the same list advertised back as available_fields, so the model
+      // never asks for a column it can't be given.
+      const canViewFinancials = await data.callerCanViewFinancials(ctx)
+      const allowedFields = reportFieldsFor(canViewFinancials)
+      const allowedKeys = reportFieldKeysFor(canViewFinancials)
+      const requested = args.fields ?? []
+      const chosen = requested.filter(k => allowedKeys.includes(k))
+      // Asked for by name, real, and not theirs to see — worth saying out loud
+      // rather than quietly handing back the defaults.
+      const withheldFields = requested.filter(k => !allowedKeys.includes(k) && REPORT_FIELD_KEYS.includes(k))
+      const defaultFields = defaultReportFieldsFor(canViewFinancials)
+      const fields = chosen.length ? chosen : defaultFields
       const rows = await surveyRows({ event: args.event, from: period.from, to: period.to, type: args.type })
       const placeholders_excluded = await countScopedPlaceholders({ event: args.event, from: period.from, to: period.to, type: args.type })
       const placeholderClause = placeholderNote(placeholders_excluded)
-      const projected = rows.map(r => projectRow(r, fields))
+      const projected = rows.map(r => projectRow(r, fields, allowedFields))
 
       const qs = new URLSearchParams()
       qs.set('event', args.event)
@@ -241,9 +254,15 @@ export const TOOLS: AssistantTool[] = [
       return {
         ok: true,
         event: args.event, type: args.type ?? 'all', period, count: rows.length,
-        fields_used: fields, available_fields: REPORT_FIELD_KEYS, default_fields: DEFAULT_REPORT_FIELDS,
+        fields_used: fields, available_fields: allowedKeys, default_fields: defaultFields,
         rows_preview: projected.slice(0, 50), truncated: projected.length > 50,
         download_url, placeholders_excluded,
+        ...(withheldFields.length ? {
+          restricted: [
+            `${withheldFields.join(', ')} — finance-only column(s), left out of this report. ` +
+            'Say you cannot include them rather than reporting them as blank.',
+          ],
+        } : {}),
         note: (chosen.length ? '' : 'Used the default columns — re-call with a subset of available_fields to choose. ') +
           `${rows.length} row(s) for ${period.label}. Download the Excel (.xlsx): ${download_url}` +
           (placeholderClause ? ` ${placeholderClause}` : ''),
@@ -296,14 +315,15 @@ export const TOOLS: AssistantTool[] = [
       "Get one rerun series' detail plus all its waves (each wave is a normal survey project: code, dates, N target/collected/actual, survey-tool id, stage/status), ordered by wave number. Identify the series by its id (from search_reruns / rerun_calendar) or by a client / survey-name query. Use for “show me the <survey> rerun series”, “how many waves has <survey> had”, “what's the history of this rerun”.",
     kind: 'read',
     schema: { series: z.string() },
-    handler: async (rawArgs) => {
+    handler: async (rawArgs, ctx) => {
       const args = rawArgs as { series: string }
       const resolved = await data.resolveRerunSeries(args.series)
       if (resolved === null) return { error: `No rerun series found matching "${args.series}".` }
       if ('ambiguous' in resolved) {
         return { note: 'Multiple rerun series match — specify the series id.', candidates: resolved.ambiguous }
       }
-      return data.getRerunSeries(resolved.id)
+      // ctx: the status row carries future_defaults, which can hold a budget.
+      return data.getRerunSeries(resolved.id, ctx)
     },
   },
   {
@@ -408,7 +428,13 @@ export const TOOLS: AssistantTool[] = [
       if (Object.keys(provided).length === 0) {
         return { needs: 'a change', message: 'Specify at least one default to set: n_target, audience, money_model, template_id, or compliance_required_override.' }
       }
+      // The merge reads the STORED blob and writes it back whole, so a caller
+      // who can't see budget still can't clear one: their audience edit carries
+      // the existing finance keys through untouched. Only what LEAVES is filtered
+      // (future_defaults is untyped jsonb — nextWaveInherit reads a `budget` key
+      // out of it), which is why the strip is on the way out and not on the way in.
       const merged = { ...((statusRow.future_defaults ?? {}) as Record<string, unknown>), ...provided }
+      const canViewFinancials = await data.callerCanViewFinancials(ctx)
       const changeDesc = Object.entries(provided).map(([k, v]) => `${k} → ${v ?? '—'}`).join(', ')
       return confirmable(
         args,
@@ -416,7 +442,11 @@ export const TOOLS: AssistantTool[] = [
         async () => {
           const { series } = await setSeriesDefaults(admin, seriesId, merged, `${userEmail} via Claude`)
           meta.detail = { series_id: seriesId, defaults: provided }
-          return { ok: true, series_id: series.id, future_defaults: series.future_defaults }
+          return {
+            ok: true,
+            series_id: series.id,
+            future_defaults: data.redactFutureDefaults(series.future_defaults, canViewFinancials),
+          }
         }
       )
     },
@@ -547,7 +577,7 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'ops_metrics',
     description:
-      "Operational analytics for a period — on-time delivery %, avg cycle time (submitted→delivered), avg fielding time (launched→delivered), N target vs collected vs actual (+ collection %), budget vs actual spend (+ over-budget count), and a PS/B2B/Rerun breakdown, with an equal-length prior-period comparison. Scoped to projects whose chosen `event` date falls in the period — default event is 'delivered' (deliver_date); pass 'submitted'/'launched' to measure intake/launch cohorts. Same flexible period as survey_stats (month+year / year / date / from-to). Mirrors the in-app Insights definitions.",
+      "Operational analytics for a period — on-time delivery %, avg cycle time (submitted→delivered), avg fielding time (launched→delivered), N target vs collected vs actual (+ collection %), actual spend, and a PS/B2B/Rerun breakdown, with an equal-length prior-period comparison. Budget vs spend (budget / over_budget / budget_used_pct) is finance-only: if those keys are absent from `metrics`, budget was NOT measured — read the `restricted` note and say so rather than reporting nothing over budget. Scoped to projects whose chosen `event` date falls in the period — default event is 'delivered' (deliver_date); pass 'submitted'/'launched' to measure intake/launch cohorts. Same flexible period as survey_stats (month+year / year / date / from-to). Mirrors the in-app Insights definitions.",
     kind: 'read',
     schema: {
       event: z.enum(['submitted', 'launched', 'delivered']).optional(),
@@ -559,7 +589,7 @@ export const TOOLS: AssistantTool[] = [
       to: z.string().optional(),
       compare: z.boolean().optional(),
     },
-    handler: async (rawArgs) => {
+    handler: async (rawArgs, ctx) => {
       const args = rawArgs as {
         event?: SurveyEvent; type?: SurveyType; month?: number; year?: number
         date?: string; from?: string; to?: string; compare?: boolean
@@ -567,7 +597,15 @@ export const TOOLS: AssistantTool[] = [
       const period = resolvePeriod(args)
       if ('error' in period) return { error: period.error }
       const event = args.event ?? 'delivered'
-      const m = await opsMetrics({ event, from: period.from, to: period.to, type: args.type, compare: args.compare ?? true })
+      // A portfolio budget total is the same restricted number, summed — so the
+      // budget/over-budget/used-% three are absent without the capability, and
+      // metrics.restricted says so. The summary line has to follow suit, hence
+      // the null check instead of the old `m.budget > 0`.
+      const canViewFinancials = await data.callerCanViewFinancials(ctx)
+      const m = await opsMetrics({
+        event, from: period.from, to: period.to, type: args.type,
+        compare: args.compare ?? true, canViewFinancials,
+      })
       const summary =
         `${period.label}: ${m.count} ${event}` +
         ` · on-time ${m.on_time_pct ?? '—'}%${m.on_time_denom ? ` (${m.on_time_denom})` : ''}` +
@@ -575,7 +613,7 @@ export const TOOLS: AssistantTool[] = [
         (m.avg_fielding_days != null ? ` · fielding ${m.avg_fielding_days}d` : '') +
         (m.collection_pct != null ? ` · collection ${m.collection_pct}%` : '') +
         ` · spend $${m.actual_spend.toLocaleString('en-US')}` +
-        (m.budget > 0 ? ` / $${m.budget.toLocaleString('en-US')} budget (${m.over_budget} over)` : '') +
+        (m.budget != null && m.budget > 0 ? ` / $${m.budget.toLocaleString('en-US')} budget (${m.over_budget} over)` : '') +
         ` · PS ${m.by_type.PS} / B2B ${m.by_type.B2B} / Rerun ${m.by_type.Rerun}` +
         (m.prior ? ` · prior ${m.prior.count} delivered, on-time ${m.prior.on_time_pct ?? '—'}%` : '')
       return { ok: true, event, type: args.type ?? 'all', period, metrics: m, summary }
@@ -595,12 +633,12 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'get_change_history',
     description:
-      "Recent field-level change history for one project, from the audit log: which field changed, old → new value, who changed it, and when (newest first, includes app / AI / sync / manual edits). Use for “what changed on <project>”, “who set the due date”, “when did N target change”. Default 20 most recent; pass limit up to 100.",
+      "Recent field-level change history for one project, from the audit log: which field changed, old → new value, who changed it, and when (newest first, includes app / AI / sync / manual edits). Use for “what changed on <project>”, “who set the due date”, “when did N target change”. Default 20 most recent; pass limit up to 100. Changes to finance-only fields (budget, price per N) are omitted unless you hold finance access, and named in `restricted` — never report those fields as unchanged.",
     kind: 'read',
     schema: { project: z.string(), limit: z.number().int().min(1).max(100).optional() },
-    handler: async (rawArgs) => {
+    handler: async (rawArgs, ctx) => {
       const args = rawArgs as { project: string; limit?: number }
-      return data.getChangeHistory(args.project, args.limit)
+      return data.getChangeHistory(args.project, args.limit, ctx)
     },
   },
   {
@@ -618,8 +656,21 @@ export const TOOLS: AssistantTool[] = [
         return { note: 'Multiple projects match — specify the project code.', candidates: resolved.ambiguous }
       }
       const p = resolved as { id: string; project_code?: string | null; segment_count?: number | null }
-      const batch = await data.getLastChangeBatch(p.id)
-      if (!batch || batch.rows.length === 0) return { note: 'No recorded change history for this project — nothing to undo.' }
+      // ctx: the batch's rows are audit rows, old value and new value in the
+      // clear. getLastChangeBatch drops the finance-only ones for a caller who
+      // can't see them and names them in restricted_fields, so this tool neither
+      // reads a ceiling aloud nor reverts a number the caller can't read.
+      const batch = await data.getLastChangeBatch(p.id, ctx)
+      if (!batch) return { note: 'No recorded change history for this project — nothing to undo.' }
+      if (batch.rows.length === 0) {
+        // "Nothing to undo" would read as "nothing changed", which is false when
+        // the whole edit was finance-only.
+        return batch.restricted_fields.length > 0
+          ? {
+              note: `The last edit (by ${batch.changed_by}) only touched finance-only field(s) — ${[...new Set(batch.restricted_fields)].join(', ')} — which I can't see or undo. Someone with finance access can revert it in the app.`,
+            }
+          : { note: 'No recorded change history for this project — nothing to undo.' }
+      }
       const token = batch.changed_at // the whole edit (one transaction) is pinned by its timestamp
 
       // A segmented project's N totals are trigger-derived from its segments; reverting the
@@ -628,7 +679,11 @@ export const TOOLS: AssistantTool[] = [
       const segmented = ((p.segment_count as number | null) ?? 0) > 0
       const SEGMENT_OWNED_N = new Set(['n_target', 'n_collected', 'n_actual', 'n_internal_target'])
       const revertible: { field: string; old_value: string | null; new_value: string | null }[] = []
-      const skipped: { field: string; reason: string }[] = []
+      // Seeded with the finance-only rows that never reached us, so a partial
+      // undo doesn't read as a total one.
+      const skipped: { field: string; reason: string }[] = [...new Set(batch.restricted_fields)].map(field => ({
+        field, reason: 'a finance-only field — someone with finance access can revert it in the app',
+      }))
       for (const r of batch.rows) {
         if (!UNDOABLE_FIELDS.has(r.field)) { skipped.push({ field: r.field, reason: describeUnrevertible(r.field) }); continue }
         if (segmented && SEGMENT_OWNED_N.has(r.field)) { skipped.push({ field: r.field, reason: describeUnrevertible(r.field) }); continue }
@@ -636,7 +691,7 @@ export const TOOLS: AssistantTool[] = [
       }
       if (revertible.length === 0) {
         return {
-          note: `The last edit (by ${batch.changed_by}) touched ${batch.rows.map(r => r.field).join(', ')} — none of which I can auto-undo (${skipped.map(s => `${s.field}: ${s.reason}`).join('; ')}).`,
+          note: `The last edit (by ${batch.changed_by}) touched ${skipped.map(s => s.field).join(', ')} — none of which I can auto-undo (${skipped.map(s => `${s.field}: ${s.reason}`).join('; ')}).`,
           last_change: batch.rows,
         }
       }
@@ -731,9 +786,12 @@ export const TOOLS: AssistantTool[] = [
       'What did we do last time for this client? Past & current projects, derived patterns (typical N, common project type, avg fielding time, cadence, recurring contacts), and any stated preferences.',
     kind: 'read',
     schema: { client: z.string() },
-    handler: async (rawArgs) => {
+    // ctx is what tells getClientHistory who is asking; without it the finance
+    // check answers false for everyone and the three holders lose the numbers
+    // they're entitled to.
+    handler: async (rawArgs, ctx) => {
       const args = rawArgs as { client: string }
-      return data.getClientHistory(args.client)
+      return data.getClientHistory(args.client, ctx)
     },
   },
   {
@@ -742,9 +800,9 @@ export const TOOLS: AssistantTool[] = [
       "A project's prior/sibling waves if it's part of a longitudinal/rerun series (key stats per wave, ordered).",
     kind: 'read',
     schema: { project: z.string() },
-    handler: async (rawArgs) => {
+    handler: async (rawArgs, ctx) => {
       const args = rawArgs as { project: string }
-      return data.getProjectHistory(args.project)
+      return data.getProjectHistory(args.project, ctx)
     },
   },
   {
@@ -1093,7 +1151,7 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'update_project',
     description:
-      "Update a project's fields (preview first; confirm to apply). Handles name, client, type, captain/co-captains, salesperson, priority, all dates, N target/internal/collected/actual, audience_size, the free-text audience, category, objective, sprint_number, budget, the Y/N flags, survey_tool_id, slack channel, latest/next-steps, and the gen-pop N-floor override (n_floor_override + n_floor_override_reason). For status/stage moves use advance_project/approve_scoping/set_project_status; for compliance override, requested-by, or linked docs use their tools; for a project whose N is split into segments, use add_segment/update_segment/remove_segment.",
+      "Update a project's fields (preview first; confirm to apply). Handles name, client, type, captain/co-captains, salesperson, priority, all dates, the N target RANGE (n_target is the minimum, n_target_max the maximum — pass both when the user gives a range; passing one end alone pulls the other end along to match, which the preview shows), n_internal_target/n_collected/n_actual, audience_size, the free-text audience, category, objective, sprint_number, budget (finance-only — refused if you don't hold finance access), the Y/N flags, survey_tool_id, slack channel, latest/next-steps, and the gen-pop N-floor override (n_floor_override + n_floor_override_reason). For status/stage moves use advance_project/approve_scoping/set_project_status; for compliance override, requested-by, or linked docs use their tools; for a project whose N is split into segments, use add_segment/update_segment/remove_segment.",
     kind: 'write',
     schema: {
       project: z.string(),
@@ -1116,6 +1174,19 @@ export const TOOLS: AssistantTool[] = [
       if (rejected.length) {
         return {
           error: `These fields can't be set here: ${rejected.join(', ')}. Use the dedicated tools for status, stage, compliance override, requested-by, or linked documents.`,
+        }
+      }
+
+      // Finance-only fields are finance-only to WRITE too. Without the
+      // capability the old value is redacted out of the preview (below), so the
+      // caller would be replacing a ceiling they cannot read — and the audit row
+      // their edit creates is invisible to them afterwards. A refusal that names
+      // the field is a better answer than a half-supported write.
+      const canViewFinancials = await data.callerCanViewFinancials(ctx)
+      const restrictedInPatch = Object.keys(patch).filter(data.isRestrictedMoneyField)
+      if (restrictedInPatch.length > 0 && !canViewFinancials) {
+        return {
+          error: `${restrictedInPatch.join(', ')} — finance-only, so I can't set it (or read the current value back to you). Someone with finance access can change it in the app.`,
         }
       }
 
@@ -1157,7 +1228,7 @@ export const TOOLS: AssistantTool[] = [
         }
       }
       if (
-        ('n_target' in patch || 'n_collected' in patch || 'n_actual' in patch) &&
+        ('n_target' in patch || 'n_target_max' in patch || 'n_collected' in patch || 'n_actual' in patch) &&
         ((p.segment_count as number | null) ?? 0) > 0
       ) {
         return {
@@ -1174,7 +1245,22 @@ export const TOOLS: AssistantTool[] = [
         )
       }
 
-      const changed = diffSummary(p, patch)
+      // One end of the N range moved past the other? Send both, or migration
+      // 078's trigger raises and "set N target to 2,000" fails on a 1,000–1,200
+      // project. The pulled-along end shows up in `changed` below, so the user
+      // sees it in the preview before confirming.
+      const aligned = alignNRangePatch(p, patch)
+
+      // `p` came from a select('*'), so the diff carries the OLD value of every
+      // field the patch names — the previous ceiling included. The refusal above
+      // already keeps a restricted field out of a non-holder's patch; this is the
+      // second line, and it covers all three places the diff surfaces at once:
+      // the preview, the commit result, and meta.detail (which telemetry writes
+      // into mcp_tool_calls, a table analysts can read). Holders see the whole
+      // diff — redactRestrictedMoney passes their row straight through.
+      const changed = data.redactRestrictedMoney(
+        diffSummary(p, aligned), canViewFinancials
+      ) as Record<string, [unknown, unknown]>
       return confirmable(
         args,
         async () => ({
@@ -1187,7 +1273,7 @@ export const TOOLS: AssistantTool[] = [
           const supabase = createAdminClient()
           const result = await runProjectWrite(supabase, {
             id: p.id as string,
-            patch,
+            patch: aligned,
             actor: `${userEmail} via Claude`,
             expectedUpdatedAt: args.expected_updated_at,
           })
@@ -1201,19 +1287,21 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'add_segment',
     description:
-      "Add an N segment to a project — e.g. split N into Buyers / Sellers, each with its own target. Adding the first segment converts the project to a segmented N (its total N becomes the sum of the segments). If the label or target isn't given, ask before adding. Preview first; confirm to apply.",
+      "Add an N segment to a project — e.g. split N into Buyers / Sellers, each with its own target. Adding the first segment converts the project to a segmented N (its total N becomes the sum of the segments). A segment's target is a RANGE: `target` is the minimum and `target_max` the maximum — pass both when the segment was sold as a range, or just `target` for a single agreed number. If the label or target isn't given, ask before adding. Preview first; confirm to apply.",
     kind: 'write',
     schema: {
       project: z.string(),
       label: z.string().min(1).max(120),
       target: z.number().int().nullable().optional(),
+      target_max: z.number().int().nullable().optional(),
       collected: z.number().int().nullable().optional(),
       actual: z.number().int().nullable().optional(),
       confirm: z.boolean().optional(),
     },
     handler: async (rawArgs, ctx, meta) => {
       const args = rawArgs as {
-        project: string; label: string; target?: number | null; collected?: number | null; actual?: number | null; confirm?: boolean
+        project: string; label: string; target?: number | null; target_max?: number | null
+        collected?: number | null; actual?: number | null; confirm?: boolean
       }
       const { userEmail } = ctx
       const p = await resolveProjectWritable(args.project)
@@ -1231,11 +1319,17 @@ export const TOOLS: AssistantTool[] = [
         }
       }
       const existing = (p.segment_count as number | null) ?? 0
+      // Both ends of the range are rejected as a pair before anything is written —
+      // migration 078's trigger raises on max < min, and a raise from inside the
+      // RPC comes back as an opaque failure instead of something actionable.
+      if (isInvertedNRange(args.target, args.target_max)) {
+        return { error: `target_max (${fmtNum(args.target_max)}) can't be below target (${fmtNum(args.target)}) — the range is the other way round.` }
+      }
       return confirmable(
         args,
         async () => ({
           summary:
-            `Add segment "${args.label}" (target ${args.target ?? '—'}, collected ${args.collected ?? 0}) to ${p.project_code}` +
+            `Add segment "${args.label}" (target ${formatNRange(args.target, args.target_max)}, collected ${fmtNum(args.collected ?? 0)}) to ${p.project_code}` +
             (existing === 0
               ? ' — this splits its single N into segments; the total N becomes the sum of the segments'
               : ` (segment ${existing + 1})`),
@@ -1245,12 +1339,13 @@ export const TOOLS: AssistantTool[] = [
             projectId: p.id as string,
             label: args.label,
             target: args.target ?? null,
+            targetMax: args.target_max ?? null,
             collected: args.collected ?? null,
             actual: args.actual ?? null,
             actor: `${userEmail} via Claude`,
           })
           meta.detail = { created_segment: { id: row.id, label: row.label } }
-          return { ok: true, segment: { id: row.id, label: row.label, n_target: row.n_target, n_collected: row.n_collected, n_actual: row.n_actual } }
+          return { ok: true, segment: { id: row.id, label: row.label, n_target: row.n_target, n_target_max: row.n_target_max, n_collected: row.n_collected, n_actual: row.n_actual } }
         }
       )
     },
@@ -1258,20 +1353,22 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'update_segment',
     description:
-      "Edit an N segment's label or numbers (target / collected / actual). Identify the segment by its name or id. If it's unclear which segment, ask. Preview first; confirm to apply.",
+      "Edit an N segment's label or numbers (the target RANGE — target is the minimum, target_max the maximum — plus collected / actual). Identify the segment by its name or id. Moving one end of the range past the other pulls the other end along to match (shown in the preview). If it's unclear which segment, ask. Preview first; confirm to apply.",
     kind: 'write',
     schema: {
       project: z.string(),
       segment_ref: z.string(),
       label: z.string().min(1).max(120).optional(),
       target: z.number().int().nullable().optional(),
+      target_max: z.number().int().nullable().optional(),
       collected: z.number().int().nullable().optional(),
       actual: z.number().int().nullable().optional(),
       confirm: z.boolean().optional(),
     },
     handler: async (rawArgs, ctx, meta) => {
       const args = rawArgs as {
-        project: string; segment_ref: string; label?: string; target?: number | null; collected?: number | null; actual?: number | null; confirm?: boolean
+        project: string; segment_ref: string; label?: string; target?: number | null; target_max?: number | null
+        collected?: number | null; actual?: number | null; confirm?: boolean
       }
       const { userEmail } = ctx
       const p = await resolveProjectWritable(args.project)
@@ -1286,24 +1383,34 @@ export const TOOLS: AssistantTool[] = [
       const patch: Record<string, unknown> = {}
       if (args.label !== undefined) patch.label = args.label
       if (args.target !== undefined) patch.n_target = args.target
+      if (args.target_max !== undefined) patch.n_target_max = args.target_max
       if (args.collected !== undefined) patch.n_collected = args.collected
       if (args.actual !== undefined) patch.n_actual = args.actual
       if (Object.keys(patch).length === 0) {
-        return { needs: 'a change', message: 'Specify at least one of: label, target, collected, actual.' }
+        return { needs: 'a change', message: 'Specify at least one of: label, target, target_max, collected, actual.' }
       }
+      // Only a pair the caller sent WHOLE can be transposed; one end on its own
+      // is handled by alignNRangePatch below, not refused.
+      if (isInvertedNRange(args.target, args.target_max)) {
+        return { error: `target_max (${fmtNum(args.target_max)}) can't be below target (${fmtNum(args.target)}) — the range is the other way round.` }
+      }
+      // project_segments carries the same range trigger as survey_projects, so a
+      // one-ended edit that crosses the stored other end has to move both.
+      const aligned = alignNRangePatch(seg as Record<string, unknown>, patch)
       const desc = [
         args.label !== undefined ? `label → "${args.label}"` : null,
-        args.target !== undefined ? `target → ${args.target ?? '—'}` : null,
-        args.collected !== undefined ? `collected → ${args.collected ?? 0}` : null,
-        args.actual !== undefined ? `actual → ${args.actual ?? '—'}` : null,
+        'n_target' in aligned ? `target → ${fmtNum(aligned.n_target as number | null)}` : null,
+        'n_target_max' in aligned ? `target max → ${fmtNum(aligned.n_target_max as number | null)}` : null,
+        args.collected !== undefined ? `collected → ${fmtNum(args.collected ?? 0)}` : null,
+        args.actual !== undefined ? `actual → ${fmtNum(args.actual)}` : null,
       ].filter(Boolean).join(', ')
       return confirmable(
         args,
         async () => ({ summary: `Update segment "${seg.label}" on ${p.project_code}: ${desc}` }),
         async () => {
-          const row = await runUpdateSegment(seg.id as string, patch, `${userEmail} via Claude`)
-          meta.detail = { segment_id: row.id, updated: patch }
-          return { ok: true, segment: { id: row.id, label: row.label, n_target: row.n_target, n_collected: row.n_collected, n_actual: row.n_actual } }
+          const row = await runUpdateSegment(seg.id as string, aligned, `${userEmail} via Claude`)
+          meta.detail = { segment_id: row.id, updated: aligned }
+          return { ok: true, segment: { id: row.id, label: row.label, n_target: row.n_target, n_target_max: row.n_target_max, n_collected: row.n_collected, n_actual: row.n_actual } }
         }
       )
     },
@@ -2323,7 +2430,7 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'create_project',
     description:
-      "Create a new survey project (preview first; confirm to apply). Set ALL provided fields in THIS one call — it accepts the dates (launch/due/deliver/submitted), N target + internal target, audience + audience size, budget, row-level flag, the Y/N flags, latest-next-steps, and requested_by (the client contact who requested it — pass their name or email; it resolves an existing contact of that client and tags them) directly, so no follow-up update or set_requested_by is needed. budget is the TOTAL planned $ — if the user gives a per-N rate (e.g. \"$37.5/N\"), multiply by the N being collected (usually the internal target) and note the assumption. Warns about possible duplicate projects before creating.",
+      "Create a new survey project (preview first; confirm to apply). Set ALL provided fields in THIS one call — it accepts the dates (launch/due/deliver/submitted), the N target range (n_target is the minimum, n_target_max the maximum — pass both when the project was sold as a range) + internal target, audience + audience size, budget, row-level flag, the Y/N flags, latest-next-steps, and requested_by (the client contact who requested it — pass their name or email; it resolves an existing contact of that client and tags them) directly, so no follow-up update or set_requested_by is needed. budget is the TOTAL planned $ we intend to SPEND (a cost ceiling, not client revenue) — if the user gives a per-N rate (e.g. \"$37.5/N\"), multiply by the N being collected (usually the internal target) and note the assumption. It is finance-only: without finance access the project is still created and everything else is set, but budget is left blank and `budget_note` says so — pass it on, don't silently drop it. Warns about possible duplicate projects before creating.",
     kind: 'write',
     schema: {
       project_name: z.string(),
@@ -2334,6 +2441,7 @@ export const TOOLS: AssistantTool[] = [
       requested_by: z.string().optional(),
       due_date: z.string().optional(),
       n_target: z.number().int().positive().optional(),
+      n_target_max: z.number().int().positive().optional(),
       n_internal_target: z.number().int().optional(),
       audience_size: z.number().int().optional(),
       audience: z.string().optional(),
@@ -2355,7 +2463,8 @@ export const TOOLS: AssistantTool[] = [
     handler: async (rawArgs, ctx, meta) => {
       const args = rawArgs as {
         project_name: string; client: string; project_type?: 'PS' | 'B2B' | 'Rerun'
-        captain?: string; salesperson?: string; requested_by?: string; due_date?: string; n_target?: number
+        captain?: string; salesperson?: string; requested_by?: string; due_date?: string
+        n_target?: number; n_target_max?: number
         n_internal_target?: number; audience_size?: number; audience?: string; budget?: number
         launch_date?: string; deliver_date?: string; submitted_date?: string
         row_level_data?: boolean; longitudinal?: boolean; voter_survey_qa?: boolean
@@ -2372,6 +2481,9 @@ export const TOOLS: AssistantTool[] = [
       }
       for (const [name, v] of [['launch_date', args.launch_date], ['deliver_date', args.deliver_date], ['submitted_date', args.submitted_date]] as const) {
         if (v && !DUE_DATE_RE.test(v)) return { error: `${name} must be in YYYY-MM-DD format.` }
+      }
+      if (isInvertedNRange(args.n_target, args.n_target_max)) {
+        return { error: `n_target_max (${fmtNum(args.n_target_max)}) can't be below n_target (${fmtNum(args.n_target)}) — the N range is the other way round.` }
       }
 
       // Canonicalize the client to an EXISTING one when it matches, so e.g. "A4A"
@@ -2455,10 +2567,25 @@ export const TOOLS: AssistantTool[] = [
       // so apply them as ONE follow-up write right after create. This lets a single
       // create_project call land the whole intake (no separate update needed).
       const extras: Record<string, unknown> = {}
+      // mcp_create_project inserts n_target (the range MINIMUM) but has no
+      // n_target_max column in its hand-written insert, so the top of the range
+      // rides along in the follow-up write — which goes through mcp_write_project,
+      // where 078 did add the arm. Order is safe: the row lands with a null max,
+      // and null-either-side is exactly the case 078's trigger lets through.
+      if (args.n_target_max != null) extras.n_target_max = args.n_target_max
       if (args.n_internal_target != null) extras.n_internal_target = args.n_internal_target
       if (args.audience_size != null) extras.audience_size = args.audience_size
       if (args.audience != null) extras.audience = args.audience
-      if (args.budget != null) extras.budget = args.budget
+      // budget is finance-only to WRITE as well as to read (same rule as
+      // update_project). Here it's DROPPED with a note rather than refused,
+      // because refusing the whole intake over one optional field is the worse
+      // outcome — the same shape as the requested-by miss below. The project
+      // lands with no ceiling and the note says who can set one.
+      let budgetNote: string | null = null
+      if (args.budget != null) {
+        if (await data.callerCanViewFinancials(ctx)) extras.budget = args.budget
+        else budgetNote = `Budget not set — it's finance-only, so I can't write it. Someone with finance access can set it in the app.`
+      }
       if (args.launch_date) extras.launch_date = args.launch_date
       if (args.deliver_date) extras.deliver_date = args.deliver_date
       if (args.row_level_data != null) extras.row_level_data = args.row_level_data
@@ -2496,6 +2623,7 @@ export const TOOLS: AssistantTool[] = [
           summary: `Create "${projectName}" for ${normalizeClientText(effectiveClient)}${args.skip_scoping ? ' (skip scoping — Active/Submitted)' : ''}`,
           fields: { ...patch, ...extras },
           requested_by_note: requestedByNote,
+          budget_note: budgetNote,
           duplicate_warning: dupRows && dupRows.length > 0
             ? `${dupRows.length} similar project(s) already exist for this client/name — proceeding anyway.`
             : null,
@@ -2511,6 +2639,7 @@ export const TOOLS: AssistantTool[] = [
           return {
             ok: true, project_code: row.project_code, id: row.id,
             client: row.client, client_id: row.client_id, phase: row.phase, board_column: row.board_column,
+            ...(budgetNote ? { budget_note: budgetNote } : {}),
           }
         }
       )

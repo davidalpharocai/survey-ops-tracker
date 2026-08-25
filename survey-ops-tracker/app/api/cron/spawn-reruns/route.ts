@@ -6,6 +6,7 @@ import { nextRerunName } from '@/lib/utils/rerun'
 import { selectDueSeries, isLegacyEligible, addDaysISO } from '@/lib/reruns/spawn'
 import { spawnWaveForSeries, QUIET_SPAWN_SKIP_REASONS } from '@/lib/reruns/spawnSeries'
 import { renumberLegacyLineage } from '@/lib/reruns/renumberLineage'
+import { copyProjectPricing } from '@/lib/server/clone'
 import type { Database } from '@/lib/supabase/types'
 
 export const dynamic = 'force-dynamic'
@@ -41,6 +42,9 @@ export async function GET(req: NextRequest) {
   const errors: string[] = []
   let seriesChecked = 0
   let legacyChecked = 0
+  // Waves that landed unpriced because project_financials wasn't there to read
+  // (082 pending). Counted, not errored — see the copy site below.
+  let pricingUnavailable = 0
 
   // -------------------------------------------------------------------------
   // Series path (migration 073): the first-class model.
@@ -95,7 +99,13 @@ export async function GET(req: NextRequest) {
   const { data: due, error } = await supabase
     .from('survey_projects')
     .select(
-      'id, project_name, client, captain_id, co_captain_ids, salesperson, n_target, audience_size, linked_documents, voter_survey_qa, citation_language_needed, row_level_data, compliance_override, rerun_number, rerun_series_id, series_id, rerun_date, rerun_spawned_at, longitudinal, status, board_column'
+      // n_target_max rides along with n_target: since migration 078 the target is
+      // a RANGE and n_target is only its FLOOR, so copying the floor alone would
+      // hand every spawned wave a silently-reset ceiling. Safe to name here —
+      // 078 is applied. price_per_n is deliberately NOT in this list: 082 is not,
+      // and PostgREST fails the WHOLE request over one unknown column, which
+      // would take the entire nightly spawn down. It is read separately below.
+      'id, project_name, client, captain_id, co_captain_ids, salesperson, n_target, n_target_max, audience_size, linked_documents, voter_survey_qa, citation_language_needed, row_level_data, compliance_override, rerun_number, rerun_series_id, series_id, rerun_date, rerun_spawned_at, longitudinal, status, board_column'
     )
     .eq('longitudinal', true)
     .not('rerun_date', 'is', null)
@@ -144,7 +154,11 @@ export async function GET(req: NextRequest) {
         captain_id: p.captain_id,
         co_captain_ids: p.co_captain_ids,
         salesperson: p.salesperson,
+        // Both ends of the range in the SAME insert — 078's
+        // enforce_n_target_range trigger only sees the fields a write carries,
+        // so the pair must never be split across two statements.
         n_target: p.n_target,
+        n_target_max: p.n_target_max,
         n_collected: 0,
         n_actual: null,
         audience_size: p.audience_size,
@@ -194,6 +208,16 @@ export async function GET(req: NextRequest) {
         )
         continue
       }
+      // Carry the client rate onto the new wave. A rerun is the same study for
+      // the same client at the same price, and a wave with no rate reads as $0
+      // revenue in every margin figure — worse than blank, because $0 looks like
+      // a number somebody agreed to. Isolated + non-fatal on purpose: migration
+      // 082 is applied by hand, so 'unavailable' is the expected answer until it
+      // lands, and a missing price must never cost us the wave itself. Recorded
+      // as a note, not an error — nothing is broken, the wave is just unpriced.
+      const pricing = await copyProjectPricing(supabase, p.id, inserted.id, 'system')
+      if (pricing === 'unavailable') pricingUnavailable++
+
       // Renumber the whole lineage by chronological position so the new wave
       // takes its true number and any pre-existing gap (legacy naive max+1)
       // self-heals — never the "1,3,4" drift this used to produce.
@@ -210,7 +234,7 @@ export async function GET(req: NextRequest) {
     source: 'spawn-reruns',
     status: errors.length ? 'partial' : 'ok',
     detail: spawned.length ? `Spawned ${spawned.length} rerun(s): ${spawned.join(', ')}` : 'No reruns due.',
-    meta: { spawned, errors, seriesChecked, legacyChecked },
+    meta: { spawned, errors, seriesChecked, legacyChecked, pricingUnavailable },
   })
 
   return Response.json(

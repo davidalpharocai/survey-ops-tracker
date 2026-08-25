@@ -1,5 +1,13 @@
 // Pure analytics for the project Insights tab — no I/O, fully testable. Dates are
 // passed in (incl. "today") so the math is deterministic under test.
+//
+// A note on N since migration 078: `n_target` is the FLOOR of a range (the N we
+// committed to) and `n_target_max` is the ceiling. Every `target` in this file is
+// whatever the caller passed, and callers pass the floor — so "100%", "on track",
+// and "projected final" all mean "clears the commitment", not "fills the range".
+// That's the intended reading (the floor is what we owe), but it's a real
+// decision: a caller that wants the top of the range must pass n_target_max in.
+// Nothing here should silently mix the two.
 
 export function pctOf(n: number, d: number | null | undefined): number | null {
   return d != null && d > 0 ? (n / d) * 100 : null
@@ -70,7 +78,9 @@ export interface SegmentPaceRow {
 }
 
 /**
- * Per-segment pace. A total-N that meets/exceeds the project target can hide a
+ * Per-segment pace. Judged against each segment's own n_target — the FLOOR of its
+ * range — so `onTrack` means "will clear what we committed to for this segment".
+ * A total-N that meets/exceeds the project target can hide a
  * segment that's badly under its OWN target — over-collecting Buyers doesn't
  * rescue an under-collected Sellers. So each segment is paced independently
  * against its own target, using the project's launch date + due date (segments
@@ -123,7 +133,11 @@ export function segmentPaces(opts: {
 
 /** Projected final cost = blended cost/complete × the completes we'll end up paying for.
  *  Floored at what's already collected so an over-quota project never projects a final
- *  cost below money already spent. */
+ *  cost below money already spent.
+ *  `target` is the N you intend to pay for: pass n_target for the cost of meeting the
+ *  commitment, n_target_max for the worst case if the range fills. This is spend
+ *  (cost to run), so it stays visible to the whole team — unlike the budget ceiling
+ *  it gets compared against. */
 export function projectedFinalCost(blended: number | null, target: number | null, collected = 0): number | null {
   return blended != null && target != null ? blended * Math.max(target, collected) : null
 }

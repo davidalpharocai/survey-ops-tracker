@@ -1,5 +1,6 @@
 import 'server-only'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { isRestrictedMoneyField } from '@/lib/mcp/data'
 import type { Database, Json } from '@/lib/supabase/types'
 
 /**
@@ -17,6 +18,31 @@ import type { Database, Json } from '@/lib/supabase/types'
  * settles (success or throw), so a failed write still gets attributed correctly.
  */
 export type ToolCallMeta = { project_id?: string; client_id?: string; detail?: unknown }
+
+/**
+ * `detail` with every restricted-money VALUE removed, at any depth.
+ *
+ * Unconditional — it does not matter who made the call. mcp_tool_calls is
+ * readable by every analyst (migration 045), so a budget written into `detail`
+ * by one of the three capability holders is a budget the whole team can query
+ * afterwards. The tool result is gated per caller; this row is gated for
+ * everyone.
+ *
+ * Only KEYS are matched, so a detail that lists which fields an undo touched
+ * (`{ undo: { fields: ['budget'] } }`) keeps the field name — the name is not
+ * the number. Non-plain values (Dates, class instances) are passed through
+ * untouched: `detail` is always plain JSON built by a handler.
+ */
+export function scrubDetail(detail: unknown): unknown {
+  if (Array.isArray(detail)) return detail.map(scrubDetail)
+  if (detail === null || typeof detail !== 'object') return detail
+  if (Object.getPrototypeOf(detail) !== Object.prototype) return detail
+  const out: Record<string, unknown> = {}
+  for (const [k, v] of Object.entries(detail as Record<string, unknown>)) {
+    if (!isRestrictedMoneyField(k)) out[k] = scrubDetail(v)
+  }
+  return out
+}
 
 /** Clean, user-safe error text. Never leak raw DB error internals to the model. */
 export function cleanErrorMessage(err: unknown): string {
@@ -46,7 +72,7 @@ export function logToolCall(
   }
   if (meta?.project_id) row.project_id = meta.project_id
   if (meta?.client_id) row.client_id = meta.client_id
-  if (meta?.detail !== undefined) row.detail = meta.detail as Json
+  if (meta?.detail !== undefined) row.detail = scrubDetail(meta.detail) as Json
   if (err !== undefined) {
     row.error_code = errorCode(err)
     row.error_message = (err instanceof Error ? err.message : String(err)).slice(0, 500)

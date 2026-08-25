@@ -1,8 +1,16 @@
 'use client'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { conflicts, buildSurvivorUpdate, PROJECT_MERGE_FIELDS, CLIENT_MERGE_FIELDS } from '@/lib/utils/merge'
+import {
+  conflicts,
+  buildSurvivorUpdate,
+  hasWithheldFields,
+  mergeFieldsFor,
+  PROJECT_MERGE_FIELDS,
+  CLIENT_MERGE_FIELDS,
+} from '@/lib/utils/merge'
 import { useMergeProjects, useMergeClients } from '@/lib/hooks/useMerge'
+import { useCanViewFinancials } from '@/lib/hooks/useCapabilities'
 
 type Row = { id: string } & Record<string, unknown>
 type Props = { kind: 'project' | 'client'; a: Row; b: Row; open: boolean; onClose: () => void }
@@ -20,7 +28,14 @@ function fmt(v: unknown): string {
 }
 
 export function MergeModal({ kind, a, b, open, onClose }: Props) {
-  const fields = kind === 'project' ? PROJECT_MERGE_FIELDS : CLIENT_MERGE_FIELDS
+  // The preview prints BOTH records' values for every differing field, so a
+  // finance-only field here would show two restricted numbers at once. False
+  // while the grant is still loading — a modal opened a beat early is one
+  // without the money, never one with it.
+  const canViewFinancials = useCanViewFinancials()
+  const allFields = kind === 'project' ? PROJECT_MERGE_FIELDS : CLIENT_MERGE_FIELDS
+  const fields = mergeFieldsFor(allFields, canViewFinancials)
+  const withheld = hasWithheldFields(allFields, canViewFinancials)
   const codeKey = kind === 'project' ? 'project_code' : 'code'
   const nameKey = kind === 'project' ? 'project_name' : 'name'
   const mergeProjects = useMergeProjects()
@@ -37,7 +52,13 @@ export function MergeModal({ kind, a, b, open, onClose }: Props) {
   const diff = conflicts(survivor, loser, fields)
 
   function doMerge() {
-    const survivorUpdate = buildSurvivorUpdate(survivor, loser, picks)
+    // Only ever send picks for fields this user was actually shown. `picks` is
+    // keyed state that outlives a re-render, so if the capability answer flips
+    // while the modal is open, a pick made a moment ago must not survive as a
+    // silent write to a field that has since disappeared from the preview.
+    const visible = new Set(fields.map(f => f.key))
+    const shownPicks = Object.fromEntries(Object.entries(picks).filter(([k]) => visible.has(k)))
+    const survivorUpdate = buildSurvivorUpdate(survivor, loser, shownPicks)
     merge.mutate(
       { survivorId: survivor.id, loserId: loser.id, survivorUpdate },
       {
@@ -112,6 +133,14 @@ export function MergeModal({ kind, a, b, open, onClose }: Props) {
           {kind === 'project' && (
             <p className="text-[11px] text-muted-foreground/70 mt-1">
               N segments follow the survivor — the retired copy&apos;s are discarded.
+            </p>
+          )}
+          {/* Say that a field was left out, without printing it. Silence here
+              would read as "there was nothing to decide", and the survivor's
+              ceiling quietly standing is a decision. */}
+          {withheld && (
+            <p className="text-[11px] text-muted-foreground/70 mt-1">
+              Finance-only fields aren&apos;t shown here — the survivor&apos;s values stand.
             </p>
           )}
         </div>

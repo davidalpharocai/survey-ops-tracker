@@ -5,7 +5,10 @@ import { useUpdateProject } from '@/lib/hooks/useProjects'
 import { useTeamMembers } from '@/lib/hooks/useTeamMembers'
 import { createClient } from '@/lib/supabase/client'
 import { autoStamp } from '@/lib/utils/date'
-import { FIELD_LABELS, formatFieldValue, fieldsToUpdates } from '@/lib/utils/quickFields'
+import { useCanViewFinancials } from '@/lib/hooks/useCapabilities'
+import {
+  FIELD_LABELS, RESTRICTED_FIELDS, formatFieldValue, fieldsToUpdates, nRangeComplaint,
+} from '@/lib/utils/quickFields'
 import type { SurveyProject } from '@/lib/hooks/useProjects'
 
 interface QuickEditProps {
@@ -19,6 +22,9 @@ export function QuickEdit({ project }: QuickEditProps) {
   const [error, setError] = useState<string | null>(null)
   const [parsed, setParsed] = useState<Record<string, unknown> | null>(null)
   const { data: teamMembers = [] } = useTeamMembers()
+  // False until the check settles true, so a restricted figure can never be sent
+  // to the model or painted in the preview while the answer is in flight.
+  const canViewFinancials = useCanViewFinancials()
   const updateProject = useUpdateProject()
   const queryClient = useQueryClient()
   const supabase = createClient()
@@ -40,10 +46,17 @@ export function QuickEdit({ project }: QuickEditProps) {
             project_type: project.project_type,
             salesperson: project.salesperson,
             n_target: project.n_target,
+            n_target_max: project.n_target_max,
             n_collected: project.n_collected,
             n_actual: project.n_actual,
             audience_size: project.audience_size,
-            budget: project.budget,
+            // The budget is a cost ceiling and restricted, so for a non-holder it
+            // is left out of the context entirely — it used to be posted for every
+            // user on every parse, which handed the ceiling to the model whatever
+            // their capabilities. Actual spend is cost to run, public, and stays.
+            // (The route scrubs this again on its side and drops `budget` from the
+            // schema, so it can't come back either.)
+            ...(canViewFinancials ? { budget: project.budget } : {}),
             actual_spend: project.actual_spend,
             due_date: project.due_date,
             launch_date: project.launch_date,
@@ -59,7 +72,11 @@ export function QuickEdit({ project }: QuickEditProps) {
         setError(body?.error ?? 'Something went wrong. Please try again.')
         return
       }
-      const entries = Object.entries(body.fields).filter(([, v]) => v != null)
+      // Belt to the route's braces: never render a restricted field even if one
+      // arrives (stale deploy, capability lost between parse and render).
+      const entries = Object.entries(body.fields).filter(
+        ([k, v]) => v != null && (canViewFinancials || !RESTRICTED_FIELDS.has(k))
+      )
       if (entries.length === 0) {
         setError("I couldn't find any project details in that. Try being more specific.")
         return
@@ -74,7 +91,22 @@ export function QuickEdit({ project }: QuickEditProps) {
 
   async function approve() {
     if (!parsed) return
-    const updates = fieldsToUpdates(parsed, teamMembers)
+    // Pass the stored N range so a one-ended change ("bump N to 2,500") goes out
+    // as a PAIR — migration 078's trigger only sees the columns the PATCH carries
+    // and raises when the new min lands above the stored max.
+    const updates = fieldsToUpdates(parsed, teamMembers, {
+      n_target: project.n_target,
+      n_target_max: project.n_target_max,
+    })
+    // A transposed range ("N target 2,500 to 2,000") is caught here, in the panel
+    // that produced it, rather than coming back as a failed save — and nothing
+    // else in this approval runs, so the note isn't logged against a change that
+    // never happened.
+    const complaint = nRangeComplaint(updates)
+    if (complaint) {
+      setError(complaint)
+      return
+    }
     if (typeof parsed.note === 'string' && parsed.note.trim()) {
       const { error } = await supabase.from('project_steps').insert({
         project_id: project.id,

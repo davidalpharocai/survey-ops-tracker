@@ -113,6 +113,7 @@ describe('buildSummaryFacts — watch-outs', () => {
       blasts: [],
       stageHistory: [],
       now: '2026-07-15T00:00:00Z',
+      canViewFinancials: true,
     })
     expect(facts.spendPct).toBe(50)
     expect(facts.nPct).toBe(30)
@@ -125,6 +126,7 @@ describe('buildSummaryFacts — watch-outs', () => {
       blasts: [],
       stageHistory: [],
       now: '2026-07-15T00:00:00Z',
+      canViewFinancials: true,
     })
     expect(facts.spendPct).toBe(40)
     expect(facts.nPct).toBe(35)
@@ -214,6 +216,7 @@ describe('buildSummaryFacts — happy path shape', () => {
       ],
       now: '2026-07-10T00:00:00Z',
       openNextSteps: ['Send reminder email'],
+      canViewFinancials: true,
     })
 
     expect(facts.stage).toBe('Fielding')
@@ -317,5 +320,42 @@ describe('buildSummaryFacts — status & delivered lifecycle', () => {
       now: '2026-07-10T00:00:00Z',
     })
     expect(facts.status).toBe('On hold')
+  })
+})
+
+describe('buildSummaryFacts — finance visibility', () => {
+  // The ✦ Summary is a SEPARATE transport: these facts are POSTed to Anthropic and
+  // returned to the browser. The budget (a cost ceiling) must ride on the
+  // capability, not on the preview allowlist that happens to contain one person
+  // today — see the note on SummaryInput.canViewFinancials.
+  const withMoney = {
+    project: project({ actual_spend: 5000, budget: 10000, n_collected: 300, n_target: 1000 }),
+    blasts: [],
+    stageHistory: [],
+    now: '2026-07-15T00:00:00Z',
+  }
+
+  it('omits the budget, its % and the burn watch-out when the caller lacks the capability', () => {
+    const facts = buildSummaryFacts(withMoney)
+    expect(facts.budget).toBeNull()
+    expect(facts.spendPct).toBeNull()
+    expect(facts.watchouts.some((w) => w.includes('Spending ahead'))).toBe(false)
+  })
+
+  it('defaults to hidden — an omitted flag is treated as "no capability"', () => {
+    const facts = buildSummaryFacts({ ...withMoney, canViewFinancials: undefined })
+    expect(facts.budget).toBeNull()
+  })
+
+  it('keeps cost-to-run public either way (spend, cost per complete)', () => {
+    const hidden = buildSummaryFacts(withMoney)
+    const shown = buildSummaryFacts({ ...withMoney, canViewFinancials: true })
+    expect(hidden.spend).toBe(5000)
+    expect(hidden.costPerComplete).toBeCloseTo(5000 / 300)
+    expect(shown.spend).toBe(hidden.spend)
+    expect(shown.costPerComplete).toBe(hidden.costPerComplete)
+    // ...and the ceiling only appears for the holder.
+    expect(shown.budget).toBe(10000)
+    expect(shown.spendPct).toBe(50)
   })
 })
