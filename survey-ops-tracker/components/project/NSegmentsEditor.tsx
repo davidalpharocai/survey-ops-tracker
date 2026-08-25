@@ -153,7 +153,21 @@ export function NSegmentsEditor({ project }: { project: SurveyProject }) {
 
       {/* Full-width rows below the 2-col cell grid. */}
       <div className="sm:col-span-2">
-        <GenPopNWarning project={project} />
+        {/* Once split, the top-level Audience field is no longer rendered (see the
+            `!segmented` guard above) and sync_segment_totals rolls up the N
+            columns but NOT audience — so the parent row keeps whatever string
+            was there before the split, invisible and uneditable. Feeding that to
+            the floor check meant a Buyers/Sellers project could show a gen-pop
+            warning sourced from a stale pre-split audience nobody could see or
+            correct. Judge the segments' own audiences instead. */}
+        <GenPopNWarning
+          project={{
+            ...project,
+            audience: segmented
+              ? segments.map(sg => sg.audience).filter(Boolean).join('; ') || null
+              : project.audience,
+          }}
+        />
       </div>
 
       {undo && (

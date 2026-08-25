@@ -7,6 +7,7 @@ import { useComplianceState } from '@/lib/hooks/useComplianceState'
 import { useRequestedByContact, useMarkOccamInvited } from '@/lib/hooks/useOccamOnboarding'
 import { complianceGate } from '@/lib/utils/compliance'
 import { occamOnboardingGate } from '@/lib/utils/occam'
+import { nFloorDeliveryGate } from '@/lib/utils/nFloor'
 import { autoStamp } from '@/lib/utils/date'
 import type { SurveyProject } from '@/lib/hooks/useProjects'
 import type { BoardColumn } from '@/lib/utils/stage'
@@ -179,6 +180,33 @@ export function usePipelineStage(project: SurveyProject) {
         onOverride: (reason: string) => {
           setGate(null)
           proceedToDelivery(newState, newColumn, willMarkDelivered, `⚠ Compliance override (${g.phase}): ${reason}`)
+        },
+      })
+      return
+    }
+
+    // Gen-pop N floor, re-checked at the last possible moment. The card in the
+    // N & Audience section already advises during fielding, but the number that
+    // matters is the one we are about to deliver — so a population-representative
+    // study whose cleaned N came in under our own standard asks for a recorded
+    // sign-off here rather than going out quietly. Same soft shape as the two
+    // gates above: it never hard-blocks, it just makes someone say why.
+    const nf = nFloorDeliveryGate({
+      willMarkDelivered,
+      audience: project.audience,
+      project_type: project.project_type,
+      n_internal_target: project.n_internal_target,
+      n_collected: project.n_collected,
+      n_actual: project.n_actual,
+      n_floor_override: project.n_floor_override,
+    })
+    if (nf.blocked) {
+      setGate({
+        message: nf.message,
+        contact: null,
+        onOverride: (reason: string) => {
+          setGate(null)
+          proceedToDelivery(newState, newColumn, willMarkDelivered, `⚠ Gen-pop N floor override: ${reason}`)
         },
       })
       return
