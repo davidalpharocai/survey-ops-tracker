@@ -19,9 +19,29 @@ export const EVENT_DATE: Record<SurveyEvent, 'submitted_date' | 'launch_date' | 
 
 type Row = Record<string, unknown>
 
+export interface ReportField {
+  key: string
+  label: string
+  get: (r: Row) => unknown
+  /** Finance-only: omitted entirely unless the caller holds `view_financials`. */
+  restricted?: true
+}
+
 /** Selectable report fields — key → { label, get(row) }. Mirrors the app's CSV
- *  export column set so the connector report and the in-app export agree. */
-export const REPORT_FIELDS: { key: string; label: string; get: (r: Row) => unknown }[] = [
+ *  export column set (lib/utils/exportCsv.ts) so the connector report and the
+ *  in-app export agree — including which columns are finance-only.
+ *
+ *  `restricted: true` marks the money that is a spending INTENTION or
+ *  revenue-side rather than a cost we actually paid: budget (a cost CEILING, not
+ *  client revenue) and, when they become columns, price per N / contract value /
+ *  margin. Cost-to-run stays public — actual_spend is exported for everyone,
+ *  because watching it is everyone's job.
+ *
+ *  BASE_SELECT still fetches budget for every row: the aggregate needs it for a
+ *  capability holder, and one shared select keeps the two consumers on identical
+ *  rows. The stripping happens at the FIELD LIST, which is the last place the
+ *  data passes through on its way to the model — same shape as the CSV. */
+export const REPORT_FIELDS: ReportField[] = [
   { key: 'project_code', label: 'Project ID', get: r => r.project_code },
   { key: 'project_name', label: 'Project Name', get: r => r.project_name },
   { key: 'client', label: 'Client', get: r => r.client },
@@ -39,7 +59,7 @@ export const REPORT_FIELDS: { key: string; label: string; get: (r: Row) => unkno
   { key: 'n_collected', label: 'N Collected', get: r => r.n_collected },
   { key: 'n_actual', label: 'N Actual', get: r => r.n_actual },
   { key: 'audience_size', label: 'Audience Size', get: r => r.audience_size },
-  { key: 'budget', label: 'Budget', get: r => r.budget },
+  { key: 'budget', label: 'Budget', get: r => r.budget, restricted: true },
   { key: 'actual_spend', label: 'Actual Spend', get: r => r.actual_spend },
   { key: 'longitudinal', label: 'Longitudinal', get: r => r.longitudinal },
   { key: 'survey_ids', label: 'Survey IDs', get: r => r.survey_tool_id },
@@ -52,6 +72,30 @@ export const DEFAULT_REPORT_FIELDS = [
   'project_code', 'project_name', 'client', 'type', 'captain',
   'submitted_date', 'launch_date', 'deliver_date', 'n_target', 'n_collected', 'status',
 ]
+
+/**
+ * The report fields this caller gets. `canViewFinancials` comes from
+ * callerCanViewFinancials(ctx), which answers false for a caller whose identity
+ * never reached us — so an unattributed report is one without the money, never
+ * one with it.
+ */
+export function reportFieldsFor(canViewFinancials: boolean): ReportField[] {
+  return canViewFinancials ? REPORT_FIELDS : REPORT_FIELDS.filter(f => !f.restricted)
+}
+
+/** The keys of reportFieldsFor() — what survey_report ADVERTISES as
+ *  `available_fields`. It has to shrink with the field list: a model told
+ *  'budget' is available will keep asking for a column it can never get. */
+export function reportFieldKeysFor(canViewFinancials: boolean): string[] {
+  return reportFieldsFor(canViewFinancials).map(f => f.key)
+}
+
+/** The default column set, minus anything this caller may not see. (Today no
+ *  default is restricted; this keeps that true if one is ever added.) */
+export function defaultReportFieldsFor(canViewFinancials: boolean): string[] {
+  const allowed = new Set(reportFieldKeysFor(canViewFinancials))
+  return DEFAULT_REPORT_FIELDS.filter(k => allowed.has(k))
+}
 
 export type Period = { from: string; to: string; label: string }
 
@@ -157,11 +201,15 @@ function fmt(v: unknown): string | number {
   return String(v)
 }
 
-/** Project a raw row down to the chosen fields, keyed by human label (for xlsx/table). */
-export function projectRow(r: Row, fieldKeys: string[]): Record<string, string | number> {
+/** Project a raw row down to the chosen fields, keyed by human label (for xlsx/table).
+ *  `fields` defaults to the full set, so pass reportFieldsFor(canViewFinancials)
+ *  to make a restricted key unresolvable even if one slips into fieldKeys. */
+export function projectRow(
+  r: Row, fieldKeys: string[], fields: ReportField[] = REPORT_FIELDS
+): Record<string, string | number> {
   const out: Record<string, string | number> = {}
   for (const key of fieldKeys) {
-    const f = REPORT_FIELDS.find(x => x.key === key)
+    const f = fields.find(x => x.key === key)
     if (f) out[f.label] = fmt(f.get(r))
   }
   return out
@@ -176,7 +224,13 @@ function shiftDate(d: string, days: number): string {
   return new Date(Date.parse(`${d}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10)
 }
 
-function aggregate(rows: Row[]) {
+/** Period totals for a set of rows. `budget`, `over_budget` and
+ *  `budget_used_pct` are the finance-only three — a portfolio budget total is
+ *  the same restricted number as one project's ceiling, just summed — so they
+ *  are ABSENT (not zeroed) without the capability, for the same reason
+ *  redactRestrictedMoney deletes keys: a 0 reads as "no budget", which is false.
+ *  Exported for the field-gating tests. */
+export function aggregate(rows: Row[], canViewFinancials: boolean) {
   const by_type: Record<string, number> = { PS: 0, B2B: 0, Rerun: 0 }
   let n_target = 0, n_collected = 0, n_actual = 0, budget = 0, actual_spend = 0, over_budget = 0
   let onTimeDenom = 0, onTime = 0
@@ -210,28 +264,48 @@ function aggregate(rows: Row[]) {
     avg_fielding_days: avg(fielding),
     n_target, n_collected, n_actual,
     collection_pct: n_target > 0 ? Math.round((n_collected / n_target) * 100) : null,
-    budget: Math.round(budget),
     actual_spend: Math.round(actual_spend),
-    over_budget,
-    budget_used_pct: budget > 0 ? Math.round((actual_spend / budget) * 100) : null,
+    ...(canViewFinancials ? {
+      budget: Math.round(budget),
+      over_budget,
+      budget_used_pct: budget > 0 ? Math.round((actual_spend / budget) * 100) : null,
+    } : {}),
   }
 }
+
+/** The note ops_metrics carries when the budget three were left out — the
+ *  `restricted` shape whatsAtRisk uses, for the same reason: an absent
+ *  over_budget count must not be read as "nothing is over budget". */
+export const OPS_METRICS_RESTRICTED_NOTE =
+  'budget, over_budget, budget_used_pct — budget is finance-only, so budget vs spend was not computed. ' +
+  'Do not tell the user nothing is over budget; say you cannot see budgets.'
 
 /** Period-scoped operational metrics for surveys whose `event` date falls in
  *  [from,to]. With compare, also computes the equal-length immediately-prior
  *  period for a period-over-period read. */
-export async function opsMetrics(opts: { event: SurveyEvent; from: string; to: string; type?: SurveyType; compare?: boolean }) {
-  const agg = aggregate(await surveyRows({ event: opts.event, from: opts.from, to: opts.to, type: opts.type }))
+export async function opsMetrics(opts: {
+  event: SurveyEvent; from: string; to: string; type?: SurveyType; compare?: boolean
+  /** From callerCanViewFinancials(ctx). Defaults to false so a caller that
+   *  forgets to pass it gets metrics without the budget three, not with them. */
+  canViewFinancials?: boolean
+}) {
+  const fin = opts.canViewFinancials === true
+  const agg = aggregate(await surveyRows({ event: opts.event, from: opts.from, to: opts.to, type: opts.type }), fin)
   let prior: { from: string; to: string; count: number; on_time_pct: number | null; actual_spend: number } | null = null
   if (opts.compare) {
     const len = Math.max(1, dayDiff(opts.from, opts.to) + 1)
     const pTo = shiftDate(opts.from, -1)
     const pFrom = shiftDate(opts.from, -len)
-    const pAgg = aggregate(await surveyRows({ event: opts.event, from: pFrom, to: pTo, type: opts.type }))
+    // The prior period reports count / on-time / actual spend only — all public —
+    // so its aggregate never needs the budget arms.
+    const pAgg = aggregate(await surveyRows({ event: opts.event, from: pFrom, to: pTo, type: opts.type }), false)
     prior = { from: pFrom, to: pTo, count: pAgg.count, on_time_pct: pAgg.on_time_pct, actual_spend: pAgg.actual_spend }
   }
   // Placeholder waves are excluded from the aggregate (see surveyRows); surface
   // how many were left out of the CURRENT period so the metrics stay transparent.
   const placeholders_excluded = await countScopedPlaceholders({ event: opts.event, from: opts.from, to: opts.to, type: opts.type })
-  return { ...agg, prior, placeholders_excluded, note: placeholderNote(placeholders_excluded) }
+  return {
+    ...agg, prior, placeholders_excluded, note: placeholderNote(placeholders_excluded),
+    ...(fin ? {} : { restricted: [OPS_METRICS_RESTRICTED_NOTE] }),
+  }
 }

@@ -1,9 +1,24 @@
-export type MergeField = { key: string; label: string }
+export type MergeField = {
+  key: string
+  label: string
+  /** Finance-only: dropped from the preview entirely unless the user holds
+   *  `view_financials`. Same flag, same meaning as CsvColumn.restricted in
+   *  lib/utils/exportCsv.ts — one word in one list, so the next restricted
+   *  field is a one-line change in both places. */
+  restricted?: true
+}
 
 // Scalar fields a user resolves in the preview (only differing ones surface).
 // voter_survey_qa and terminations are absent on purpose — retired from the UI
 // 2026-08-24, so there is nothing for a human to reason about; the survivor
 // simply keeps its own value and both columns are retained in the DB.
+//
+// `budget` is marked restricted because the preview renders BOTH records' values
+// side by side — merging two projects would otherwise print two cost ceilings to
+// any analyst, which is the one place a restricted number gets shown twice at
+// once. Cost-to-run (actual_spend) is not in this list at all: it is a trigger-
+// computed rollup of the child rows the merge already combines, so there is
+// nothing for a human to pick.
 export const PROJECT_MERGE_FIELDS: MergeField[] = [
   { key: 'project_name', label: 'Project name' },
   { key: 'project_type', label: 'Type' },
@@ -19,7 +34,7 @@ export const PROJECT_MERGE_FIELDS: MergeField[] = [
   { key: 'audience_size', label: 'Audience size' },
   { key: 'salesperson', label: 'Salesperson' },
   { key: 'priority', label: 'Priority' },
-  { key: 'budget', label: 'Total budget' },
+  { key: 'budget', label: 'Total budget', restricted: true },
   { key: 'category', label: 'Category' },
   { key: 'objective', label: 'Objective' },
   { key: 'longitudinal', label: 'Longitudinal' },
@@ -35,6 +50,28 @@ export const CLIENT_MERGE_FIELDS: MergeField[] = [
   { key: 'compliance_contact', label: 'Compliance contact' },
   { key: 'compliance_notes', label: 'Compliance notes' },
 ]
+
+/**
+ * The fields this user resolves. `canViewFinancials` must come from
+ * useCanViewFinancials(), which is false while the capability query is in
+ * flight — so a modal opened before the check resolves is a preview WITHOUT the
+ * money, never one with it.
+ *
+ * A dropped field is simply never picked, so `buildSurvivorUpdate` leaves it out
+ * of the patch and the survivor keeps its own value — exactly what happens to
+ * the retired voter_survey_qa / terminations columns above. Nothing is
+ * overwritten with the loser's number behind the user's back.
+ */
+export function mergeFieldsFor(fields: MergeField[], canViewFinancials: boolean): MergeField[] {
+  return canViewFinancials ? fields : fields.filter(f => !f.restricted)
+}
+
+/** True when this field list had any finance-only field withheld from it — what
+ *  the modal uses to say the survivor's value stands, rather than staying quiet
+ *  about a field the user can't see. */
+export function hasWithheldFields(fields: MergeField[], canViewFinancials: boolean): boolean {
+  return !canViewFinancials && fields.some(f => f.restricted)
+}
 
 // Array columns that always UNION (never a pick).
 const PROJECT_ARRAY_FIELDS = ['linked_documents', 'co_captain_ids'] as const

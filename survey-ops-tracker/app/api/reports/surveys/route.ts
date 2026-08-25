@@ -4,9 +4,10 @@ import { createClient } from '@/lib/supabase/server'
 import {
   EVENT_DATE, resolvePeriod, surveyRows, projectRow,
   countScopedPlaceholders, placeholderNote,
-  REPORT_FIELD_KEYS, DEFAULT_REPORT_FIELDS,
+  reportFieldsFor, reportFieldKeysFor, defaultReportFieldsFor,
   type SurveyEvent, type SurveyType,
 } from '@/lib/mcp/reports'
+import { canViewFinancials } from '@/lib/auth/capabilities'
 
 export const dynamic = 'force-dynamic'
 
@@ -33,14 +34,28 @@ export async function GET(req: NextRequest) {
   if ('error' in period) return NextResponse.json({ error: period.error }, { status: 400 })
 
   const type = (sp.get('type') as SurveyType | null) ?? undefined
+
+  // This download is a THIRD consumer of the report field set, alongside the
+  // survey_report and ops_metrics tools — and it is the one that hands over a
+  // whole spreadsheet, so it has to make the same capability decision they do.
+  // All three of the choices below must be gated together: filtering the
+  // requested `fields` against the full key list would let ?fields=budget
+  // through, and projectRow's third argument defaults to the COMPLETE
+  // REPORT_FIELDS (restricted entries included), so omitting it re-adds the
+  // column even when the key list was clean.
+  const canSeeMoney = await canViewFinancials(user.id)
+  const allowedFields = reportFieldsFor(canSeeMoney)
+  const allowedKeys = reportFieldKeysFor(canSeeMoney)
+  const defaults = defaultReportFieldsFor(canSeeMoney)
+
   const fieldsParam = sp.get('fields')
   const fields = fieldsParam
-    ? fieldsParam.split(',').map(s => s.trim()).filter(k => REPORT_FIELD_KEYS.includes(k))
-    : DEFAULT_REPORT_FIELDS
-  const useFields = fields.length ? fields : DEFAULT_REPORT_FIELDS
+    ? fieldsParam.split(',').map(s => s.trim()).filter(k => allowedKeys.includes(k))
+    : defaults
+  const useFields = fields.length ? fields : defaults
 
   const rows = await surveyRows({ event, from: period.from, to: period.to, type })
-  const json = rows.map(r => projectRow(r, useFields))
+  const json = rows.map(r => projectRow(r, useFields, allowedFields))
 
   const ws = json.length
     ? XLSX.utils.json_to_sheet(json)

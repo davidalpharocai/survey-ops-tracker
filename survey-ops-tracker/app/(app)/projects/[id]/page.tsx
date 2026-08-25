@@ -26,6 +26,7 @@ import { ProjectInsights } from '@/components/project/ProjectInsights'
 import { CompliancePanel } from '@/components/compliance/CompliancePanel'
 import { ComplianceBanner } from '@/components/project/ComplianceBanner'
 import { useComplianceState } from '@/lib/hooks/useComplianceState'
+import { useCanViewFinancials } from '@/lib/hooks/useCapabilities'
 import { beforeFieldingRequired, afterFieldingRequired } from '@/lib/utils/compliance'
 import { RequestedByRow } from '@/components/project/RequestedByRow'
 import { DeliverablesPanel } from '@/components/deliverables/DeliverablesPanel'
@@ -803,7 +804,17 @@ function SidebarCard({
 function NewProjectSetupBanner({ project }: { project: SurveyProject }) {
   const key = `sot.setupBannerDismissed.${project.id}`
   const [dismissed, setDismissed] = useState(true) // hidden until storage read (no flash)
-  const isNew = !project.due_date && project.n_target == null && project.budget == null
+  // Budget is a restricted cost ceiling and BudgetWidget hides the field for
+  // anyone without view_financials — so asking for it sent most of the team
+  // looking for a box that isn't on their screen, and left the "still blank"
+  // test permanently true so the banner could never clear. Ask each reader only
+  // for the fields they can actually fill.
+  const canViewFinancials = useCanViewFinancials()
+  const fields = ['Due date', 'N target', 'Captain', ...(canViewFinancials ? ['Budget'] : [])]
+  const isNew =
+    !project.due_date &&
+    project.n_target == null &&
+    (!canViewFinancials || project.budget == null)
 
   useEffect(() => {
     setDismissed(localStorage.getItem(key) === '1')
@@ -816,10 +827,14 @@ function NewProjectSetupBanner({ project }: { project: SurveyProject }) {
       <div className="flex-1 text-sm">
         <p className="font-medium text-foreground">New project — a few essentials to fill in</p>
         <p className="text-muted-foreground mt-0.5 leading-relaxed">
-          Fill in the <span className="text-foreground">Due date</span>,{' '}
-          <span className="text-foreground">N target</span>,{' '}
-          <span className="text-foreground">Captain</span>, and{' '}
-          <span className="text-foreground">Budget</span> to finish setting this project up.
+          Fill in the{' '}
+          {fields.map((f, i) => (
+            <span key={f}>
+              {i > 0 && (i === fields.length - 1 ? ', and ' : ', ')}
+              <span className="text-foreground">{f}</span>
+            </span>
+          ))}{' '}
+          to finish setting this project up.
         </p>
       </div>
       <button

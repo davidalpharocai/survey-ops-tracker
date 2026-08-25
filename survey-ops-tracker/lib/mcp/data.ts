@@ -2,6 +2,8 @@ import 'server-only'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { totalBidDollars } from '@/lib/utils/blast'
 import { beforeFieldingRequired, afterFieldingRequired, beforeFieldingMet, afterFieldingMet } from '@/lib/utils/compliance'
+import { VIEW_FINANCIALS } from '@/lib/auth/capabilityNames'
+import { isRestrictedAuditField } from '@/lib/utils/auditFormat'
 import type { Database } from '@/lib/supabase/types'
 
 /** Tool args are user-controlled: strip PostgREST-reserved chars, escape LIKE wildcards, cap length. */
@@ -42,18 +44,78 @@ const STRIPPED = [
 
 type Row = Record<string, unknown>
 
-export function slimProject(p: Row): Row {
+// ---- finance visibility (a SOFT gate, not a security boundary) ------------
+//
+// The cost CEILING (`budget`) and everything revenue-side (client price per N,
+// contract value, margin — migration 082) are limited to the three people who
+// hold `view_financials` (migration 079). What it costs to RUN a project —
+// actual_spend, supplier CPI, blast bids, project_costs lines — is public to the
+// whole team, so none of that is touched here.
+//
+// Be honest about the strength of this: every query in this file runs as
+// service_role, and the connector only knows who is asking when the tool handler
+// forwards its ctx. So this is "don't put the number in front of someone who
+// shouldn't see it", NOT "the number is protected". It fails CLOSED — a caller
+// whose identity doesn't reach us is treated as NOT holding the capability, so
+// the worst case is one of the three holders seeing one number fewer in a
+// connector answer, never the reverse.
+
+/** True for a field the model must not be shown without `view_financials`.
+ *  `budget` is named explicitly; the revenue columns land in migration 082, so
+ *  match their tokens too — a new price/margin/contract column is then
+ *  suppressed the day the SQL runs, not the day someone remembers this list.
+ *  No existing survey_projects/clients column matches the pattern. */
+export function isRestrictedMoneyField(field: string): boolean {
+  return field === 'budget' || /(^|_)(price|margin|contract_value)/.test(field)
+}
+
+/** The row minus its restricted-money fields. Returns the row untouched for a
+ *  capability holder. Keys are DELETED rather than nulled: a null reads to the
+ *  model as "no budget set", which is a different (and false) claim. */
+export function redactRestrictedMoney(row: Row, canViewFinancials: boolean): Row {
+  if (canViewFinancials) return row
+  const out: Row = {}
+  for (const [k, v] of Object.entries(row)) if (!isRestrictedMoneyField(k)) out[k] = v
+  return out
+}
+
+/** Does the calling user hold VIEW_FINANCIALS? Service-role read (this file
+ *  has no session cookie — the MCP route authenticates an OAuth token and hands
+ *  us ctx.userId), keyed on the profile id. Never throws and never defaults
+ *  open: no ctx, no id, a failed query, or a missing table all answer false.
+ *  Mirrors lib/auth/capabilities.ts, which is the browser/session-scoped reader
+ *  for the same table. */
+export async function callerCanViewFinancials(
+  ctx?: { userId?: string | null }
+): Promise<boolean> {
+  if (!ctx?.userId) return false
+  try {
+    const supabase = createAdminClient()
+    const { data, error } = await supabase.from('profile_capabilities')
+      .select('capability')
+      .eq('profile_id', ctx.userId)
+      .eq('capability', VIEW_FINANCIALS)
+      .maybeSingle()
+    if (error) return false
+    return !!data
+  } catch {
+    return false
+  }
+}
+
+export function slimProject(p: Row, canViewFinancials = false): Row {
   if (p.status === 'Closed') {
-    return {
+    return redactRestrictedMoney({
       project_code: p.project_code, project_name: p.project_name, client: p.client,
       project_type: p.project_type, status: 'Closed', submitted_date: p.submitted_date,
-      deliver_date: p.deliver_date, n_target: p.n_target, n_actual: p.n_actual,
+      deliver_date: p.deliver_date, n_target: p.n_target, n_target_max: p.n_target_max,
+      n_actual: p.n_actual,
       budget: p.budget, actual_spend: p.actual_spend, salesperson: p.salesperson,
-    }
+    }, canViewFinancials)
   }
   const slim: Row = { ...p }
   for (const f of STRIPPED) delete slim[f]
-  return slim
+  return redactRestrictedMoney(slim, canViewFinancials)
 }
 
 // ---- query helpers (service-role; caller has already passed the analyst gate) ----
@@ -205,6 +267,9 @@ export function parseLinkedDocuments(raw: unknown): { name: string | null; url: 
 
 export async function getProjectDetail(id: string, userId: string) {
   const supabase = createAdminClient()
+  // Resolved once, up front: the whole return shape is assembled below and the
+  // restricted fields have to be gone before it leaves this function.
+  const canViewFinancials = await callerCanViewFinancials({ userId })
 
   const { data: project, error } = await supabase.from('survey_projects')
     .select('*, captain:team_members(name, initials)')
@@ -247,7 +312,7 @@ export async function getProjectDetail(id: string, userId: string) {
   }
 
   return {
-    ...slimProject(p),
+    ...slimProject(p, canViewFinancials),
     linked_documents: parseLinkedDocuments(p.linked_documents),
     bids: bidsRes.data ?? [],
     blasts,
@@ -267,7 +332,10 @@ export async function getProjectDetail(id: string, userId: string) {
  *  `rerun_series_id ?? id` and the family is `id = seriesId OR rerun_series_id = seriesId`.
  *  This lets the tool work whether asked from the original or from a later wave — the plan's
  *  literal spec only covers the "has rerun_series_id" case; this is a superset of that. */
-export async function getProjectHistory(projectRef: string) {
+export async function getProjectHistory(
+  projectRef: string,
+  ctx?: { userId?: string | null }
+) {
   const resolved = await resolveProject(projectRef)
   if (resolved === null) return { error: `No project found matching "${projectRef}".` }
   if ('ambiguous' in resolved) {
@@ -276,15 +344,18 @@ export async function getProjectHistory(projectRef: string) {
   const p = resolved as Row
   const seriesId = (p.rerun_series_id as string | null) ?? (p.id as string)
 
+  const canViewFinancials = await callerCanViewFinancials(ctx)
   const supabase = createAdminClient()
+  // n_target is the MINIMUM of the N range since migration 078 — select the max
+  // alongside it so a wave reads as "1,000–1,200", not a bare 1,000.
   const { data, error } = await supabase.from('survey_projects')
-    .select('project_code, project_name, status, phase, board_column, rerun_number, launch_date, deliver_date, due_date, n_target, n_collected, n_actual, budget, actual_spend')
+    .select('project_code, project_name, status, phase, board_column, rerun_number, launch_date, deliver_date, due_date, n_target, n_target_max, n_collected, n_actual, budget, actual_spend')
     .is('deleted_at', null)
     .or(`id.eq.${seriesId},rerun_series_id.eq.${seriesId}`)
     .order('rerun_number', { ascending: true })
   if (error) throw error
 
-  const waves = data ?? []
+  const waves = (data ?? []).map(w => redactRestrictedMoney(w as unknown as Row, canViewFinancials))
   if (waves.length <= 1) {
     return { waves: [], note: 'not a longitudinal/rerun series' }
   }
@@ -366,7 +437,10 @@ function mode<T>(vals: T[]): T | null {
  * page — cheap since this is one extra query, and a client with >50 projects shouldn't have
  * its typical-N/cadence skewed by the cap) and any explicitly stated preferences.
  */
-export async function getClientHistory(clientRef: string) {
+export async function getClientHistory(
+  clientRef: string,
+  ctx?: { userId?: string | null }
+) {
   const resolved = await resolveClient(clientRef)
   if (resolved === null) return { error: `No client found matching "${clientRef}".` }
   if ('ambiguous' in resolved) {
@@ -375,12 +449,13 @@ export async function getClientHistory(clientRef: string) {
   const client = resolved as Row
   const clientId = client.id as string
 
+  const canViewFinancials = await callerCanViewFinancials(ctx)
   const supabase = createAdminClient()
 
   const { data: allRows, error } = await supabase.from('survey_projects')
     .select(
       'id, project_code, project_name, project_type, status, phase, ' +
-      'n_target, n_collected, n_actual, budget, actual_spend, launch_date, deliver_date, due_date, ' +
+      'n_target, n_target_max, n_collected, n_actual, budget, actual_spend, launch_date, deliver_date, due_date, ' +
       'salesperson, linked_documents, created_at, captain:team_members(name, initials)'
     )
     .eq('client_id', clientId)
@@ -405,21 +480,34 @@ export async function getClientHistory(clientRef: string) {
 
   const projects = recent.map(r => {
     const cap = r.captain as { name?: string; initials?: string } | null
-    return {
+    return redactRestrictedMoney({
       project_code: r.project_code, project_name: r.project_name, project_type: r.project_type,
       status: r.status, phase: r.phase,
-      n_target: r.n_target, n_collected: r.n_collected, n_actual: r.n_actual,
+      // n_target is the BOTTOM of the N range (migration 078); n_target_max is
+      // the top. They're equal on every pre-078 project.
+      n_target: r.n_target, n_target_max: r.n_target_max,
+      n_collected: r.n_collected, n_actual: r.n_actual,
       budget: r.budget, actual_spend: r.actual_spend,
       launch_date: r.launch_date, deliver_date: r.deliver_date, due_date: r.due_date,
       captain: cap ? { initials: cap.initials ?? null, name: cap.name ?? null } : null,
       salesperson: r.salesperson,
       linked_documents: parseLinkedDocuments(r.linked_documents),
       deliverables_count: deliverableCounts.get(r.id as string) ?? 0,
-    }
+    }, canViewFinancials)
   })
 
   // ---- patterns (over the full history) ----
-  const nTargets = rows.map(r => r.n_target).filter((n): n is number => typeof n === 'number')
+  // Since migration 078 an N target is a RANGE: n_target is the floor we commit
+  // to, n_target_max the ceiling. A single `typical_n_target` would now be read
+  // as "the N they usually order" when it's really "the least N they'd accept",
+  // so report both ends under names that say which is which. (A project with no
+  // max recorded falls back to its min — the range is a point.) The two medians
+  // are computed independently, so the pair is a typical floor and a typical
+  // ceiling, not necessarily one real project's range.
+  const nTargetMins = rows.map(r => r.n_target).filter((n): n is number => typeof n === 'number')
+  const nTargetMaxes = rows
+    .map(r => (typeof r.n_target_max === 'number' ? r.n_target_max : r.n_target))
+    .filter((n): n is number => typeof n === 'number')
   const types = rows.map(r => r.project_type).filter((t): t is string => typeof t === 'string')
   const fieldingDays = rows
     .filter(r => typeof r.launch_date === 'string' && typeof r.deliver_date === 'string')
@@ -455,7 +543,8 @@ export async function getClientHistory(clientRef: string) {
     client: { code: client.code as string | null, name: client.name as string },
     projects,
     patterns: {
-      typical_n_target: median(nTargets),
+      typical_n_target_min: median(nTargetMins),
+      typical_n_target_max: median(nTargetMaxes),
       common_project_type: mode(types),
       avg_fielding_days: avgFieldingDaysRaw === null ? null : Math.round(avgFieldingDaysRaw),
       cadence_per_year: cadencePerYear,
@@ -483,7 +572,7 @@ function addDays(isoDate: string, n: number): string {
 export async function pipelineSummary(args: { mine?: boolean; userId?: string } = {}) {
   const supabase = createAdminClient()
   const { data, error } = await supabase.from('survey_projects')
-    .select('project_code, project_name, client, board_column, due_date, n_target, n_collected, status, phase, captain:team_members(name, initials)')
+    .select('project_code, project_name, client, board_column, due_date, n_target, n_target_max, n_collected, status, phase, captain:team_members(name, initials)')
     .eq('status', 'Open')
     .eq('phase', 'Active')
     .is('deleted_at', null)
@@ -595,15 +684,25 @@ function projectShortfall(p: Row, today: string): {
  *   - due_soon: due today .. +3 days (with days_until; days_until 0 = due today)
  *   - fielding_behind: in Fielding, under target, due within the window, with a
  *     projected final N + shortfall extrapolated from the collection rate so far
- *   - over_budget: actual_spend > budget (with the overage)
+ *   - over_budget: actual_spend > budget (with the overage) — RESTRICTED, see below
  *   - reruns_overdue: recurring reruns past due (from the first-class rerun_series_status via rerunRadar)
  *  at_risk_count is the DISTINCT project count across the four project buckets, so the
  *  headline isn't inflated by a project that's in several. mine:true scopes projects to
- *  your captained work and reruns to the ones you own. */
+ *  your captained work and reruns to the ones you own.
+ *
+ *  over_budget is a budget COMPARISON, so it's limited to `view_financials`
+ *  holders — and the whole bucket goes, not just its numbers: even a bare count
+ *  of over-budget projects is a statement about the ceiling. For everyone else
+ *  the key is ABSENT (not an empty list, which reads as "nothing is over
+ *  budget") and `restricted` names what was withheld, so the model can say it
+ *  doesn't know instead of asserting all-clear. Dropping the bucket also drops
+ *  those projects from at_risk_count when nothing else flags them — correct: you
+ *  can't act on a risk whose evidence you can't see. */
 export async function whatsAtRisk(args: { mine?: boolean; userId?: string; userEmail?: string } = {}) {
+  const canViewFinancials = await callerCanViewFinancials(args)
   const supabase = createAdminClient()
   const { data, error } = await supabase.from('survey_projects')
-    .select('project_code, project_name, client, board_column, due_date, launch_date, n_target, n_collected, budget, actual_spend, status, phase, captain:team_members(name, initials)')
+    .select('project_code, project_name, client, board_column, due_date, launch_date, n_target, n_target_max, n_collected, budget, actual_spend, status, phase, captain:team_members(name, initials)')
     .eq('status', 'Open').eq('phase', 'Active').is('deleted_at', null)
     .or('project_type.is.null,project_type.neq.Internal')
   if (error) throw error
@@ -644,13 +743,18 @@ export async function whatsAtRisk(args: { mine?: boolean; userId?: string; userE
       (((r.n_collected as number | null) ?? 0) < (r.n_target as number)) &&
       r.due_date != null &&
       (r.due_date as string) <= soon)
-    .map(r => ({ ...base(r), n_target: r.n_target, n_collected: (r.n_collected as number | null) ?? 0, ...projectShortfall(r, today) }))
+    // Judged against n_target — the FLOOR of the range, i.e. the N we committed
+    // to; n_target_max rides along so the model reports the range, not the floor
+    // as if it were the whole ask.
+    .map(r => ({ ...base(r), n_target: r.n_target, n_target_max: r.n_target_max, n_collected: (r.n_collected as number | null) ?? 0, ...projectShortfall(r, today) }))
     .sort((a, b) => (b.shortfall ?? 0) - (a.shortfall ?? 0))
 
-  const overBudget = rows
-    .filter(r => r.budget != null && r.actual_spend != null && (r.actual_spend as number) > (r.budget as number))
-    .map(r => ({ ...base(r), budget: r.budget, actual_spend: r.actual_spend, overage: Math.round((r.actual_spend as number) - (r.budget as number)) }))
-    .sort((a, b) => b.overage - a.overage)
+  const overBudget = canViewFinancials
+    ? rows
+        .filter(r => r.budget != null && r.actual_spend != null && (r.actual_spend as number) > (r.budget as number))
+        .map(r => ({ ...base(r), budget: r.budget, actual_spend: r.actual_spend, overage: Math.round((r.actual_spend as number) - (r.budget as number)) }))
+        .sort((a, b) => b.overage - a.overage)
+    : null
 
   const reruns = await rerunRadar(args.mine && args.userEmail ? { ownerEmail: args.userEmail } : {})
   const rerunsOverdue = reruns.overdue
@@ -658,34 +762,67 @@ export async function whatsAtRisk(args: { mine?: boolean; userId?: string; userE
   // A project can surface in several buckets (different dimensions); count DISTINCT
   // projects for the headline so it isn't double/triple-counted.
   const distinct = new Set<string>()
-  for (const x of [...overdue, ...dueSoon, ...fieldingBehind, ...overBudget]) distinct.add(String(x.project_code))
+  for (const x of [...overdue, ...dueSoon, ...fieldingBehind, ...(overBudget ?? [])]) distinct.add(String(x.project_code))
   const at_risk_count = distinct.size
 
-  const counts = {
+  const counts: {
+    overdue: number; due_soon: number; fielding_behind: number
+    over_budget?: number; reruns_overdue: number
+  } = {
     overdue: overdue.length, due_soon: dueSoon.length, fielding_behind: fieldingBehind.length,
-    over_budget: overBudget.length, reruns_overdue: rerunsOverdue.length,
+    reruns_overdue: rerunsOverdue.length,
   }
+  if (overBudget) counts.over_budget = overBudget.length
+  // "Nothing at risk" would overstate for a caller whose over-budget bucket was
+  // never checked, so qualify the all-clear rather than letting it read absolute.
   const summary = (at_risk_count === 0 && rerunsOverdue.length === 0)
-    ? 'Nothing flagged at risk right now.'
-    : `${at_risk_count} project(s) at risk — ${counts.overdue} overdue, ${counts.due_soon} due soon, ${counts.fielding_behind} fielding behind pace, ${counts.over_budget} over budget` +
+    ? (overBudget
+        ? 'Nothing flagged at risk right now.'
+        : "Nothing flagged at risk right now, except that budget vs spend wasn't checked (finance-only).")
+    : `${at_risk_count} project(s) at risk — ${counts.overdue} overdue, ${counts.due_soon} due soon, ${counts.fielding_behind} fielding behind pace` +
+      (overBudget ? `, ${overBudget.length} over budget` : '') +
       (rerunsOverdue.length ? ` · ${rerunsOverdue.length} rerun(s) overdue` : '') + '.'
   return {
     ok: true, at_risk_count, counts,
-    overdue, due_soon: dueSoon, fielding_behind: fieldingBehind, over_budget: overBudget, reruns_overdue: rerunsOverdue,
+    overdue, due_soon: dueSoon, fielding_behind: fieldingBehind,
+    ...(overBudget ? { over_budget: overBudget } : {}),
+    reruns_overdue: rerunsOverdue,
+    ...(overBudget ? {} : {
+      restricted: [
+        'over_budget — budget vs spend is limited to finance-capability holders, so it was not checked. Do not tell the user nothing is over budget; say you cannot see budgets.',
+      ],
+    }),
     summary,
   }
 }
 
 /** Recent field-level change history for one project, from the project_audit log
  *  (populated by DB triggers for app, AI, sync, and manual-SQL writes). Newest
- *  first. Resolves the project ref the same way get_project does. */
-export async function getChangeHistory(projectRef: string, limit = 20) {
+ *  first. Resolves the project ref the same way get_project does.
+ *
+ *  The audit log is the back door onto every restricted number: a row for
+ *  `budget` carries BOTH the old and the new ceiling as text, so an ungated
+ *  history read hands out more than the field itself ever would. Rows for
+ *  restricted fields are therefore dropped for a caller without
+ *  `view_financials`, and the fields they named come back in `restricted` —
+ *  naming the FIELD is fine, it's the values that are limited, and the model has
+ *  to know something was withheld or it will report "nothing else changed".
+ *
+ *  Which rows those are is auditFormat's isRestrictedAuditField — the same
+ *  predicate the app's audit feeds use, so the connector and the Logs tab hide
+ *  exactly the same rows. */
+export async function getChangeHistory(
+  projectRef: string,
+  limit = 20,
+  ctx?: { userId?: string | null }
+) {
   const resolved = await resolveProject(projectRef)
   if (resolved === null) return { error: `No project found matching "${projectRef}".` }
   if ('ambiguous' in resolved) {
     return { note: 'Multiple projects match — specify the project code.', candidates: resolved.ambiguous }
   }
   const p = resolved as Row
+  const canViewFinancials = await callerCanViewFinancials(ctx)
   const supabase = createAdminClient()
   const { data, error } = await supabase.from('project_audit')
     .select('field, old_value, new_value, changed_by, changed_at')
@@ -693,24 +830,55 @@ export async function getChangeHistory(projectRef: string, limit = 20) {
     .order('changed_at', { ascending: false })
     .limit(Math.min(limit, 100))
   if (error) throw error
-  const changes = (data ?? []).map(c => ({
-    field: c.field, from: c.old_value, to: c.new_value, by: c.changed_by, at: c.changed_at,
-  }))
+  const withheld = new Set<string>()
+  const changes = (data ?? [])
+    .filter(c => {
+      if (canViewFinancials || !isRestrictedAuditField(c.field)) return true
+      withheld.add(c.field)
+      return false
+    })
+    .map(c => ({
+      field: c.field, from: c.old_value, to: c.new_value, by: c.changed_by, at: c.changed_at,
+    }))
   return {
     project_code: p.project_code as string | null,
     project_name: p.project_name as string,
     count: changes.length,
     changes,
+    ...(withheld.size ? { restricted: [restrictedAuditNote([...withheld])] } : {}),
   }
+}
+
+/** The one sentence a tool says when it dropped audit rows for restricted
+ *  fields. Names the fields and forbids the "so nothing changed" reading —
+ *  same job as whatsAtRisk's `restricted` note. */
+export function restrictedAuditNote(fields: string[]): string {
+  return `${fields.sort().join(', ')} — finance-only field(s), so their changes were left out of this history. ` +
+    'Do not tell the user those fields did not change; say you cannot see them.'
 }
 
 /** The most recent EDIT (all audit rows sharing the newest changed_at — a single
  *  UPDATE audits one row per changed field, all with the same transaction timestamp)
  *  for a project, or null. Powers undo_last_change, which reverts the batch as a unit
- *  so a multi-field edit is undone together and the target is order-independent. */
-export async function getLastChangeBatch(projectId: string): Promise<
-  { changed_at: string; changed_by: string; rows: { field: string; old_value: string | null; new_value: string | null }[] } | null
+ *  so a multi-field edit is undone together and the target is order-independent.
+ *
+ *  Same gate as getChangeHistory, and it does double duty here: a restricted row
+ *  is dropped from `rows`, so a caller without `view_financials` neither reads
+ *  the old ceiling out of the preview NOR reverts a number they can't see. What
+ *  was dropped comes back in `restricted_fields` so the tool can list it as
+ *  skipped instead of pretending that field wasn't part of the edit. */
+export async function getLastChangeBatch(
+  projectId: string,
+  ctx?: { userId?: string | null }
+): Promise<
+  {
+    changed_at: string
+    changed_by: string
+    rows: { field: string; old_value: string | null; new_value: string | null }[]
+    restricted_fields: string[]
+  } | null
 > {
+  const canViewFinancials = await callerCanViewFinancials(ctx)
   const supabase = createAdminClient()
   const { data: top, error: e1 } = await supabase.from('project_audit')
     .select('changed_at, changed_by')
@@ -725,10 +893,13 @@ export async function getLastChangeBatch(projectId: string): Promise<
     .eq('project_id', projectId)
     .eq('changed_at', top.changed_at as string)
   if (e2) throw e2
+  const all = (data ?? []) as { field: string; old_value: string | null; new_value: string | null }[]
+  const restricted_fields = canViewFinancials ? [] : all.filter(r => isRestrictedAuditField(r.field)).map(r => r.field)
   return {
     changed_at: top.changed_at as string,
     changed_by: top.changed_by as string,
-    rows: (data ?? []) as { field: string; old_value: string | null; new_value: string | null }[],
+    rows: canViewFinancials ? all : all.filter(r => !isRestrictedAuditField(r.field)),
+    restricted_fields,
   }
 }
 
@@ -845,8 +1016,14 @@ export async function searchReruns(args: {
 }
 
 /** One rerun series' status row + its waves (as normal survey_projects rows),
- *  ordered by wave number. Mirrors useRerunSeriesRecord's read. */
-export async function getRerunSeries(seriesId: string) {
+ *  ordered by wave number. Mirrors useRerunSeriesRecord's read.
+ *
+ *  The row carries `future_defaults` — untyped jsonb of what the next wave
+ *  inherits, and `budget` is one of the keys nextWaveInherit reads out of it
+ *  (lib/reruns/series.ts). So the blob gets the same treatment as a project row
+ *  before it leaves. */
+export async function getRerunSeries(seriesId: string, ctx?: { userId?: string | null }) {
+  const canViewFinancials = await callerCanViewFinancials(ctx)
   const supabase = createAdminClient()
   const { data: series, error: sErr } = await supabase
     .from('rerun_series_status')
@@ -870,7 +1047,19 @@ export async function getRerunSeries(seriesId: string) {
     `${s.client} — ${s.survey_name}: ${waveList.length} wave(s), ` +
     `next ${s.effective_next ?? '—'}, ${s.owner_email ?? 'unassigned'}` +
     (s.paused ? ' (paused)' : !s.in_service ? ' (ended)' : '')
-  return { series: s, waves: waveList, summary }
+  return {
+    series: { ...s, future_defaults: redactFutureDefaults(s.future_defaults, canViewFinancials) },
+    waves: waveList,
+    summary,
+  }
+}
+
+/** `rerun_series.future_defaults` minus its restricted-money keys. The blob is
+ *  jsonb with no type to lean on, so anything non-object comes back as an empty
+ *  object rather than being passed through unread. */
+export function redactFutureDefaults(raw: unknown, canViewFinancials: boolean): Record<string, unknown> {
+  const blob = (raw && typeof raw === 'object' && !Array.isArray(raw)) ? (raw as Row) : {}
+  return redactRestrictedMoney(blob, canViewFinancials)
 }
 
 /** Resolve a series ref for a WRITE tool: same resolution as resolveRerunSeries

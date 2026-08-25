@@ -4,9 +4,11 @@ import { useQuery } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
 import { Skeleton } from '@/components/shared/Skeleton'
+import { useCanViewFinancials } from '@/lib/hooks/useCapabilities'
 import { STAGE_ORDER } from '@/lib/utils/stage'
 import { differenceInCalendarDays, parseISO } from 'date-fns'
 import { fmtNum } from '@/lib/utils/number'
+import { formatNRange, sumNRange } from '@/lib/utils/nRange'
 import Link from 'next/link'
 
 // Read-only analytics derived from data already captured — no new tables.
@@ -21,6 +23,7 @@ interface InsightProject {
   due_date: string | null
   deliver_date: string | null
   n_target: number | null
+  n_target_max: number | null
   n_collected: number
   n_actual: number | null
   budget: number | null
@@ -28,8 +31,14 @@ interface InsightProject {
   captain: { id: string; name: string; initials: string } | null
 }
 
+// n_target_max sits beside n_target because since migration 078 n_target is only
+// the FLOOR of the agreed range — rolling up floors and calling the total "the
+// target" understates the whole portfolio. Safe to name: 078 is applied.
+// price_per_n / project_financials are deliberately absent: 082 is not applied,
+// and one unknown column in an explicit select fails the entire request, which
+// would blank this page for everyone.
 const COLS =
-  'id, client, status, phase, scoping_stage, board_column, submitted_date, due_date, deliver_date, n_target, n_collected, n_actual, budget, actual_spend, captain:team_members(id, name, initials)'
+  'id, client, status, phase, scoping_stage, board_column, submitted_date, due_date, deliver_date, n_target, n_target_max, n_collected, n_actual, budget, actual_spend, captain:team_members(id, name, initials)'
 
 function useInsights() {
   const supabase = createClient()
@@ -57,6 +66,9 @@ const heading = 'text-xs text-muted-foreground uppercase tracking-widest mb-3 fo
 
 export default function InsightsPage() {
   const { data: projects = [], isLoading } = useInsights()
+  // The budget rollup is a cost-ceiling comparison — view_financials only. False
+  // while the grant is still loading, so the restricted panel never flashes.
+  const canViewFinancials = useCanViewFinancials()
 
   const m = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10)
@@ -124,14 +136,18 @@ export default function InsightsPage() {
       .slice(0, 8)
 
     const totalCollected = open.reduce((s, p) => s + p.n_collected, 0)
-    const totalTarget = open.reduce((s, p) => s + (p.n_target ?? 0), 0)
+    // The portfolio target is a RANGE of ranges: sum the mins, sum the maxes.
+    // sumNRange mirrors migration 078's sync_segment_totals(), so this readout
+    // and the per-project totals the DB writes can never disagree.
+    const target = sumNRange(open)
 
     return {
       openCount: open.length, scopingCount: scoping.length, closedCount: closed.length,
       overdue: overdue.length, dueThisWeek: dueThisWeek.length, behind: behind.length,
       onTimePct, onTimeDenom: deliveredWithDates.length, avgCycle, cycleDenom: cycles.length,
       byStage, workload, totalBudget, totalSpend, overBudget: overBudget.length,
-      withBudgetCount: withBudget.length, topClients, totalCollected, totalTarget,
+      withBudgetCount: withBudget.length, withSpendCount: withSpend.length,
+      topClients, totalCollected, targetMin: target.min, targetMax: target.max,
     }
   }, [projects])
 
@@ -151,7 +167,13 @@ export default function InsightsPage() {
 
   const maxStage = Math.max(1, ...m.byStage.map(s => s.count))
   const maxCap = Math.max(1, ...m.workload.map(w => w.open))
-  const collectionPct = m.totalTarget > 0 ? Math.round((m.totalCollected / m.totalTarget) * 100) : null
+  // Percent is measured against the MINIMUM — the N we actually committed to —
+  // which is the same convention whatsAtRisk uses to judge fielding behind pace
+  // (lib/mcp/data.ts). The range itself is printed beside it so the floor is
+  // never mistaken for the whole ask.
+  const targetMin = m.targetMin ?? 0
+  const collectionPct = targetMin > 0 ? Math.round((m.totalCollected / targetMin) * 100) : null
+  const targetIsRange = m.targetMin != null && m.targetMax != null && m.targetMin !== m.targetMax
 
   return (
     <div className="max-w-5xl mx-auto flex flex-col gap-4">
@@ -205,7 +227,7 @@ export default function InsightsPage() {
         </div>
         {collectionPct != null && (
           <p className="text-xs text-muted-foreground mt-3">
-            Collection across active projects: <span className="text-foreground font-medium">{fmtNum(m.totalCollected)}</span> of {fmtNum(m.totalTarget)} responses ({collectionPct}%) · {m.behind} behind target in Fielding
+            Collection across active projects: <span className="text-foreground font-medium">{fmtNum(m.totalCollected)}</span> of {formatNRange(m.targetMin, m.targetMax)} responses ({collectionPct}%{targetIsRange ? ' of the minimum' : ''}) · {m.behind} behind target in Fielding
           </p>
         )}
       </div>
@@ -243,27 +265,42 @@ export default function InsightsPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Budget rollup */}
-        <div className="bg-card border border-border shadow-sm rounded-xl p-4">
-          <h3 className={heading}>Budget vs spend<InfoTooltip text="Internal cost tracking across projects where budget/spend is recorded. Not client billing." /></h3>
-          <div className="flex flex-col gap-2 text-sm">
-            <div className="flex justify-between"><span className="text-muted-foreground">Allocated</span><span className="text-foreground">{money(m.totalBudget)}</span></div>
-            <div className="flex justify-between"><span className="text-muted-foreground">Actual spend</span><span className="text-foreground">{money(m.totalSpend)}</span></div>
-            {m.totalBudget > 0 && (
-              <div className="mt-0.5">
-                <div className="h-2 bg-muted rounded-full overflow-hidden">
-                  <div
-                    className={`h-full rounded-full ${m.totalSpend > m.totalBudget ? 'bg-red-500' : 'bg-primary/70'}`}
-                    style={{ width: `${Math.min(100, (m.totalSpend / m.totalBudget) * 100)}%` }}
-                  />
+        {/* Budget rollup — the ceiling and every comparison against it are
+            view_financials only. Everyone still gets the cost-to-run total in
+            the fallback panel below, so the row keeps both halves and nobody
+            loses a number they're allowed to see. */}
+        {canViewFinancials ? (
+          <div className="bg-card border border-border shadow-sm rounded-xl p-4">
+            <h3 className={heading}>Budget vs spend<InfoTooltip text="Internal cost tracking across projects where budget/spend is recorded. Budget is a COST CEILING — the most we intend to spend — not client billing." /></h3>
+            <div className="flex flex-col gap-2 text-sm">
+              <div className="flex justify-between"><span className="text-muted-foreground">Allocated</span><span className="text-foreground">{money(m.totalBudget)}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Actual spend</span><span className="text-foreground">{money(m.totalSpend)}</span></div>
+              {m.totalBudget > 0 && (
+                <div className="mt-0.5">
+                  <div className="h-2 bg-muted rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full ${m.totalSpend > m.totalBudget ? 'bg-red-500' : 'bg-primary/70'}`}
+                      style={{ width: `${Math.min(100, (m.totalSpend / m.totalBudget) * 100)}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">{Math.round((m.totalSpend / m.totalBudget) * 100)}% of allocated used</p>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">{Math.round((m.totalSpend / m.totalBudget) * 100)}% of allocated used</p>
-              </div>
-            )}
-            <div className="flex justify-between"><span className="text-muted-foreground">Over budget</span><span className={m.overBudget > 0 ? 'text-red-600 dark:text-red-400' : 'text-foreground'}>{m.overBudget} project{m.overBudget === 1 ? '' : 's'}</span></div>
-            <p className="text-xs text-muted-foreground/60 mt-1">{m.withBudgetCount} projects have a budget set.</p>
+              )}
+              <div className="flex justify-between"><span className="text-muted-foreground">Over budget</span><span className={m.overBudget > 0 ? 'text-red-600 dark:text-red-400' : 'text-foreground'}>{m.overBudget} project{m.overBudget === 1 ? '' : 's'}</span></div>
+              <p className="text-xs text-muted-foreground/60 mt-1">{m.withBudgetCount} projects have a budget set.</p>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="bg-card border border-border shadow-sm rounded-xl p-4">
+            <h3 className={heading}>Cost to run<InfoTooltip text="What our projects have actually cost — supplier CPIs, blast rewards, and flat cost lines, summed across every project with spend recorded." /></h3>
+            <div className="flex flex-col gap-2 text-sm">
+              <div className="flex justify-between"><span className="text-muted-foreground">Actual spend</span><span className="text-foreground">{money(m.totalSpend)}</span></div>
+              <p className="text-xs text-muted-foreground/60 mt-1">
+                {fmtNum(m.withSpendCount)} project{m.withSpendCount === 1 ? '' : 's'} have spend recorded. Budget vs spend is limited to finance.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Top clients */}
         <div className="bg-card border border-border shadow-sm rounded-xl p-4">

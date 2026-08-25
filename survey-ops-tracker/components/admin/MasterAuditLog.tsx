@@ -14,7 +14,7 @@ export function MasterAuditLog() {
     <div className="bg-card border border-border shadow-sm rounded-xl p-4">
       <h3 className="text-xs text-muted-foreground uppercase tracking-widest mb-3 font-medium flex items-center">
         Audit log
-        <InfoTooltip text="Every field change across all projects, newest first — who, when, what changed, and old → new. 'system' = automated (nightly Edwin sync or import). Captured by the database, so it's complete." />
+        <InfoTooltip text="Every field change across all projects, newest first — who, when, what changed, and old → new. 'system' = automated (nightly Edwin sync or import). Captured by the database, so nothing slips past it. Budget and client-pricing changes are listed only for people with finance access." />
       </h3>
 
       {isError ? (

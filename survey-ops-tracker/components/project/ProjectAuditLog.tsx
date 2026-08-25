@@ -11,7 +11,7 @@ export function ProjectAuditLog({ projectId }: { projectId: string }) {
     <div className="bg-card border border-border shadow-sm rounded-xl p-4">
       <h3 className="text-xs text-muted-foreground uppercase tracking-widest mb-3 font-medium flex items-center">
         Audit Log
-        <InfoTooltip text="Every field change on this project, captured automatically — who changed what, when, and the old → new value. 'system' means an automated update (nightly Edwin sync or an import)." />
+        <InfoTooltip text="Every field change on this project, captured automatically — who changed what, when, and the old → new value. 'system' means an automated update (nightly Edwin sync or an import). Budget and client-pricing changes are listed only for people with finance access." />
       </h3>
 
       {isError ? (

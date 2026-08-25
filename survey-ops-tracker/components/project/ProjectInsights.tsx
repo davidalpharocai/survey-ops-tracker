@@ -9,6 +9,7 @@ import { useProjectBlasts, type Blast } from '@/lib/hooks/useProjectBlasts'
 import { useProjectLaunches, type ProjectLaunch } from '@/lib/hooks/useProjectLaunches'
 import { useProjectSuppliers, type ProjectSupplier } from '@/lib/hooks/useProjectSuppliers'
 import { useProjectSegments } from '@/lib/hooks/useProjectSegments'
+import { useCanViewFinancials } from '@/lib/hooks/useCapabilities'
 import { projectEstimateRange, projectTarget, modalCap } from '@/lib/utils/suppliers'
 import {
   pctOf, computePace, costPerComplete, projectedFinalCost,
@@ -81,12 +82,21 @@ export function ProjectInsights({ project }: { project: SurveyProject }) {
   const { data: launches = [] } = useProjectLaunches(project.id)
   const { data: suppliers = [] } = useProjectSuppliers(project.id)
   const { data: segments = [] } = useProjectSegments(project.id)
+  // False until the capability check settles true, so the ceiling can never
+  // flash on screen while the answer is still in flight.
+  const canViewFinancials = useCanViewFinancials()
 
   const todayISO = new Date().toISOString()
   const collected = project.n_collected ?? 0
   const target = project.n_target ?? null
   const spend = project.actual_spend ?? 0
-  const budget = project.budget ?? null
+  // Cost to run is public — spend, cost/complete and the projected final cost
+  // show for everyone, because that is what the team needs to run the job. The
+  // BUDGET is a cost ceiling and restricted, so for a non-holder it is simply
+  // absent, the same shape lib/server/projectSummary.ts uses. Everything
+  // measured against it (budget-used %, the "spending ahead of collection"
+  // banner) then degrades to null on its own instead of needing its own gate.
+  const budget = canViewFinancials ? project.budget ?? null : null
   const cpc = costPerComplete(spend, collected)
   const projFinal = projectedFinalCost(cpc, target, collected)
   const startISO = project.launch_date ?? project.created_at ?? null
@@ -147,7 +157,16 @@ export function ProjectInsights({ project }: { project: SurveyProject }) {
           <div className="mt-1.5"><NProgressBar collected={collected} target={target} showLabel={false} /></div>
         </KpiCard>
 
-        <KpiCard label="Budget" tooltip="Actual spend to date vs the total budget, plus a projected final cost (blended cost/complete × N target).">
+        {/* Without the ceiling there is no budget on this tile, so the label says
+            what is actually on it — same split as BudgetWidget's header. */}
+        <KpiCard
+          label={canViewFinancials ? 'Budget' : 'Spend'}
+          tooltip={
+            canViewFinancials
+              ? 'Actual spend to date vs the total budget, plus a projected final cost (blended cost/complete × N target).'
+              : 'Actual spend to date, plus a projected final cost (blended cost/complete × N target).'
+          }
+        >
           <p className="text-lg font-semibold text-foreground leading-tight">
             {money(spend)}
             <span className="text-sm font-normal text-muted-foreground">{budget != null ? ` / ${money(budget)}` : ''}</span>

@@ -7,7 +7,10 @@ import type { Database } from '@/lib/supabase/types'
 export type ProjectSegment = Database['public']['Tables']['project_segments']['Row']
 export type SegmentInput = {
   label: string
+  /** The MINIMUM of the agreed N range (migration 078). */
   n_target: number | null
+  /** The maximum of that range. Null means "one agreed number" = the min. */
+  n_target_max: number | null
   n_internal_target: number | null
   n_collected: number
   n_actual: number | null
@@ -56,10 +59,13 @@ export function useSplitProject(projectId: string) {
   const supabase = createClient()
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (seed: { n_target: number | null; n_internal_target: number | null; n_collected: number; n_actual: number | null; audience: string | null; audience_size: number | null }) => {
+    mutationFn: async (seed: { n_target: number | null; n_target_max: number | null; n_internal_target: number | null; n_collected: number; n_actual: number | null; audience: string | null; audience_size: number | null }) => {
+      // Both ends of the N range travel together, here as everywhere: seeding
+      // only the min would leave segment 1 open-ended and roll a null max back
+      // up to the project, silently dropping the maximum we agreed.
       const rows = [
-        { project_id: projectId, label: '', n_target: seed.n_target, n_internal_target: seed.n_internal_target, n_collected: seed.n_collected ?? 0, n_actual: seed.n_actual, audience: seed.audience, audience_size: seed.audience_size, sort_order: 0 },
-        { project_id: projectId, label: '', n_target: null, n_internal_target: null, n_collected: 0, n_actual: null, audience: null, audience_size: null, sort_order: 1 },
+        { project_id: projectId, label: '', n_target: seed.n_target, n_target_max: seed.n_target_max, n_internal_target: seed.n_internal_target, n_collected: seed.n_collected ?? 0, n_actual: seed.n_actual, audience: seed.audience, audience_size: seed.audience_size, sort_order: 0 },
+        { project_id: projectId, label: '', n_target: null, n_target_max: null, n_internal_target: null, n_collected: 0, n_actual: null, audience: null, audience_size: null, sort_order: 1 },
       ]
       const { error } = await supabase.from('project_segments').insert(rows)
       if (error) throw error
@@ -82,6 +88,7 @@ export function useAddSegment(projectId: string) {
         project_id: projectId,
         label: p.label ?? '',
         n_target: p.n_target ?? null,
+        n_target_max: p.n_target_max ?? null,
         n_internal_target: p.n_internal_target ?? null,
         n_collected: p.n_collected ?? 0,
         n_actual: p.n_actual ?? null,
@@ -102,10 +109,25 @@ export function useUpdateSegment(projectId: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<SegmentInput> }) => {
+      // Migration 078's enforce_n_target_range trigger raises when max < min and
+      // only sees the columns this PATCH carries, so a one-ended write can fail
+      // purely on ordering (widening fails min-first, narrowing fails max-first).
+      // NRangeCell always sends the pair; this makes a future caller that forgets
+      // fail loudly right here instead of as an intermittent save error nobody
+      // can reproduce.
+      if (('n_target' in updates) !== ('n_target_max' in updates)) {
+        throw new Error('N Target must be saved as a pair (n_target + n_target_max).')
+      }
       const { error } = await supabase.from('project_segments').update(updates).eq('id', id)
       if (error) throw error
     },
-    onError: () => toast("Couldn't save the segment — please try again."),
+    // The DB guard writes a readable message ("N Target max (100) cannot be
+    // below N Target min (1,000)"), and so does the pair assertion above — pass
+    // either straight through rather than burying it under the generic line.
+    onError: (e) => {
+      const msg = (e as Error)?.message ?? ''
+      toast(msg.startsWith('N Target') ? msg : "Couldn't save the segment — please try again.")
+    },
     onSettled: () => invalidateAll(qc, projectId),
   })
 }

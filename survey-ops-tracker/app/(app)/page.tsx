@@ -16,6 +16,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useIsNewForMe } from '@/lib/hooks/useSeenProjects'
 import { useViewMode } from '@/lib/hooks/useViewMode'
 import { useStoredFlag } from '@/lib/hooks/useStoredFlag'
+import { useCanViewFinancials } from '@/lib/hooks/useCapabilities'
 import { exportProjectsCsv } from '@/lib/utils/exportCsv'
 import { isTypingTarget } from '@/lib/utils/keyboard'
 import { cardOrder, dropSortOrder, type BoardSortMode } from '@/lib/utils/ordering'
@@ -39,6 +40,10 @@ export default function BoardPage() {
   const { data: complianceMaps } = useComplianceMaps()
   const isNewForMe = useIsNewForMe()
   const { mode, setMode } = useViewMode()
+  // Decides whether the CSV carries the finance-restricted columns. False until
+  // the capability query resolves, so an export fired the instant the page loads
+  // is a CSV without the money rather than one with it.
+  const canViewFinancials = useCanViewFinancials()
   const [showNewProject, setShowNewProject] = useState(false)
   const [showClosed, setShowClosed] = useState(false)
   // "Delivered in X" window — shared by the board filter bar and the Archived
@@ -144,12 +149,18 @@ export default function BoardPage() {
       : activeProjects
 
   // The board runs on a slim fetch — pull the full rows on demand so the
-  // CSV gets every column (budget, slack channel, linked docs, ...).
+  // CSV gets every column (slack channel, linked docs, ...). The rows always
+  // come back complete (FULL_SELECT is '*'); which columns reach the FILE is
+  // decided by the capability, and the pull is logged to data_exports either way.
   async function handleExport() {
     if (exporting) return
     setExporting(true)
     try {
-      exportProjectsCsv(await fetchFullProjects(exportableProjects.map(p => p.id)))
+      await exportProjectsCsv(await fetchFullProjects(exportableProjects.map(p => p.id)), {
+        canViewFinancials,
+        route: 'board-csv',
+        filters: { mode, deliveredWithin, sort: boardSort },
+      })
     } finally {
       setExporting(false)
     }

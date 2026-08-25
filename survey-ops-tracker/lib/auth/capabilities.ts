@@ -1,6 +1,6 @@
 import 'server-only'
-import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
+import { VIEW_FINANCIALS, type Capability } from './capabilityNames'
 
 // Capabilities: additive per-user permissions that sit ALONGSIDE profiles.role
 // rather than extending it. Everyone internal stays role = 'analyst', so the
@@ -23,10 +23,10 @@ import { createClient } from '@/lib/supabase/server'
 // be refactored onto this one once capabilities are wired up; deliberately not
 // done yet.
 
-/** The only capability so far: may see prices, margins and other money that is
- *  not the cost ceiling. Free text in the DB, so adding one here is enough. */
-export const VIEW_FINANCIALS = 'view_financials'
-export type Capability = typeof VIEW_FINANCIALS
+// The names live in ./capabilityNames so the browser hook can share them
+// without dragging this server-only module into a client bundle. Re-exported
+// here so server callers keep importing everything from one place.
+export { VIEW_FINANCIALS, type Capability }
 
 /** Every capability held by the signed-in user (or `userId`, when the caller
  *  already has the user and doesn't need a second auth round-trip).
@@ -38,19 +38,13 @@ export async function getMyCapabilities(userId?: string): Promise<Set<Capability
     const uid = userId ?? (await supabase.auth.getUser()).data.user?.id
     if (!uid) return new Set()
 
-    // profile_capabilities isn't in the generated Database type yet (types are
-    // regenerated in their own pass), so reach the table through an untyped
-    // handle and narrow the rows the way the data hooks do.
-    const db = supabase as unknown as SupabaseClient
-    const { data, error } = await db
+    const { data, error } = await supabase
       .from('profile_capabilities')
       .select('capability')
       .eq('profile_id', uid)
     if (error || !data) return new Set()
 
-    return new Set(
-      (data as unknown as { capability: string }[]).map((r) => r.capability as Capability)
-    )
+    return new Set(data.map((r) => r.capability as Capability))
   } catch {
     return new Set()
   }

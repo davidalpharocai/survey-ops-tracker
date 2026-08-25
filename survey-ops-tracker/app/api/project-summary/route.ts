@@ -6,6 +6,7 @@ import { isAllowedEmail } from '@/lib/utils/allowedDomain'
 import { canSeeSummaryPreview } from '@/lib/utils/summaryPreview'
 import { getAiBudget, logAiUsage } from '@/lib/server/observability'
 import { buildSummaryFacts, type SummaryFacts } from '@/lib/server/projectSummary'
+import { canViewFinancials } from '@/lib/auth/capabilities'
 import type { Blast } from '@/lib/hooks/useProjectBlasts'
 import type { SurveyProject } from '@/lib/hooks/useProjects'
 import type { StageHistoryRow } from '@/lib/utils/stageTiming'
@@ -197,6 +198,13 @@ export async function POST(req: NextRequest) {
   const segments = (segmentsRes.data ?? []) as { label: string | null; n_target: number | null; n_collected: number | null }[]
 
   const now = new Date().toISOString()
+  // buildSummaryFacts defaults canViewFinancials to FALSE, which is the right
+  // default for a transport that ships prose to Anthropic — but it means the
+  // flag has to be fed here or budget is withheld from the three people who ARE
+  // cleared for it, and the gate reads as "working" while the feature is dead.
+  // Resolved separately from the allowed-email gate above on purpose: this is a
+  // capability check, not the SUMMARY_PREVIEW_EMAILS allowlist, so widening that
+  // allowlist can never widen who sees money.
   const facts = buildSummaryFacts({
     project: project as unknown as SurveyProject,
     blasts,
@@ -204,6 +212,7 @@ export async function POST(req: NextRequest) {
     now,
     openNextSteps,
     segments,
+    canViewFinancials: await canViewFinancials(user.id),
   })
 
   const anthropic = new Anthropic({ apiKey })

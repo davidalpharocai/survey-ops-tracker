@@ -206,7 +206,7 @@ export function useUpdateProject() {
       void queryClient.cancelQueries({ queryKey: ['project', id] })
       return { previousLists, previousInternal, previousDetail }
     },
-    onError: (_err, { id }, context) => {
+    onError: (err, { id }, context) => {
       for (const [key, data] of context?.previousLists ?? []) {
         queryClient.setQueryData(key, data)
       }
@@ -216,7 +216,14 @@ export function useUpdateProject() {
       if (context && context.previousDetail !== undefined) {
         queryClient.setQueryData(['project', id], context.previousDetail)
       }
-      toast("Couldn't save that change — it was reverted.")
+      // Migration 078's enforce_n_target_range guard raises a message written to
+      // be read ("N Target max (100) cannot be below N Target min (1,000)"), and
+      // PostgREST passes it through. NRangeCell catches a transposed range before
+      // it ever gets here, but the other write paths that PATCH n_target (Quick
+      // Edit, the parse-project route, the connector) don't — and for them the
+      // generic line below would throw away the only useful part.
+      const msg = (err as Error)?.message ?? ''
+      toast(msg.startsWith('N Target max') ? msg : "Couldn't save that change — it was reverted.")
     },
     onSettled: (_data, _err, { id }) => {
       queryClient.invalidateQueries({ queryKey: ['projects'] })

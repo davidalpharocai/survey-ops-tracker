@@ -9,6 +9,7 @@ import { Skeleton } from '@/components/shared/Skeleton'
 import { formatDate, getDueUrgency, urgencyPrefix } from '@/lib/utils/date'
 import { stageLabel } from '@/lib/utils/stage'
 import { fmtNum } from '@/lib/utils/number'
+import { formatNRange } from '@/lib/utils/nRange'
 import { contactName } from '@/lib/utils/contact'
 import type { Tables } from '@/lib/supabase/types'
 import { isRerunProject } from '@/lib/reruns/isRerun'
@@ -42,12 +43,19 @@ type ContactProject = {
   delivered_at: string | null
   created_at: string
   n_target: number | null
+  n_target_max: number | null
   n_collected: number
   is_placeholder: boolean
 }
 
+// n_target_max joins n_target because since migration 078 n_target is only the
+// FLOOR of the agreed range, and a requester's page showing the floor as "the
+// target" understates what we owe the person who asked for it. Safe to name:
+// 078 is applied. price_per_n is NOT here — 082 isn't applied, one unknown
+// column fails the whole request, and revenue has no business on this page
+// anyway (see the header note above).
 const PROJECT_COLS =
-  'id, project_code, project_name, status, phase, board_column, project_type, series_id, rerun_number, submitted_date, due_date, deliver_date, delivered_at, created_at, n_target, n_collected, is_placeholder'
+  'id, project_code, project_name, status, phase, board_column, project_type, series_id, rerun_number, submitted_date, due_date, deliver_date, delivered_at, created_at, n_target, n_target_max, n_collected, is_placeholder'
 
 function useContactPage(contactId: string) {
   const supabase = createClient()
@@ -263,7 +271,12 @@ export default function ContactPage() {
           {formatDate(p.submitted_date)}
         </td>
         <td className="px-4 py-3 text-sm text-muted-foreground whitespace-nowrap">
-          {fmtNum(p.n_collected)}{p.n_target != null ? ` / ${fmtNum(p.n_target)}` : ''}
+          {/* "collected / target", the target being the agreed RANGE — a single
+              number when both ends match, "1,350 – 1,600" when they differ. */}
+          {fmtNum(p.n_collected)}
+          {p.n_target != null || p.n_target_max != null
+            ? ` / ${formatNRange(p.n_target, p.n_target_max)}`
+            : ''}
         </td>
         <td className={`px-4 py-3 text-xs whitespace-nowrap ${dueColor}`}>
           {delivered ? (
@@ -421,7 +434,7 @@ export default function ContactPage() {
                             ['project_name', 'Project', 'Click any row to open the project'],
                             ['status', 'Status', 'Open / Hold / Archived, with the pipeline stage for open projects'],
                             ['submitted_date', 'Submitted', 'When the project entered the pipeline'],
-                            ['n', 'N', 'Responses collected vs target'],
+                            ['n', 'N', 'Responses collected vs the target range agreed with the client (minimum – maximum)'],
                             ['due_date', 'Due', 'Internal deadline'],
                           ] as [PSort, string, string][]
                         ).map(([field, label, title]) => (

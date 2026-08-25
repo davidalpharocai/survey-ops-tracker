@@ -18,6 +18,21 @@ export interface SummaryInput {
   openNextSteps?: string[]
   /** N segments (2+) for per-segment pacing; omit/empty for a single-N project. */
   segments?: { label: string | null; n_target: number | null; n_collected: number | null }[]
+  /**
+   * Does the person who asked for this summary hold `view_financials`? Gates the
+   * cost CEILING (budget) and every comparison against it — see the note above
+   * SummaryFacts.budget.
+   *
+   * DEFAULTS TO FALSE, deliberately. This file is a SEPARATE transport out of the
+   * app: the facts object is POSTed to Anthropic and returned to the browser, and
+   * the only thing keeping revenue prose off other people's screens today is the
+   * ✦ Summary preview allowlist (lib/utils/summaryPreview.ts), which documents its
+   * own '*' GA switch. Containment by allowlist is containment by luck — flipping
+   * that switch would ship budget narration to everyone. So the money is gated on
+   * the capability instead, and a caller who doesn't pass this flag gets no
+   * budget: the failure mode is a missing sentence, not a leak.
+   */
+  canViewFinancials?: boolean
 }
 
 export interface SummaryFacts {
@@ -34,8 +49,14 @@ export interface SummaryFacts {
   nPct: number | null
   /** Per-segment pace (empty unless the project has 2+ N segments). */
   segments: SegmentPaceRow[]
+  /** What the project has actually cost so far. Public to the whole team. */
   spend: number
+  /** The cost CEILING (the most we mean to spend), NOT client revenue. null both
+   *  when no budget is set AND when the caller may not see it — the narrative
+   *  treats those the same way (it just doesn't mention a budget), so nothing
+   *  downstream has to tell them apart. */
   budget: number | null
+  /** spend ÷ budget — a budget comparison, so it follows budget's visibility. */
   spendPct: number | null
   costPerComplete: number | null
   pacePerDay: number | null
@@ -132,8 +153,11 @@ export function buildSummaryFacts(input: SummaryInput): SummaryFacts {
       })
     : []
 
+  // Spend and cost-per-complete are cost-to-run: public. The ceiling and
+  // anything measured against it are not.
+  const canViewFinancials = input.canViewFinancials === true
   const spend = project.actual_spend ?? 0
-  const budget = project.budget ?? null
+  const budget = canViewFinancials ? project.budget ?? null : null
   const spendPct = pctOf(spend, budget)
   const cpc = costPerComplete(spend, nCollected)
 
@@ -177,6 +201,8 @@ export function buildSummaryFacts(input: SummaryInput): SummaryFacts {
   if (overdueDays != null && overdueDays > 0 && !delivered) {
     watchouts.push(`Past due by ${overdueDays} day(s) (due ${formatDate(project.due_date)}).`)
   }
+  // Quotes the % of budget, so it rides on spendPct — null (no budget set, or the
+  // caller may not see it) means no watch-out, not a silent leak in the prose.
   if (spendPct != null && nPct != null && spendPct - nPct > 10) {
     watchouts.push(
       `Spending ahead of collection (${Math.round(spendPct)}% of budget for ${Math.round(nPct)}% of N).`

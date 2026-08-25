@@ -9,6 +9,7 @@ import { useProjects, fetchFullProjects } from '@/lib/hooks/useProjects'
 import { useTeamMembers } from '@/lib/hooks/useTeamMembers'
 import { useCurrentMember } from '@/lib/hooks/useCurrentMember'
 import { useViewMode } from '@/lib/hooks/useViewMode'
+import { useCanViewFinancials } from '@/lib/hooks/useCapabilities'
 import { exportProjectsCsv } from '@/lib/utils/exportCsv'
 import { matchesDuePreset } from '@/lib/utils/date'
 import { isTypingTarget } from '@/lib/utils/keyboard'
@@ -40,6 +41,10 @@ export default function ListView() {
   const { data: teamMembers = [] } = useTeamMembers()
   const { data: currentMember } = useCurrentMember()
   const { mode, setMode } = useViewMode()
+  // Decides whether the CSV carries the finance-restricted columns. False until
+  // the capability query resolves, so an export fired the instant the page loads
+  // is a CSV without the money rather than one with it.
+  const canViewFinancials = useCanViewFinancials()
   const [search, setSearch] = useState('')
   const [exporting, setExporting] = useState(false)
   // Transient Full-view override from a ?view=full deep-link — shows this visit
@@ -214,12 +219,31 @@ export default function ListView() {
   })
 
   // The list runs on a slim fetch — pull the full rows on demand so the
-  // CSV gets every column (budget, slack channel, linked docs, ...).
+  // CSV gets every column (slack channel, linked docs, ...). The rows always
+  // come back complete (FULL_SELECT is '*'); which columns reach the FILE is
+  // decided by the capability, and the pull is logged to data_exports either way.
   async function handleExport() {
     if (exporting) return
     setExporting(true)
     try {
-      exportProjectsCsv(await fetchFullProjects(visibleProjects.map(p => p.id)))
+      await exportProjectsCsv(await fetchFullProjects(visibleProjects.map(p => p.id)), {
+        canViewFinancials,
+        route: 'list-csv',
+        filters: {
+          mode: effectiveMode,
+          search,
+          captain: captainFilter,
+          salesperson: salespersonFilter,
+          rerun: rerunFilter,
+          type: typeFilter,
+          due: dueFilter,
+          dueFrom,
+          dueTo,
+          stage: stageFilter,
+          client: clientFilter,
+          contact: contactFilter,
+        },
+      })
     } finally {
       setExporting(false)
     }
