@@ -1,17 +1,16 @@
 'use client'
 import { useState } from 'react'
 import { nFloorCheck } from '@/lib/utils/nFloor'
-import { formatNRange } from '@/lib/utils/nRange'
 import { useUpdateProject } from '@/lib/hooks/useProjects'
 import { fmtNum } from '@/lib/utils/number'
 import { toast } from '@/lib/utils/toast'
 
 type P = {
   id: string
-  salesperson: string | null
   audience: string | null
-  n_target: number | null
-  n_target_max?: number | null
+  project_type?: string | null
+  /** The number this card judges — OUR internal goal, not the client's N target. */
+  n_internal_target: number | null
   n_collected?: number | null
   n_actual: number | null
   /** Fielding ticked = n_collected is final, which is what turns the
@@ -27,19 +26,23 @@ function joinAnd(parts: string[]): string {
   return `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`
 }
 
-// Soft warning shown in the Sample N card when a Jenna general-population study
-// is below its expected N floor. Graded, because the target is a RANGE since
-// migration 078: a range whose top end still clears the floor gets a plain
-// notice (you just have to field to the top of it — nothing to sign off), while
-// a range that can't clear it at all — or an n_actual that already didn't —
-// keeps the deliberate typed "override" + optional reason, which persists on the
-// project and can be undone.
+// Soft advisory in the N & Audience card when a population-representative study
+// sits below our internal sampling standard (national 1,350 / state 500).
+//
+// It judges N INTERNAL TARGET, never N Target: the floor is our own cushion, and
+// a client contracting 1,000 while we internally target 1,350 is a correctly
+// set-up project — the old version scolded exactly that. Two shapes follow from
+// that:
+//   · no internal target set at all → a plain SETUP prompt (go type the number).
+//     Nothing to sign off, so no override.
+//   · an internal target below the floor → the deliberate typed "override" +
+//     optional reason, which persists on the project and can be undone.
 //
 // Once Fielding is ticked the same card also re-checks what we actually
-// COLLECTED — the last clause of the locked spec, the check that has to happen
-// before a project is marked Delivered. Gated on `stage_fielding` rather than
-// running always, because n_collected climbs from zero and would otherwise sit
-// under the floor (demanding a sign-off) for most of every field period.
+// COLLECTED, and always re-checks the cleaned N ACTUAL — the check that has to
+// happen before a project is marked Delivered. Gated on `stage_fielding` rather
+// than running always, because n_collected climbs from zero and would otherwise
+// sit under the floor (demanding a sign-off) for most of every field period.
 export function GenPopNWarning({ project }: { project: P }) {
   const check = nFloorCheck({ ...project, collectionFinal: project.stage_fielding === true })
   const update = useUpdateProject()
@@ -47,8 +50,8 @@ export function GenPopNWarning({ project }: { project: P }) {
   const [confirmText, setConfirmText] = useState('')
   const [reason, setReason] = useState('')
 
-  // Nothing to say only when the plan is fine AND no delivered/collected fact
-  // contradicts it — requiresOverride is the one flag that covers both facts.
+  // Nothing to say only when the internal target is fine AND no
+  // delivered/collected fact contradicts it.
   if (!check.applies || (check.band === 'ok' && !check.requiresOverride)) return null
 
   function setOverride(on: boolean, why: string | null) {
@@ -74,18 +77,30 @@ export function GenPopNWarning({ project }: { project: P }) {
   }
 
   const scopeLabel = check.scope === 'state' ? 'state-level' : 'national'
-  const rangeLabel = formatNRange(check.targetMin, check.targetMax)
-  const isRange =
-    check.targetMin != null && check.targetMax != null && check.targetMin !== check.targetMax
 
-  // Notice band: the top of the agreed range clears the floor, so there is no
-  // decision to make and nothing to override — just say what to field to.
-  if (!check.requiresOverride) {
+  // Setup gap, not a sample problem: there is no number to judge yet, so ask for
+  // one instead of asserting a shortfall against a blank field.
+  //
+  // Two conditions beyond the band, both learned the hard way:
+  //   · `!project.n_floor_override` — an existing sign-off has to keep working.
+  //     This branch used to sit ABOVE the override check below, so a project
+  //     someone had already dismissed came back as a fresh amber banner with no
+  //     Override button and no Undo on it: literally unclearable without typing
+  //     a number into N Internal Target.
+  //   · `started` — a fresh project has no internal target by definition, so
+  //     typing "Gen pop" into a brand-new row would pop an amber warning
+  //     instantly. Nagging at setup time is how a card teaches people to ignore
+  //     it, and this module is deliberately biased toward silence.
+  const started =
+    project.stage_fielding === true ||
+    (project.n_collected ?? 0) > 0 ||
+    project.n_actual != null
+  if (check.band === 'unset' && !check.requiresOverride && !project.n_floor_override && started) {
     return (
-      <div className="mt-2 rounded-lg border border-amber-500/25 bg-amber-500/[0.06] px-2.5 py-1.5 text-xs text-amber-700/90 dark:text-amber-300/80">
-        ⓘ Gen-pop floor: the N target range {rangeLabel} dips below the {fmtNum(check.floor)}{' '}
-        expected for a {scopeLabel} general-population study — fine as long as you field to at least{' '}
-        {fmtNum(check.floor)}.
+      <div className="mt-2 rounded-lg border border-border bg-muted/30 px-2.5 py-1.5 text-xs text-muted-foreground">
+        ⓘ Gen-pop floor: no N Internal Target set. Our internal standard for a {scopeLabel}{' '}
+        general-population study is {fmtNum(check.floor)} — set N Internal Target so this study can
+        be checked against it.
       </div>
     )
   }
@@ -109,14 +124,13 @@ export function GenPopNWarning({ project }: { project: P }) {
     )
   }
 
-  // Name the RANGE, not a single number — otherwise a typed override reason is
-  // being given against a figure the project doesn't actually carry.
-  const targetPhrase = isRange ? `the whole N target range ${rangeLabel}` : `N target ${rangeLabel}`
-  // Name every number that is genuinely short and only those. A list rather than
-  // nested ternaries because the three shortfalls are independent — an unclearable
-  // range, the N we collected, the N we delivered — and any combination is real.
+  // Name every number that is genuinely short and only those — and name them as
+  // what they are, so a typed override reason is given against the figure the
+  // project actually carries. A list rather than nested ternaries because the
+  // three shortfalls are independent — our internal target, the N we collected,
+  // the N we delivered — and any combination is real.
   const short: string[] = []
-  if (check.band === 'warning') short.push(targetPhrase)
+  if (check.band === 'warning') short.push(`N internal target ${fmtNum(check.internalTarget ?? 0)}`)
   if (check.shortfallCollected) short.push(`N collected ${fmtNum(project.n_collected ?? 0)}`)
   if (check.shortfallActual) short.push(`N actual ${fmtNum(project.n_actual ?? 0)}`)
   const shortfallText = `${joinAnd(short)} ${short.length > 1 ? 'are' : 'is'}`
@@ -124,9 +138,16 @@ export function GenPopNWarning({ project }: { project: P }) {
   return (
     <div className="mt-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-2.5 py-2 text-xs text-amber-700 dark:text-amber-300 flex flex-col gap-1.5">
       <p>
-        ⚠ Gen-pop floor: {shortfallText} under the {fmtNum(check.floor)} expected for a {scopeLabel}{' '}
-        general-population study.
+        ⚠ Gen-pop floor: {shortfallText} under the {fmtNum(check.floor)} we target internally for a{' '}
+        {scopeLabel} general-population study.
       </p>
+      {/* A fact is short while the plan is blank — say so, or the fix looks like
+          it is only ever "click override". */}
+      {check.band === 'unset' && (
+        <p className="text-amber-700/80 dark:text-amber-300/80">
+          No N Internal Target is set on this project either.
+        </p>
+      )}
       {/* Say what the override is FOR at this point in the pipeline. Fielding is
           done, so this number won't grow on its own — the next step is delivery. */}
       {check.shortfallCollected && (
