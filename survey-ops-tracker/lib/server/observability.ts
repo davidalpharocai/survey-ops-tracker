@@ -8,6 +8,63 @@ import { computeCostUsd, type TokenUsage } from '@/lib/utils/aiCost'
 
 type Admin = ReturnType<typeof createAdminClient>
 
+// ---------------------------------------------------------------------------
+// Pricing the parts lib/utils/aiCost.ts does not know about
+// ---------------------------------------------------------------------------
+
+/**
+ * Rates for models missing from aiCost.ts's PRICING map, per 1M tokens (USD).
+ *
+ * WHY HERE AND NOT THERE: aiCost.ts falls back to Opus pricing for an unknown
+ * model, so a missing entry books at *some* rate and nothing ever errors — the
+ * spend is simply attributed to a model's rate that nobody chose. `claude-opus-5`
+ * ($5 in / $25 out, cache read 10%, 5-minute cache write 1.25x) is the model the
+ * project-context builder uses, so it gets a real entry rather than a fallback.
+ * Add a model here (or to aiCost.ts) the day it is first called, not after the
+ * first surprising invoice.
+ */
+const EXTRA_MODEL_PRICING: Record<
+  string,
+  { input: number; output: number; cacheRead: number; cacheWrite: number }
+> = {
+  'claude-opus-5': { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
+}
+
+/**
+ * The SERVER-SIDE web search tool bills PER SEARCH, on top of tokens
+ * ($10 per 1,000 searches). Token cost alone therefore under-reports any call
+ * that searched, which matters because the monthly budget guard is driven by
+ * `ai_usage.cost_usd`: under-report and the cap silently stops being a cap.
+ */
+export const WEB_SEARCH_USD_PER_SEARCH = 0.01
+
+function round4(n: number): number {
+  return Math.round(n * 10_000) / 10_000
+}
+
+/** Token cost for one call, using EXTRA_MODEL_PRICING before aiCost's table. */
+export function modelTokenCostUsd(model: string, usage: TokenUsage): number {
+  const r = EXTRA_MODEL_PRICING[model]
+  if (!r) return computeCostUsd(model, usage)
+  const cost =
+    ((usage.input_tokens ?? 0) * r.input +
+      (usage.output_tokens ?? 0) * r.output +
+      (usage.cache_read_input_tokens ?? 0) * r.cacheRead +
+      (usage.cache_creation_input_tokens ?? 0) * r.cacheWrite) /
+    1_000_000
+  return round4(cost)
+}
+
+/** Full billed cost of one call: tokens + any server-tool searches it ran. */
+export function aiCallCostUsd(
+  model: string,
+  usage: TokenUsage,
+  opts: { searches?: number } = {},
+): number {
+  const searches = Math.max(0, Math.floor(opts.searches ?? 0))
+  return round4(modelTokenCostUsd(model, usage) + searches * WEB_SEARCH_USD_PER_SEARCH)
+}
+
 /** First day of the current month, ISO — for "spend this month" queries. */
 function monthStartISO(): string {
   const now = new Date()
@@ -20,6 +77,8 @@ export async function logAiUsage(args: {
   userEmail?: string | null
   model: string
   usage: TokenUsage
+  /** Server-side web searches this call ran. Billed per search on top of tokens. */
+  searches?: number
 }): Promise<void> {
   try {
     const admin = createAdminClient()
@@ -31,7 +90,7 @@ export async function logAiUsage(args: {
       output_tokens: args.usage.output_tokens ?? 0,
       cache_read_tokens: args.usage.cache_read_input_tokens ?? 0,
       cache_creation_tokens: args.usage.cache_creation_input_tokens ?? 0,
-      cost_usd: computeCostUsd(args.model, args.usage),
+      cost_usd: aiCallCostUsd(args.model, args.usage, { searches: args.searches }),
     })
   } catch (err) {
     console.error('[observability] logAiUsage failed:', err)
