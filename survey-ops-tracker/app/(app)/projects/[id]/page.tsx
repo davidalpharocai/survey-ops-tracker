@@ -23,6 +23,7 @@ import { SlackChannel } from '@/components/project/SlackChannel'
 import { InfoTooltip, HelpTip } from '@/components/shared/InfoTooltip'
 import { Skeleton } from '@/components/shared/Skeleton'
 import { ProjectInsights } from '@/components/project/ProjectInsights'
+import { ContextTab } from '@/components/project/ContextTab'
 import { CompliancePanel } from '@/components/compliance/CompliancePanel'
 import { ComplianceBanner } from '@/components/project/ComplianceBanner'
 import { useComplianceState } from '@/lib/hooks/useComplianceState'
@@ -36,13 +37,15 @@ import { ProjectSummaryStrip } from '@/components/project/summary/ProjectSummary
 import { isRerunProject } from '@/lib/reruns/isRerun'
 import { RerunChip } from '@/components/reruns/RerunChip'
 
-type ActiveTab = 'overview' | 'insights' | 'activity' | 'compliance' | 'deliverables' | 'links' | 'logs'
+type ActiveTab = 'overview' | 'insights' | 'context' | 'activity' | 'compliance' | 'deliverables' | 'links' | 'logs'
 
-// Tab bar config — order here is the on-screen order. Compliance sits between
+// Tab bar config — order here is the on-screen order. Context sits next to
+// Insights (both are "read about this project" tabs); Compliance sits between
 // Activity and Deliverables; "Other" (Slack + notifications) sits last.
 const PROJECT_TABS: { id: ActiveTab; label: string; title: string }[] = [
   { id: 'overview', label: 'Overview', title: 'The full project view — stats, pipeline, next steps, documents, and details' },
   { id: 'insights', label: 'Insights (Beta)', title: 'Performance stats — completion/fill rates, cost per complete, pace, supplier mix' },
+  { id: 'context', label: 'Context', title: 'Background on this project from the open web — what appears to have sparked the study, what moved during the field window, and the links behind both. Internal reading, refreshed daily; never a client deliverable.' },
   { id: 'activity', label: 'Activity', title: 'Logged emails and events for this project' },
   { id: 'compliance', label: 'Compliance', title: 'Compliance review — submit the question list for the client to approve before launch, and log the after-fielding results review' },
   { id: 'deliverables', label: 'Deliverables', title: 'Files delivered to the client for this project' },
@@ -564,6 +567,15 @@ export default function ProjectDetailPage() {
       </div>
 
       {activeTab === 'insights' && <ProjectInsights project={project} />}
+
+      {/* Context — background reading pulled from the open web. Everything it
+          renders is UNTRUSTED data (see the notes in ContextTab.tsx and
+          lib/hooks/useProjectContext.ts): text only, never HTML, never an action. */}
+      {activeTab === 'context' && (
+        <div className="max-w-3xl">
+          <ContextTab project={project} />
+        </div>
+      )}
 
       {activeTab === 'activity' && (
         <div className="max-w-3xl">
