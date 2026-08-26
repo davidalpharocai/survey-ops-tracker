@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   clientName,
   composeSummary,
+  CONTEXT_FRESH_HOURS,
   computeInputsFingerprint,
   deriveTopics,
   harvestSearchResults,
@@ -511,13 +512,23 @@ function row(overrides: Partial<ProjectContextRow> = {}): ProjectContextRow {
 const NOW = Date.parse('2026-08-25T12:00:00Z')
 const hoursAgo = (h: number) => new Date(NOW - h * 3_600_000).toISOString()
 
+// Relative to CONTEXT_FRESH_HOURS, never a hard-coded age. That constant IS the
+// refresh cadence and is expected to change (20h -> 72h already; weekly next), so
+// a test pinning "21 hours is stale" fails for the wrong reason the moment the
+// cadence moves and tells you nothing about whether the logic still works.
+const INSIDE_WINDOW = Math.max(1, Math.floor(CONTEXT_FRESH_HOURS / 2))
+const PAST_WINDOW = CONTEXT_FRESH_HOURS + 1
+
 describe('isContextFresh', () => {
   it('measures the BRIEFING (generated_at), not the last attempt', () => {
-    expect(isContextFresh(row({ generated_at: hoursAgo(2) }), NOW)).toBe(true)
-    expect(isContextFresh(row({ generated_at: hoursAgo(21) }), NOW)).toBe(false)
-    // Attempted an hour ago, but the summary is three days old and failing.
+    expect(isContextFresh(row({ generated_at: hoursAgo(INSIDE_WINDOW) }), NOW)).toBe(true)
+    expect(isContextFresh(row({ generated_at: hoursAgo(PAST_WINDOW) }), NOW)).toBe(false)
+    // Attempted an hour ago, but the briefing itself is stale and failing.
     expect(
-      isContextFresh(row({ refresh_status: 'error', generated_at: hoursAgo(72), last_refreshed_at: hoursAgo(1) }), NOW),
+      isContextFresh(
+        { refresh_status: 'error', generated_at: hoursAgo(PAST_WINDOW) } as Parameters<typeof isContextFresh>[0],
+        NOW,
+      ),
     ).toBe(false)
   })
 })
@@ -526,11 +537,15 @@ describe('shouldRefresh', () => {
   const FP = 'fp-current'
 
   it('skips a project refreshed inside the freshness window', () => {
-    expect(shouldRefresh(row({ last_refreshed_at: hoursAgo(2), generated_at: hoursAgo(2) }), NOW, FP)).toBe(false)
+    expect(
+      shouldRefresh(row({ last_refreshed_at: hoursAgo(INSIDE_WINDOW), generated_at: hoursAgo(INSIDE_WINDOW) }), NOW, FP),
+    ).toBe(false)
   })
 
   it('refreshes once the context ages past the window', () => {
-    expect(shouldRefresh(row({ last_refreshed_at: hoursAgo(21), generated_at: hoursAgo(21) }), NOW, FP)).toBe(true)
+    expect(
+      shouldRefresh(row({ last_refreshed_at: hoursAgo(PAST_WINDOW), generated_at: hoursAgo(PAST_WINDOW) }), NOW, FP),
+    ).toBe(true)
   })
 
   it('throttles retries after a failure instead of burning budget', () => {

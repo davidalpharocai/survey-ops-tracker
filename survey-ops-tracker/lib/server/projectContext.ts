@@ -141,15 +141,32 @@ export const CONTEXT_PROJECT_COLUMNS =
 
 // Opus, not Haiku: this call has to run real web searches, judge which of them
 // actually explain why a study exists, and refuse to pad. That is judgement, not
-// phrasing. Cost is controlled by the freshness gate (one call per project per
-// DAY), MAX_SEARCHES, and the shared monthly AI budget — not by the model tier.
+// phrasing. Cost is controlled by CONTEXT_FRESH_HOURS (the real lever — it sets
+// the cadence), MAX_SEARCHES, and MAX_RUN_SPEND_USD in the cron — not by the
+// model tier. Dropping to Haiku 4.5 would cut spend ~5x if that is ever wanted;
+// it is a live option David has been shown, not an oversight.
 const MODEL = 'claude-opus-5'
 const MAX_TOKENS = 16000
 const MAX_SEARCHES = 5
 
-/** Hours a successful context stays "fresh" — under 24 so a daily sweep never
- *  skips a project because yesterday's run started a few minutes earlier. */
-export const CONTEXT_FRESH_HOURS = 20
+/**
+ * Hours a successful briefing stays "fresh". **This one number IS the refresh
+ * cadence** — the cron fires daily and only regenerates what has aged past it,
+ * so changing the cadence never means touching vercel.json or redeploying a
+ * schedule. 72 = every 3 days (David, 2026-08-26). Weekly is 168. Turning the
+ * background refresh off entirely is deleting the project-context entry from
+ * vercel.json and leaving the manual button — the direction David expects this
+ * to go.
+ *
+ * Daily-cron-plus-a-window beats a `*​/3` cron schedule on three counts: no gap
+ * at month boundaries (where day-of-month stepping resets), the load spreads
+ * across days instead of landing on every project at once, and the Hobby plan
+ * forbids sub-daily schedules anyway (see vercel.json).
+ *
+ * Cost follows directly: at ~19 active projects and ~$0.60 a refresh, 24h is
+ * ~$340/month, 72h is ~$115, 168h is ~$50.
+ */
+export const CONTEXT_FRESH_HOURS = 72
 /** After a FAILED attempt, wait this long before spending money retrying. */
 export const CONTEXT_RETRY_HOURS = 4
 /**
