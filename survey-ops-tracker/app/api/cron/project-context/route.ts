@@ -41,6 +41,15 @@ import {
  *   4. `MAX_RUN_SPEND_USD`, a ceiling this route enforces itself, and the shared
  *      monthly AI budget IF an admin has switched `ai_hard_stop` on (it is off
  *      by default, so the shared guard alone stops nothing),
+ *
+ * SCHEDULE: once daily at 10:20 UTC. It was "20 9-11 * * *" (three firings),
+ * which Vercel REJECTED at deployment creation — the deployment failed in the
+ * same second it was created, with no build, and never appeared in the
+ * dashboard at all. Every other entry in vercel.json is once-daily; match them.
+ * Once daily also caps the worst case at MAX_PROJECTS_PER_RUN model calls a day
+ * instead of three times that, which is the difference between ~$5 and ~$15 on
+ * a bad day. If more throughput is ever needed, raise MAX_PROJECTS_PER_RUN
+ * rather than adding firings.
  *   5. PROJECT_CONTEXT_ENABLED=false switches it off entirely.
  * Every call is recorded through logAiUsage inside buildProjectContext — tokens
  * AND per-search fees — so the spend shows up in Admin → AI usage like every
