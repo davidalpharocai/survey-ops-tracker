@@ -30,7 +30,7 @@
     },
     {
       "path": "/api/cron/project-context",
-      "schedule": "20 9-11 * * *"
+      "schedule": "20 10 * * *"
     }
   ]
 }
