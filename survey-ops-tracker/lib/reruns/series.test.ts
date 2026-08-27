@@ -170,6 +170,42 @@ describe('renumberWaves', () => {
     expect(result).toHaveLength(4)
     expect(new Set(result.map((r) => r.rerun_number))).toEqual(new Set([1, 2, 3, 4]))
   })
+  it('falls through to pure date order when originId matches no wave', () => {
+    // The contract attachProjectToSeries depends on. 10 of 26 live series have
+    // origin_project_id = NULL, so attach passes the SERIES id as originId — a
+    // value that can never equal a project id — precisely so that no wave is
+    // forced to position 1 and date order decides.
+    //
+    // The bug this guards against: passing the project being ATTACHED as the
+    // fallback originId. That promoted the newcomer to Wave 1 and demoted the
+    // series' real first wave. Attaching PR00010 to "National Hingevoter" would
+    // have renamed it Wave 1 and pushed PR00341 to Wave 2.
+    const waves = [
+      wave({ id: 'first', submitted_date: '2026-01-01' }),
+      wave({ id: 'newcomer', submitted_date: '2026-06-01' }),
+      wave({ id: 'middle', submitted_date: '2026-03-01' }),
+    ]
+    const result = renumberWaves(waves, 'a-series-id-not-a-project-id')
+    const num = (id: string) => result.find((r) => r.id === id)!.rerun_number
+    expect(num('first')).toBe(1)
+    expect(num('middle')).toBe(2)
+    expect(num('newcomer')).toBe(3)
+  })
+
+  it('would promote the newcomer if it were passed as originId (the bug, pinned)', () => {
+    // Documents WHY the fallback must not be the attached project: the origin is
+    // forced first regardless of its date. Keeping this as an explicit
+    // expectation means a future refactor of renumberWaves cannot quietly make
+    // the old, wrong call site look correct again.
+    const waves = [
+      wave({ id: 'first', submitted_date: '2026-01-01' }),
+      wave({ id: 'newcomer', submitted_date: '2026-06-01' }),
+    ]
+    const result = renumberWaves(waves, 'newcomer')
+    expect(result.find((r) => r.id === 'newcomer')!.rerun_number).toBe(1)
+    expect(result.find((r) => r.id === 'first')!.rerun_number).toBe(2)
+  })
+
 })
 
 // ---------------------------------------------------------------------------

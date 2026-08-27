@@ -543,7 +543,23 @@ export async function attachProjectToSeries(
     .eq('id', projectId)
   if (upErr) throw new Error(upErr.message)
 
-  await applyRenumber(admin, seriesId, series.origin_project_id ?? projectId)
+  // The originId fallback is `seriesId`, NOT projectId, and the difference is a
+  // real bug rather than a style choice. renumberWaves FORCES the wave whose id
+  // equals originId to number 1 (when no wave carries a manual wave_order), so
+  // passing the project being attached would promote the newcomer to Wave 1 and
+  // demote the series' actual first wave.
+  //
+  // That is not hypothetical: 10 of 26 live series have origin_project_id = NULL,
+  // including HingeVoter/Carah's "National Hingevoter" — the very series
+  // PR00010 and PR00207 need adding to. Attaching PR00010 there would have
+  // renamed it Wave 1 and pushed PR00341 ("National Hingevoter - Wave 1") to
+  // Wave 2.
+  //
+  // A series id can never equal a project id, so passing it means NO wave is
+  // forced first and the ordering falls through to pure date order — which is
+  // exactly the documented rule for a series with no declared origin.
+  // detachProjectFromSeries does the same thing for the same reason.
+  await applyRenumber(admin, seriesId, series.origin_project_id ?? seriesId)
 
   const waves = await fetchWaves(admin, seriesId)
   const maxNum = waves.reduce((m, w) => Math.max(m, w.rerun_number), 0)
@@ -594,6 +610,11 @@ export async function detachProjectFromSeries(
   // renumberWaves forces it first. Removing it would leave the series pointing at
   // a survey no longer in it — legal, but confusing, and not something this
   // function can repair. End the series, or add a replacement first.
+  //
+  // Note this guard is inert for the 10-of-26 series whose origin_project_id is
+  // NULL, and that is correct rather than an oversight: such a series has no
+  // declared anchor, so there is no particular wave to protect and its numbering
+  // is pure date order either way. Nothing is lost by removing any member.
   if (series?.origin_project_id === projectId) {
     throw new SeriesOpError(
       `${label} is Wave 1 — the series is anchored to it. Add another survey to the series first, or end the series instead.`,
