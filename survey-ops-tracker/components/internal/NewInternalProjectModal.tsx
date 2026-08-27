@@ -50,6 +50,8 @@ export function NewInternalProjectModal({
         // inherit the sprint's start as the project start (overridable later)
         launch_date: sprintNum != null && sprintCfg ? sprintStartISO(sprintNum, sprintCfg) : null,
       })
+      // Post-create redirect, not a link — the URL doesn't exist until the
+      // insert returns, so there is nothing to render an <a href> for.
       router.push(`/projects/${created.id}`)
     } catch {
       setError('Could not create the project — please try again.')
