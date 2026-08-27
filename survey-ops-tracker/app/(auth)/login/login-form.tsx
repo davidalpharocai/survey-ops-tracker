@@ -49,6 +49,15 @@ export default function LoginForm() {
       supabase.auth.signOut()
       setError(`Only @${ALLOWED_EMAIL_DOMAIN} accounts can access this app.`)
     }
+    // A real, allowed account whose tier has no surface here yet (a sales
+    // profile before the sales view exists). Sign out for the same reason as
+    // above — leaving the session alive means the layout bounces them straight
+    // back here on every attempt, which reads as a broken login rather than a
+    // deliberate answer.
+    if (searchParams.get('pending')) {
+      supabase.auth.signOut()
+      setError("Your account doesn't have access to this view yet. Ask David to finish setting it up.")
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 

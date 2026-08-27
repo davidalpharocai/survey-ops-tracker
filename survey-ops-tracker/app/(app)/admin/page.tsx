@@ -11,6 +11,7 @@ import { SprintCadence } from '@/components/admin/SprintCadence'
 import { SystemStatus } from '@/components/admin/SystemStatus'
 import { AiUsagePanel } from '@/components/admin/AiUsagePanel'
 import { TeamRoster } from '@/components/admin/TeamRoster'
+import { AccessControl } from '@/components/admin/AccessControl'
 import { NewClientModal } from '@/components/client/NewClientModal'
 
 const SUPABASE_PROJECT = 'xcfoyxyxovibltwfydbf'
@@ -360,6 +361,10 @@ export default function AdminPage() {
 
       {/* Roster — add/edit captains */}
       <TeamRoster />
+
+      {/* Access — who holds which role. Renders only for a holder of
+          manage_permissions; the route and the DB check again. */}
+      <AccessControl />
         </>
       )}
 
