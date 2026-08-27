@@ -12,6 +12,7 @@ import { SystemStatus } from '@/components/admin/SystemStatus'
 import { AiUsagePanel } from '@/components/admin/AiUsagePanel'
 import { TeamRoster } from '@/components/admin/TeamRoster'
 import { AccessControl } from '@/components/admin/AccessControl'
+import { ContactsDirectory } from '@/components/admin/ContactsDirectory'
 import { NewClientModal } from '@/components/client/NewClientModal'
 
 const SUPABASE_PROJECT = 'xcfoyxyxovibltwfydbf'
@@ -61,7 +62,11 @@ const heading =
 // The Admin page groups many sections; tabs keep it scannable as it grows.
 const ADMIN_TABS = [
   { key: 'overview', label: 'Overview' },
-  { key: 'accounts', label: 'Accounts & Team' },
+  // Accounts and Contacts are who we work FOR; Users is who works HERE. Those
+  // were previously mixed into one "Accounts & Team" tab, which is why nobody
+  // could guess where the roster lived.
+  { key: 'accounts', label: 'Accounts & Contacts' },
+  { key: 'users', label: 'Users' },
   { key: 'operations', label: 'Operations' },
   { key: 'audit', label: 'Audit Log' },
 ] as const
@@ -359,11 +364,22 @@ export default function AdminPage() {
         )}
       </div>
 
-      {/* Roster — add/edit captains */}
+      {/* Contacts — the people at those accounts. Lives beside Accounts because
+          that is how you think about them: an account is a firm, and a contact is
+          who at that firm asks for work. */}
+      <ContactsDirectory />
+        </>
+      )}
+
+      {tab === 'users' && (
+        <>
+      {/* Everyone who works HERE — separated from Accounts (who we work FOR),
+          which is the distinction that made "Accounts & Team" a confusing tab.
+          Roster = who can be a captain; Access = who can see and do what. */}
       <TeamRoster />
 
-      {/* Access — who holds which role. Renders only for a holder of
-          manage_permissions; the route and the DB check again. */}
+      {/* Renders only for a holder of manage_permissions; the route and the DB
+          check again. */}
       <AccessControl />
         </>
       )}

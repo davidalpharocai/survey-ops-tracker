@@ -227,3 +227,54 @@ export function useRerunSeriesActions() {
     },
   })
 }
+
+// ---------------------------------------------------------------------------
+// Candidates for "add another survey to THIS series"
+// ---------------------------------------------------------------------------
+
+export interface SeriesAddCandidate {
+  id: string
+  project_code: string | null
+  project_name: string
+  client: string
+  submitted_date: string | null
+  launch_date: string | null
+  board_column: string | null
+}
+
+/** Surveys that could be added to a series: same firm, not already in ANY
+ *  first-class series, newest first.
+ *
+ *  Deliberately NOT useRerunCandidates (lib/hooks/useRerunLineage.ts). That one
+ *  excludes the project's legacy lineage family, which is right for "link this as
+ *  a rerun of another survey" — you cannot be a rerun of something already in
+ *  your own lineage. Here the opposite is true: a legacy sibling that never got a
+ *  series link is the single most likely thing you want to add, and excluding it
+ *  would hide exactly the surveys this control exists to fix. PR00010 and PR00207
+ *  were in precisely that state.
+ *
+ *  `series_id is null` is the only hard filter, so a survey already in a
+ *  DIFFERENT series never appears — attachProjectToSeries would refuse it, and
+ *  offering a choice the server rejects is worse than not offering it. */
+export function useSeriesAddCandidates(client: string | null | undefined, enabled: boolean) {
+  const supabase = createClient()
+  // Client strings are "Firm - Contact"; a series belongs to the firm.
+  const firm = (client ?? '').split(' - ')[0].trim()
+  return useQuery({
+    queryKey: ['series-add-candidates', firm],
+    enabled: enabled && firm.length > 0,
+    queryFn: async (): Promise<SeriesAddCandidate[]> => {
+      const { data, error } = await supabase
+        .from('survey_projects')
+        .select('id, project_code, project_name, client, submitted_date, launch_date, board_column')
+        .ilike('client', `${firm.replace(/([%_\\])/g, '\\$1')}%`)
+        .is('series_id', null)
+        .is('deleted_at', null)
+        .order('submitted_date', { ascending: false, nullsFirst: false })
+        .limit(200)
+      if (error) throw error
+      return (data ?? []) as SeriesAddCandidate[]
+    },
+    staleTime: 30_000,
+  })
+}
