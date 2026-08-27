@@ -13,6 +13,8 @@ import {
   spawnNextWave,
   armSeries,
   reorderWaves,
+  attachProjectToSeries,
+  detachProjectFromSeries,
 } from '@/lib/reruns/seriesOps'
 
 export const dynamic = 'force-dynamic'
@@ -148,6 +150,30 @@ export async function POST(req: Request) {
         if (orderedWaveIds.length === 0) return NextResponse.json({ error: 'orderedWaveIds is required.' }, { status: 400 })
         const { waves } = await reorderWaves(admin, seriesId, orderedWaveIds, actor)
         return NextResponse.json({ waves })
+      }
+
+      // Add an EXISTING survey to an existing series, and take one out again.
+      // Before these, series_id could only be set by promoting a project to a
+      // NEW series or by the auto-spawn cron — a hand-created wave, or one whose
+      // link a merge had dropped, could only be fixed with SQL (which is what
+      // BAM's PR00388 needed). seriesOps refuses rather than guesses when the
+      // survey is already in another series or belongs to another client, and
+      // those messages are written to be read by a person, so they pass through
+      // verbatim via SeriesOpError below.
+      case 'attach_wave': {
+        const seriesId = typeof body.seriesId === 'string' ? body.seriesId : ''
+        const projectId = typeof body.projectId === 'string' ? body.projectId : ''
+        if (!seriesId) return NextResponse.json({ error: 'seriesId is required.' }, { status: 400 })
+        if (!projectId) return NextResponse.json({ error: 'projectId is required.' }, { status: 400 })
+        const { series, waves } = await attachProjectToSeries(admin, seriesId, projectId, actor)
+        return NextResponse.json({ series, waves })
+      }
+
+      case 'detach_wave': {
+        const projectId = typeof body.projectId === 'string' ? body.projectId : ''
+        if (!projectId) return NextResponse.json({ error: 'projectId is required.' }, { status: 400 })
+        const { seriesId, waves } = await detachProjectFromSeries(admin, projectId, actor)
+        return NextResponse.json({ seriesId, waves })
       }
 
       default:

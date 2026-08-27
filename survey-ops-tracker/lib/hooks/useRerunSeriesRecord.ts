@@ -152,9 +152,18 @@ export type RerunSeriesActionInput =
   | { action: 'spawn_next'; seriesId: string }
   | { action: 'arm'; seriesId: string; armed: boolean }
   | { action: 'reorder'; seriesId: string; orderedWaveIds: string[] }
+  // Add an EXISTING survey to a series, or take one out. `detach_wave` carries no
+  // seriesId on purpose — the survey knows which series it is in, and asking the
+  // caller to supply it would let a stale UI detach from the wrong one.
+  | { action: 'attach_wave'; seriesId: string; projectId: string }
+  | { action: 'detach_wave'; projectId: string }
 
 export interface RerunSeriesActionResult {
   series?: Database['public']['Tables']['rerun_series']['Row']
+  /** Returned by `detach_wave`, which has no seriesId in its input and no series
+   *  row in its response — without this the series record would never be
+   *  invalidated and the wave list would keep showing the removed wave. */
+  seriesId?: string
   waves?: SeriesWave[]
   pendingWave?: PendingWave | null
   spawn?: SpawnWaveResult
@@ -182,12 +191,24 @@ export function useRerunSeriesActions() {
       return json
     },
     onSuccess: (data, variables) => {
-      const seriesId = 'seriesId' in variables ? variables.seriesId : data.series?.id
+      const seriesId =
+        'seriesId' in variables ? variables.seriesId : (data.series?.id ?? data.seriesId)
       if (seriesId) queryClient.invalidateQueries({ queryKey: ['rerun-series-record', seriesId] })
       queryClient.invalidateQueries({ queryKey: ['all-rerun-series'] })
       queryClient.invalidateQueries({ queryKey: ['rerun-series-list'] })
       queryClient.invalidateQueries({ queryKey: ['projects'] })
       queryClient.invalidateQueries({ queryKey: ['rerun-snapshot'] })
+      // attach_wave / detach_wave change the PROJECT's own series_id, and the
+      // project detail page decides between the first-class and legacy wave
+      // history off that field — so its own query has to be refetched or the
+      // page keeps rendering the branch it was on before. The legacy lineage
+      // queries go too, since a detach clears rerun_series_id as well.
+      if ('projectId' in variables && variables.projectId) {
+        queryClient.invalidateQueries({ queryKey: ['project', variables.projectId] })
+      }
+      queryClient.invalidateQueries({ queryKey: ['project'] })
+      queryClient.invalidateQueries({ queryKey: ['rerun-series'] })
+      queryClient.invalidateQueries({ queryKey: ['rerun-candidates'] })
       // The nav Reruns badge sums first-class + legacy overdue counts; a
       // lifecycle action (pause/resume/end/spawn/…) can flip a series' overdue
       // state, so refresh it too.
