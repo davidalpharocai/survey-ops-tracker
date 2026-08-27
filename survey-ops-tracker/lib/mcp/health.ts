@@ -2,6 +2,7 @@ import 'server-only'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { resolveProject, isActiveOperational, getMe } from './data'
 import { stageDurations } from '@/lib/utils/stageTiming'
+import { isKnownSalesperson, ALL_SALESPERSON_VALUES } from '@/lib/utils/salespeople'
 
 // Data-integrity + pipeline-throughput reads for the connector. All read-only.
 //   - reconcileProject: cross-field consistency for one project
@@ -133,6 +134,26 @@ function buildChecks(p: Row, sup: SupRow[], blasts: BlastRow[], costs: CostRow[]
     checks.push({ check: 'date_order', ok: false, advisory: false, detail: `launch_date ${launch} is after deliver_date ${deliver}` })
   }
 
+  // 6) The salesperson must be a name this app recognises.
+  //
+  //    Not cosmetic. `salesperson` is free text and is the ONLY link between a
+  //    project and the person who sold it — a scoped sales view resolves the
+  //    signed-in account to a canonical name (salespersonForEmail) and filters on
+  //    it. A project holding "Jenna" instead of "Jenna Shrove" therefore vanishes
+  //    from her own view, with nothing on screen to explain why. Five rows had
+  //    drifted that way and were normalised on 2026-08-27; this is what stops it
+  //    happening again quietly.
+  //
+  //    Advisory, because the value is still perfectly readable to a human and
+  //    nothing is broken today — it only bites once the sales view ships.
+  const sp = p.salesperson as string | null
+  if (sp && sp.trim() !== '' && !isKnownSalesperson(sp)) {
+    checks.push({
+      check: 'salesperson_unknown', ok: false, advisory: true, actual: sp,
+      detail: `salesperson "${sp}" is not one of the known names (${ALL_SALESPERSON_VALUES.join(', ')}) — a scoped sales view would not match this project to anyone`,
+    })
+  }
+
   return checks
 }
 
@@ -234,7 +255,11 @@ async function inChunks<T>(
 export async function dataHealth(args: { active_only?: boolean; limit?: number } = {}) {
   const supabase = createAdminClient()
   const { data: projData, error } = await supabase.from('survey_projects')
-    .select('id, project_code, project_name, status, phase, board_column, n_target, n_collected, n_actual, actual_spend, survey_id_discrepancy, launch_date, deliver_date')
+    // `salesperson` rides along for check 6. An explicit select that omits a column
+    // buildChecks reads does not error — `p.salesperson` is simply undefined and the
+    // check silently never fires, which is the quietest way for an integrity checker
+    // to stop checking something.
+    .select('id, project_code, project_name, status, phase, board_column, n_target, n_collected, n_actual, actual_spend, survey_id_discrepancy, launch_date, deliver_date, salesperson')
     .is('deleted_at', null)
     .or('project_type.is.null,project_type.neq.Internal')
   if (error) throw error
