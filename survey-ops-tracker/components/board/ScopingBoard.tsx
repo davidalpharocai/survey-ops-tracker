@@ -56,6 +56,9 @@ export function ScopingBoard({ projects, wrapInContext = true, sortMode = 'due' 
           projects={projects
             .filter(p => (p.scoping_stage ?? 'New Inquiry') === stage)
             .sort(cardOrder('scoping', sortMode))}
+          // Whole-card convenience click ONLY — the card wrapper is the dnd drag
+          // handle, so it must not become an <a>. ProjectCard's TITLE carries the
+          // real <a href> (new-tab / middle-click / cmd-click).
           onCardClick={id => router.push(`/projects/${id}`)}
           isNewFor={isNewForMe}
         />

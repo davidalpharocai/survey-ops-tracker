@@ -2,6 +2,11 @@
 import { Caret } from '@/components/shared/Caret'
 
 import { useRef, useState } from 'react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/client'
+import { toast } from '@/lib/utils/toast'
+import { InfoTooltip } from '@/components/shared/InfoTooltip'
 import { FieldCell, FieldSection, NumberCell, TextCell, useSavedFlash } from './fields'
 import { GenPopNWarning } from './GenPopNWarning'
 import {
@@ -43,6 +48,8 @@ const TIP = {
     'Who the survey is fielded to — the target respondent profile (free text, e.g. "US adults 18+, likely voters").',
   segmentTotal:
     'The project N Target: the sum of the segment minimums through to the sum of the segment maximums.',
+  segmentNote:
+    'A note about THIS SEGMENT only — why its N is what it is, quota or audience quirks, who asked for it. The project has its own notes; this one travels with the segment.',
 }
 
 /**
@@ -239,8 +246,215 @@ export function NSegmentsEditor({ project }: { project: SurveyProject }) {
   )
 }
 
-/** One editable segment: name, full N, and audience — each cell writes through
- *  useUpdateSegment. The ✕ hands the whole row up for session-level Undo. */
+/**
+ * Is the note column there yet, and what does it say?
+ *
+ * Migration 084 is applied BY HAND, at a different time from this deploy, so both
+ * schemas have to work. useProjectSegments selects `*`, which makes key PRESENCE
+ * the honest signal: pre-084 the row arrives with NO `note` key at all, post-084
+ * it arrives with `note: null`. That costs no extra query — contrast
+ * useProjectFinancials, which needs its own isolated read because price_per_n
+ * also sits behind a whole table (082) that may be missing.
+ *
+ * `supported: false` hides the note affordance COMPLETELY rather than offering a
+ * field whose save can only fail: PostgREST rejects the entire request when a
+ * body names a column missing from its schema cache. And because this reads the
+ * live row, the note appears by itself the moment the SQL is applied — no second
+ * deploy, no flag.
+ *
+ * Exported for its own test: the pre-migration branch is the half that cannot be
+ * exercised against a database that already has the column.
+ */
+export function readSegmentNote(segment: unknown): {
+  supported: boolean
+  note: string | null
+} {
+  // `unknown` in, deliberately: whether a row HAS a note is a runtime fact about
+  // the database, not something the generated types can settle — types.ts is
+  // regenerated in its own pass and, pre-084, would be RIGHT to omit the column.
+  const supported = typeof segment === 'object' && segment !== null && 'note' in segment
+  const raw = supported ? (segment as { note?: unknown }).note : null
+  // '' and '   ' both mean "no note". The editor below writes null when cleared,
+  // but a row touched by SQL or the connector can hold either.
+  return {
+    supported,
+    note: typeof raw === 'string' && raw.trim() !== '' ? raw : null,
+  }
+}
+
+/**
+ * A cached segment row as this file has to treat it: the generated ProjectSegment
+ * plus the OPTIONAL note column, because pre-084 it genuinely is not there. Used
+ * for the optimistic patch below — `Row` itself would reject `note` as an excess
+ * property, which is TypeScript telling the truth about a schema this code is
+ * deliberately written to straddle.
+ */
+type SegmentRow = ProjectSegment & { note?: string | null }
+
+/**
+ * Pre-084, PostgREST answers PGRST204 — "Could not find the 'note' column of
+ * 'project_segments' in the schema cache". The UI hides the control in that case,
+ * so this only fires when a schema cache is stale (or the column was reverted).
+ * Name the migration rather than repeating a raw PostgREST string at the user.
+ */
+function needsNoteMigration(e: unknown): boolean {
+  const err = e as { code?: string; message?: string }
+  return err?.code === 'PGRST204' || /schema cache/i.test(err?.message ?? '')
+}
+
+/**
+ * The note write, deliberately ISOLATED from useUpdateSegment — the posture
+ * useSetSegmentRate (lib/hooks/useProjectFinancials.ts) takes for price_per_n,
+ * for the same two reasons:
+ *  · a PATCH body that names a column PostgREST cannot see fails ENTIRELY, so the
+ *    note must never ride along with n_target / n_collected. On its own, a stale
+ *    schema cache costs you the note; bundled, it would cost you the numbers.
+ *  · useUpdateSegment's payload IS the N contract (it asserts 078's min+max pair
+ *    on every call). A freeform sentence has no business in that type.
+ *
+ * Only the segments cache is invalidated: a note moves no total, no spend and no
+ * board field, so ['project'] and ['projects'] are deliberately left alone.
+ */
+function useSetSegmentNote(projectId: string) {
+  const supabase = createClient()
+  const qc = useQueryClient()
+  const key = ['segments', projectId]
+  return useMutation({
+    mutationFn: async ({ id, note }: { id: string; note: string | null }) => {
+      // `note` is not in the generated Database type yet (types.ts is regenerated
+      // in its own pass), so this one write goes through an untyped handle.
+      const db = supabase as unknown as SupabaseClient
+      const { error } = await db.from('project_segments').update({ note }).eq('id', id)
+      if (error) throw error
+    },
+    // Optimistic, in useClientNotes' shape. Not a nicety: the note row is only
+    // rendered when the ROW has a note, so writing the first one would make the
+    // editor close onto nothing for the length of a round trip — which reads
+    // exactly like "it didn't save". Rolling back on error is what makes this
+    // safe pre-084 as well: the restored snapshot has no `note` key, so the
+    // affordance disappears again instead of showing a note the table can't hold.
+    onMutate: async ({ id, note }) => {
+      await qc.cancelQueries({ queryKey: key })
+      const previous = qc.getQueryData<SegmentRow[]>(key)
+      qc.setQueryData<SegmentRow[]>(key, old =>
+        (old ?? []).map(s => (s.id === id ? { ...s, note } : s)),
+      )
+      return previous
+    },
+    onError: (e: Error, _vars, previous) => {
+      qc.setQueryData(key, previous)
+      toast(
+        needsNoteMigration(e)
+          ? 'Segment notes need the project_segments note migration (084) in Supabase, then try again.'
+          : "Couldn't save the note — it was reverted.",
+      )
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: key }),
+  })
+}
+
+/**
+ * One segment's note: a full-width row at the foot of the segment card that is
+ * CLICK-TO-EDIT AS A WHOLE LINE — the treatment a blast's description got in the
+ * deliberate 2026-07-21 change, rather than the launch note's always-visible
+ * textarea (077 / SuppliersWidget). The difference matters here: a segment card
+ * already carries a label, an N range, an internal target, collected, actual,
+ * audience, audience size and a price override, so a permanently open textarea
+ * per segment would push the numbers out of view. The editor is still a textarea,
+ * because a note is a sentence and not a field.
+ *
+ * The empty state renders NOTHING — no placeholder row, no empty box. The
+ * "＋ Note" trigger lives in the card's existing header row instead, so a segment
+ * without a note is not one pixel taller than before. Fully controlled (the
+ * header trigger has to be able to open it) and so testable on its own, the way
+ * NRangeCell is.
+ */
+export function SegmentNote({
+  note,
+  editing,
+  onOpen,
+  onClose,
+  onSave,
+}: {
+  note: string | null
+  editing: boolean
+  onOpen: () => void
+  onClose: () => void
+  /** null when the note is cleared — never '' (see readSegmentNote). */
+  onSave: (note: string | null) => void
+}) {
+  const [saved, flash] = useSavedFlash()
+  const escaped = useRef(false)
+
+  // Uncontrolled textarea seeded from defaultValue — the same shape the launch
+  // note uses: no draft state to keep in sync, and a background refetch mid-edit
+  // cannot overwrite what is being typed.
+  function commit(e: React.FocusEvent<HTMLTextAreaElement>) {
+    if (escaped.current) {
+      escaped.current = false
+      onClose()
+      return
+    }
+    const next = e.target.value.trim() || null
+    // Only write when something actually changed — opening and closing a note
+    // should not spend a round trip or refetch the list.
+    if (next !== note) {
+      onSave(next)
+      flash()
+    }
+    onClose()
+  }
+
+  if (editing) {
+    return (
+      <FieldCell label="Note" tooltip={TIP.segmentNote} editing saved={saved}>
+        <textarea
+          autoFocus
+          rows={2}
+          defaultValue={note ?? ''}
+          aria-label="Segment note"
+          placeholder="e.g. client asked for the oversample here — quota is regional"
+          onBlur={commit}
+          onKeyDown={e => {
+            if (e.key === 'Escape') {
+              e.preventDefault()
+              escaped.current = true
+              e.currentTarget.blur()
+            } else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+              // Enter alone has to stay a newline in a multi-line note, so the
+              // keyboard save is the usual ⌘/Ctrl+Enter.
+              e.preventDefault()
+              e.currentTarget.blur()
+            }
+          }}
+          className="w-full resize-y rounded border border-border bg-muted px-2 py-1 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none"
+        />
+        <p className="mt-1 text-[11px] text-muted-foreground">
+          This segment only. Enter adds a line · click away or ⌘/Ctrl+Enter to save · Esc
+          to cancel.
+        </p>
+      </FieldCell>
+    )
+  }
+
+  // No note and not editing: render nothing at all. This is the line that keeps
+  // an un-noted segment from growing a row.
+  if (!note) return null
+
+  return (
+    <FieldCell label="Note" tooltip={TIP.segmentNote} editable onEdit={onOpen} saved={saved}>
+      {/* FieldCell truncates the value slot to a single line, so a 500-word note
+          can never stretch the card; title= keeps all of it readable on hover. */}
+      <span className="truncate" title={note}>
+        {note}
+      </span>
+    </FieldCell>
+  )
+}
+
+/** One editable segment: name, full N, audience, and a per-segment note — each
+ *  cell writes through useUpdateSegment (the note through its own isolated
+ *  write). The ✕ hands the whole row up for session-level Undo. */
 function SegmentBlock({
   segment,
   index,
@@ -252,6 +466,11 @@ function SegmentBlock({
 }) {
   const update = useUpdateSegment(segment.project_id)
   const save = (updates: Partial<SegmentInput>) => update.mutate({ id: segment.id, updates })
+  const setNote = useSetSegmentNote(segment.project_id)
+  // Note state is lifted here because two controls open the same editor: the
+  // "＋ Note" trigger in the header (the empty state) and the note row itself.
+  const { supported: noteSupported, note } = readSegmentNote(segment)
+  const [editingNote, setEditingNote] = useState(false)
 
   return (
     <div className="rounded-lg border border-border bg-background/60 p-2.5">
@@ -259,13 +478,32 @@ function SegmentBlock({
         <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
           Segment {index + 1}
         </span>
-        <button
-          onClick={() => onRemove(segment)}
-          title="Remove segment"
-          className="shrink-0 text-sm text-muted-foreground/50 transition-colors hover:text-red-600 dark:hover:text-red-400"
-        >
-          ✕
-        </button>
+        <span className="flex shrink-0 items-center gap-0.5">
+          {/* The empty-state trigger rides in this EXISTING header row, so a
+              segment with no note stays exactly as tall as it is today. Hidden
+              entirely pre-084 (readSegmentNote), and replaced by the note row
+              itself once there is something to click. */}
+          {noteSupported && !note && !editingNote && (
+            <>
+              <button
+                type="button"
+                onClick={() => setEditingNote(true)}
+                title="Add a note about this segment"
+                className="text-[11px] font-medium text-primary hover:underline"
+              >
+                ＋ Note
+              </button>
+              <InfoTooltip text={TIP.segmentNote} />
+            </>
+          )}
+          <button
+            onClick={() => onRemove(segment)}
+            title="Remove segment"
+            className="text-sm text-muted-foreground/50 transition-colors hover:text-red-600 dark:hover:text-red-400"
+          >
+            ✕
+          </button>
+        </span>
       </div>
       <div className="grid grid-cols-1 gap-x-6 sm:grid-cols-2">
         <div className="sm:col-span-2">
@@ -309,6 +547,17 @@ function SegmentBlock({
           value={segment.audience_size}
           onSave={v => save({ audience_size: v })}
         />
+        {noteSupported && (note || editingNote) && (
+          <div className="sm:col-span-2">
+            <SegmentNote
+              note={note}
+              editing={editingNote}
+              onOpen={() => setEditingNote(true)}
+              onClose={() => setEditingNote(false)}
+              onSave={v => setNote.mutate({ id: segment.id, note: v })}
+            />
+          </div>
+        )}
       </div>
     </div>
   )

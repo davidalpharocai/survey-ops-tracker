@@ -370,6 +370,8 @@ export default function AdminPage() {
     {showNewClient && (
       <NewClientModal
         onClose={() => setShowNewClient(false)}
+        // Post-create redirect, not a link: the destination doesn't exist until
+        // the save returns, so there is nothing to render an <a href> for.
         onCreated={created => router.push(`/clients/${created.id}`)}
       />
     )}

@@ -1,4 +1,5 @@
 'use client'
+import Link from 'next/link'
 import { getDueDateStatus, formatDate } from '@/lib/utils/date'
 import type { SlimProject } from '@/lib/hooks/useProjects'
 import type { SprintConfig } from '@/lib/utils/sprints'
@@ -29,9 +30,17 @@ export function InternalCard({
       className="relative bg-background rounded-lg p-2.5 border border-border border-l-4 border-l-foreground/80 cursor-pointer hover:ring-1 hover:ring-ring transition-colors"
     >
       <div className="flex items-start justify-between gap-x-2 gap-y-1 mb-1 flex-wrap">
-        <span className="text-foreground text-sm font-semibold leading-tight break-words flex-1 basis-28 min-w-0">
+        {/* The TITLE is the real <a href> — never the card wrapper, which is the
+            drag handle. Mirrors ProjectCard: stopPropagation so a plain click
+            navigates once (the anchor) instead of also firing the card's onClick,
+            while cmd/ctrl-click and middle-click still open a new tab. */}
+        <Link
+          href={`/projects/${project.id}`}
+          onClick={e => e.stopPropagation()}
+          className="text-foreground text-sm font-semibold leading-tight break-words flex-1 basis-28 min-w-0 hover:text-blue-600 dark:hover:text-blue-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded transition-colors"
+        >
           {project.project_name}
-        </span>
+        </Link>
         <span className="flex items-center gap-1 flex-wrap justify-end shrink-0">
           {priorityChip && (
             <span className={`text-[12px] px-1.5 py-0.5 rounded ${priorityChip.classes}`} title={priorityChip.label}>

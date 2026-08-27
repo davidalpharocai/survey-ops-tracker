@@ -450,6 +450,10 @@ export default function BoardPage() {
               </p>
             ) : (
               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2">
+                {/* Whole-card convenience click. The real <a href> is on the
+                    card TITLE inside ProjectCard (so archived studies can be
+                    right-clicked open in a new tab like any other link); this
+                    onClick just keeps the rest of the card clickable. */}
                 {archivedShown.map(p => (
                   <ProjectCard
                     key={p.id}

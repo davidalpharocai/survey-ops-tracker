@@ -107,6 +107,10 @@ export default function InternalProjectsPage() {
                           <Draggable key={p.id} draggableId={p.id} index={index}>
                             {prov => (
                               <div ref={prov.innerRef} {...prov.draggableProps} {...prov.dragHandleProps}>
+                                {/* Whole-card convenience click ONLY — this wrapper
+                                    is the drag handle, so it must not become an
+                                    <a>. InternalCard's TITLE is the real <a href>
+                                    (right-click / middle-click / cmd-click). */}
                                 <InternalCard project={p} sprintConfig={sprintCfg ?? null} onClick={() => router.push(`/projects/${p.id}`)} />
                               </div>
                             )}

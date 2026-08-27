@@ -280,6 +280,11 @@ export function Board({ projects, teamMembers, onMoveProject, wrapInContext = tr
             .filter(p => columnMatch(p, stage))
             .sort(pipelineOrder)}
           isNewFor={isNewForMe}
+          // Whole-card convenience click ONLY — deliberately not a link. The card
+          // wrapper is the dnd drag handle, and an <a> there would hand the drag
+          // to the browser's native link-drag (ghost image and all). The real
+          // <a href> lives on the card TITLE inside ProjectCard, which is what
+          // makes right-click / middle-click / cmd-click open a new tab.
           onCardClick={id => router.push(`/projects/${id}`)}
           bodyClassName="h-[calc(100vh-15rem)] overflow-y-auto thin-scroll"
           collapseWhenEmpty

@@ -14,6 +14,7 @@ import { ClientNameHeading } from '@/components/client/ClientNameHeading'
 import { NewProjectModal } from '@/components/board/NewProjectModal'
 import { MergeButton } from '@/components/merge/MergeButton'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
+import { RowLink } from '@/components/shared/RowLink'
 import { Skeleton } from '@/components/shared/Skeleton'
 import { formatDate, getDueUrgency, urgencyPrefix } from '@/lib/utils/date'
 import { stageLabel } from '@/lib/utils/stage'
@@ -362,9 +363,9 @@ export default function ClientPage() {
     return (
       <div className="text-muted-foreground text-sm">
         Client not found.{' '}
-        <button onClick={() => router.push('/admin')} className="text-blue-600 dark:text-blue-400 underline">
+        <Link href="/admin" className="text-blue-600 dark:text-blue-400 underline">
           Back to Admin
-        </button>
+        </Link>
       </div>
     )
   }
@@ -376,7 +377,10 @@ export default function ClientPage() {
     return <span className="text-foreground/80 ml-1">{sortDir === 'asc' ? '↑' : '↓'}</span>
   }
 
-  // A normal (or nested child) project row — click-through to the project.
+  // A normal (or nested child) project row. The whole row stays clickable for
+  // convenience, but the project name is a REAL <a href> (RowLink) so the study
+  // can be right-clicked / middle-clicked / cmd-clicked open in a new tab —
+  // people work several studies side by side.
   const renderProjectRow = (p: ClientProject, opts: { zebra: boolean; child?: boolean }) => {
     // Delivered = board_column 'Delivery' (status stays 'Open'). Show it
     // as done with its delivery date instead of an overdue warning.
@@ -407,7 +411,7 @@ export default function ClientPage() {
         </td>
         <td className="px-4 py-3 text-sm text-foreground font-medium">
           {p.status === 'Hold' && <span title="On hold">⏸ </span>}
-          {p.project_name}
+          <RowLink href={`/projects/${p.id}`}>{p.project_name}</RowLink>
           {(p.project_type === 'PS' || p.project_type === 'B2B') && (
             <span className="ml-2 text-xs text-muted-foreground">{p.project_type}</span>
           )}

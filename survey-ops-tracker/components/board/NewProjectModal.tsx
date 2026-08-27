@@ -111,6 +111,8 @@ export function NewProjectModal({ teamMembers, initialClient, onClose }: NewProj
     try {
       const created = await createProject.mutateAsync(project)
       onClose()
+      // Post-create redirect, not a link — the project (and its URL) only exist
+      // once the insert returns, so there is nothing to hang an <a href> on.
       router.push(`/projects/${created.id}`)
     } catch {
       setError('Could not create the project. Please try again.')

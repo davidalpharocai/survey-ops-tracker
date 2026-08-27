@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import {
   startOfMonth,
   endOfMonth,
@@ -33,37 +33,69 @@ function dayKey(d: Date): string {
   return format(d, 'yyyy-MM-dd')
 }
 
+/**
+ * One event chip on the grid (or in the day popover).
+ *
+ * A chip that points at a project renders a REAL <a href>, so it can be
+ * right-clicked / middle-clicked / cmd-clicked open in a new tab like any other
+ * link — the reason this is an anchor and not the button it used to be. A chip
+ * with no project (a bare reminder) renders an inert div. Both carry the exact
+ * same classes, so the dense grid's row heights don't move.
+ *
+ * `onActivate` is a side effect only (the day popover uses it to close itself);
+ * navigation is the anchor's own job, which is what keeps modifier-clicks working.
+ */
 function EventChip({
   event,
-  onNavigate,
+  onActivate,
   compact = true,
 }: {
   event: CalendarEvent
-  onNavigate: (e: CalendarEvent) => void
+  onActivate?: (e: CalendarEvent) => void
   compact?: boolean
 }) {
   const meta = EVENT_TYPE_META[event.type]
   const clickable = !!event.projectId
   const ring = event.urgency ? URGENCY_RING[event.urgency] ?? '' : ''
   const label = compact ? event.title : `${meta.short}: ${event.title}`
-  return (
-    <button
-      type="button"
-      disabled={!clickable}
-      onClick={ev => {
-        ev.stopPropagation()
-        if (clickable) onNavigate(event)
-      }}
-      title={`${meta.short} · ${event.title}${clickable ? '' : ' (no linked project)'}`}
-      className={`w-full flex items-center gap-1 rounded px-1.5 py-0.5 text-left text-[12px] leading-tight truncate transition-colors ${meta.chip} ${ring} ${
-        clickable ? 'hover:brightness-95 cursor-pointer' : 'cursor-default'
-      }`}
-    >
+  const title = `${meta.short} · ${event.title}${clickable ? '' : ' (no linked project)'}`
+  const chipClass = `w-full flex items-center gap-1 rounded px-1.5 py-0.5 text-left text-[12px] leading-tight truncate transition-colors ${meta.chip} ${ring} ${
+    clickable ? 'hover:brightness-95 cursor-pointer' : 'cursor-default'
+  }`
+  const body = (
+    <>
       <span aria-hidden="true" className="shrink-0">
         {meta.icon}
       </span>
       <span className="truncate min-w-0">{label}</span>
-    </button>
+    </>
+  )
+  if (!event.projectId) {
+    // A chip with nowhere to go was a DISABLED button, and a disabled button
+    // swallows its click. Keep that exactly: without stopPropagation the click
+    // would now bubble to the day cell and pop the day open, which is a
+    // behaviour change this mechanics fix has no business making.
+    return (
+      <div title={title} className={chipClass} onClick={ev => ev.stopPropagation()}>
+        {body}
+      </div>
+    )
+  }
+  return (
+    <Link
+      href={`/projects/${event.projectId}`}
+      title={title}
+      // Stop the day cell's own onClick from ALSO opening the day popover.
+      // Only React bubbling is stopped — the anchor still navigates, and
+      // cmd/ctrl-click and middle-click still open a new tab.
+      onClick={ev => {
+        ev.stopPropagation()
+        onActivate?.(event)
+      }}
+      className={`${chipClass} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring`}
+    >
+      {body}
+    </Link>
   )
 }
 
@@ -76,6 +108,7 @@ function DayPopover({
   day: Date
   events: CalendarEvent[]
   onClose: () => void
+  /** Side effect when a chip is activated — the chip's anchor does the navigating. */
   onNavigate: (e: CalendarEvent) => void
 }) {
   useEffect(() => {
@@ -114,7 +147,7 @@ function DayPopover({
         <ul className="flex flex-col gap-1.5">
           {events.map(e => (
             <li key={e.id}>
-              <EventChip event={e} onNavigate={onNavigate} compact={false} />
+              <EventChip event={e} onActivate={onNavigate} compact={false} />
             </li>
           ))}
         </ul>
@@ -130,12 +163,7 @@ interface CalendarGridProps {
 }
 
 export function CalendarGrid({ byDate, viewMonth, onMonthChange }: CalendarGridProps) {
-  const router = useRouter()
   const [popoverDay, setPopoverDay] = useState<Date | null>(null)
-
-  const navigate = (e: CalendarEvent) => {
-    if (e.projectId) router.push(`/projects/${e.projectId}`)
-  }
 
   const monthStart = startOfMonth(viewMonth)
   const gridStart = startOfWeek(monthStart, { weekStartsOn: 0 })
@@ -221,7 +249,7 @@ export function CalendarGrid({ byDate, viewMonth, onMonthChange }: CalendarGridP
               </div>
               <div className="flex flex-col gap-0.5">
                 {shown.map(e => (
-                  <EventChip key={e.id} event={e} onNavigate={navigate} />
+                  <EventChip key={e.id} event={e} />
                 ))}
                 {overflow > 0 && (
                   <button
@@ -246,10 +274,8 @@ export function CalendarGrid({ byDate, viewMonth, onMonthChange }: CalendarGridP
           day={popoverDay}
           events={byDate[dayKey(popoverDay)] ?? []}
           onClose={() => setPopoverDay(null)}
-          onNavigate={e => {
-            setPopoverDay(null)
-            navigate(e)
-          }}
+          // The chip's anchor navigates; the popover just gets out of the way.
+          onNavigate={() => setPopoverDay(null)}
         />
       )}
     </div>

@@ -8,6 +8,7 @@ import type { SlimProject } from '@/lib/hooks/useProjects'
 import { useLatestSubmissionStatuses } from '@/lib/hooks/useSubmissions'
 import { isRerunProject } from '@/lib/reruns/isRerun'
 import { RerunChip } from '@/components/reruns/RerunChip'
+import { RowLink } from '@/components/shared/RowLink'
 
 export type SortField =
   | 'project_name'
@@ -263,20 +264,17 @@ export function ProjectTable({
             const dueColor = urgencyTextClass(urgency) || 'text-muted-foreground'
             // Row background: badly-overdue tint wins over the zebra stripe.
             const rowBg = badlyOverdue ? 'bg-red-500/5' : i % 2 === 1 ? 'bg-muted/70' : ''
+            // The row keeps its whole-row click for convenience, but the PROJECT
+            // NAME is the real <a href> (RowLink) — that's what makes right-click
+            // "Open in new tab", middle-click, cmd-click and keyboard focus work.
+            // The row deliberately no longer claims role="button"/tabIndex: a
+            // fake button wrapping a real link is nested interactive semantics,
+            // and the anchor inside is now both the focus stop and Enter target.
             return (
               <tr
                 key={p.id}
-                role="button"
-                tabIndex={0}
-                aria-label={`Open ${p.project_name}`}
                 onClick={() => router.push(`/projects/${p.id}`)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault()
-                    router.push(`/projects/${p.id}`)
-                  }
-                }}
-                className={`group border-t border-border cursor-pointer hover:bg-accent/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring transition-colors ${rowBg} ${
+                className={`group border-t border-border cursor-pointer hover:bg-accent/80 transition-colors ${rowBg} ${
                   p.status === 'Hold' ? 'opacity-60' : ''
                 }`}
               >
@@ -287,7 +285,7 @@ export function ProjectTable({
                   <div className="flex items-center gap-2">
                     <span>
                       {p.status === 'Hold' && <span title="On hold">⏸ </span>}
-                      {p.project_name}
+                      <RowLink href={`/projects/${p.id}`}>{p.project_name}</RowLink>
                     </span>
                     {p.project_code && (
                       <span
