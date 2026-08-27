@@ -43,6 +43,7 @@ import {
   cadenceToMonths, createSeriesFromProject, setSeriesDefaults,
   pauseSeries, endSeries, resumeSeries, spawnNextWave,
   attachProjectToSeries, detachProjectFromSeries, previewAttachFamily,
+  promotionFamilyConflict,
 } from '@/lib/reruns/seriesOps'
 import {
   confirmable, describeChanges, fmtChangeVal, fieldLabel, describeUnrevertible, todayEastern, fetchDocTitle,
@@ -341,7 +342,7 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'put_in_rerun_service',
     description:
-      "Put a project into rerun service — promote it to Wave 1 of a new first-class rerun series so future waves are tracked (and auto-spawned in 'auto' mode). Needs the project, its base_type (PS/B2B), and a cadence (monthly / quarterly / semiannual / yearly / adhoc — adhoc = no fixed cadence). Optional service_mode (auto = spawn automatically, manual = create each wave by hand; default auto) and delivery_cadence note. Preview first; confirm to apply.",
+      "Put a project into rerun service — promote it to Wave 1 of a new first-class rerun series so future waves are tracked (and auto-spawned in 'auto' mode). Needs the project, its base_type (PS/B2B), and a cadence (monthly / quarterly / semiannual / yearly / adhoc — adhoc = no fixed cadence). Optional service_mode (auto = spawn automatically, manual = create each wave by hand; default auto) and delivery_cadence note. ONLY for a study that has NO series yet: this creates a BRAND-NEW series and sweeps every survey linked to the project as a rerun into it, so if the project — or anything linked to it — is already in a series, it refuses and names add_survey_to_series, which adds the survey to the EXISTING series instead of duplicating it. Preview first; confirm to apply.",
     kind: 'write',
     schema: {
       project: z.string(),
@@ -363,11 +364,56 @@ export const TOOLS: AssistantTool[] = [
       if ('error' in p) return p
       if ('ambiguous' in p) return p
       meta.project_id = p.id as string
-      // Re-promotion guard: createSeriesFromProject sweeps a legacy
-      // rerun_series_id lineage but NOT an existing first-class series_id, so
-      // promoting an already-in-service project would mint a DUPLICATE series.
+      // Re-promotion guard, BOTH halves, and answered here — before confirmable
+      // — so the model gets an actionable message at preview time instead of an
+      // exception after the user has already said yes.
+      //
+      // Half one: this project is itself in a series. Half two, and the one that
+      // was missing: createSeriesFromProject sweeps the project's whole LEGACY
+      // LINEAGE FAMILY into the new series, so a project with series_id null can
+      // still have siblings that are already in a first-class series. Promoting
+      // it then mints a SECOND series for the same study and re-points those
+      // siblings into it. PR00207 is exactly that shape (null series_id, lineage
+      // root PR00341 in series 36329d48). seriesOps refuses either way now; this
+      // asks the same question first, and names add_survey_to_series as the tool
+      // that actually does what the user meant.
       if (p.series_id) {
         return { error: 'This project is already in a rerun series.', series_id: p.series_id as string }
+      }
+      const familyConflict = await promotionFamilyConflict(createAdminClient(), {
+        id: p.id as string,
+        project_code: p.project_code as string | null,
+        project_name: p.project_name as string,
+        series_id: null, // handled above; passing it again would just re-ask
+        rerun_series_id: p.rerun_series_id as string | null,
+      })
+      if (familyConflict) {
+        return {
+          error: familyConflict.error.message,
+          blocked_by: familyConflict.codes,
+          series_id: familyConflict.seriesIds[0],
+          // NOT a single `use_instead` directive. The guard knows a rerun LINK
+          // exists between these surveys, not that they are the same study —
+          // and a structured "do this instead" is read as an instruction and
+          // acted on. Live case: PR00197 ("SWK - Construction") is blocked by
+          // PR00232 ("SWK - Consumer - Wave 2") being linked to it; obeying
+          // add_survey_to_series there files a Construction study into the
+          // Consumer series. Two options and an explicit instruction to ASK is
+          // the honest answer when the tool cannot tell which fact is wrong.
+          options: [
+            {
+              if: 'the blocked surveys are the same study as this one',
+              use: 'add_survey_to_series',
+              note: 'adds this survey to the series they are already in',
+            },
+            {
+              if: 'they are NOT the same study — the rerun link between them is the mistake',
+              use: 'unlink the rerun link first, then retry put_in_rerun_service',
+              note: 'the project page wave list has the unlink control',
+            },
+          ],
+          ask_user_first: true,
+        }
       }
       const serviceMode = args.service_mode ?? 'auto'
       const cadenceMonths = cadenceToMonths(args.cadence)
