@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { ThemeToggle } from '@/components/shared/ThemeToggle'
 import { NavSearch } from '@/components/shared/NavSearch'
+import { hasUnreadChanges } from '@/lib/changelog/seen'
 
 const HANDOVER_URL =
   'https://docs.google.com/document/d/1rkT0KYApcvYU1BlK-TO_lfiXyhL0FuGIPz9UjduSJgk/edit'
@@ -64,6 +65,22 @@ const menuItemClass =
 export function TopNav() {
   const pathname = usePathname()
   const [moreOpen, setMoreOpen] = useState(false)
+
+  // Whether there is a changelog entry this browser hasn't seen. Starts FALSE
+  // and is filled in after mount on purpose: localStorage doesn't exist during
+  // server rendering, so reading it in the initial state would make the server
+  // and client markup disagree and React would blow the whole tree away with a
+  // hydration error. A dot that appears a frame late costs nothing.
+  const [seenStale, setSeenStale] = useState(false)
+  useEffect(() => {
+    setSeenStale(hasUnreadChanges())
+  }, [pathname])
+  // Suppressed while actually ON the changelog. Both this effect and the page's
+  // "mark as read" effect run in the same tick on that navigation, so reading
+  // localStorage here would still see the OLD value and the dot would linger for
+  // one more navigation. Hiding it on the page itself is both correct and what a
+  // reader expects; by the time they navigate away the marker has been written.
+  const unread = seenStale && pathname !== '/changelog'
   const moreRef = useRef<HTMLDivElement>(null)
 
   // Pending Deliverables-review + Email-review + overdue Rerun counts → badges. Fail soft to 0.
@@ -320,6 +337,9 @@ export function TopNav() {
             className="inline-flex items-center gap-1.5 text-sm px-2.5 py-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
           >
             <span aria-hidden="true">⋯</span> More
+            {/* Surfaced on the button too, not only on the item inside — a dot
+                nobody can see until they open the menu announces nothing. */}
+            {unread && <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />}
           </button>
           {moreOpen && (
             <div className="absolute left-0 top-full mt-2 z-50 w-60 bg-popover border border-border rounded-xl shadow-xl p-1.5 flex flex-col">
@@ -335,6 +355,15 @@ export function TopNav() {
               <div className="border-t border-border my-1.5" />
               <Link href="/guide" className={menuItemClass} title="How to use the tracker — the in-app guide (always current)">
                 <span>📖</span> User Guide
+              </Link>
+              <Link href="/changelog" className={menuItemClass} title="What's new — everything that changed in the tracker, newest first">
+                <span>✨</span> What&rsquo;s new
+                {unread && (
+                  <span
+                    className="ml-auto w-2 h-2 rounded-full bg-blue-500"
+                    title="There's something new since you last looked"
+                  />
+                )}
               </Link>
               <a href={HANDOVER_URL} target="_blank" rel="noopener noreferrer" className={menuItemClass} title="Systems, accounts, and runbooks — opens the Google Doc">
                 <span>🛟</span> Systems &amp; Handover <span className="ml-auto text-xs text-muted-foreground">↗</span>
