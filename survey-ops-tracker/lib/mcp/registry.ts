@@ -42,7 +42,7 @@ import { cloneProject } from '@/lib/server/clone'
 import {
   cadenceToMonths, createSeriesFromProject, setSeriesDefaults,
   pauseSeries, endSeries, resumeSeries, spawnNextWave,
-  attachProjectToSeries, detachProjectFromSeries,
+  attachProjectToSeries, detachProjectFromSeries, previewAttachFamily,
 } from '@/lib/reruns/seriesOps'
 import {
   confirmable, describeChanges, fmtChangeVal, fieldLabel, describeUnrevertible, todayEastern, fetchDocTitle,
@@ -398,7 +398,7 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'add_survey_to_series',
     description:
-      "Add an EXISTING survey to an EXISTING rerun series, so it is tracked as one of that series' waves. Use this when a wave was created by hand, or when a survey should have been part of a series but isn't — it is the fix for a survey that shows up on its own instead of grouped with the rest of the series on the client page. NOT the same as put_in_rerun_service, which promotes a project to Wave 1 of a BRAND-NEW series: using that on a survey whose family already has a series creates a second, duplicate series. Identify the survey by PR code or name, and the series by id or a client / survey-name query. The whole series is renumbered by date afterwards, so other waves' numbers can shift. Preview first; confirm to apply.",
+      "Add an EXISTING survey to an EXISTING rerun series, so it is tracked as one of that series' waves. Use this when a wave was created by hand, or when a survey should have been part of a series but isn't — it is the fix for a survey that shows up on its own instead of grouped with the rest of the series on the client page. NOT the same as put_in_rerun_service, which promotes a project to Wave 1 of a BRAND-NEW series: using that on a survey whose family already has a series creates a second, duplicate series. Identify the survey by PR code or name, and the series by id or a client / survey-name query. IMPORTANT: if the survey has other surveys linked to it as reruns, they are added TOO - the whole linked family moves together, which the preview lists by name. The series is then renumbered by date, so other waves' numbers can shift. Preview first; confirm to apply.",
     kind: 'write',
     schema: {
       project: z.string(),
@@ -435,23 +435,41 @@ export const TOOLS: AssistantTool[] = [
 
       return confirmable(
         args,
-        async () => ({
-          summary: `Add ${p.project_code ?? p.project_name} to ${label} as a wave`,
-          note: 'The whole series is renumbered by date afterwards, so other wave numbers may shift.',
-        }),
+        async () => {
+          // Attaching sweeps the survey's whole legacy lineage family, so the
+          // preview has to name ALL of it. "Add PR00262" really means "add
+          // PR00262 and its 13 linked waves", and confirming the first sentence
+          // while the second is true is how a user approves something they did
+          // not intend.
+          const admin = createAdminClient()
+          const family = await previewAttachFamily(admin, p.id as string)
+          const extra = family.codes.filter((c) => c !== (p.project_code ?? p.project_name))
+          return {
+            summary:
+              extra.length > 0
+                ? `Add ${p.project_code ?? p.project_name} to ${label} — along with ${extra.length} survey(s) linked to it: ${extra.join(', ')}`
+                : `Add ${p.project_code ?? p.project_name} to ${label} as a wave`,
+            also_moves: extra,
+            note: 'The whole series is renumbered by date afterwards, so other wave numbers may shift.',
+          }
+        },
         async () => {
           const admin = createAdminClient()
-          const { series, waves } = await attachProjectToSeries(
+          const { series, waves, attached } = await attachProjectToSeries(
             admin,
             seriesId,
             p.id as string,
             `${userEmail} via Claude`
           )
-          meta.detail = { series_id: seriesId, action: 'add_survey_to_series', project: p.project_code }
+          meta.detail = {
+            series_id: seriesId, action: 'add_survey_to_series',
+            project: p.project_code, attached,
+          }
           return {
             ok: true,
             series_id: series.id,
             survey_name: series.survey_name,
+            attached,
             wave_count: waves.length,
             waves: waves.map((w) => ({ wave: w.rerun_number, project_code: w.project_code, name: w.project_name })),
           }
