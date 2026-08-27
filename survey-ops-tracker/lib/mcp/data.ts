@@ -36,10 +36,15 @@ export function decodeSurveyId(
   }
 }
 
+// Noise columns dropped from the `select('*')` project payloads. sheet_synced_at /
+// sheet_synced_hash are here because the SOCC->Surveys write-back that maintained them
+// is deleted: the columns survive (migration 053, historical data kept) but are frozen,
+// so surfacing them would tell a reader the sheet is still being mirrored.
 const STRIPPED = [
   'created_at', 'updated_at', 'calendar_event_id', 'survey_ids_from_sheet',
   'survey_ids_synced_at', 'stage_doc_programming', 'stage_survey_programming',
   'stage_edwin_qa', 'stage_fielding', 'stage_data_qa', 'stage_delivery',
+  'sheet_synced_at', 'sheet_synced_hash',
 ] as const
 
 type Row = Record<string, unknown>
