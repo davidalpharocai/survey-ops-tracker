@@ -6,6 +6,7 @@ import {
   useRerunSeriesRecord,
   useRerunSeriesList,
   useRerunSeriesActions,
+  useSeriesAddCandidates,
 } from '@/lib/hooks/useRerunSeriesRecord'
 import { WaveSeriesView } from '@/components/reruns/WaveSeriesView'
 import { toast } from '@/lib/utils/toast'
@@ -55,13 +56,108 @@ function FirstClassWaveHistory({ project, seriesId }: { project: P; seriesId: st
           ↻ Open full series record ↗
         </Link>
       </div>
+      {/* Adding is offered on EVERY wave, including Wave 1 — and that is the
+          point David made: he should always be able to add a wave, and only be
+          blocked from removing the last one. A one-wave series previously had
+          neither control, so a project promoted by mistake was stuck. Adding a
+          second survey is now the way out of that. */}
+      <AddWaveToSeries seriesId={seriesId} client={project.client} />
+
       {!isOrigin && <RemoveFromSeries project={project} />}
-      {isOrigin && (
+      {isOrigin && data.waves.length <= 1 && (
+        <p className="text-[11px] text-muted-foreground/50">
+          The only wave in this series can&apos;t be removed — add another survey first.
+        </p>
+      )}
+      {isOrigin && data.waves.length > 1 && (
         <p className="text-[11px] text-muted-foreground/50">
           This is Wave 1 — the series is anchored to it, so it can&apos;t be removed. End the series
           instead.
         </p>
       )}
+    </div>
+  )
+}
+
+/** Add another EXISTING survey into this series.
+ *
+ *  The mirror of AddToSeries below: that one puts THIS survey into some other
+ *  series, this one pulls another survey into THIS series. Both end up calling
+ *  attach_wave; which of the two you reach for just depends on which page you
+ *  happen to be looking at, so both exist. */
+function AddWaveToSeries({ seriesId, client }: { seriesId: string; client: string }) {
+  const [picking, setPicking] = useState(false)
+  const { data: candidates = [], isLoading } = useSeriesAddCandidates(client, picking)
+  const act = useRerunSeriesActions()
+
+  function add(projectId: string, label: string) {
+    act.mutate(
+      { action: 'attach_wave', seriesId, projectId },
+      {
+        onSuccess: (res) => {
+          const n = res?.attached?.length ?? 1
+          toast(n > 1 ? `Added ${label} and ${n - 1} linked survey(s).` : `Added ${label}.`, 'success')
+          setPicking(false)
+        },
+        onError: (e) => toast((e as Error).message),
+      }
+    )
+  }
+
+  if (!picking) {
+    return (
+      <button
+        onClick={() => setPicking(true)}
+        className="text-[12px] text-primary hover:underline self-start"
+        title="Add an existing survey to this series as another wave"
+      >
+        ＋ Add a wave from an existing survey
+      </button>
+    )
+  }
+
+  const firm = client.split(' - ')[0].trim()
+
+  return (
+    <div className="rounded-lg border border-border bg-muted/40 p-2 flex flex-col gap-1">
+      <p className="text-[12px] text-muted-foreground">
+        Pick a {firm} survey to add as a wave. Anything linked to it as a rerun comes too, and the
+        series is renumbered by date afterwards.
+      </p>
+      {isLoading ? (
+        <p className="text-xs text-muted-foreground/50">Loading…</p>
+      ) : candidates.length === 0 ? (
+        <p className="text-xs text-muted-foreground/60">
+          No unassigned {firm} surveys to add — every one is already in a series.
+        </p>
+      ) : (
+        <div className="max-h-[12rem] overflow-y-auto flex flex-col thin-scroll">
+          {candidates.map((c) => (
+            <button
+              key={c.id}
+              disabled={act.isPending}
+              onClick={() => add(c.id, c.project_code ?? c.project_name)}
+              className="text-left rounded px-1.5 py-1 hover:bg-accent transition-colors disabled:opacity-40"
+            >
+              <span className="block text-sm text-foreground truncate">
+                {c.project_code ? `${c.project_code} · ` : ''}
+                {c.project_name}
+              </span>
+              <span className="block text-[12px] text-muted-foreground truncate">
+                {c.client}
+                {c.submitted_date ? ` · submitted ${c.submitted_date}` : ''}
+                {c.board_column ? ` · ${c.board_column}` : ''}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+      <button
+        onClick={() => setPicking(false)}
+        className="text-[12px] text-muted-foreground hover:text-foreground self-start"
+      >
+        Cancel
+      </button>
     </div>
   )
 }
