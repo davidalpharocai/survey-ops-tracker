@@ -9,6 +9,7 @@ import {
   computeInputsFingerprint,
   contextEnabled,
   isContextFresh,
+  readActivityCount,
   readProjectContext,
   resolveTopics,
   saveProjectContext,
@@ -21,7 +22,9 @@ import {
 
 // Context tab — per-project news/background.
 //   GET  : read the stored context. Cheap, no model call, instant.
-//   POST : refresh it now (one Opus + web-search call). Rate/cost guarded.
+//   POST : refresh it now. Rate/cost guarded. Two model calls now, not one:
+//          a Haiku 4.5 subject-extraction pass over the project's own records
+//          (~half a cent) followed by the Opus 5 + web-search briefing (~$0.60).
 //
 // The analyst's topic overrides are saved by a SEPARATE route,
 // app/api/projects/[id]/context/topics/route.ts — the browser has no write grant
@@ -79,10 +82,25 @@ async function loadProject(projectId: string): Promise<ContextProject | null> {
   return (data as unknown as ContextProject | null) ?? null
 }
 
-/** Does the stored briefing still describe the project as it is now? */
-function inputsStale(project: ContextProject, row: ProjectContextRow | null): boolean {
-  if (!row) return false
-  const expected = computeInputsFingerprint(project, resolveTopics(project, row))
+/**
+ * Does the stored briefing still describe the project as it is now?
+ *
+ * `activityCount` is the fingerprint's coarse evidence signal (see
+ * computeInputsFingerprint). It is `null` when the count query failed, and that
+ * is NOT the same as zero: hashing a failed query's 0 would produce a
+ * fingerprint the builder never stored, mark the row stale, and buy a refresh on
+ * every request. A null count means "no opinion" — say not stale, and let the
+ * freshness window do its job.
+ */
+function inputsStale(
+  project: ContextProject,
+  row: ProjectContextRow | null,
+  activityCount: number | null,
+): boolean {
+  if (!row || activityCount == null) return false
+  const expected = computeInputsFingerprint(project, resolveTopics(project, row), {
+    activity_count: activityCount,
+  })
   return !row.inputs_fingerprint || row.inputs_fingerprint !== expected
 }
 
@@ -95,13 +113,17 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 })
 
   const admin = createAdminClient()
-  const { row, tableMissing } = await readProjectContext(admin, id)
+  // A HEAD count — no rows cross the wire — so the GET stays cheap and instant.
+  const [{ row, tableMissing }, activityCount] = await Promise.all([
+    readProjectContext(admin, id),
+    readActivityCount(admin, id),
+  ])
   const body: Ok = {
     context: row,
     table_missing: tableMissing,
     fresh: isContextFresh(row),
     topics: resolveTopics(project, row),
-    stale_inputs: inputsStale(project, row),
+    stale_inputs: inputsStale(project, row, activityCount),
   }
   return NextResponse.json(body)
 }
@@ -115,7 +137,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 })
 
   const admin = createAdminClient()
-  const { row: existing, tableMissing } = await readProjectContext(admin, id)
+  const [{ row: existing, tableMissing }, activityCount] = await Promise.all([
+    readProjectContext(admin, id),
+    readActivityCount(admin, id),
+  ])
 
   const reply = (extra: Partial<Ok>, row: ProjectContextRow | null = existing): NextResponse =>
     NextResponse.json(
@@ -124,7 +149,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         table_missing: false,
         fresh: isContextFresh(row),
         topics: resolveTopics(project, row),
-        stale_inputs: inputsStale(project, row),
+        stale_inputs: inputsStale(project, row, activityCount),
         refreshed: false,
         ...extra,
       } satisfies Ok,
@@ -157,7 +182,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   // just changed the topics and should not have to wait 20 hours. It skips the
   // FRESHNESS window; it does NOT skip the claim below, which is the spend guard.
   const force = req.nextUrl.searchParams.get('force') === '1'
-  const fingerprint = computeInputsFingerprint(project, resolveTopics(project, existing))
+  // `undefined` (not null) when the count query failed: shouldRefresh treats
+  // undefined as "ignore the fingerprint, use the freshness window", which is the
+  // safe direction — a flaky count must not become a reason to spend.
+  const fingerprint =
+    activityCount == null
+      ? undefined
+      : computeInputsFingerprint(project, resolveTopics(project, existing), {
+          activity_count: activityCount,
+        })
   if (!force && !shouldRefresh(existing, Date.now(), fingerprint)) {
     // Two reasons to be "not due", and they need different words: a good recent
     // briefing (say nothing, the tab already shows it) versus a recent FAILURE
@@ -214,6 +247,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const outcome = await buildProjectContext(project, existing, {
     endpoint: 'project-context',
     userEmail: user.email,
+    admin,
   })
   const saved = await saveProjectContext(admin, id, outcome, existing?.refresh_status ?? null)
 
@@ -241,7 +275,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       table_missing: saved.tableMissing,
       fresh: isContextFresh(row),
       topics: resolveTopics(project, row),
-      stale_inputs: inputsStale(project, row),
+      stale_inputs: inputsStale(project, row, activityCount),
       refreshed,
       // A failed refresh leaves the previous summary in place; the note rides
       // alongside it rather than replacing it.

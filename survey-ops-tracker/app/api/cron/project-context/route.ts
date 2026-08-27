@@ -8,6 +8,7 @@ import {
   claimContextRefresh,
   computeInputsFingerprint,
   contextEnabled,
+  readActivityCounts,
   readManyProjectContexts,
   refreshSortKey,
   resolveTopics,
@@ -28,13 +29,27 @@ import {
  * and placeholder-wave projects are excluded, matching daily-digest and
  * searchProjects. That is ~17 projects today.
  *
- * COST: one Opus 5 call with up to 5 web searches per project per day. Tokens run
- * ~$0.20-$0.50 (search results land in the context window and are re-sent on each
- * tool turn) plus $0.05 for the searches themselves at $10/1,000 — call it
- * $0.25-$0.55 per project, so roughly $4-$9/day and $130-$280/month at 17 active
- * projects. That is real money, so the sweep is guarded five ways:
- *   1. `shouldRefresh` skips anything already fresh (<20h) or unchanged since its
- *      last briefing (083's inputs_fingerprint) — repeat runs are free,
+ * COST: TWO model calls per project per refresh. A Haiku 4.5 subject-extraction
+ * pass over the project's own records (activity, analyst notes, linked docs) at
+ * about $0.005, then the Opus 5 briefing with up to 5 web searches: tokens run
+ * ~$0.20-$0.50 (search results AND the project-records blob land in the context
+ * window and are re-sent on each tool turn) plus $0.05 for the searches
+ * themselves at $10/1,000. Call it $0.25-$0.60 per project.
+ *
+ * What the subject-extraction work added: ~$0.015 on a typical project and up to
+ * ~$0.10 on one with a big linked doc and a chatty inbox — half a cent of Haiku,
+ * and the rest the per-turn re-send of the evidence blob. See the cost note on
+ * buildProjectContext in lib/server/projectContext.ts for the arithmetic; the
+ * dial is MAX_EVIDENCE_CHARS there, not anything in this file. It buys a briefing
+ * that searches for Novo Nordisk instead of for "Considerers".
+ *
+ * Both calls are logged separately through logAiUsage (endpoints
+ * `project-context-cron` and `project-context-cron-extract`). That is real money,
+ * so the sweep is guarded five ways:
+ *   1. `shouldRefresh` skips anything still inside the freshness window
+ *      (CONTEXT_FRESH_HOURS — 72h today, and THAT constant is the cadence dial,
+ *      not this schedule) or unchanged since its last briefing (083's
+ *      inputs_fingerprint) — so repeat runs on the same day are free,
  *   2. `claimContextRefresh` stamps the attempt BEFORE the call, so two
  *      overlapping runs (or a run plus a manual click) cannot double-spend,
  *   3. `MAX_PROJECTS_PER_RUN` + a wall-clock deadline cap a single run,
@@ -55,10 +70,8 @@ import {
  * AND per-search fees — so the spend shows up in Admin → AI usage like every
  * other Claude call.
  *
- * SCHEDULING: vercel.json runs this at 09:20 / 10:20 / 11:20 UTC
- * ("20 9-11 * * *"). One 120s invocation cannot cover 17 projects, so it runs
- * three times and the freshness gate makes the repeats free; all three finish
- * before the 12:00 daily digest.
+ * (The SCHEDULE note above is authoritative: vercel.json fires this ONCE daily.
+ * An earlier three-firing schedule was rejected at deployment creation.)
  * --------------------------------------------------------------------------- */
 
 export const dynamic = 'force-dynamic'
@@ -70,9 +83,36 @@ export const maxDuration = 120
 const MAX_PROJECTS_PER_RUN = 8
 /** How many projects to research at once. Small: each call is expensive and slow,
  *  and Anthropic rate limits are shared with the assistant and ✦ Summary. */
-const CONCURRENCY = 2
-/** Stop STARTING new projects this many ms before maxDuration expires. */
-const DEADLINE_MS = 95_000
+// Four, not two. At CONCURRENCY 2 with a 25s start-deadline and a 40-70s build,
+// a run finishes ~2-4 projects — so ~19 active projects took 5-10 DAYS to cycle
+// while every comment, cost estimate and tooltip in the feature claimed 3. The
+// cadence was fiction. Four concurrent calls still fit inside maxDuration
+// because they overlap, and MAX_RUN_SPEND_USD remains the real spend ceiling.
+const CONCURRENCY = 4
+/**
+ * Stop STARTING new projects once this much of the invocation is gone.
+ *
+ * 25s — and the number is DERIVED from the timeout constants in
+ * lib/server/projectContext.ts, not tuned. One project's worst case is 90s:
+ * DOC_FETCH_TIMEOUT_MS 5s for the linked-doc read + EXTRACT_TIMEOUT_MS 15s for
+ * the Haiku subject-extraction call + BRIEFING_TIMEOUT_MS 70s for the Opus +
+ * web-search briefing. maxDuration is 120s, so anything STARTED after
+ * 120 - 90 = 30s can be killed by the platform mid-call — after the tokens are
+ * billed, with nothing logged and nothing saved. 25s leaves a small margin.
+ * Change any of those three timeouts and this number has to be re-derived.
+ *
+ * The honest consequence: a single invocation completes about 2-4 projects, not 8.
+ * A longer deadline does not buy throughput — it buys killed calls that were paid
+ * for and thrown away. MAX_PROJECTS_PER_RUN is the non-binding cap and the clock
+ * is the real one. If ~19 active projects need to cycle faster than that, the
+ * lever is more invocations or higher CONCURRENCY, not a deadline that outlives
+ * the function.
+ */
+// 45s, not 25s: this only stops workers STARTING, and a build that starts at 45s
+// still lands by ~115s inside maxDuration 120. Paired with CONCURRENCY 4 that is
+// ~8 projects a run, which actually delivers the 3-day cycle the feature claims
+// (19 projects / 8 per day = every ~2.4 days).
+const DEADLINE_MS = 45_000
 
 // A ceiling this sweep enforces ITSELF, independent of app_config.
 //
@@ -127,6 +167,12 @@ export async function GET(req: NextRequest) {
     admin,
     active.map((p) => p.id),
   )
+  // The fingerprint's coarse evidence signal — bucketed activity counts. HEAD
+  // counts, so no rows cross the wire; ~19 of them in chunks of 8 is three round
+  // trips of a few milliseconds. A project whose count failed is ABSENT from the
+  // map, and the gate below then skips the fingerprint for it rather than hashing
+  // a wrong value and buying a refresh it did not need.
+  const activityCounts = await readActivityCounts(admin, active.map((p) => p.id))
   if (tableMissing) {
     // Migration 083 hasn't been run yet. Not an error — just nothing to do.
     await logSystemEvent({
@@ -141,10 +187,15 @@ export async function GET(req: NextRequest) {
   const due = active.filter((p) => {
     const row = contexts.get(p.id) ?? null
     // 083's inputs_fingerprint is the authoritative staleness signal: a project
-    // whose name/client/audience/objective/category or topic lists have moved
-    // since its briefing was written is due even inside the freshness window, and
-    // merge_projects NULLs it precisely to force that.
-    const fingerprint = computeInputsFingerprint(p, resolveTopics(p, row))
+    // whose name/client/audience/objective/category, analyst notes, linked
+    // documents or human topic overrides have moved since its briefing was
+    // written is due even inside the freshness window, and merge_projects NULLs
+    // it precisely to force that.
+    const count = activityCounts.get(p.id)
+    const fingerprint =
+      count === undefined
+        ? undefined
+        : computeInputsFingerprint(p, resolveTopics(p, row), { activity_count: count })
     return shouldRefresh(row, now, fingerprint)
   })
 
@@ -216,6 +267,7 @@ export async function GET(req: NextRequest) {
       const outcome = await buildProjectContext(project, priorRow, {
         endpoint: 'project-context-cron',
         userEmail: null,
+        admin,
       })
       costUsd += outcome.costUsd
 
