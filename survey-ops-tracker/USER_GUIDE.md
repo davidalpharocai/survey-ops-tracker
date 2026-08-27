@@ -85,7 +85,7 @@ Below the Summary, the Overview body is a Salesforce-style **field grid** — al
 - **Details** — Submitted / Launch / Due / Delivery dates, a **Rerun date** row (longitudinal projects only), **Type**, and **Survey IDs** (comma separated; auto-filled overnight from the Edwin sync — a mismatch surfaces an inline "Use Edwin ID / Keep current" banner above the grid rather than overwriting silently).
 - **N & Audience** — see *N Segments* below.
 - **Money** — by project type: **PS** shows **Suppliers**, grouped into **launches** (fielding waves) — each launch has its own **target** plus supplier rows with a **$/complete (CPI)** and a per-supplier **cap**; before completes it shows a cost **range** (target × cheapest…priciest CPI), and **＋ Add launch** starts a new wave pre-filled from the last one. **B2B** shows **Blast Configuration** — each blast's **$/bid**, **# of people** reached, **# of completes** (editable inline as they trickle in), a date/time, and a description; cost = $/bid × completes. A Rerun-tagged or not-yet-typed project shows both, since neither maps cleanly. A **Budget & spend** summary sits underneath: Total budget, computed actual spend, cost/complete, and a budget-used bar.
-- **Flags** — five small color-coded, click-to-toggle chips — Longitudinal, Voter Survey QA, Citation Language, Row-Level Data, Terminations — each with an (i) explaining it.
+- **Flags** — small color-coded, click-to-toggle chips — Longitudinal, Row-Level Data, Occam — each with an (i) explaining it.
 
 Alongside the grid, a slim right rail holds: **People** (Client — click to open their page; the **Requested by** contact; Captain; Salesperson; and, for **B2B** projects with a Slack channel set, a **Slack** row that opens the channel in the desktop app rather than the browser), **Rerun history** (every wave of a recurring survey in order, each linking to that wave's page with its dates and N; a stand-alone survey can **↻ Link this as a rerun of another survey**, and a linked wave can be unlinked), **Compliance** (only when the client requires a review — see §7b), and **Latest / Next Steps** (add a to-do with Ctrl+Enter; check one off and it moves to the "Latest" log with date + who; old imported notes live under "History"). **Linked Documents** now sits at the bottom of the main column, below the field grid — paste any URL (its title fills in automatically), rename via ✎ or unlink via ✕ (the file stays in Drive).
 
@@ -148,9 +148,7 @@ The **✦ Assistant** is now a full working assistant — it can both **answer q
 
 - **Survey IDs** sync nightly (~6:45pm ET) from each project's Edwin link; conflicts show an amber review banner on the project
 - **Launch (fielding) date auto-fills** the day a project first moves into **Fielding** — but only if it's still blank, so a date you entered yourself is never overwritten. Still editable anytime in the Details grid.
-- **Voter QA + Citation flags** auto-set when the salesperson is Jenna or the project/client mentions "vote"
 - **Morning digest** posts to Slack at 8am ET: overdue, due-soon, and behind-pace projects
-- **Legacy sheet sync** (migration period): new PS/B2B projects and their changes are mirrored into the old "Surveys" Google Sheet automatically, so the team keeps seeing current data there while everyone moves onto SOCC
 - **Live updates**: teammates' changes appear on your screen within a second — no refreshing
 - **If a save ever fails**, a message pops up bottom-left and the change safely reverts — nothing is ever half-saved
 

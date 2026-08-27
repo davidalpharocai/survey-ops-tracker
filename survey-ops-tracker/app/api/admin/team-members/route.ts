@@ -17,8 +17,8 @@ async function requireAnalyst() {
   return profile?.role === 'analyst' ? user : null
 }
 
-// Initials feed the sheet write-back captain cell + card avatars — keep them
-// A–Z only, capped at 4 chars (matches the existing roster convention: "DS").
+// Initials feed the card avatars — keep them A–Z only, capped at 4 chars
+// (matches the existing roster convention: "DS").
 const cleanInitials = (s: string) => s.trim().toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4)
 
 export async function POST(req: Request) {

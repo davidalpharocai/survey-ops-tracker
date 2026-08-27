@@ -120,20 +120,13 @@ function buildChecks(p: Row, sup: SupRow[], blasts: BlastRow[], costs: CostRow[]
     checks.push({ check: 'survey_id_discrepancy', ok: false, advisory: false, detail: `survey ID mismatch flagged: ${String(disc)}` })
   }
 
-  // 5) Sheet copy behind the app — ADVISORY (only meaningful once write-back is live).
-  //    Compare DATE-only: survey_projects has a BEFORE-UPDATE trigger that bumps
-  //    updated_at=now() (DB commit time) in the same write that stamps sheet_synced_at
-  //    (app clock, captured pre-round-trip), so a raw timestamp compare would flag every
-  //    cleanly-synced row. A whole day behind is the real "stale" signal.
-  if (p.sheet_synced_at != null && p.updated_at != null &&
-      String(p.sheet_synced_at).slice(0, 10) < String(p.updated_at).slice(0, 10)) {
-    checks.push({
-      check: 'sheet_stale', ok: false, advisory: true,
-      detail: `sheet last synced ${String(p.sheet_synced_at).slice(0, 10)}, project updated ${String(p.updated_at).slice(0, 10)} — sheet copy is behind`,
-    })
-  }
+  // (The old `sheet_stale` advisory lived here. It compared sheet_synced_at against
+  //  updated_at, and both of those were only ever written by the SOCC->Surveys
+  //  write-back, which is deleted. sheet_synced_at is now frozen at whatever the
+  //  July-2026 runs left, so the check could only ever report "sheet copy is behind"
+  //  forever — a permanent false alarm. Dropped with the feature.)
 
-  // 6) Date-order sanity: launched after delivered is impossible.
+  // 5) Date-order sanity: launched after delivered is impossible.
   const launch = p.launch_date as string | null
   const deliver = p.deliver_date as string | null
   if (launch && deliver && launch > deliver) {
@@ -241,7 +234,7 @@ async function inChunks<T>(
 export async function dataHealth(args: { active_only?: boolean; limit?: number } = {}) {
   const supabase = createAdminClient()
   const { data: projData, error } = await supabase.from('survey_projects')
-    .select('id, project_code, project_name, status, phase, board_column, n_target, n_collected, n_actual, actual_spend, survey_id_discrepancy, sheet_synced_at, updated_at, launch_date, deliver_date')
+    .select('id, project_code, project_name, status, phase, board_column, n_target, n_collected, n_actual, actual_spend, survey_id_discrepancy, launch_date, deliver_date')
     .is('deleted_at', null)
     .or('project_type.is.null,project_type.neq.Internal')
   if (error) throw error
