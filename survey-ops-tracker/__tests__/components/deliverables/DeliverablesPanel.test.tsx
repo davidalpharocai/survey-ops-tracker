@@ -32,6 +32,11 @@ vi.mock('@/lib/hooks/useDeliverables', () => ({
     isLoading: false,
   }),
   useUploadDeliverable: () => ({ mutate: vi.fn(), isPending: false }),
+  // The panel calls this on every render (it powers the per-row ✕ remove
+  // control). vi.mock replaces the WHOLE module, so an unlisted export is
+  // `undefined` and the component throws on render — every export the panel
+  // imports at runtime has to be present here, used by these assertions or not.
+  useRemoveDeliverable: () => ({ mutate: vi.fn(), isPending: false }),
 }))
 
 function wrap(ui: React.ReactNode) {

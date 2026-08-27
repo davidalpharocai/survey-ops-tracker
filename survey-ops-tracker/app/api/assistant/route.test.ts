@@ -77,9 +77,22 @@ vi.mock('@anthropic-ai/sdk', () => {
 })
 
 // --- Supabase (session + admin telemetry sink) --------------------------------
+// Both POST handlers do two things with the session client: read the user, then
+// read that user's `profiles.role` for the analyst gate. The gate query has to
+// be mocked as the full `.from().select().eq().single()` chain — without it the
+// route throws "supabase.from is not a function" before the loop ever runs.
+// Every test here acts as an analyst (the only role that exists today), so the
+// chain answers 'analyst' regardless of the table/column asked for.
 vi.mock('@/lib/supabase/server', () => ({
   createClient: async () => ({
     auth: { getUser: async () => ({ data: { user: { id: 'u1', email: h.userEmail } } }) },
+    from: () => ({
+      select: () => ({
+        eq: () => ({
+          single: async () => ({ data: { role: 'analyst' }, error: null }),
+        }),
+      }),
+    }),
   }),
 }))
 vi.mock('@/lib/supabase/admin', () => ({
