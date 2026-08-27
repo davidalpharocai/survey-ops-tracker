@@ -521,6 +521,138 @@ export type Database = {
         }
         Relationships: []
       }
+      // ── Roles as permission bundles (migration 085) ──────────────────────────
+      // Every entry below MUST end with `Relationships: []`. Omitting it on ONE
+      // table collapses this ENTIRE schema type to `never` — hundreds of
+      // "not assignable to never" errors app-wide, with no syntax error and
+      // balanced braces to point at. That has cost this repo an hour once
+      // already; don't rediscover it.
+      permissions: {
+        Row: {
+          name: string
+          description: string
+          is_sensitive: boolean
+        }
+        Insert: {
+          name: string
+          description: string
+          is_sensitive?: boolean
+        }
+        Update: {
+          name?: string
+          description?: string
+          is_sensitive?: boolean
+        }
+        Relationships: []
+      }
+      roles: {
+        Row: {
+          name: string
+          description: string
+        }
+        Insert: {
+          name: string
+          description: string
+        }
+        Update: {
+          name?: string
+          description?: string
+        }
+        Relationships: []
+      }
+      role_permissions: {
+        Row: {
+          role: string
+          permission: string
+        }
+        Insert: {
+          role: string
+          permission: string
+        }
+        Update: {
+          role?: string
+          permission?: string
+        }
+        Relationships: []
+      }
+      profile_roles: {
+        Row: {
+          profile_id: string
+          role: string
+          granted_by: string | null
+          granted_at: string
+        }
+        Insert: {
+          profile_id: string
+          role: string
+          granted_by?: string | null
+          granted_at?: string
+        }
+        Update: {
+          profile_id?: string
+          role?: string
+          granted_by?: string | null
+          granted_at?: string
+        }
+        Relationships: []
+      }
+      permission_audit: {
+        Row: {
+          id: number
+          at: string
+          actor: string
+          action: string
+          subject_id: string | null
+          subject: string
+          target: string
+          reason: string | null
+        }
+        Insert: {
+          id?: number
+          at?: string
+          actor: string
+          action: string
+          subject_id?: string | null
+          subject: string
+          target: string
+          reason?: string | null
+        }
+        Update: {
+          id?: number
+          at?: string
+          actor?: string
+          action?: string
+          subject_id?: string | null
+          subject?: string
+          target?: string
+          reason?: string | null
+        }
+        Relationships: []
+      }
+      profile_provisioning: {
+        Row: {
+          email: string
+          role: string
+          note: string | null
+          added_by: string | null
+          added_at: string
+        }
+        Insert: {
+          email: string
+          role: string
+          note?: string | null
+          added_by?: string | null
+          added_at?: string
+        }
+        Update: {
+          email?: string
+          role?: string
+          note?: string | null
+          added_by?: string | null
+          added_at?: string
+        }
+        Relationships: []
+      }
       clients: {
         Row: {
           id: string
@@ -1802,6 +1934,50 @@ export type Database = {
       }
     }
     Functions: {
+      // ── Access administration (migration 085) ────────────────────────────────
+      // service_role EXECUTE only — `authenticated` is revoked, so these are
+      // reachable from the server route and nowhere else. p_actor_id is the
+      // CALLER's own profile id, which is how the self-grant guard works.
+      grant_role: {
+        Args: {
+          p_actor_id: string
+          p_actor: string
+          p_subject_id: string
+          p_role: string
+          p_reason?: string | null
+        }
+        Returns: undefined
+      }
+      revoke_role: {
+        Args: {
+          p_actor_id: string
+          p_actor: string
+          p_subject_id: string
+          p_role: string
+          p_reason?: string | null
+        }
+        Returns: undefined
+      }
+      grant_capability: {
+        Args: {
+          p_actor_id: string
+          p_actor: string
+          p_subject_id: string
+          p_capability: string
+          p_reason?: string | null
+        }
+        Returns: undefined
+      }
+      revoke_capability: {
+        Args: {
+          p_actor_id: string
+          p_actor: string
+          p_subject_id: string
+          p_capability: string
+          p_reason?: string | null
+        }
+        Returns: undefined
+      }
       replace_rerun_snapshot: {
         Args: { rows: Json }
         Returns: number
