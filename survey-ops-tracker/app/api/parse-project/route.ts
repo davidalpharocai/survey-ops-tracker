@@ -47,8 +47,6 @@ const FIELDS_SCHEMA = {
     longitudinal: { type: 'boolean' },
     row_level_data: { type: 'boolean' },
     terminations: { type: 'boolean' },
-    voter_survey_qa: { type: 'boolean' },
-    citation_language_needed: { type: 'boolean' },
     survey_tool_id: { type: 'string', description: 'Comma separated survey IDs' },
     slack_channel_url: { type: 'string' },
     board_column: {

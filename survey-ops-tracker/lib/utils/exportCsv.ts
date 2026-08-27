@@ -43,7 +43,6 @@ const COLUMNS: CsvColumn[] = [
   { header: 'Budget', value: p => p.budget, restricted: true },
   { header: 'Actual Spend', value: p => p.actual_spend },
   { header: 'Longitudinal', value: p => p.longitudinal },
-  { header: 'Citation Language', value: p => p.citation_language_needed },
   { header: 'Row-Level Data', value: p => p.row_level_data },
   { header: 'Survey IDs', value: p => p.survey_tool_id },
   { header: 'Slack Channel', value: p => p.slack_channel_url },

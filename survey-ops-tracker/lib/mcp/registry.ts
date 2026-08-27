@@ -2626,8 +2626,6 @@ export const TOOLS: AssistantTool[] = [
       submitted_date: z.string().optional(),
       row_level_data: z.boolean().optional(),
       longitudinal: z.boolean().optional(),
-      voter_survey_qa: z.boolean().optional(),
-      citation_language_needed: z.boolean().optional(),
       terminations: z.boolean().optional(),
       latest_next_steps: z.string().optional(),
       skip_scoping: z.boolean().optional(),
@@ -2642,8 +2640,8 @@ export const TOOLS: AssistantTool[] = [
         n_target?: number; n_target_max?: number
         n_internal_target?: number; audience_size?: number; audience?: string; budget?: number
         launch_date?: string; deliver_date?: string; submitted_date?: string
-        row_level_data?: boolean; longitudinal?: boolean; voter_survey_qa?: boolean
-        citation_language_needed?: boolean; terminations?: boolean; latest_next_steps?: string
+        row_level_data?: boolean; longitudinal?: boolean
+        terminations?: boolean; latest_next_steps?: string
         skip_scoping?: boolean; confirm?: boolean; proceed_despite_duplicate?: boolean; idem_key?: string
       }
       const { userEmail } = ctx
@@ -2765,8 +2763,6 @@ export const TOOLS: AssistantTool[] = [
       if (args.deliver_date) extras.deliver_date = args.deliver_date
       if (args.row_level_data != null) extras.row_level_data = args.row_level_data
       if (args.longitudinal != null) extras.longitudinal = args.longitudinal
-      if (args.voter_survey_qa != null) extras.voter_survey_qa = args.voter_survey_qa
-      if (args.citation_language_needed != null) extras.citation_language_needed = args.citation_language_needed
       if (args.terminations != null) extras.terminations = args.terminations
       if (args.latest_next_steps) extras.latest_next_steps = args.latest_next_steps
 

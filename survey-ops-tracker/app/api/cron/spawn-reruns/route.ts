@@ -105,7 +105,7 @@ export async function GET(req: NextRequest) {
       // 078 is applied. price_per_n is deliberately NOT in this list: 082 is not,
       // and PostgREST fails the WHOLE request over one unknown column, which
       // would take the entire nightly spawn down. It is read separately below.
-      'id, project_name, client, captain_id, co_captain_ids, salesperson, n_target, n_target_max, audience_size, linked_documents, voter_survey_qa, citation_language_needed, row_level_data, compliance_override, rerun_number, rerun_series_id, series_id, rerun_date, rerun_spawned_at, longitudinal, status, board_column'
+      'id, project_name, client, captain_id, co_captain_ids, salesperson, n_target, n_target_max, audience_size, linked_documents, row_level_data, compliance_override, rerun_number, rerun_series_id, series_id, rerun_date, rerun_spawned_at, longitudinal, status, board_column'
     )
     .eq('longitudinal', true)
     .not('rerun_date', 'is', null)
@@ -163,8 +163,9 @@ export async function GET(req: NextRequest) {
         n_actual: null,
         audience_size: p.audience_size,
         longitudinal: true,
-        voter_survey_qa: p.voter_survey_qa,
-        citation_language_needed: p.citation_language_needed,
+        // voter_survey_qa / citation_language_needed are deliberately NOT carried:
+        // both were retired (migration 090 stopped the 009 auto-set), so copying
+        // them would be seeding a new wave with a dead column's value.
         row_level_data: p.row_level_data,
         compliance_override: p.compliance_override,
         linked_documents: p.linked_documents,

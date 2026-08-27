@@ -14,6 +14,11 @@ export const PROJECT_WRITE_FIELDS = [
   // 078). Both are writable, and alignNRangePatch() below is why a caller may
   // name just one of them.
   'n_target','n_target_max','n_collected','n_actual','n_internal_target','audience_size','budget',
+  // voter_survey_qa, citation_language_needed and terminations are RETIRED flags
+  // (no UI, no auto-set since migration 090) but stay writable here on purpose:
+  // update_project takes a generic `fields` record, so nothing advertises them to
+  // a caller, and undo_last_change replays audited values through this same
+  // whitelist — an audit row for a retired column should still be undoable.
   'longitudinal','voter_survey_qa','citation_language_needed','row_level_data','terminations',
   'survey_tool_id','slack_channel_url','latest_next_steps',
   // Added 2026-07-20 (migration 057): plain fields the connector couldn't set before.
