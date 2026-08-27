@@ -62,6 +62,11 @@ export async function POST(req: Request) {
         if (baseType !== 'B2B' && baseType !== 'PS') {
           return NextResponse.json({ error: "base_type must be 'B2B' or 'PS'." }, { status: 400 })
         }
+        // createSeriesFromProject refuses (409, message written for a person)
+        // when the project or anything linked to it as a rerun is already in a
+        // series — promoting then would mint a duplicate series and steal those
+        // siblings. The catch below passes that message through verbatim, so the
+        // modal's toast reads as an explanation rather than a 500.
         const { series, waves } = await createSeriesFromProject(
           admin,
           {

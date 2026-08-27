@@ -146,10 +146,11 @@ export async function cancelWave(admin: Admin, waveId: string): Promise<void> {
  * numbers. That affected drag-reorder and promotion too, not only the new
  * attach/detach.
  *
- * So: park every wave on a distinct NEGATIVE number first (no real wave is ever
- * negative, and negatives cannot collide with the positive numbers still in
- * place), then write the final values into the now-empty positive range. Two
- * passes over a handful of rows, and no ordering to reason about.
+ * So: move every wave whose number CHANGES onto a distinct number ABOVE the live
+ * range first, then write the final values into the slots that frees. Two passes
+ * over a handful of rows, and no ordering to reason about. Parking above rather
+ * than below zero means a renumber that dies between the phases leaves a wave
+ * numbered too high rather than negative — wrong, but not obviously corrupt.
  *
  * Every UPDATE is checked. A renumber that half-applies is worse than one that
  * fails loudly, because the numbers are what the UI sorts and labels by. */
@@ -203,6 +204,180 @@ export async function applyRenumber(admin: Admin, seriesId: string, originId: st
 }
 
 // ---------------------------------------------------------------------------
+// legacy-lineage family sweep — the shared guard for BOTH series_id writers
+// ---------------------------------------------------------------------------
+//
+// Two functions put an EXISTING survey into a series, and both sweep the whole
+// LEGACY LINEAGE FAMILY (`id.eq.<root> OR rerun_series_id.eq.<root>`) rather
+// than the one survey named: createSeriesFromProject (promote to Wave 1 of a
+// NEW series) and attachProjectToSeries (add to an EXISTING one). Sweeping is
+// right — a lineage root carries its children, and moving the root alone leaves
+// them pointing at a parent inside a series they are not in — but it means
+// either call can re-home a survey the caller never mentioned.
+//
+// attach refused that from the start. createSeriesFromProject did NOT, and its
+// only guard lived one layer up in the MCP tool, keyed on the promoted project's
+// OWN series_id. That misses the case that actually happens: promote a legacy
+// CHILD whose series_id is null but whose siblings are already in a first-class
+// series, and you get a SECOND series for the same study plus those siblings
+// silently moved into it. PR00207 (HingeVoter / Carah) is exactly that shape —
+// series_id null, while its lineage root PR00341 sits in series 36329d48 — so
+// "put PR00207 into rerun service" would have duplicated the series and pulled
+// PR00341 out of the one it is in. The right action there is add_survey_to_series
+// (the series page's "Add wave"), which is what the refusal now says.
+//
+// So the judgement lives here, once, and both paths share it.
+
+export type FamilyMemberRow = {
+  id: string
+  project_code: string | null
+  project_name: string
+  series_id: string | null
+}
+
+/** Every live survey in a project's legacy lineage family — the exact set both
+ *  writers sweep. The root is the project's `rerun_series_id` when it has one (it
+ *  is a legacy child, so the root is its parent) else its own id (it IS the root,
+ *  by the convention in app/api/projects/link-rerun/route.ts). */
+export async function fetchLegacyFamily(
+  admin: Admin,
+  project: { id: string; rerun_series_id?: string | null }
+): Promise<{ root: string; members: FamilyMemberRow[] }> {
+  const root = project.rerun_series_id ?? project.id
+  const { data, error } = await admin
+    .from('survey_projects')
+    .select('id, project_code, project_name, series_id')
+    .or(`id.eq.${root},rerun_series_id.eq.${root}`)
+    .is('deleted_at', null)
+  if (error) throw new Error(error.message)
+  return { root, members: (data ?? []) as FamilyMemberRow[] }
+}
+
+/** The family members a sweep would STEAL: already in a first-class series, and
+ *  not the one being swept into. Pure, so both paths judge the identical set and
+ *  the refusal is unit-testable without a DB.
+ *
+ *  `intoSeriesId` is the series the sweep aims at — an existing series for attach
+ *  (a member already there is the idempotent case, not a conflict), or NULL for a
+ *  promotion, because the series is created by that same call and nobody can
+ *  already legitimately be in it. */
+export function familySeriesConflicts<T extends { series_id: string | null }>(
+  family: T[],
+  intoSeriesId: string | null
+): T[] {
+  return family.filter((f) => f.series_id != null && f.series_id !== intoSeriesId)
+}
+
+/** The refusal both paths raise, worded the same way on purpose: one sentence
+ *  naming the surveys that block it, then one saying what to do instead.
+ *  `action` completes "Can't <action>: …" — `add PR00010`,
+ *  `put PR00207 into rerun service`. 409, because this is a real conflict with
+ *  existing data rather than bad input. */
+export function familySeriesConflictError(
+  action: string,
+  conflicting: Array<{ project_code: string | null; project_name: string }>,
+  remedy: string,
+  seriesLabel?: string
+): SeriesOpError {
+  const codes = conflicting.map((c) => c.project_code ?? c.project_name).join(', ')
+  const one = conflicting.length === 1
+  const where = seriesLabel ? ` (${seriesLabel})` : ''
+  return new SeriesOpError(
+    `Can't ${action}: ${codes} ${one ? 'is' : 'are'} linked to it and already in a different series${where}. ${remedy}`,
+    409
+  )
+}
+
+export type PromotionConflict = {
+  /** Worded for a person, and a SeriesOpError so the route passes it through as
+   *  a 409 with the message intact instead of a 500. */
+  error: SeriesOpError
+  /** The blocking surveys and the series they are already in, as fields — so a
+   *  connector or UI response can carry them structured, not only as prose. */
+  codes: string[]
+  seriesIds: string[]
+}
+
+/** Would promoting this project to Wave 1 of a NEW series duplicate a series
+ *  that already exists for the same study? Returns the refusal, or null when the
+ *  promotion is safe.
+ *
+ *  Read-only, which is the whole point: createSeriesFromProject calls it BEFORE
+ *  inserting the series row (refusing afterwards would leave an orphan
+ *  rerun_series behind), and put_in_rerun_service calls it at PREVIEW time so the
+ *  user is never asked to confirm something that cannot happen. Both therefore
+ *  say the same thing.
+ *
+ *  Pass `members` when the caller has already read the family, so the set checked
+ *  is exactly the set swept. */
+export async function promotionFamilyConflict(
+  admin: Admin,
+  project: {
+    id: string
+    project_code?: string | null
+    project_name?: string | null
+    series_id?: string | null
+    rerun_series_id?: string | null
+  },
+  members?: FamilyMemberRow[]
+): Promise<PromotionConflict | null> {
+  const label = project.project_code ?? project.project_name ?? 'this survey'
+
+  // The project itself, kept separate from the family case below: the family
+  // query INCLUDES the project, and "PR00207 is linked to it" reads as nonsense
+  // when "it" IS PR00207. This half also closes a hole of its own — the only
+  // check on re-promotion lived in the MCP tool, so a direct POST to the series
+  // route could promote an already-in-service project a second time.
+  if (project.series_id) {
+    return {
+      error: new SeriesOpError(
+        `${label} is already in a rerun series. Work with the series it is in, or remove it from that one first.`,
+        409
+      ),
+      codes: [label],
+      seriesIds: [project.series_id],
+    }
+  }
+
+  const family = members ?? (await fetchLegacyFamily(admin, project)).members
+  const conflicting = familySeriesConflicts(family, null)
+  if (conflicting.length === 0) return null
+
+  const seriesIds = [...new Set(conflicting.map((c) => c.series_id as string))]
+  const codes = conflicting.map((c) => c.project_code ?? c.project_name)
+  return {
+    error: familySeriesConflictError(
+      `put ${label} into rerun service`,
+      conflicting,
+      // Deliberately offers BOTH paths instead of prescribing one. The guard
+      // knows only that a lineage LINK exists — not that the two surveys are
+      // the same study, and it cannot know. Sometimes the link is the error.
+      //
+      // Live example: PR00197 is "Stanley Black & Decker (SWK) - Construction"
+      // and it is blocked because PR00232, "SWK - Consumer - Wave 2", is linked
+      // to it and sits in the "SWK - Consumer" series. Telling the user to add
+      // PR00197 to that series would file a Construction study as a wave of the
+      // Consumer one — a worse outcome than the duplicate series being
+      // prevented. So: name both surveys and the series, and let the person
+      // decide which of the two facts is wrong.
+      `Promoting ${label} would create a SECOND series and move ${codes.join(', ')} into it. If ${label} really is part of that same study, add it to the existing series instead. If it is NOT — the rerun link between them is the mistake — unlink ${codes.join(', ')} from ${label} first, then promote.`,
+      await describeSeriesIds(admin, seriesIds)
+    ),
+    codes,
+    seriesIds,
+  }
+}
+
+/** Human label for the series a conflict points at — "Acme Tracker", falling
+ *  back to the raw id if the row has gone. Names, because a bare UUID in a toast
+ *  tells the reader nothing about which series to add the survey to instead. */
+async function describeSeriesIds(admin: Admin, seriesIds: string[]): Promise<string> {
+  const { data } = await admin.from('rerun_series').select('id, survey_name').in('id', seriesIds)
+  const byId = new Map((data ?? []).map((s) => [s.id, s.survey_name]))
+  return seriesIds.map((id) => byId.get(id) ?? id).join(', ')
+}
+
+// ---------------------------------------------------------------------------
 // create
 // ---------------------------------------------------------------------------
 
@@ -219,7 +394,13 @@ export interface CreateSeriesParams {
 /** Promote a project to Wave 1 of a new first-class rerun series: insert the
  * series row, sweep any legacy lineage (`id.eq.<root> OR rerun_series_id.eq.<root>`)
  * into series_id, force the promoted project to Wave 1 via renumber, then set
- * next_wave_no = max wave + 1. Returns the final series row + its waves. */
+ * next_wave_no = max wave + 1. Returns the final series row + its waves.
+ *
+ * REFUSES (409) when the project — or anything in that legacy lineage — is
+ * already in a first-class series, because the sweep would otherwise create a
+ * second series for the same study and re-point those siblings into it. Adding
+ * the survey to the existing series (attachProjectToSeries) is the operation the
+ * caller wanted. */
 export async function createSeriesFromProject(
   admin: Admin,
   params: CreateSeriesParams,
@@ -232,12 +413,29 @@ export async function createSeriesFromProject(
 
   const { data: project, error: projErr } = await admin
     .from('survey_projects')
-    .select('id, client, client_id, project_name, captain_id, rerun_series_id, rerun_number')
+    .select('id, project_code, client, client_id, project_name, captain_id, series_id, rerun_series_id, rerun_number')
     .eq('id', params.projectId)
     .is('deleted_at', null)
     .maybeSingle()
   if (projErr) throw new Error(projErr.message)
   if (!project) throw new SeriesOpError('Project not found.', 404)
+
+  // REFUSE RATHER THAN STEAL, and refuse BEFORE the insert.
+  //
+  // The sweep further down moves the project's whole legacy lineage family into
+  // the new series. If any of that family already belongs to a first-class
+  // series, this promotion would mint a duplicate series for the same study and
+  // drag those siblings into it — the PR00207 / PR00341 case in the section
+  // header above. Same judgement, and deliberately the same shape of message, as
+  // attachProjectToSeries.
+  //
+  // The order matters twice over: the check has to precede the rerun_series
+  // INSERT (throwing after it would leave an orphan series row that nothing
+  // cleans up), and the family is read ONCE here and reused for the sweep, so the
+  // set the guard approved is exactly the set that moves.
+  const family = await fetchLegacyFamily(admin, project)
+  const conflict = await promotionFamilyConflict(admin, project, family.members)
+  if (conflict) throw conflict.error
 
   const futureDefaultsIn = (params.future_defaults ?? {}) as Record<string, unknown>
   const insert: TablesInsert<'rerun_series'> = {
@@ -271,15 +469,9 @@ export async function createSeriesFromProject(
 
   // Migrate the whole legacy lineage (if this project already had one) into the
   // new first-class series, so the record isn't just Wave 1 and the first
-  // auto-spawn doesn't collide with legacy numbering.
-  const legacyRoot = project.rerun_series_id ?? project.id
-  const { data: family, error: familyErr } = await admin
-    .from('survey_projects')
-    .select('id')
-    .or(`id.eq.${legacyRoot},rerun_series_id.eq.${legacyRoot}`)
-    .is('deleted_at', null)
-  if (familyErr) throw new Error(familyErr.message)
-  const familyIds = (family ?? []).map((f) => f.id)
+  // auto-spawn doesn't collide with legacy numbering. Read before the insert (by
+  // the conflict guard above) rather than here, so the two cannot disagree.
+  const familyIds = family.members.map((f) => f.id)
   if (familyIds.length > 0) {
     const { error: linkErr } = await admin
       .from('survey_projects')
@@ -617,28 +809,22 @@ export async function attachProjectToSeries(
   // It also makes the useful case one action instead of three: adding PR00010 to
   // National Hingevoter sweeps PR00341 and PR00207 in with it, which is exactly
   // the repair those two need.
-  const familyRoot = (project as { rerun_series_id?: string | null }).rerun_series_id ?? projectId
-  const { data: family, error: famErr } = await admin
-    .from('survey_projects')
-    .select('id, project_code, project_name, series_id')
-    .or(`id.eq.${familyRoot},rerun_series_id.eq.${familyRoot}`)
-    .is('deleted_at', null)
-  if (famErr) throw new Error(famErr.message)
+  const { root: familyRoot, members: family } = await fetchLegacyFamily(admin, project)
 
-  // Refuse rather than steal. createSeriesFromProject sweeps unconditionally,
-  // which means promoting a legacy child can silently re-home siblings that
-  // already belong to a different first-class series. Do not copy that: if any
-  // family member is already in another series, stop and say which.
-  const conflicting = (family ?? []).filter((f) => f.series_id && f.series_id !== seriesId)
+  // Refuse rather than steal: if any family member is already in another series,
+  // stop and say which. createSeriesFromProject now refuses on the same
+  // judgement, through the same shared helpers — see the "legacy-lineage family
+  // sweep" section above for why it did not, and what that cost.
+  const conflicting = familySeriesConflicts(family, seriesId)
   if (conflicting.length > 0) {
-    const codes = conflicting.map((c) => c.project_code ?? c.project_name).join(', ')
-    throw new SeriesOpError(
-      `Can't add ${label}: ${codes} ${conflicting.length === 1 ? 'is' : 'are'} linked to it and already in a different series. Remove ${conflicting.length === 1 ? 'it' : 'them'} from that series first.`,
-      409
+    throw familySeriesConflictError(
+      `add ${label}`,
+      conflicting,
+      `Remove ${conflicting.length === 1 ? 'it' : 'them'} from that series first.`
     )
   }
 
-  const memberIds = (family ?? []).map((f) => f.id)
+  const memberIds = family.map((f) => f.id)
   if (!memberIds.includes(projectId)) memberIds.push(projectId)
 
   // Join the series on a PARKED negative wave number, one write per member.
@@ -719,7 +905,7 @@ export async function attachProjectToSeries(
   // so. One click can move a whole legacy family — thirteen waves in Holocene's
   // case — and a UI or connector preview that named only the survey the user
   // asked about would be lying by omission about the action's biggest effect.
-  const attached = (family ?? [])
+  const attached = family
     .filter((f) => !f.series_id)
     .map((f) => f.project_code ?? f.project_name)
   return { series: finalSeries, waves, attached }
@@ -895,14 +1081,9 @@ export async function previewAttachFamily(
     .maybeSingle()
   if (!project) return { codes: [], conflicting: [] }
 
-  const root = (project as { rerun_series_id?: string | null }).rerun_series_id ?? projectId
-  const { data: family } = await admin
-    .from('survey_projects')
-    .select('id, project_code, project_name, series_id')
-    .or(`id.eq.${root},rerun_series_id.eq.${root}`)
-    .is('deleted_at', null)
-
-  const members = family ?? []
+  // Same family read the write path uses, so the preview cannot describe a
+  // different set of surveys from the one attach would actually move.
+  const { members } = await fetchLegacyFamily(admin, project)
   const label = (f: { project_code: string | null; project_name: string }) =>
     f.project_code ?? f.project_name
   return {
