@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
+import { RowLink } from '@/components/shared/RowLink'
 import { Skeleton } from '@/components/shared/Skeleton'
 import { formatDate, getDueUrgency, urgencyPrefix } from '@/lib/utils/date'
 import { stageLabel } from '@/lib/utils/stage'
@@ -201,9 +202,9 @@ export default function ContactPage() {
     return (
       <div className="text-muted-foreground text-sm">
         Contact not found.{' '}
-        <button onClick={() => router.push('/admin')} className="text-blue-600 dark:text-blue-400 underline">
+        <Link href="/admin" className="text-blue-600 dark:text-blue-400 underline">
           Back to Admin
-        </button>
+        </Link>
       </div>
     )
   }
@@ -217,7 +218,10 @@ export default function ContactPage() {
     return <span className="text-foreground/80 ml-1">{sortDir === 'asc' ? '↑' : '↓'}</span>
   }
 
-  // A survey row — click-through to the project, same shape as the client page's.
+  // A survey row, same shape as the client page's. The whole row stays clickable
+  // for convenience, but the project name is a REAL <a href> (RowLink) so the
+  // study can be opened in a new tab from the context menu / middle-click /
+  // cmd-click.
   const renderProjectRow = (p: ContactProject, zebra: boolean) => {
     // Delivered = board_column 'Delivery' (status stays 'Open'). Show it
     // as done with its delivery date instead of an overdue warning.
@@ -242,7 +246,7 @@ export default function ContactPage() {
         </td>
         <td className="px-4 py-3 text-sm text-foreground font-medium">
           {p.status === 'Hold' && <span title="On hold">⏸ </span>}
-          {p.project_name}
+          <RowLink href={`/projects/${p.id}`}>{p.project_name}</RowLink>
           {(p.project_type === 'PS' || p.project_type === 'B2B') && (
             <span className="ml-2 text-xs text-muted-foreground">{p.project_type}</span>
           )}

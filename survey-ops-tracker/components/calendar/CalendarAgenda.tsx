@@ -1,5 +1,5 @@
 'use client'
-import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { format, parseISO } from 'date-fns'
 import { EVENT_TYPE_META, type CalendarEvent } from '@/lib/calendar/events'
 
@@ -23,7 +23,6 @@ interface CalendarAgendaProps {
  * doesn't shrink to phones). Today first, then upcoming days ascending.
  */
 export function CalendarAgenda({ byDate }: CalendarAgendaProps) {
-  const router = useRouter()
   const today = todayKey()
   const days = Object.keys(byDate)
     .filter(d => d >= today)
@@ -53,26 +52,38 @@ export function CalendarAgenda({ byDate }: CalendarAgendaProps) {
             <ul className="flex flex-col gap-1.5">
               {byDate[day].map(e => {
                 const meta = EVENT_TYPE_META[e.type]
-                const clickable = !!e.projectId
                 const ring = e.urgency ? URGENCY_RING[e.urgency] ?? '' : ''
+                // An event tied to a project is a real <a href> (right-click /
+                // middle-click / cmd-click open it in a new tab); one without a
+                // project — a bare reminder — was a disabled button and is now
+                // an inert div. Identical classes either way, so the row keeps
+                // its exact height and padding.
+                const rowClass = `w-full flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-left transition-colors ${
+                  e.projectId ? 'hover:border-ring cursor-pointer' : 'cursor-default'
+                }`
+                const body = (
+                  <>
+                    <span
+                      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[12px] font-medium shrink-0 ${meta.chip} ${ring}`}
+                    >
+                      <span aria-hidden="true">{meta.icon}</span>
+                      {meta.short}
+                    </span>
+                    <span className="text-sm text-foreground truncate min-w-0">{e.title}</span>
+                  </>
+                )
                 return (
                   <li key={e.id}>
-                    <button
-                      type="button"
-                      disabled={!clickable}
-                      onClick={() => clickable && router.push(`/projects/${e.projectId}`)}
-                      className={`w-full flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-left transition-colors ${
-                        clickable ? 'hover:border-ring cursor-pointer' : 'cursor-default'
-                      }`}
-                    >
-                      <span
-                        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[12px] font-medium shrink-0 ${meta.chip} ${ring}`}
+                    {e.projectId ? (
+                      <Link
+                        href={`/projects/${e.projectId}`}
+                        className={`${rowClass} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring`}
                       >
-                        <span aria-hidden="true">{meta.icon}</span>
-                        {meta.short}
-                      </span>
-                      <span className="text-sm text-foreground truncate min-w-0">{e.title}</span>
-                    </button>
+                        {body}
+                      </Link>
+                    ) : (
+                      <div className={rowClass}>{body}</div>
+                    )}
                   </li>
                 )
               })}
