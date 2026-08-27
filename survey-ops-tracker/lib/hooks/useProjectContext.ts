@@ -31,8 +31,13 @@ import { toast } from '@/lib/utils/toast'
  *
  *   project_id          uuid  PRIMARY KEY
  *   summary             text        - the briefing itself (markdown-ish, untrusted)
- *   sources             jsonb       - [{ url, title, published_at? }]
- *   auto_topics         text[]      - KEYWORDS the machine derived (nightly, disposable)
+ *                                     ONE text column, by design. Bullets are
+ *                                     markdown "- " lines INSIDE it; there is no
+ *                                     summary_bullets column and there must not be.
+ *   sources             jsonb       - [{ url, title, published_at?, note?,
+ *                                        uncorroborated? }]
+ *   auto_topics         text[]      - KEYWORDS the machine derived (disposable,
+ *                                     re-derived on every refresh)
  *   auto_companies      text[]      - SUBJECT ENTITIES the machine derived
  *   topics_override     text[]|null - the human's keyword list (never machine-written)
  *   companies_override  text[]|null - the human's entity list
@@ -86,6 +91,23 @@ export interface ContextSource {
   published_at: string | null
   /** Not in 083's documented element shape; tolerated if a writer adds it. */
   publisher: string | null
+  /**
+   * What the briefing used this source FOR, in the model's words. Untrusted text
+   * about an untrusted page — rendered as text, never as markup.
+   */
+  note: string | null
+  /**
+   * TRUE = the search returned this link but the briefing did not cite it.
+   * Written by reconcileSources in lib/server/projectContext.ts, which keeps the
+   * raw hits when nothing the model cited could be matched to a real result.
+   *
+   * "Things the search returned" is a different claim from "things this briefing
+   * is based on", and the tab MUST render them differently — laundering the first
+   * into the second is what makes an AI briefing untrustworthy. Absent key =>
+   * false, so an older row degrades to "cited", which is what it meant when only
+   * corroborated sources were ever stored.
+   */
+  uncorroborated: boolean
 }
 
 export interface ProjectContext {
@@ -94,8 +116,10 @@ export interface ProjectContext {
   sources: ContextSource[]
 
   /**
-   * The machine half of the search inputs. Re-derived nightly and disposable —
-   * shown so an analyst can see what the job is guessing, never written back.
+   * The machine half of the search inputs. Re-derived on every refresh (about
+   * every 3 days — the cron is daily but CONTEXT_FRESH_HOURS is 72) and
+   * disposable: shown so an analyst can see what the job is guessing, never
+   * written back from here.
    */
   auto_topics: string[]
   auto_companies: string[]
@@ -213,6 +237,11 @@ function parseSources(v: unknown): ContextSource[] {
       url,
       published_at: str(o.published_at) ?? str(o.date) ?? null,
       publisher: str(o.publisher) ?? str(o.site) ?? null,
+      note: str(o.note),
+      // `=== true` on purpose: any other value (missing, "false", 0, null) means
+      // we cannot prove this was an uncited hit, and the honest default for an
+      // older row is the meaning it was written with.
+      uncorroborated: o.uncorroborated === true,
     })
   }
   return out
@@ -418,7 +447,7 @@ export function useProjectContext(projectId: string) {
  * Both override lists, exactly as they should end up in the database.
  *
  * `null` is meaningful and is sent as `null`: it clears the override so the
- * nightly auto list takes over again (rule 3). `[]` is equally meaningful and
+ * machine's auto list takes over again (rule 3). `[]` is equally meaningful and
  * means "a human ruled there are none".
  */
 export interface ContextTopicOverrides {

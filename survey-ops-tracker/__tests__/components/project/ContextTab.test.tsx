@@ -54,6 +54,8 @@ function mkCtx(over: Partial<ProjectContext> = {}): ProjectContext {
         title: 'Q2 earnings call transcript',
         published_at: '2026-05-02',
         publisher: 'Example Wire',
+        note: 'Cited for the supply remark',
+        uncorroborated: false,
       },
     ],
     auto_topics: [],
@@ -184,11 +186,11 @@ describe('ContextTab — states', () => {
     expect(screen.queryByText(/nothing generated yet/i)).not.toBeInTheDocument()
   })
 
-  it('says the nightly refresh no longer covers an archived project', () => {
+  it('says the automatic refresh no longer covers an archived project', () => {
     state = { data: ok(), isLoading: false, isError: false }
     render(wrap(<ContextTab project={mkProject({ status: 'Closed' })} />))
 
-    expect(screen.getByText(/no longer picked up by the nightly refresh/i)).toBeInTheDocument()
+    expect(screen.getByText(/no longer picked up by the automatic refresh/i)).toBeInTheDocument()
   })
 
   it('warns when the project gave topic derivation almost nothing to work with', () => {
@@ -258,6 +260,8 @@ describe('ContextTab — sources are untrusted', () => {
             title: 'Q2 earnings call transcript',
             publisher: 'Example Wire',
             published_at: '2026-05-02',
+            note: null,
+            uncorroborated: false,
           },
           // Untrusted input: a source URL is attacker-controlled if the page is.
           // An href is executable, so this one must never become an anchor.
@@ -266,6 +270,8 @@ describe('ContextTab — sources are untrusted', () => {
             title: 'Totally normal article',
             publisher: null,
             published_at: null,
+            note: null,
+            uncorroborated: false,
           },
         ],
       }),
@@ -344,8 +350,9 @@ describe('ContextTab — topic overrides (083 auto vs human)', () => {
     expect(screen.getByText('Vrbo').parentElement?.className).toMatch(/border-solid/)
     expect(screen.getByText('hotel supply').parentElement?.className).toMatch(/border-dashed/)
     // The machine's discarded suggestion is still surfaced, so an override can't
-    // silently hide a newly relevant subject.
-    expect(screen.getByText(/still suggested nightly: Marriott/i)).toBeInTheDocument()
+    // silently hide a newly relevant subject — and it goes back in one click.
+    expect(screen.getByText(/also suggested, not searched/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Track Marriott' })).toBeInTheDocument()
   })
 
   it('writes ONLY the edited group’s override and never freezes the other list', () => {
@@ -357,8 +364,8 @@ describe('ContextTab — topic overrides (083 auto vs human)', () => {
     expect(setTopics).toHaveBeenCalledTimes(1)
     expect(setTopics).toHaveBeenCalledWith({
       companies_override: ['Airbnb'],
-      // Untouched: the keyword list stays machine-owned and keeps updating
-      // nightly. This is the bug — one edit used to write every chip on the tab
+      // Untouched: the keyword list stays machine-owned and keeps updating on
+      // every refresh. This is the bug — one edit used to write every chip on the tab
       // into the overrides and freeze the auto lists forever.
       topics_override: null,
     })
@@ -423,5 +430,305 @@ describe('ContextTab — topic overrides (083 auto vs human)', () => {
       companies_override: null, // back to the auto list
       topics_override: null,
     })
+  })
+})
+
+/**
+ * PART 1 of the bullet change: the server now writes markdown "- " lines INSIDE
+ * the single `summary` text column (no new column, no schema change), and this
+ * tab has to render them as a real list — while every row already in production
+ * is still one prose paragraph until it regenerates. Both shapes are tested here
+ * because both are live at the same time for the first few days after ship.
+ */
+describe('ContextTab — the briefing renders as bullets', () => {
+  const BULLETED = [
+    '**Why this study exists**',
+    '',
+    '- Novo Nordisk cut its 2026 outlook on 29 July, blaming compounded semaglutide.',
+    '- Eli Lilly launched Zepbound self-pay vials at $399 a month.',
+    '',
+    '**During the field window**',
+    '',
+    '- CMS said it would pilot Medicare coverage of obesity drugs.',
+  ].join('\n')
+
+  it('renders markdown bullets as a real list, one <li> per bullet', () => {
+    state = { data: ok({ summary: BULLETED }), isLoading: false, isError: false }
+    const { container } = render(wrap(<ContextTab project={mkProject()} />))
+
+    // One list per section — bullets are never merged across a heading. The
+    // sources card uses <ol>, so <ul> counts only the briefing's own lists.
+    expect(container.querySelectorAll('ul')).toHaveLength(2)
+    expect(container.querySelectorAll('ul li')).toHaveLength(3)
+    // The "- " marker is consumed by the parser, never shown to the reader.
+    expect(container.textContent).not.toContain('- Novo Nordisk')
+    expect(screen.getByText(/cut its 2026 outlook/i).closest('li')).not.toBeNull()
+  })
+
+  it('treats a wholly-bold line as a section heading, not as a paragraph', () => {
+    state = {
+      data: ok({
+        summary:
+          'The client asked after an earnings call.\n\n**During the field window**\n\n- CMS moved.',
+      }),
+      isLoading: false,
+      isError: false,
+    }
+    render(wrap(<ContextTab project={mkProject()} />))
+
+    // This is how composeSummary() has always written the divider; before the
+    // bullet change it rendered as ordinary body prose.
+    expect(screen.getByText('During the field window').tagName).toBe('H4')
+  })
+
+  it('handles a mix of prose and bullets under one heading', () => {
+    state = {
+      data: ok({
+        summary:
+          '## Why this study exists\n\nThe client asked right after the Q2 call.\n\n- Novo cut guidance.\n- Lilly cut price.',
+      }),
+      isLoading: false,
+      isError: false,
+    }
+    const { container } = render(wrap(<ContextTab project={mkProject()} />))
+
+    expect(screen.getByText(/right after the Q2 call/i).tagName).toBe('P')
+    expect(container.querySelectorAll('ul')).toHaveLength(1)
+    expect(container.querySelectorAll('ul li')).toHaveLength(2)
+  })
+
+  it('says so when a heading has nothing under it', () => {
+    state = {
+      data: ok({
+        summary: '## Why this study exists\n\n- Novo cut guidance.\n\n**During the field window**',
+      }),
+      isLoading: false,
+      isError: false,
+    }
+    render(wrap(<ContextTab project={mkProject()} />))
+
+    // An empty section is a real answer (nothing moved in field) — it must not
+    // render as an unexplained gap under a heading.
+    expect(screen.getByText(/nothing was recorded under this heading/i)).toBeInTheDocument()
+  })
+
+  it('still renders a LEGACY prose-only summary, with nothing broken', () => {
+    // Every row in production is this shape until its next refresh, which is the
+    // common case for the first few days after the bullet prompt ships.
+    const prose =
+      'Airbnb told investors that hotels are listing on the platform. Management framed it as supply diversification, and analysts pressed on take rate.'
+    state = { data: ok({ summary: prose }), isLoading: false, isError: false }
+    const { container } = render(wrap(<ContextTab project={mkProject()} />))
+
+    expect(container.querySelectorAll('ul')).toHaveLength(0)
+    expect(screen.getByText(/supply diversification/i).tagName).toBe('P')
+    // ...and the reader is told why this one looks different from the next.
+    expect(screen.getByText(/older prose format/i)).toBeInTheDocument()
+    // No section header was invented for it, and no empty-section text either.
+    expect(screen.queryByText(/nothing was recorded under this heading/i)).not.toBeInTheDocument()
+  })
+})
+
+/**
+ * PART 2: the chips shown for PR00376 in production were fragments of the project
+ * title ("Considerers", "Current"). The server track fixes the extraction; the
+ * presentation has to make correcting it cost one click in BOTH directions.
+ */
+describe('ContextTab — correcting the machine', () => {
+  const withTopics = (over: Partial<ProjectContext> = {}) =>
+    ok({
+      auto_companies: ['Airbnb', 'Marriott'],
+      auto_topics: ['hotel supply'],
+      effective_companies: ['Airbnb', 'Marriott'],
+      effective_topics: ['hotel supply'],
+      ...over,
+    })
+
+  it('removes a wrong chip on one click, with no confirmation step', () => {
+    state = { data: withTopics(), isLoading: false, isError: false }
+    render(wrap(<ContextTab project={mkProject()} />))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Stop tracking Marriott' }))
+
+    expect(setTopics).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+  })
+
+  it('adds several comma-separated entries in one write', () => {
+    state = { data: withTopics(), isLoading: false, isError: false }
+    render(wrap(<ContextTab project={mkProject()} />))
+
+    fireEvent.click(screen.getAllByText('+ add')[0]) // companies
+    const input = screen.getByLabelText('Add a subject company')
+    fireEvent.change(input, { target: { value: 'Novo Nordisk, Eli Lilly' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+
+    expect(setTopics).toHaveBeenCalledWith({
+      companies_override: ['Airbnb', 'Marriott', 'Novo Nordisk', 'Eli Lilly'],
+      topics_override: null,
+    })
+    // ONE write, not two: the payload is the complete desired list, so two
+    // sequential adds would have to be built on a list the server has not
+    // answered with yet — and the second would silently drop the first.
+    expect(setTopics).toHaveBeenCalledTimes(1)
+    expect(screen.queryByLabelText('Add a subject company')).not.toBeInTheDocument()
+  })
+
+  it('ignores a duplicate rather than writing the same chip twice', () => {
+    state = { data: withTopics(), isLoading: false, isError: false }
+    render(wrap(<ContextTab project={mkProject()} />))
+
+    fireEvent.click(screen.getAllByText('+ add')[0])
+    const input = screen.getByLabelText('Add a subject company')
+    fireEvent.change(input, { target: { value: 'airbnb' } })
+    fireEvent.blur(input)
+
+    expect(setTopics).not.toHaveBeenCalled()
+  })
+
+  it('puts a discarded suggestion back on one click', () => {
+    state = {
+      data: withTopics({ companies_override: ['Airbnb'], effective_companies: ['Airbnb'] }),
+      isLoading: false,
+      isError: false,
+    }
+    render(wrap(<ContextTab project={mkProject()} />))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Track Marriott' }))
+
+    expect(setTopics).toHaveBeenCalledWith({
+      companies_override: ['Airbnb', 'Marriott'],
+      topics_override: null,
+    })
+  })
+
+  it('keeps "ruled none" and "never ruled" apart in words, not just in the payload', () => {
+    state = {
+      data: withTopics({ topics_override: [], effective_topics: [] }),
+      isLoading: false,
+      isError: false,
+    }
+    render(wrap(<ContextTab project={mkProject()} />))
+
+    // Removing the last chip lands here, so the state has to say which of the
+    // two it is — and offer the way back to the other.
+    const none = screen.getByText(/the team ruled there are no keywords/i)
+    expect(none).toHaveTextContent(/searches nothing here/i)
+    expect(none).toHaveTextContent(/not the same as/i)
+    expect(screen.getAllByRole('button', { name: 'Use suggestions' })).toHaveLength(1)
+  })
+
+  it('states the real cadence, and no longer claims a nightly one', () => {
+    state = { data: withTopics(), isLoading: false, isError: false }
+    const { container } = render(wrap(<ContextTab project={mkProject()} />))
+
+    expect(screen.getByText(/suggested automatically, every 3 days/i)).toBeInTheDocument()
+    expect(container.textContent).not.toMatch(/nightly/i)
+  })
+
+  it('shows the topics the server WOULD search before any brief exists', () => {
+    // The hook fetches these for a project with no context row; without them the
+    // moment an analyst's correction is worth the most shows an empty list.
+    state = {
+      data: {
+        available: true,
+        context: null,
+        suggested: { companies: ['Novo Nordisk'], topics: ['GLP-1 adherence'] },
+      },
+      isLoading: false,
+      isError: false,
+    }
+    render(wrap(<ContextTab project={mkProject()} />))
+
+    expect(screen.getByRole('button', { name: 'Stop tracking Novo Nordisk' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Stop tracking GLP-1 adherence' })).toBeInTheDocument()
+    // Nobody has ruled yet, so they are drawn as suggestions.
+    expect(screen.getByText('Novo Nordisk').parentElement?.className).toMatch(/border-dashed/)
+  })
+})
+
+/**
+ * PART 3: this tab asks an analyst to believe an AI briefing. It must never look
+ * confident when it is uncorroborated, or fresh when it is stale.
+ */
+describe('ContextTab — trust signals', () => {
+  it('shouts when a successful brief has gone stale', () => {
+    state = { data: ok({ generated_at: daysAgo(21) }), isLoading: false, isError: false }
+    render(wrap(<ContextTab project={mkProject()} />))
+
+    const banner = screen.getByText(/out of date/i)
+    expect(banner).toHaveTextContent('21 days old')
+    expect(banner.className).toMatch(/red/)
+    expect(screen.getByText(/rebuilds about every 3 days/i)).toBeInTheDocument()
+  })
+
+  it('flags a brief that has missed a run, more mildly', () => {
+    state = { data: ok({ generated_at: daysAgo(6) }), isLoading: false, isError: false }
+    render(wrap(<ContextTab project={mkProject()} />))
+
+    expect(screen.getByText('This brief is 6 days old')).toBeInTheDocument()
+    expect(screen.queryByText(/out of date/i)).not.toBeInTheDocument()
+  })
+
+  it('says nothing about age when the brief is current', () => {
+    state = { data: ok({ generated_at: daysAgo(2) }), isLoading: false, isError: false }
+    render(wrap(<ContextTab project={mkProject()} />))
+
+    expect(screen.queryByText(/days old/i)).not.toBeInTheDocument()
+  })
+
+  it('does not stack the age banner on top of a failure banner', () => {
+    state = {
+      data: ok({ status: 'error', error: 'Search provider timed out', generated_at: daysAgo(21) }),
+      isLoading: false,
+      isError: false,
+    }
+    render(wrap(<ContextTab project={mkProject()} />))
+
+    // The failure banner already says how old the surviving brief is.
+    expect(screen.getByText(/the last refresh failed/i)).toBeInTheDocument()
+    expect(screen.queryByText(/out of date/i)).not.toBeInTheDocument()
+  })
+
+  it('marks a link the search returned but the briefing never cited', () => {
+    state = {
+      data: ok({
+        status: 'empty',
+        sources: [
+          {
+            url: 'https://example.com/hit',
+            title: 'Something the search turned up',
+            publisher: 'Example Wire',
+            published_at: '2026-08-01',
+            note: null,
+            // reconcileSources keeps the raw hits when it could not match a
+            // single citation. A hit is NOT evidence.
+            uncorroborated: true,
+          },
+        ],
+      }),
+      isLoading: false,
+      isError: false,
+    }
+    render(wrap(<ContextTab project={mkProject()} />))
+
+    expect(screen.getByText(/^search hit/i)).toBeInTheDocument()
+    expect(screen.getByText(/1 not cited/)).toBeInTheDocument()
+    expect(screen.getByText(/none of these were cited by the briefing/i)).toBeInTheDocument()
+    // Still linked, so the analyst can go and look.
+    expect(screen.getByRole('link', { name: 'Something the search turned up' })).toHaveAttribute(
+      'href',
+      'https://example.com/hit',
+    )
+  })
+
+  it('shows what the briefing used a cited source FOR', () => {
+    state = { data: ok(), isLoading: false, isError: false }
+    render(wrap(<ContextTab project={mkProject()} />))
+
+    expect(screen.getByText('Cited for the supply remark')).toBeInTheDocument()
+    expect(screen.queryByText(/^search hit/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/not cited/i)).not.toBeInTheDocument()
   })
 })
