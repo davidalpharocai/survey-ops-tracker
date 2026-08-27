@@ -165,8 +165,11 @@ export async function POST(req: Request) {
         const projectId = typeof body.projectId === 'string' ? body.projectId : ''
         if (!seriesId) return NextResponse.json({ error: 'seriesId is required.' }, { status: 400 })
         if (!projectId) return NextResponse.json({ error: 'projectId is required.' }, { status: 400 })
-        const { series, waves } = await attachProjectToSeries(admin, seriesId, projectId, actor)
-        return NextResponse.json({ series, waves })
+        // `attached` names every survey that actually moved — attaching sweeps
+        // the survey's legacy lineage family, so this can be more than the one
+        // the caller asked about, and the UI has to be able to say so.
+        const { series, waves, attached } = await attachProjectToSeries(admin, seriesId, projectId, actor)
+        return NextResponse.json({ series, waves, attached })
       }
 
       case 'detach_wave': {

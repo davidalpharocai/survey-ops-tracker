@@ -164,6 +164,10 @@ export interface RerunSeriesActionResult {
    *  row in its response — without this the series record would never be
    *  invalidated and the wave list would keep showing the removed wave. */
   seriesId?: string
+  /** Returned by `attach_wave`: every survey that actually moved. Attaching
+   *  sweeps the survey's legacy lineage family, so this is often longer than the
+   *  one the user picked — report the real number, not the one they named. */
+  attached?: string[]
   waves?: SeriesWave[]
   pendingWave?: PendingWave | null
   spawn?: SpawnWaveResult
@@ -209,6 +213,13 @@ export function useRerunSeriesActions() {
       queryClient.invalidateQueries({ queryKey: ['project'] })
       queryClient.invalidateQueries({ queryKey: ['rerun-series'] })
       queryClient.invalidateQueries({ queryKey: ['rerun-candidates'] })
+      // The CLIENT page is the whole point of series membership — it is the only
+      // surface that groups waves, and it reads its own keys that none of the
+      // above match. Without these, attaching a wave then navigating to the
+      // client page shows the OLD grouping for up to the 30s global staleTime,
+      // i.e. the user does the fix and sees it not work.
+      queryClient.invalidateQueries({ queryKey: ['client-projects'] })
+      queryClient.invalidateQueries({ queryKey: ['client-rerun-series'] })
       // The nav Reruns badge sums first-class + legacy overdue counts; a
       // lifecycle action (pause/resume/end/spawn/…) can flip a series' overdue
       // state, so refresh it too.

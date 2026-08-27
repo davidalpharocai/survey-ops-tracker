@@ -274,8 +274,13 @@ function AddToSeries({ project }: { project: P }) {
     act.mutate(
       { action: 'attach_wave', seriesId, projectId: project.id },
       {
-        onSuccess: () => {
-          toast(`Added to ${label}.`, 'success')
+        onSuccess: (res) => {
+          // Report how many surveys actually moved, not just this one. Attaching
+          // sweeps the whole legacy lineage family, so a Holocene week-1 survey
+          // takes thirteen siblings with it — saying "Added to X" there would
+          // understate the action by an order of magnitude.
+          const n = res?.attached?.length ?? 1
+          toast(n > 1 ? `Added ${n} linked surveys to ${label}.` : `Added to ${label}.`, 'success')
           setPicking(false)
         },
         onError: (e) => toast((e as Error).message),
@@ -298,8 +303,8 @@ function AddToSeries({ project }: { project: P }) {
   return (
     <div className="rounded-lg border border-border bg-muted/40 p-2 flex flex-col gap-1">
       <p className="text-[12px] text-muted-foreground">
-        Add this survey as a wave of an existing series. The whole series is renumbered by date
-        afterwards.
+        Add this survey as a wave of an existing series. Any surveys linked to it as reruns come
+        too, and the series is renumbered by date afterwards.
       </p>
       {isLoading ? (
         <p className="text-xs text-muted-foreground/50">Loading…</p>

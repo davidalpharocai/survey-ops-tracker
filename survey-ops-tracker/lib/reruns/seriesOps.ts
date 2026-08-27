@@ -130,6 +130,29 @@ export async function cancelWave(admin: Admin, waveId: string): Promise<void> {
     .eq('id', waveId)
 }
 
+/** Recompute and write every wave's number for a series.
+ *
+ * TWO PHASES, because of migration 073's partial unique index:
+ *
+ *   create unique index survey_projects_series_wave_uidx
+ *     on survey_projects(series_id, rerun_number)
+ *     where series_id is not null and deleted_at is null;
+ *
+ * No two live waves in one series may share a number. Writing the new numbers
+ * directly, one row at a time, therefore collides whenever a wave moves INTO a
+ * slot another wave has not vacated yet — a plain two-wave swap (A 1→2, B 2→1)
+ * fails on the first UPDATE. Worse, the original loop ignored each UPDATE's
+ * error, so the collision was silent and the series was simply left with stale
+ * numbers. That affected drag-reorder and promotion too, not only the new
+ * attach/detach.
+ *
+ * So: park every wave on a distinct NEGATIVE number first (no real wave is ever
+ * negative, and negatives cannot collide with the positive numbers still in
+ * place), then write the final values into the now-empty positive range. Two
+ * passes over a handful of rows, and no ordering to reason about.
+ *
+ * Every UPDATE is checked. A renumber that half-applies is worse than one that
+ * fails loudly, because the numbers are what the UI sorts and labels by. */
 export async function applyRenumber(admin: Admin, seriesId: string, originId: string): Promise<void> {
   const { data, error } = await admin
     .from('survey_projects')
@@ -139,8 +162,24 @@ export async function applyRenumber(admin: Admin, seriesId: string, originId: st
   if (error) throw new Error(error.message)
   const waves = (data ?? []) as Wave[]
   const renumbered = renumberWaves(waves, originId)
+
+  // Phase 1 — park. -1, -2, … are distinct from each other and from every
+  // positive number currently held, so each of these can never collide.
+  for (let i = 0; i < renumbered.length; i++) {
+    const { error: parkErr } = await admin
+      .from('survey_projects')
+      .update({ rerun_number: -(i + 1) })
+      .eq('id', renumbered[i].id)
+    if (parkErr) throw new Error(`Renumber failed while reordering waves: ${parkErr.message}`)
+  }
+
+  // Phase 2 — settle. The positive range is empty now, so every target is free.
   for (const w of renumbered) {
-    await admin.from('survey_projects').update({ rerun_number: w.rerun_number }).eq('id', w.id)
+    const { error: setErr } = await admin
+      .from('survey_projects')
+      .update({ rerun_number: w.rerun_number })
+      .eq('id', w.id)
+    if (setErr) throw new Error(`Renumber failed while assigning wave numbers: ${setErr.message}`)
   }
 }
 
@@ -479,7 +518,13 @@ export async function attachProjectToSeries(
   seriesId: string,
   projectId: string,
   actor: string
-): Promise<{ series: SeriesRow; waves: Awaited<ReturnType<typeof fetchWaves>> }> {
+): Promise<{
+  series: SeriesRow
+  waves: Awaited<ReturnType<typeof fetchWaves>>
+  /** Every survey this call moved, named. More than one when the survey carried
+   *  a legacy lineage family in with it. */
+  attached: string[]
+}> {
   const { data: series, error: sErr } = await admin
     .from('rerun_series')
     .select('*')
@@ -488,9 +533,13 @@ export async function attachProjectToSeries(
   if (sErr) throw new Error(sErr.message)
   if (!series) throw new SeriesOpError('Series not found.', 404)
 
+  // rerun_series_id is in the select because the family sweep below keys off it.
+  // Without it, familyRoot silently falls back to the project's own id and the
+  // sweep degenerates to "just this survey" — which is the exact bug the sweep
+  // exists to prevent, only harder to see.
   const { data: project, error: pErr } = await admin
     .from('survey_projects')
-    .select('id, project_code, project_name, client, client_id, series_id')
+    .select('id, project_code, project_name, client, client_id, series_id, rerun_series_id')
     .eq('id', projectId)
     .is('deleted_at', null)
     .maybeSingle()
@@ -501,7 +550,7 @@ export async function attachProjectToSeries(
 
   // Idempotent: already where it should be.
   if (project.series_id === seriesId) {
-    return { series: series as SeriesRow, waves: await fetchWaves(admin, seriesId) }
+    return { series: series as SeriesRow, waves: await fetchWaves(admin, seriesId), attached: [] }
   }
 
   // Moving a survey between series is a different, riskier operation than adding
@@ -534,14 +583,77 @@ export async function attachProjectToSeries(
   // `wave_order` is deliberately left untouched: renumberWaves sorts a wave with
   // no explicit order after every ordered one, which is the documented
   // "newly-added waves append at the end" behaviour.
-  const { error: upErr } = await admin
+  // SWEEP THE WHOLE LEGACY FAMILY, not just the named survey — the same thing
+  // createSeriesFromProject does (seriesOps.ts, createSeriesFromProject) and for
+  // the same reason.
+  //
+  // Attaching only the named survey looked right and is actively harmful: a
+  // legacy lineage root carries its children with it conceptually, and moving the
+  // root alone leaves them pointing at a parent that is now inside a series they
+  // are not in — which is precisely the "orphaned series member" state this whole
+  // feature exists to fix. Eight live roots are in a position to cause that, and
+  // attaching PR00262 (Holocene Weekly Tracker week 1) on its own would have
+  // manufactured THIRTEEN new orphans in one click.
+  //
+  // It also makes the useful case one action instead of three: adding PR00010 to
+  // National Hingevoter sweeps PR00341 and PR00207 in with it, which is exactly
+  // the repair those two need.
+  const familyRoot = (project as { rerun_series_id?: string | null }).rerun_series_id ?? projectId
+  const { data: family, error: famErr } = await admin
     .from('survey_projects')
-    .update({
-      series_id: seriesId,
-      rerun_series_id: projectId === series.origin_project_id ? null : series.origin_project_id,
-    })
-    .eq('id', projectId)
-  if (upErr) throw new Error(upErr.message)
+    .select('id, project_code, project_name, series_id')
+    .or(`id.eq.${familyRoot},rerun_series_id.eq.${familyRoot}`)
+    .is('deleted_at', null)
+  if (famErr) throw new Error(famErr.message)
+
+  // Refuse rather than steal. createSeriesFromProject sweeps unconditionally,
+  // which means promoting a legacy child can silently re-home siblings that
+  // already belong to a different first-class series. Do not copy that: if any
+  // family member is already in another series, stop and say which.
+  const conflicting = (family ?? []).filter((f) => f.series_id && f.series_id !== seriesId)
+  if (conflicting.length > 0) {
+    const codes = conflicting.map((c) => c.project_code ?? c.project_name).join(', ')
+    throw new SeriesOpError(
+      `Can't add ${label}: ${codes} ${conflicting.length === 1 ? 'is' : 'are'} linked to it and already in a different series. Remove ${conflicting.length === 1 ? 'it' : 'them'} from that series first.`,
+      409
+    )
+  }
+
+  const memberIds = (family ?? []).map((f) => f.id)
+  if (!memberIds.includes(projectId)) memberIds.push(projectId)
+
+  // Join the series on a PARKED negative wave number, one write per member.
+  //
+  // Migration 073 has a partial unique index on (series_id, rerun_number) for
+  // live rows, and an incoming survey still carries whatever number it had
+  // outside the series — very often 1, which the series already has. A single
+  // bulk `.in(...).update({ series_id })` would therefore fail the moment any
+  // incoming number matched an existing one, and a bulk update to the SAME
+  // negative number would collide the incoming members with each other.
+  //
+  // Negative numbers are safe to park on: nothing else ever writes one, so they
+  // cannot clash with the positive numbers already in the series. applyRenumber
+  // then assigns the real 1..N. The index does not constrain the rows before this
+  // point, because it only covers rows where series_id is not null.
+  for (let i = 0; i < memberIds.length; i++) {
+    const { error: upErr } = await admin
+      .from('survey_projects')
+      .update({ series_id: seriesId, rerun_number: -(1000 + i) })
+      .eq('id', memberIds[i])
+    if (upErr) throw new Error(upErr.message)
+  }
+
+  // The lineage pointer is per-project and must stay consistent: the family root
+  // keeps NULL (its own id IS the root, by the convention in
+  // app/api/projects/link-rerun/route.ts) and everything else points at it. Only
+  // the named survey can need this set — its siblings already point at the root.
+  if (projectId !== familyRoot) {
+    const { error: linkErr } = await admin
+      .from('survey_projects')
+      .update({ rerun_series_id: familyRoot })
+      .eq('id', projectId)
+    if (linkErr) throw new Error(linkErr.message)
+  }
 
   // The originId fallback is `seriesId`, NOT projectId, and the difference is a
   // real bug rather than a style choice. renumberWaves FORCES the wave whose id
@@ -571,7 +683,14 @@ export async function attachProjectToSeries(
     .single()
   if (bumpErr) throw new Error(bumpErr.message)
 
-  return { series: finalSeries, waves }
+  // `attached` is every survey this call actually moved, so the caller can SAY
+  // so. One click can move a whole legacy family — thirteen waves in Holocene's
+  // case — and a UI or connector preview that named only the survey the user
+  // asked about would be lying by omission about the action's biggest effect.
+  const attached = (family ?? [])
+    .filter((f) => !f.series_id)
+    .map((f) => f.project_code ?? f.project_name)
+  return { series: finalSeries, waves, attached }
 }
 
 /** Take a survey out of its series and renumber what is left.
@@ -586,9 +705,12 @@ export async function detachProjectFromSeries(
   projectId: string,
   actor: string
 ): Promise<{ seriesId: string; waves: Awaited<ReturnType<typeof fetchWaves>> }> {
+  // rerun_number is selected because the auto-spawn repair at the end of this
+  // function needs to know whether the survey being removed was the series' top
+  // wave.
   const { data: project, error: pErr } = await admin
     .from('survey_projects')
-    .select('id, project_code, project_name, series_id')
+    .select('id, project_code, project_name, series_id, rerun_number')
     .eq('id', projectId)
     .is('deleted_at', null)
     .maybeSingle()
@@ -611,13 +733,33 @@ export async function detachProjectFromSeries(
   // a survey no longer in it — legal, but confusing, and not something this
   // function can repair. End the series, or add a replacement first.
   //
-  // Note this guard is inert for the 10-of-26 series whose origin_project_id is
-  // NULL, and that is correct rather than an oversight: such a series has no
-  // declared anchor, so there is no particular wave to protect and its numbering
-  // is pure date order either way. Nothing is lost by removing any member.
   if (series?.origin_project_id === projectId) {
     throw new SeriesOpError(
       `${label} is Wave 1 — the series is anchored to it. Add another survey to the series first, or end the series instead.`,
+      409
+    )
+  }
+
+  // NEVER EMPTY A SERIES. The guard above is keyed on origin_project_id, which is
+  // NULL for 10 of 26 live series — so on its own it protects nothing for those,
+  // and 4 of them (PR00341, PR00343, PR00344, PR00352) have exactly ONE live wave
+  // that could therefore be removed, leaving a series record pointing at nothing.
+  //
+  // That state is not hypothetical: two series are already sitting in it, and one
+  // of them (RP3 / NOVA) is still flagged in_service with zero waves, so the
+  // spawn cron and the digest both have a series they cannot reason about. This
+  // check is what stops the new Remove control manufacturing more of them, and it
+  // is keyed on the actual invariant (a series has at least one wave) rather than
+  // on a field that is often null.
+  const { count: liveWaves, error: cErr } = await admin
+    .from('survey_projects')
+    .select('id', { count: 'exact', head: true })
+    .eq('series_id', seriesId)
+    .is('deleted_at', null)
+  if (cErr) throw new Error(cErr.message)
+  if ((liveWaves ?? 0) <= 1) {
+    throw new SeriesOpError(
+      `${label} is the only wave left in this series, and a series cannot be left with none. Add another survey to the series first, or end the series instead.`,
       409
     )
   }
@@ -627,9 +769,31 @@ export async function detachProjectFromSeries(
   // whole detach 500s. 1 is also the right value semantically — it is what every
   // standalone project has, and what Wave 1 of a series has. series_id,
   // rerun_series_id and wave_order ARE nullable and are genuinely cleared.
+  // rerun_date is cleared, and that is NOT tidiness — it stops the removal
+  // silently re-arming the LEGACY auto-spawn.
+  //
+  // app/api/cron/spawn-reruns/route.ts runs a legacy path for un-migrated
+  // longitudinal projects, and its own comment states the invariant: "a row that
+  // has been seeded into a series must NEVER also spawn here — that's the
+  // `series_id is null` filter". Series membership is the only thing suppressing
+  // it. Clearing series_id therefore hands the project straight back to that
+  // path, and if longitudinal is true with a rerun_date at or before the horizon
+  // and rerun_spawned_at null, the nightly cron creates a wave for a survey the
+  // user just took OUT of a series — days later, with no visible cause.
+  //
+  // Clearing rerun_date breaks that chain at its `.not('rerun_date','is',null)`
+  // filter, and is the right value anyway: the next-wave date came from the
+  // series' cadence, which no longer applies. `longitudinal` is deliberately left
+  // alone — it describes the study, and on its own it spawns nothing.
   const { error: upErr } = await admin
     .from('survey_projects')
-    .update({ series_id: null, rerun_series_id: null, rerun_number: 1, wave_order: null })
+    .update({
+      series_id: null,
+      rerun_series_id: null,
+      rerun_number: 1,
+      wave_order: null,
+      rerun_date: null,
+    })
     .eq('id', projectId)
   if (upErr) throw new Error(upErr.message)
 
@@ -644,5 +808,73 @@ export async function detachProjectFromSeries(
     .eq('id', seriesId)
   if (bumpErr) throw new Error(bumpErr.message)
 
+  // UNWEDGE AUTO-SPAWN when the removed survey was the series' top wave.
+  //
+  // canSpawnNextWave (lib/reruns/spawn.ts) refuses to spawn when the highest live
+  // wave already has rerun_spawned_at set — the reasonable assumption being that
+  // a stamped wave has already produced its successor. Removing the top wave
+  // breaks that assumption: the NEW top wave is stamped, but the successor it
+  // produced is the one that just left. The series then answers
+  // 'prev-already-spawned' forever, and nothing surfaces it — no error, no badge,
+  // just a monthly series that quietly stops producing waves.
+  //
+  // Clearing the stamp restores the invariant the gate depends on. Scoped to the
+  // case that actually breaks it: if a MIDDLE wave was removed, the top wave and
+  // its successor are both untouched and the stamp is still true.
+  //
+  // The comparison is the removed wave's OLD number against the REMAINING waves'
+  // NEW ones, which looks like a mistake and is not. Before removal the numbers
+  // are 1..N; after removing wave k the rest are renumbered 1..N-1, so
+  // "every remaining number < k" is true exactly when N-1 < k, i.e. only when
+  // k = N. Any other k leaves a wave numbered k or higher behind.
+  const removedWasTop =
+    typeof project.rerun_number === 'number' &&
+    waves.every((w) => w.rerun_number < (project.rerun_number as number))
+  if (removedWasTop && waves.length > 0) {
+    const newTop = waves.reduce((a, b) => (a.rerun_number >= b.rerun_number ? a : b))
+    const { error: unwedgeErr } = await admin
+      .from('survey_projects')
+      .update({ rerun_spawned_at: null })
+      .eq('id', newTop.id)
+    if (unwedgeErr) throw new Error(unwedgeErr.message)
+  }
+
   return { seriesId, waves }
+}
+
+/** Which surveys attachProjectToSeries would ACTUALLY move, given the named one.
+ *
+ * Exists so a preview can be honest. attach sweeps the whole legacy lineage
+ * family, so "add PR00262 to this series" really means "add PR00262 and its
+ * thirteen linked waves" — and a confirmation prompt that named only the first is
+ * describing the wrong action. Read-only; safe to call before confirming.
+ *
+ * Returns the family members that would gain a series link (excluding any that
+ * already have one), the named survey first. */
+export async function previewAttachFamily(
+  admin: Admin,
+  projectId: string
+): Promise<{ codes: string[]; conflicting: string[] }> {
+  const { data: project } = await admin
+    .from('survey_projects')
+    .select('id, project_code, project_name, series_id, rerun_series_id')
+    .eq('id', projectId)
+    .is('deleted_at', null)
+    .maybeSingle()
+  if (!project) return { codes: [], conflicting: [] }
+
+  const root = (project as { rerun_series_id?: string | null }).rerun_series_id ?? projectId
+  const { data: family } = await admin
+    .from('survey_projects')
+    .select('id, project_code, project_name, series_id')
+    .or(`id.eq.${root},rerun_series_id.eq.${root}`)
+    .is('deleted_at', null)
+
+  const members = family ?? []
+  const label = (f: { project_code: string | null; project_name: string }) =>
+    f.project_code ?? f.project_name
+  return {
+    codes: members.filter((f) => !f.series_id).map(label),
+    conflicting: members.filter((f) => f.series_id).map(label),
+  }
 }
