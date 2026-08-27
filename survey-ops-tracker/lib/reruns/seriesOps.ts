@@ -163,18 +163,37 @@ export async function applyRenumber(admin: Admin, seriesId: string, originId: st
   const waves = (data ?? []) as Wave[]
   const renumbered = renumberWaves(waves, originId)
 
-  // Phase 1 — park. -1, -2, … are distinct from each other and from every
-  // positive number currently held, so each of these can never collide.
-  for (let i = 0; i < renumbered.length; i++) {
+  // Only the waves whose number actually CHANGES are touched. Two reasons, and
+  // the second is why this is not just an optimisation:
+  //  · migration 088 now audits rerun_number, so touching a wave that is already
+  //    correct writes history rows describing a change that did not happen;
+  //  · a wave that keeps its number cannot be the one a collision lands on — the
+  //    targets are a permutation of 1..N, so no moving wave's target can equal a
+  //    stationary wave's current number.
+  const current = new Map(waves.map((w) => [w.id, w.rerun_number]))
+  const moving = renumbered.filter((r) => current.get(r.id) !== r.rerun_number)
+  if (moving.length === 0) return
+
+  // Park ABOVE the live range rather than below zero. Negatives would work for
+  // uniqueness, but if a renumber ever died between the phases the UI would
+  // render "Wave -2"; a number above the wave count reads as merely wrong rather
+  // than corrupt, and nothing else in the codebase assumes wave numbers are
+  // small.
+  const parkBase =
+    Math.max(renumbered.length, ...waves.map((w) => w.rerun_number ?? 0)) + 1
+
+  // Phase 1 — vacate. Every moving wave leaves the 1..N range, so no phase-2
+  // write can land on a number another wave has not given up yet.
+  for (let i = 0; i < moving.length; i++) {
     const { error: parkErr } = await admin
       .from('survey_projects')
-      .update({ rerun_number: -(i + 1) })
-      .eq('id', renumbered[i].id)
+      .update({ rerun_number: parkBase + i })
+      .eq('id', moving[i].id)
     if (parkErr) throw new Error(`Renumber failed while reordering waves: ${parkErr.message}`)
   }
 
-  // Phase 2 — settle. The positive range is empty now, so every target is free.
-  for (const w of renumbered) {
+  // Phase 2 — settle into the now-free slots.
+  for (const w of moving) {
     const { error: setErr } = await admin
       .from('survey_projects')
       .update({ rerun_number: w.rerun_number })
@@ -631,15 +650,28 @@ export async function attachProjectToSeries(
   // incoming number matched an existing one, and a bulk update to the SAME
   // negative number would collide the incoming members with each other.
   //
-  // Negative numbers are safe to park on: nothing else ever writes one, so they
-  // cannot clash with the positive numbers already in the series. applyRenumber
-  // then assigns the real 1..N. The index does not constrain the rows before this
-  // point, because it only covers rows where series_id is not null.
-  for (let i = 0; i < memberIds.length; i++) {
+  // Each incoming survey takes the next number ABOVE the series' current
+  // highest, which is free by definition. applyRenumber then sorts the whole
+  // series into its real 1..N. The index does not constrain these rows before
+  // this write, since it only covers rows where series_id is not null.
+  //
+  // Worth knowing how wide this was: 269 of 295 live standalone projects carry
+  // rerun_number = 1 (migration 040's not-null default), and every one of the 24
+  // series with waves already has a wave numbered 1 — so without this the feature
+  // would have failed for the large majority of the surveys the picker offers.
+  const { data: used, error: usedErr } = await admin
+    .from('survey_projects')
+    .select('rerun_number')
+    .eq('series_id', seriesId)
+    .is('deleted_at', null)
+  if (usedErr) throw new Error(usedErr.message)
+  let park = (used ?? []).reduce((m, r) => Math.max(m, r.rerun_number ?? 0), 0)
+
+  for (const id of memberIds) {
     const { error: upErr } = await admin
       .from('survey_projects')
-      .update({ series_id: seriesId, rerun_number: -(1000 + i) })
-      .eq('id', memberIds[i])
+      .update({ series_id: seriesId, rerun_number: ++park })
+      .eq('id', id)
     if (upErr) throw new Error(upErr.message)
   }
 
