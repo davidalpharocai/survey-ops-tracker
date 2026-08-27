@@ -1,0 +1,131 @@
+MATCHED: 209 | with changes: 72 | NEW to insert: 21 | held/flagged-new: 1 | genuine-disagreement flags: 4
+board cards moving: 1 | status->Closed: 22 | compliance stamps: 32
+
+=== FIELD CHANGE TALLY (matched) ===
+  latest_next_steps: 52
+  n_actual: 25
+  status: 22
+  n_collected: 12
+  n_target: 8
+  deliver_date: 6
+  salesperson: 5
+  due_date: 5
+  terminations: 5
+  launch_date: 5
+  survey_tool_id: 4
+  project_type: 3
+  row_level_data: 2
+  stage_doc_programming: 1
+  stage_survey_programming: 1
+  stage_edwin_qa: 1
+  stage_fielding: 1
+  board_column: 1
+  submitted_date: 1
+  linked_documents: 1
+  citation_language_needed: 1
+
+=== NEW PROJECTS TO INSERT (21) ===
+  + BofA - Grace | AI Restaurants - Starbucks (Open, Data QA)
+  + Quince | Trial - (Open, Fielding)
+  + Holocene - Max Hannula | 2nd Run: Stanley Black & Decker (SWK) - Consumer (Open, Submitted)
+  + BeaconLight - Felicity Wang | Minimal Residual Disease (MRD) — Diagnostic Test Adoption, Preference &amp; Outlook (Open, Submitted)
+  + AARP | July Survey: Asking 50+ y/o AARP affiliation (Closed, Fielding)
+  + Benchmark | Advertising Campaign Tagline Survey for a senior living community (Closed, Fielding)
+  + BAM - Jared Osteen | Reddit User survey (Closed, EdWin QA)
+  + NutriSource - David Denham | Pet Food in Stores (Open, Fielding)
+  + BAM - Jared Khoo | Orthopedic Survey (Closed, Fielding)
+  + Vance Junction.AI | Bi-weekly Poll (Closed, Delivery)
+  + BAM - Nick Amato | BioProcessing - Flash (Closed, Delivery)
+  + BAM - James Cook | India (Open, Submitted)
+  + BAM - James Cook | Indonesia (Open, Submitted)
+  + BAM - Grey Jones | TOST New MerchantIQ Grow & Hardware Supply survey (Open, Submitted)
+  + SIG - Harrison Bauer | Feight Transport (Open, Fielding)
+  + Argentum - Stephanie Robert | Senior Living Careers Outlook Index (SLCOI) (Open, Submitted)
+  + Oklahoma Chamber - Luke Reynolds | Education Sales Tax (Open, EdWin QA)
+  + EcoMap Technologies - Paige McDonald | Philly BIRT (Open, Submitted)
+  + Gingrich360 - Joe Desantis | Economic questions (Closed, Delivery)
+  + BofA | Allison Sun - survey (Hold, Submitted)
+  + BofA - David Amira | Legal AI & Clinical Decision Tools (Open, Submitted)
+
+=== HELD NEW ROWS (not inserted — your call) ===
+  ? BAM - Jeff Cumming | BAM - Jeff Cumming (Done)
+
+=== GENUINE DISAGREEMENTS (kept app value — flagged) ===
+  PR00119 Employers: salesperson: sheet="Alex Pinsky" app="Vineet Kapur"
+  PR00122 Business Leaders: salesperson: sheet="SEND TO Jenna before client" app="Jenna Shrove"
+  PR00202 AI Infrastructure - 2nd Run: survey_tool_id: sheet="B2B_BFCOATUEAISELLER20260601, B2B_BFCOATUEAIBUYER20260601, B2B_BFCOATUEAISELLER202607, B2B_BFCOATUEAIBUYER202607" app="B2B_BFCOATUEAISELLER20260601, B2B_BFCOATUEAIBUYER20260601"
+  PR00210 Argentina/Mexico/Brazil FIFA E-commerce: survey_tool_id: sheet="AWSIGWCPECM20260706BR" app="AWSIGLATAM20260625MEX"
+
+=== PER-PROJECT CHANGES (matched) ===
+  PR00061 AI Usage and Shopping agent Tracker: {"latest_next_steps":"Shanu rerun Study to be assigned\nIntern Project\nRemove Michael's questions and Add Bryans energy feasibility survey questions\nComments: We need to add a tracker with all the famous LLM agents"}
+  PR00085 Sports Bet [compliance-stamp]: {"latest_next_steps":"SENT TO CLIENT\nComments: Sreerag CheerothChange the depe and check the age split for both the survey. Young - 30N\n⚠ Compliance approved via email — sheet refresh 2026.06.30"}
+  PR00053 Tinder [compliance-stamp]: {"latest_next_steps":"SA QA\nComments: On Shanu to QA\n⚠ Compliance approved via email — sheet refresh 2026.06.30"}
+  PR00080 HR study [compliance-stamp]: {"latest_next_steps":"SA QA\nComments: QA more C level / finance folks. Check shanu slack\n⚠ Compliance approved via email — sheet refresh 2026.06.30"}
+  PR00042 wealth manager study [compliance-stamp]: {"latest_next_steps":"x\nComments: Collecting 10 more wirehouse\n⚠ Compliance approved via email — sheet refresh 2026.06.30"}
+  PR00048 HR study V2 [compliance-stamp]: {"latest_next_steps":"wait on client\nComments: look a distribution of responses\n⚠ Compliance approved via email — sheet refresh 2026.06.30"}
+  PR00060 POS STUDY 2.0 [compliance-stamp]: {"latest_next_steps":"Collected so far:\nTOST(20) - 43\nSQR(20) - 33\nCLVR(20) - 14\nSHFT(10-15) - 9\nGenius POS(5-10) - 7\nOTHR(15) - 43\n⚠ Compliance approved via email — sheet refresh 2026.06.30"}
+  PR00066 Wealth manager [compliance-stamp]: {"latest_next_steps":"Delivered\n⚠ Compliance approved via email — sheet refresh 2026.06.30"}
+  PR00046 Hood/Amex [compliance-stamp]: {"latest_next_steps":"Need 10-15n 18-29\n⚠ Compliance approved via email — sheet refresh 2026.06.30"}
+  PR00073 Prediction markets tracker [compliance-stamp]: {"latest_next_steps":"PUSH TO RERUN\n⚠ Compliance approved via email — sheet refresh 2026.06.30"}
+  PR00072 InstaCart study [compliance-stamp]: {"latest_next_steps":"Bryan QA'd the spreadsheet. Ready to submit\n⚠ Compliance approved via email — sheet refresh 2026.06.30"}
+  PR00079 smart glasses [compliance-stamp]: {"latest_next_steps":"⚠ Compliance approved via email — sheet refresh 2026.06.30"}
+  PR00083 GLP-1 [compliance-stamp]: {"latest_next_steps":"Shanu to respond\n⚠ Compliance approved via email — sheet refresh 2026.06.30"}
+  PR00082 GLP 1 + Fast Food [compliance-stamp]: {"latest_next_steps":"Ask Sowrya to relaunch and check exclusion criteria. QA in Occam\nComments: Launched\n⚠ Compliance approved via email — sheet refresh 2026.06.30"}
+  PR00045 Coatue NYT study [compliance-stamp]: {"latest_next_steps":"Anne - Relaunch today again\n⚠ Compliance approved via email — sheet refresh 2026.06.30"}
+  PR00115 Sree - lets collect another 1350n at the end of march, so we have more N for March. And them put these in rerun for 1350n per month. These need to stay private [compliance-stamp]: {"latest_next_steps":"Sree\n⚠ Compliance approved via email — sheet refresh 2026.06.30"}
+  PR00087 Sherwin Williams brand tracker set [compliance-stamp]: {"latest_next_steps":"Market - Household and Personal Product\n⚠ Compliance approved via email — sheet refresh 2026.06.30"}
+  PR00118 chatgpt follow up [compliance-stamp]: {"latest_next_steps":"DELIVERED TO CLIENT\n⚠ Compliance approved via email — sheet refresh 2026.06.30"}
+  PR00095 GTA6 [compliance-stamp]: {"latest_next_steps":"Waiting on pipeline\nComments: Needs to fix the random and flip other options\n⚠ Compliance approved via email — sheet refresh 2026.06.30"}
+  PR00135 NYT - rerun and new survey [compliance-stamp]: {"latest_next_steps":"2 surveys - new NYT 2 questions to old audience, new survey with 2 new questions\n⚠ Compliance approved via email — sheet refresh 2026.06.30"}
+  PR00154 Consumer Study New Data [compliance-stamp]: {"latest_next_steps":"Waiting on pipeline (Another One)\n⚠ Compliance approved via email — sheet refresh 2026.06.30"}
+  PR00142 Uniform Service Provider [compliance-stamp]: {"latest_next_steps":"Reblast on Monday $50\n⚠ Compliance approved via email — sheet refresh 2026.06.30"}
+  PR00145 Freight Trucking [compliance-stamp]: {"latest_next_steps":"Bryan sent to client\n⚠ Compliance approved via email — sheet refresh 2026.06.30"}
+  PR00144 Appfolio [compliance-stamp]: {"latest_next_steps":"Collected Ns (need to QA)\n⚠ Compliance approved via email — sheet refresh 2026.06.30"}
+  PR00149 Holocene Weekly Tracker [compliance-stamp]: {"status":"Closed","deliver_date":"2026-07-01","latest_next_steps":"Discuss scope to make in S3. (Anne- Tedi)\nWeekly rerun - Tuesdays\n6/10: Client responded requesting confirmation of: large increase in the previously reported wave of 2026-05-31 between this week’s file and last week’s for both shoe wear brands and retail brands.\n⚠ Compliance approved via email — sheet refresh 2026.06.30"}
+  PR00139 FIFA - International Study [compliance-stamp]: {"latest_next_steps":"QA (Bryan) before sending to client\n⚠ Compliance approved via email — sheet refresh 2026.06.30"}
+  PR00174 Yeztugo Patient Survey [compliance-stamp]: {"latest_next_steps":"Sent to Jared\n⚠ Compliance approved via email — sheet refresh 2026.06.30"}
+  PR00183 Cruise Lines B2B [compliance-stamp]: {"status":"Closed","n_target":40,"latest_next_steps":"6/16: Received 3k more audience, raised to 9k\n6/18: Bid raised from $25 -> $50\n6/22: evaluate N by Wednesday and give James an update then. Chuka starting to reach out today, with list where it's sorted by greatest revenue to least\n6/23: Bid increased from $50 -> $75 and another blast tomorrow. Shanu to relay to James tomorrow\n6/25: Bryan to look at data\n7/1: Julia to review row-level data. in addition to fraud check, check data that we're getting as many trends as possible on cruise lines\n--we're going to send the 25-26 to James by 2pm and mention the revenye threshold causing lower N count. We should include where terminations were happening\n⚠ Compliance approved via email — sheet refresh 2026.06.30"}
+  PR00179 Tinder User study [compliance-stamp]: {"n_actual":223,"latest_next_steps":"Compare the comparison with the changes that tinder has made to see if the Sbar changes are aligned with it\n⚠ Compliance approved via email — sheet refresh 2026.06.30"}
+  PR00012 Ohio: {"n_actual":401}
+  PR00011 AI Coding Tools: {"salesperson":"Vineet Kapur"}
+  PR00013 IA Independent Candidate voting: {"n_actual":730}
+  PR00025 Foodservice - SYY, USFD and PFGC: {"n_actual":25}
+  PR00027 Pharma R&D Real Estate: {"n_target":45}
+  PR00028 Wave 1: Predicting Persuasion: {"status":"Closed","due_date":"2026-06-24","n_actual":64}
+  PR00029 Oklahomans & Early Employment: {"n_actual":434}
+  PR00182 wealth manager study B2B [compliance-stamp]: {"n_actual":92,"latest_next_steps":"Add the Crypto currency related question\n6/12: doing another blast with a target of 50, and then will reach out to bigger audience at $25/bid\n6/23: Sree in final stage of collection\n6/25: will confirm with shanu if the data can wait to go out on monday with more Ns. Will start QA\n6/26: Change the terminations to hit 100Ns before monday\n⚠ Compliance approved via email — sheet refresh 2026.06.30"}
+  PR00031 Oklahomans & Business community favorability: {"n_actual":500,"n_collected":500}
+  PR00030 June Health - pt1: {"n_actual":1061}
+  PR00032 June Health - pt2: {"n_actual":1046}
+  PR00188 Sweetgreen Consumers: {"n_actual":102,"n_collected":105}
+  PR00194 Nissan OEM Accessory Study - Survey A: {"n_actual":1172}
+  PR00195 Nissan OEM Accessory Study - Survey B: {"n_actual":1174,"n_collected":1174}
+  PR00197 Stanley Black & Decker (SWK) - Construction: {"status":"Closed","deliver_date":"2026-07-01","n_actual":119,"latest_next_steps":"6/22: via advertising: 6 open, 0 completes\n--Bid increased from $5 to $10. Refielding today\n6/23: Julia to relaunch twice today \n6/24: Assessment from Bryan's PS data QA is that we have a solid amount of good data, but Julia to push another blast.\n6/25: Bryan, Julia QA'd. Waiting on Shanu for Final approval\n7/1: 119 clean N (actual). Going to send what we have today\nComments: $60/N\n⚠ Compliance approved via email — sheet refresh 2026.06.30"}
+  PR00198 Stanley Black & Decker (SWK) - Consumers: {"status":"Closed","n_collected":250,"latest_next_steps":"6/17: Julia reached out to Holocene compliance and they approved also gave Max a heads up\n6/30: Julia Tibbetts to let Max know about Construction delivery date\nComments: $60/N\n⚠ Compliance approved via email — sheet refresh 2026.06.30"}
+  PR00199 Bioprocessing (targeted at CDMOs, Pharmas, and Biotechs): {"status":"Closed","n_actual":15,"n_collected":16,"terminations":false,"latest_next_steps":"7/1: Lets review the analytics - how many starts, how many terminations, etc. it may be an audience issue\n--Adjust audience to pharma decision makers\n---Chuka  to start calling\n7/6: Nick good with this Thursday as latest delivery date. Requests update some time tomorrow.\n7/8: Another blast going out tonight\n7/9: Bryan and shanu to get it out to the client\nComments: $150/N"}
+  PR00200 Large Research Institutions (referenced as "A&G"): {"status":"Closed","n_actual":16,"n_collected":17,"terminations":false,"latest_next_steps":"7/1: Lets review the analytics - how many starts, how many terminations, etc. it may be an audience issue\n--Greg to start calling\n7/6: Nick good with this Thursday as latest delivery date. Requests update some time tomorrow.\n7/8: Another blast going out tonight\nComments: $150/N"}
+  PR00201 TV Consumer: {"n_actual":360}
+  PR00202 AI Infrastructure - 2nd Run: {"status":"Closed","latest_next_steps":"6/2: Chuka to help with getting more responses from the 75. tomorrow BF has green light to raise to $100\n6/8: Sellers raised to $100; Buyers raised to $125\n7/8: Chuka and Greg calling Europe\n7/9: Australia - Less opens. Chuka to Call UK (3Ns - 50GBP), Singapore (3Ns - 50SGD ) and Australia (3Ns - 50AUD) (buyers and sellers links)- Sree to provide the call list \n7/13: Bryan to begin QA of sellers and continuing to blast buyers. ~50% are repeat respondents. Xx to pull anything international from Zoominfo\n-Greg to continue calling, Chuka to call Asia tomorrow AM\n⚠ Compliance approved via email — sheet refresh 2026.06.30"}
+  PR00205 SharkNinja - Logistics: {"project_type":"B2B","status":"Closed","n_target":45,"terminations":false,"latest_next_steps":"Audience: 3PL companies and Retailers\n6/30: Shanu to tell the client to lower the N for logistics from 40 to ~15 - Shanu to handle communications for this - done\n7/2: Additional blasts scheduled for over the weekend. N increased from 4 to 11"}
+  PR00206 SharkNinja - Retail: {"status":"Closed","n_target":45,"terminations":false,"latest_next_steps":"6/30: Shanu to tell the client to lower the N for logistics from 40 to ~15 - Shanu to handle communications for this - done\n7/2: Additional blasts scheduled for over the weekend. N increased from 18 to 24"}
+  PR00207 National survey: {"status":"Closed","n_actual":1350,"latest_next_steps":"6/24: Sree/Julia to QA today > give to Jenna tomorrow AM for sign-off and delivery\n6/30: Waiting for Jenna to give the green light to send"}
+  PR00204 Match / Dating Apps: {"latest_next_steps":"6/30: Cleaning up Occam data. Shanu to take one more look of the row level before delivery\n⚠ Compliance approved via email — sheet refresh 2026.06.30"}
+  PR00203 Used electronics consumers: {"status":"Closed","n_actual":360,"latest_next_steps":"6/30: Shanu to do final QA for signoff\n⚠ Compliance approved via email — sheet refresh 2026.06.30"}
+  PR00208 Nationally registered voters: {"status":"Closed","n_actual":1000,"n_collected":1000,"latest_next_steps":"6/30: Shelly is working on urban density issue by EOD, but may carry over to tomorrow AM"}
+  PR00209 Proxy Voting [board Submitted -> Fielding]: {"n_collected":66,"stage_doc_programming":true,"stage_survey_programming":true,"stage_edwin_qa":true,"stage_fielding":true,"board_column":"Fielding","latest_next_steps":"7/8: AlphaRoc to fill out CFA vendor onboarding process - David to check in with Vineet\n7/16: Waiting on Vineet/Client to get back to us"}
+  PR00210 Argentina/Mexico/Brazil FIFA E-commerce: {"status":"Closed","launch_date":"2026-07-08","due_date":"2026-07-14","deliver_date":"2026-07-14","n_actual":400,"n_collected":500,"latest_next_steps":"7/8: Brazil programming QA done. other two expected to be done today\n7/9: To QA and create 3 studies on basis of the country\n7/13: Waiting for pipeline so we can deliver\n7/14: Delivering today"}
+  PR00211 CDW: {"status":"Closed","latest_next_steps":"7/2: Bryan did first pass of QA. Shanu to do final pass of QA so we can to client EOD. Make sure we dont include any screeners that Coatue didn't give us\n⚠ Compliance approved via email — sheet refresh 2026.06.30"}
+  PR00222 national independent awareness barometer: {"status":"Closed"}
+  PR00212 ATTR-CM Therapeutic Survey [compliance-stamp]: {"project_type":"B2B","status":"Closed","launch_date":"2026-07-01","latest_next_steps":"7/7: Shanu to x-ref final xlsx vs document > send to compliance\n⚠ Compliance approved via email — sheet refresh 2026.06.30"}
+  PR00213 POC trial: {"project_type":"B2B","status":"Closed","submitted_date":"2026-06-29","n_target":16,"n_actual":16,"n_collected":16,"latest_next_steps":"6/30: Shanu to finish QA"}
+  PR00214 Footjoy Brand Tracking: {"status":"Closed","launch_date":"2026-07-01","due_date":"2026-07-13","deliver_date":"2026-07-13","n_actual":305,"latest_next_steps":"7/6: David B requested additional 600 N - back in the field\n7/13: QA and send out row-level today"}
+  PR00215 Wealth Manager Data [compliance-stamp]: {"status":"Closed","due_date":"2026-07-15","deliver_date":"2026-07-15","n_target":100,"n_actual":100,"salesperson":"Alex Pinsky","n_collected":100,"row_level_data":true,"latest_next_steps":"7/9: Anticipated launch for 7/10 - Sree to confirm when launched. Expected to complete collection next week\n7/13:\n⚠ Compliance approved via email — sheet refresh 2026.06.30"}
+  PR00220 Diabetes / Medtech: {"due_date":"2026-07-14","deliver_date":"2026-07-14","survey_tool_id":"AWBAMDBTS20260701","latest_next_steps":"7/10: Data not clear - Shanu to QA"}
+  PR00226 Harvey Study - Competitive Positioning, Foundation Models, Market Impact, In-house Opportunities: {"status":"Closed","launch_date":"2026-07-08","n_target":35,"n_actual":45,"survey_tool_id":"B2B_JTWELHAR20260707","n_collected":53,"row_level_data":true,"latest_next_steps":"Audience:\n-Law firm partners/attorneys with input into tech budgets.\n-Legal operations/knowledge management leaders at law firms (i.e, CTO, CIO, etc)\n-In-house counsel/General Counsel with input into legal tech budgets.\n-Legal operations leaders at corporations (non-attorney).\n7/9: More Audience - $25 Reachouts\n7/10: Scheduled another blast for tonight w/ new audience of corporate counsel and legal operations\n7/13: Julia having issue with DV tool- messaged Rohit\nComments: Competitive Positioning, Foundation Models (Harvey's ability to compete the foundation model layer), Market Impact (can legal AI grow spend at law firms), In-house Opportunities (selling in-house counsel)","linked_documents":["{\"name\":\"Survey doc (for programming)\",\"url\":\"https://docs.google.com/document/d/11HJvRbZykpDwoZdNhryTW-EcNG2tbEJF/edit\"}","https://staging.study.edwin.alpharoc.ai/survey?source=B2B_JTWELHAR20260707&transaction_id=test_72731"]}
+  PR00227 Korea Consumer survey: {"status":"Closed","survey_tool_id":"AWBAMKRNINCMLXRY20260707","latest_next_steps":"7/9: Abby and Julia to help QA the data\n7/10: Anne to do another pass of QA today and aim to deliver today after Shanu looks at it"}
+  PR00228 Government Shutdown Polling: {"launch_date":"2026-07-15","n_target":450,"survey_tool_id":"PII_JTGOVTSHTDWN20260715"}
+  PR00004 Autodesk: {"salesperson":"Alex Pinsky"}
+  PR00033 Brand Attribution study (Sports themed Ads): {"salesperson":"Vineet Kapur","latest_next_steps":"7/13: Shanu/Vineet haven't heard back from them"}
+  PR00009 M365 Copilot Enterprise Workers & Decision Makers: {"terminations":false}
+  PR00002 UFL - City Study: {"salesperson":"Vineet Kapur"}
+  PR00020 California (same survey + video): {"citation_language_needed":true}

@@ -34,8 +34,6 @@ const TIP = {
   surveyIds:
     "IDs of this project's surveys, comma separated. Auto-filled from the attached Google Sheet by the scheduled sync; manual edits stick unless the sheet changes.",
   longitudinal: 'Whether this is a longitudinal study tracked across multiple waves.',
-  citation:
-    'Whether deliverables need citation language. Auto-set to Yes when the salesperson is Jenna or the project/client mentions "vote". Click to override.',
   rowLevel: 'Whether individual respondent-level data is included in the deliverable.',
   occam: 'Whether this project uses Occam (our internal survey tool).',
 }
@@ -184,14 +182,6 @@ export function OverviewFieldGrid({ project }: { project: SurveyProject }) {
             tone="emerald"
             tooltip={TIP.longitudinal}
             onToggle={v => save({ longitudinal: v })}
-          />
-          <FlagChip
-            label="Citation Language"
-            icon="❝"
-            value={project.citation_language_needed ?? false}
-            tone="amber"
-            tooltip={TIP.citation}
-            onToggle={v => save({ citation_language_needed: v })}
           />
           <FlagChip
             label="Row-Level Data"

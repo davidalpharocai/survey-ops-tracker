@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "socc-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "survey-ops-tracker", "run", "dev"],
+      "port": 3000
+    }
+  ]
+}

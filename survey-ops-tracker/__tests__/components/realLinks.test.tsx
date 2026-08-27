@@ -60,7 +60,6 @@ const baseProject = {
   deliver_date: null,
   sort_order: 0,
   longitudinal: false,
-  citation_language_needed: false,
   segment_count: 1,
   created_at: '2026-01-01',
   updated_at: '2026-01-01',

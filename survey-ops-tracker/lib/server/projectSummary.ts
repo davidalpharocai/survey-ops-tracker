@@ -70,13 +70,13 @@ export interface SummaryFacts {
   watchouts: string[]
 }
 
-// voter_survey_qa and terminations are deliberately absent: both were retired
-// from the UI on 2026-08-24. The columns and their history are kept so either
-// can be resurfaced, but nothing user-facing should name them — and this list
-// feeds prose the user reads.
+// voter_survey_qa, terminations and citation_language_needed are deliberately
+// absent: the first two were retired from the UI on 2026-08-24, citation on
+// 2026-08-26 (migration 090 also stopped the auto-set). The columns and their
+// history are kept so any of them can be resurfaced, but nothing user-facing
+// should name them — and this list feeds prose the user reads.
 const FLAG_LABELS: { key: keyof SurveyProject; label: string }[] = [
   { key: 'longitudinal', label: 'Longitudinal' },
-  { key: 'citation_language_needed', label: 'Citation Language' },
   { key: 'row_level_data', label: 'Row-Level Data' },
   { key: 'occam', label: 'Occam' },
 ]

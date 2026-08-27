@@ -67,7 +67,6 @@ const TOOLTIPS: Record<string, string> = {
   'Requested by': "The client contact who requested this survey. Pick from this client's people or add a new one; click the name to view or edit their details.",
   'N Actual': 'Final usable response count after cleaning N Collected.',
   'Longitudinal': 'Whether this is a longitudinal study tracked across multiple waves.',
-  'Citation Language': 'Whether deliverables need citation language. Auto-set to Yes when the salesperson is Jenna or the project/client mentions "vote". Click to override.',
   'Survey IDs': 'IDs of this project\'s surveys, comma separated. Auto-filled from the attached Google Sheet by the scheduled sync; manual edits stick unless the sheet changes.',
   'Submitted': 'Date the project was submitted into the pipeline.',
   'Launch Date': 'Date the survey went (or goes) live in the field.',

@@ -42,8 +42,6 @@ const SLIM_PROJECT_COLUMNS = [
   'board_column',
   'latest_next_steps',
   'longitudinal',
-  'voter_survey_qa',
-  'citation_language_needed',
   'priority',
   'blocked_by',
   'stage_doc_programming',

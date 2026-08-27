@@ -9,9 +9,10 @@ export type MergeField = {
 }
 
 // Scalar fields a user resolves in the preview (only differing ones surface).
-// voter_survey_qa and terminations are absent on purpose — retired from the UI
-// 2026-08-24, so there is nothing for a human to reason about; the survivor
-// simply keeps its own value and both columns are retained in the DB.
+// voter_survey_qa, terminations and citation_language_needed are absent on
+// purpose — retired from the UI (the first two 2026-08-24, citation 2026-08-26),
+// so there is nothing for a human to reason about; the survivor simply keeps its
+// own value and all three columns are retained in the DB.
 //
 // `budget` is marked restricted because the preview renders BOTH records' values
 // side by side — merging two projects would otherwise print two cost ceilings to
@@ -38,7 +39,6 @@ export const PROJECT_MERGE_FIELDS: MergeField[] = [
   { key: 'category', label: 'Category' },
   { key: 'objective', label: 'Objective' },
   { key: 'longitudinal', label: 'Longitudinal' },
-  { key: 'citation_language_needed', label: 'Citation language' },
   { key: 'row_level_data', label: 'Row-level data' },
 ]
 
@@ -59,7 +59,7 @@ export const CLIENT_MERGE_FIELDS: MergeField[] = [
  *
  * A dropped field is simply never picked, so `buildSurvivorUpdate` leaves it out
  * of the patch and the survivor keeps its own value — exactly what happens to
- * the retired voter_survey_qa / terminations columns above. Nothing is
+ * the retired flag columns named above. Nothing is
  * overwritten with the loser's number behind the user's back.
  */
 export function mergeFieldsFor(fields: MergeField[], canViewFinancials: boolean): MergeField[] {

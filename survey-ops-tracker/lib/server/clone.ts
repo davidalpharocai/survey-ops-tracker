@@ -17,10 +17,7 @@ import { runCreateProject, runProjectWrite } from '@/lib/mcp/writes'
 export interface CloneCarry {
   people?: boolean // captain + co-captains, salesperson, requested-by
   audienceN?: boolean // audience, N target, N internal target, audience size
-  // longitudinal, voter QA, citation, row-level, terminations. Voter QA and
-  // terminations are retired from the UI (2026-08-24) but still carried here
-  // deliberately, so the data stays continuous if either is ever resurfaced.
-  flags?: boolean
+  flags?: boolean // longitudinal, row-level, terminations
   suppliers?: boolean // copy PS suppliers (CPIs + caps; N collected reset to 0)
   budget?: boolean // total budget
   // The client's price per N (project_financials, migration 082). Carried by
@@ -308,8 +305,9 @@ export async function cloneProject(opts: {
   }
   if (on(c.flags)) {
     patch.longitudinal = src.longitudinal
-    patch.voter_survey_qa = src.voter_survey_qa
-    patch.citation_language_needed = src.citation_language_needed
+    // voter_survey_qa / citation_language_needed are NOT carried: both are
+    // retired (migration 090 stopped the 009 auto-set), so a clone that copied
+    // them would be the only thing still writing a dead column.
     patch.row_level_data = src.row_level_data
     patch.terminations = src.terminations
   }
