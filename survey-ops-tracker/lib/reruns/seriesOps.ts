@@ -447,3 +447,181 @@ export async function reorderWaves(
   const waves = await fetchWaves(admin, seriesId)
   return { waves }
 }
+
+// ---------------------------------------------------------------------------
+// attach / detach — put an existing survey into a series, or take it out
+// ---------------------------------------------------------------------------
+//
+// The gap these close: before this, `series_id` was written in exactly TWO
+// places — createSeriesFromProject (promoting a project to Wave 1 of a NEW
+// series, which sweeps its legacy family in) and the auto-spawn cron. There was
+// no way to put an EXISTING survey into an EXISTING series, so a wave created by
+// hand, or one whose link was lost, could only be fixed with SQL. That is
+// exactly what happened to BAM's PR00388.
+//
+// Why this lives here rather than in a migration: the numbering rule
+// (renumberWaves in lib/reruns/series.ts) is subtle — a manual `wave_order`
+// beats dates once ANY wave has one, the date key falls back
+// submitted → launch → deliver → created, and the origin is forced to Wave 1
+// when no manual order exists. A second copy of that rule in SQL would drift
+// from this one. So attach/detach reuse applyRenumber, exactly like
+// reorderWaves does.
+
+/** Put an existing survey into an existing series, then renumber the series.
+ *
+ * Refuses rather than guesses in the two cases where guessing would be
+ * destructive: a survey already in a DIFFERENT series (moving it implicitly is
+ * how a wave ends up silently re-homed) and a survey belonging to a different
+ * client than the series. Attaching one already in THIS series is a no-op, so a
+ * double-click or a retried request is harmless. */
+export async function attachProjectToSeries(
+  admin: Admin,
+  seriesId: string,
+  projectId: string,
+  actor: string
+): Promise<{ series: SeriesRow; waves: Awaited<ReturnType<typeof fetchWaves>> }> {
+  const { data: series, error: sErr } = await admin
+    .from('rerun_series')
+    .select('*')
+    .eq('id', seriesId)
+    .maybeSingle()
+  if (sErr) throw new Error(sErr.message)
+  if (!series) throw new SeriesOpError('Series not found.', 404)
+
+  const { data: project, error: pErr } = await admin
+    .from('survey_projects')
+    .select('id, project_code, project_name, client, client_id, series_id')
+    .eq('id', projectId)
+    .is('deleted_at', null)
+    .maybeSingle()
+  if (pErr) throw new Error(pErr.message)
+  if (!project) throw new SeriesOpError('Survey not found.', 404)
+
+  const label = project.project_code ?? project.project_name
+
+  // Idempotent: already where it should be.
+  if (project.series_id === seriesId) {
+    return { series: series as SeriesRow, waves: await fetchWaves(admin, seriesId) }
+  }
+
+  // Moving a survey between series is a different, riskier operation than adding
+  // an unattached one. Make the caller remove it first, deliberately.
+  if (project.series_id) {
+    throw new SeriesOpError(
+      `${label} is already in another series. Remove it from that one first, then add it here.`,
+      409
+    )
+  }
+
+  // A series belongs to a client; a wave from a different client is almost always
+  // a mis-click, and the cost of being wrong is a survey appearing under someone
+  // else's account.
+  if (series.client_id && project.client_id && series.client_id !== project.client_id) {
+    throw new SeriesOpError(
+      `${label} belongs to ${project.client ?? 'another client'}, but this series is ${series.client ?? 'a different client'}. Move the survey to the right client first.`,
+      409
+    )
+  }
+
+  // Set BOTH halves of the wiring. This is the whole lesson of the PR00388 bug:
+  // `series_id` is the first-class FK the client page groups on, while
+  // `rerun_series_id` is the legacy lineage pointer holding the FIRST WAVE'S
+  // PROJECT ID, which the project page's wave list reads. Filling one and not the
+  // other is what makes a survey look grouped on one screen and loose on another.
+  // The origin wave keeps a NULL lineage pointer — by convention its own id IS
+  // the root (see app/api/projects/link-rerun/route.ts).
+  //
+  // `wave_order` is deliberately left untouched: renumberWaves sorts a wave with
+  // no explicit order after every ordered one, which is the documented
+  // "newly-added waves append at the end" behaviour.
+  const { error: upErr } = await admin
+    .from('survey_projects')
+    .update({
+      series_id: seriesId,
+      rerun_series_id: projectId === series.origin_project_id ? null : series.origin_project_id,
+    })
+    .eq('id', projectId)
+  if (upErr) throw new Error(upErr.message)
+
+  await applyRenumber(admin, seriesId, series.origin_project_id ?? projectId)
+
+  const waves = await fetchWaves(admin, seriesId)
+  const maxNum = waves.reduce((m, w) => Math.max(m, w.rerun_number), 0)
+  const { data: finalSeries, error: bumpErr } = await admin
+    .from('rerun_series')
+    .update({ next_wave_no: maxNum + 1, updated_by: actor, updated_at: new Date().toISOString() })
+    .eq('id', seriesId)
+    .select('*')
+    .single()
+  if (bumpErr) throw new Error(bumpErr.message)
+
+  return { series: finalSeries, waves }
+}
+
+/** Take a survey out of its series and renumber what is left.
+ *
+ * Clears the first-class link, the legacy lineage pointer and any manual order,
+ * and resets the wave number to 1, so the survey becomes genuinely standalone
+ * rather than half-attached — half-attached being the exact state this whole area
+ * keeps ending up in. Every changed value lands in project_audit (migration 088),
+ * so an accidental removal is recoverable from the history. */
+export async function detachProjectFromSeries(
+  admin: Admin,
+  projectId: string,
+  actor: string
+): Promise<{ seriesId: string; waves: Awaited<ReturnType<typeof fetchWaves>> }> {
+  const { data: project, error: pErr } = await admin
+    .from('survey_projects')
+    .select('id, project_code, project_name, series_id')
+    .eq('id', projectId)
+    .is('deleted_at', null)
+    .maybeSingle()
+  if (pErr) throw new Error(pErr.message)
+  if (!project) throw new SeriesOpError('Survey not found.', 404)
+
+  const label = project.project_code ?? project.project_name
+  const seriesId = project.series_id
+  if (!seriesId) throw new SeriesOpError(`${label} is not in a series.`, 400)
+
+  const { data: series, error: sErr } = await admin
+    .from('rerun_series')
+    .select('id, origin_project_id')
+    .eq('id', seriesId)
+    .maybeSingle()
+  if (sErr) throw new Error(sErr.message)
+
+  // Wave 1 is the series anchor: rerun_series.origin_project_id points at it and
+  // renumberWaves forces it first. Removing it would leave the series pointing at
+  // a survey no longer in it — legal, but confusing, and not something this
+  // function can repair. End the series, or add a replacement first.
+  if (series?.origin_project_id === projectId) {
+    throw new SeriesOpError(
+      `${label} is Wave 1 — the series is anchored to it. Add another survey to the series first, or end the series instead.`,
+      409
+    )
+  }
+
+  // rerun_number goes back to 1, NOT null: migration 040 declares it
+  // `integer not null default 1`, so a null here is a not-null violation and the
+  // whole detach 500s. 1 is also the right value semantically — it is what every
+  // standalone project has, and what Wave 1 of a series has. series_id,
+  // rerun_series_id and wave_order ARE nullable and are genuinely cleared.
+  const { error: upErr } = await admin
+    .from('survey_projects')
+    .update({ series_id: null, rerun_series_id: null, rerun_number: 1, wave_order: null })
+    .eq('id', projectId)
+  if (upErr) throw new Error(upErr.message)
+
+  // Renumber what remains, so the surviving waves are 1..N with no gap.
+  await applyRenumber(admin, seriesId, series?.origin_project_id ?? seriesId)
+
+  const waves = await fetchWaves(admin, seriesId)
+  const maxNum = waves.reduce((m, w) => Math.max(m, w.rerun_number), 0)
+  const { error: bumpErr } = await admin
+    .from('rerun_series')
+    .update({ next_wave_no: maxNum + 1, updated_by: actor, updated_at: new Date().toISOString() })
+    .eq('id', seriesId)
+  if (bumpErr) throw new Error(bumpErr.message)
+
+  return { seriesId, waves }
+}
