@@ -1,4 +1,10 @@
--- 087: a merge must not drop the survivor's series membership.
+-- 087: a merge must not silently drop what it cannot re-point.
+--
+-- merge_projects re-points fifteen CHILD TABLES and carries the price row and the
+-- context override, but it never merged the scalar columns on survey_projects
+-- itself. Two of those carry real information, and both were being lost:
+-- series membership (series_id / rerun_series_id / rerun_number) and the
+-- append-only notes log (latest_next_steps).
 --
 -- WHY THIS EXISTS
 --
@@ -19,9 +25,16 @@
 --
 -- This file fixes (2), the one that is a bug rather than a missing feature.
 --
--- PR00388's data was already repaired by hand on 2026-08-27 (project_audit holds
--- a `series_id` row attributed to "david@alpharoc.ai (manual repair via Claude)"),
--- so this file does not touch it.
+-- Tracing that turned up a SECOND column lost by the same merge: PR00388's notes
+-- log was empty while PR00295 held 1,436 characters David wrote on 2026-08-25 --
+-- who was really driving the study, the pricing Alex had held, an ownership
+-- caveat, an open client issue, and an explicit "reconcile before programming"
+-- flag on the N target. The project_steps checklist had transferred correctly, so
+-- nothing looked wrong; the project reached Fielding without the note.
+--
+-- Both of PR00388's values were repaired by hand on 2026-08-27 (project_audit
+-- holds a `series_id` row and a notes-log update, both attributed to
+-- "david@alpharoc.ai ... via Claude"), so this file does not touch its data.
 --
 -- WHAT THIS FILE DOES NOT DO
 --
@@ -183,6 +196,53 @@ begin
    where l.id = p_loser and s.id = p_survivor
      and l.series_id is not null and s.series_id is not null
      and l.series_id <> s.series_id;
+
+  -- 087: carry the loser's NOTES LOG too.
+  --
+  -- Same defect, different column, found while tracing the first one. The merge
+  -- re-points fifteen child TABLES but never merged the scalar text on
+  -- survey_projects, and latest_next_steps is not a denormalisation of
+  -- project_steps -- it is its own append-only narrative log, auto-stamped with a
+  -- date and author (lib/hooks/useProjects.ts:372, autoStamp).
+  --
+  -- What that cost in the case that prompted this: PR00295 carried 1,436
+  -- characters David wrote on 2026-08-25 -- who was actually driving the study,
+  -- the $125/N pricing Alex had held, an ownership caveat, an open client issue,
+  -- and an explicit "reconcile before programming" flag on the N target. The
+  -- project_steps checklist transferred correctly; that note did not, and the
+  -- project reached Fielding without it. It was restored by hand on 2026-08-27.
+  --
+  -- CONCATENATED, not coalesced. Every other carry-over in this function is
+  -- survivor-wins, and for a single-valued field like a price that is right --
+  -- one of them has to lose. An append-only log is different: both halves are
+  -- real history, and picking one silently destroys the other. So a blank
+  -- survivor inherits the loser's log outright, and when BOTH have content the
+  -- loser's is appended beneath a marker naming where it came from. The result is
+  -- longer than either input, which is the correct failure mode for a log.
+  update survey_projects s
+     set latest_next_steps = case
+           when nullif(btrim(coalesce(l.latest_next_steps, '')), '') is null
+             then s.latest_next_steps
+           when nullif(btrim(coalesce(s.latest_next_steps, '')), '') is null
+             then l.latest_next_steps
+           else s.latest_next_steps || chr(10) || chr(10)
+                || '[merged in from ' || coalesce(l.project_code, p_loser::text) || ']'
+                || chr(10) || l.latest_next_steps
+         end
+    from survey_projects l
+   where s.id = p_survivor
+     and l.id = p_loser
+     and nullif(btrim(coalesce(l.latest_next_steps, '')), '') is not null;
+
+  -- The 028 audit trigger already logs latest_next_steps on any UPDATE, so the
+  -- change itself is recorded. This line records WHY, which the trigger cannot
+  -- know -- and matches the price block's habit of naming the merge explicitly.
+  insert into project_audit(project_id, field, new_value, changed_by)
+  select p_survivor, 'next_steps_merge_carried',
+         coalesce(l.project_code, p_loser::text), actor
+    from survey_projects l
+   where l.id = p_loser
+     and nullif(btrim(coalesce(l.latest_next_steps, '')), '') is not null;
 
   update survey_projects set deleted_at = now() where id = p_loser;
 
