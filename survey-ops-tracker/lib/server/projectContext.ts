@@ -1304,6 +1304,42 @@ export function harvestSearchResults(content: unknown): HarvestedSearch {
   return { results, errors, searches }
 }
 
+/**
+ * Turn raw web-search `error_code`s into something an analyst can act on.
+ *
+ * The codes are the API's, and they went straight into `refresh_error` — so the
+ * tab told David "Web search failed (max_uses_exceeded)", which names the
+ * mechanism in the vocabulary of a system he is not looking at. The codes stay
+ * in the cron's system_events meta, where a code is exactly the right thing to
+ * log; a human reading the tab gets the sentence.
+ *
+ * Unknown codes are passed through verbatim rather than swallowed: a code we
+ * have not seen before is information, and hiding it behind "web search failed"
+ * is how the next one of these takes a release to diagnose.
+ */
+export function describeSearchErrors(codes: string[], limit = 3): string {
+  const seen = dedupe(codes, limit)
+  const described = seen.map((code) => {
+    switch (code) {
+      // OUR OWN CAP, hit — not an outage. See the note above SYSTEM_PROMPT.
+      case 'max_uses_exceeded':
+        return `the ${MAX_SEARCHES}-search budget for this briefing ran out`
+      case 'too_many_requests':
+        return 'the web-search rate limit was hit'
+      case 'unavailable':
+        return 'web search was temporarily unavailable'
+      case 'query_too_long':
+      case 'invalid_tool_input':
+        return 'a search query was rejected as invalid'
+      case 'unknown_error':
+        return 'web search failed without saying why'
+      default:
+        return code
+    }
+  })
+  return described.join('; ')
+}
+
 // ---------------------------------------------------------------------------
 // Model output parsing
 // ---------------------------------------------------------------------------
@@ -1694,11 +1730,35 @@ export async function extractSubjects(
 // Prompting
 // ---------------------------------------------------------------------------
 
+/* ---------------------------------------------------------------------------
+ * ⚠️ THE SEARCH BUDGET IS PART OF THE PROMPT, AND IT HAS TO BE.
+ *
+ * `max_uses: MAX_SEARCHES` below is a HARD per-request cap enforced by the API,
+ * not a hint. When the model asks for search N+1 the tool comes back with
+ * `error_code: 'max_uses_exceeded'` — on an HTTP 200 — and the model, which was
+ * never told a cap existed, concludes its research was cut off and writes about
+ * THAT instead of writing the briefing. Three of the first five real briefings
+ * came back saying the web search tool had hit its usage limit, with an empty
+ * `sources` array, which the code below then correctly refused to call a sourced
+ * answer. Backing the billed cost out of `ai_usage.cost_usd` for those runs
+ * (cost minus token cost, at $0.01 a search) showed 5 searches on 7 of 7 calls:
+ * the cap was binding on EVERY run, which is what an unstated budget does to a
+ * model told to check earnings calls, transcripts, IR posts, shareholder
+ * letters, filings and press releases and then the topic keywords.
+ *
+ * So the number is interpolated from the constant rather than typed as prose —
+ * a prompt that says "five" while max_uses says 3 is worse than saying nothing —
+ * and the model is told what to do when the budget runs out: answer from what it
+ * already has. A partial briefing with two solid sources is the deliverable. A
+ * report about our own tool configuration is not.
+ * ------------------------------------------------------------------------- */
 const SYSTEM_PROMPT = [
   'You are a research assistant for an internal survey-operations tool used by market-research analysts.',
   'Your job: explain, from public sources, WHY a particular survey project exists right now, and what happened while it was in the field.',
   '',
   'How to search:',
+  `- YOUR SEARCH BUDGET IS ${MAX_SEARCHES} SEARCHES, and it is a hard limit enforced by the tool, not a guideline. Decide what the ${MAX_SEARCHES} highest-value queries are before you spend the first one. Prefer a few broad, well-aimed queries over many narrow ones, and never spend a search re-confirming something a result already told you.`,
+  `- If you run out of searches, WRITE THE BRIEFING FROM THE RESULTS YOU ALREADY HAVE. A shorter briefing with fewer bullets and the sources you did get is exactly the right answer, and it is the whole deliverable. Do NOT report the search limit, do NOT describe what you would have looked up next, and do NOT withhold the sources you found: an answer about the tool's own limits is useless to an analyst and will be discarded.`,
   "- The SUBJECT COMPANIES matter most. Weight the subject company's OWN disclosures highest: earnings calls and transcripts, investor-relations posts, shareholder letters, SEC filings, product and press announcements. Studies are very often sparked by one sentence on an earnings call.",
   '- Then use the TOPIC KEYWORDS for industry, regulatory and trade-press context.',
   "- The CLIENT commissioned the study; it is usually an investment firm, not the subject. Only research the client itself when the project is plainly about the client's own brand.",
@@ -1710,7 +1770,12 @@ const SYSTEM_PROMPT = [
   '- "driving_bullets": 2 to 6 bullets on the recent developments that plausibly explain why this study was commissioned now. This is the PRIMARY section. Each bullet is ONE claim, at most about 35 words, written to be skimmed.',
   '- "window_bullets": 0 to 4 bullets on events dated INSIDE the field window given below. If no field window was given, or nothing relevant happened inside it, return an EMPTY ARRAY. NEVER pad this section — an empty array is the correct answer far more often than not.',
   '- Every bullet that makes a factual claim ends with its attribution in parentheses: the source and its date, e.g. "(Novo Nordisk Q2 call, 5 Aug)". A bullet with no source is a bullet you should not write.',
-  '- Every factual claim must be supported by one of the search results you actually received. If the searches returned nothing useful, say so in a single driving bullet and return an empty sources array. Do not speculate, and do not fill space.',
+  // The empty-sources escape hatch is deliberately narrowed to the case it was
+  // written for. Unqualified, it was the sentence a budget-exhausted model
+  // reached for — "the searches did not get me there, so: one bullet, no
+  // sources" — which is how a run with four good hits produced a briefing with
+  // nothing behind it.
+  '- Every factual claim must be supported by one of the search results you actually received. If the searches ran and genuinely returned nothing relevant, say so in a single driving bullet and return an empty sources array. That applies ONLY to empty or irrelevant results — if you received relevant results and merely ran out of searches, cite what you received. Do not speculate, and do not fill space.',
   '- No bullet may restate another. Fewer, denser bullets beat more, thinner ones — the whole briefing has to stay a one-minute read.',
   '- Attribute dates and figures to the source that stated them. Never present your own inference as a reported fact.',
   '',
@@ -1802,6 +1867,18 @@ export interface BuildOutcome {
   /** Stored on success so the next pass can tell whether the inputs moved. */
   inputs_fingerprint: string
   searches: number
+  /**
+   * Raw web-search `error_code`s this run hit, for the CRON LOG only.
+   *
+   * Not persisted and not shown: `refresh_error` carries the human sentence
+   * (describeSearchErrors). This exists because the run that produced three
+   * unusable briefings recorded the codes NOWHERE — not in system_events, not in
+   * ai_usage (which has no `searches` column, so even the search count is only
+   * recoverable by backing it out of `cost_usd`) — and the cause had to be
+   * reconstructed from arithmetic. A sweep that hits the search cap should say so
+   * in its own log line.
+   */
+  searchErrors: string[]
   costUsd: number
 }
 
@@ -1823,6 +1900,7 @@ function failure(
     uncorroborated: false,
     inputs_fingerprint: fingerprint,
     searches: 0,
+    searchErrors: [],
     costUsd,
   }
 }
@@ -1979,6 +2057,7 @@ export async function buildProjectContext(
   if (response.stop_reason === 'refusal') {
     return {
       ...failure('Claude declined to answer for this project.', topics, fingerprint),
+      searchErrors: harvest.errors,
       searches: harvest.searches,
       costUsd,
     }
@@ -1987,13 +2066,14 @@ export async function buildProjectContext(
   if (harvest.results.size === 0) {
     const searchFailed = harvest.errors.length > 0
     const detail = searchFailed
-      ? `Web search failed (${dedupe(harvest.errors, 3).join(', ')}).`
+      ? `Web search failed — ${describeSearchErrors(harvest.errors)}.`
       : 'Web search returned no results for this project.'
     return {
       ...failure(detail, topics, fingerprint),
       // A search that ran and found nothing is 'empty', not 'error' — 083 is
       // explicit that 'empty' must not be retried as a failure.
       status: searchFailed ? 'error' : 'empty',
+      searchErrors: harvest.errors,
       searches: harvest.searches,
       costUsd,
     }
@@ -2003,6 +2083,7 @@ export async function buildProjectContext(
   if (!payload) {
     return {
       ...failure('Claude returned an unreadable answer.', topics, fingerprint),
+      searchErrors: harvest.errors,
       searches: harvest.searches,
       costUsd,
     }
@@ -2011,7 +2092,7 @@ export async function buildProjectContext(
   const sources = reconcileSources(payload.sources, harvest.results)
   const corroborated = hasCorroboration(sources)
   const searchErrorNote = harvest.errors.length
-    ? `Some searches failed (${dedupe(harvest.errors, 3).join(', ')}).`
+    ? `Some searches failed — ${describeSearchErrors(harvest.errors)}.`
     : null
 
   // ⚠️ UNTRUSTED: `summary` and `sources` below are web content restated by a
@@ -2020,7 +2101,23 @@ export async function buildProjectContext(
     // NOT 'ok' when nothing could be corroborated: the tab has to be able to say
     // "these are search hits, not citations" instead of implying the briefing is
     // sourced. 'empty' is the only non-failure status 083's CHECK allows.
-    status: corroborated ? 'ok' : 'empty',
+    //
+    // ⚠️ 'empty' vs 'error' HERE IS A RETRY DECISION, NOT A LABEL. shouldRefresh
+    // treats 'empty' as a COMPLETED PASS and deliberately will not retry it for
+    // CONTEXT_FRESH_HOURS (72h) — because 'empty' is supposed to mean "we looked
+    // and the world had nothing", a fact about the world that re-asking cannot
+    // change. A run whose SEARCH TOOL ERRORED found nothing for the opposite
+    // reason: a fact about us. Filing that as 'empty' locked a briefing that said
+    // the search tool hit its usage limit onto the tab for three days, with the
+    // fingerprint stamped so the "inputs moved" escape hatch could not fire
+    // either; only a manual ?force=1 click could clear it. 'error' puts it in the
+    // lane CONTEXT_RETRY_HOURS was built for, which is what the sibling branch
+    // above already does when the same errors leave no results at all.
+    //
+    // keepPrevious stays FALSE, so the partial briefing is still saved and still
+    // shown — a cut-off answer with two real sources beats a blank tab, and
+    // saveProjectContext's downgrade guard still protects an earlier 'ok' row.
+    status: corroborated ? 'ok' : harvest.errors.length ? 'error' : 'empty',
     summary: composeSummary(payload.driving_bullets, payload.window_bullets),
     sources,
     // Store the EXTRACTION — what was actually searched this run.
@@ -2046,6 +2143,7 @@ export async function buildProjectContext(
     uncorroborated: !corroborated,
     inputs_fingerprint: fingerprint,
     searches: harvest.searches,
+    searchErrors: harvest.errors,
     costUsd,
   }
 }

@@ -465,9 +465,18 @@ export function ContextTab({ project }: { project: SurveyProject }) {
           <p className="text-sm text-foreground/80 mt-0.5 whitespace-pre-wrap break-words">
             {ctx?.error ?? 'No reason was recorded.'}
           </p>
+          {/* "the brief from <date>", NOT "the last GOOD version". A failed run
+              used to be unable to write a summary at all (the builder's failure
+              path preserves the previous one), so whatever was on screen here was
+              by definition the last good briefing. That is no longer true: a run
+              whose web search errored part-way now saves the partial answer it
+              did manage and files it as 'error' so it gets retried — a cut-off
+              brief with two real sources beats a blank tab. Calling that "the
+              last good version" would be the tab vouching for something the
+              banner above it is simultaneously calling a failure. */}
           <p className="text-xs text-muted-foreground mt-1">
             {hasSummary
-              ? `Showing the last good version${
+              ? `Showing the brief${
                   ctx?.generated_at ? ` from ${shortDate(ctx.generated_at) ?? 'earlier'}` : ''
                 }${
                   ctx?.last_refreshed_at

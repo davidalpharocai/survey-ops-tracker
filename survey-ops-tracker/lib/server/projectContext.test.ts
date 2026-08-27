@@ -46,11 +46,13 @@ import {
   activityBucket,
   applyExtraction,
   buildExtractionPrompt,
+  buildProjectContext,
   clientName,
   composeSummary,
   CONTEXT_FRESH_HOURS,
   computeInputsFingerprint,
   deriveFallbackTopics,
+  describeSearchErrors,
   evidenceText,
   extractSubjects,
   googleDocId,
@@ -783,6 +785,37 @@ describe('harvestSearchResults', () => {
     expect(harvestSearchResults(null).results.size).toBe(0)
     expect(harvestSearchResults('nope').errors).toEqual([])
     expect(harvestSearchResults([null, 42, searchBlock(null)]).results.size).toBe(0)
+  })
+})
+
+describe('describeSearchErrors', () => {
+  it('translates our OWN search cap into words an analyst can act on', () => {
+    // What the tab used to say: "Web search failed (max_uses_exceeded)".
+    const out = describeSearchErrors(['max_uses_exceeded'])
+    expect(out).toMatch(/search budget/i)
+    expect(out).toMatch(/ran out/i)
+    expect(out).not.toContain('max_uses_exceeded')
+  })
+
+  it('keeps a rate limit and an outage distinguishable — they need different fixes', () => {
+    expect(describeSearchErrors(['too_many_requests'])).toMatch(/rate limit/i)
+    expect(describeSearchErrors(['unavailable'])).toMatch(/temporarily unavailable/i)
+  })
+
+  it('passes an UNKNOWN code through verbatim rather than swallowing it', () => {
+    // A code we have never seen is the most valuable thing in the message.
+    expect(describeSearchErrors(['some_new_code_2027'])).toBe('some_new_code_2027')
+  })
+
+  it('de-duplicates and caps, so five identical failures are one clause', () => {
+    expect(describeSearchErrors(['unavailable', 'unavailable', 'unavailable'])).toMatch(
+      /^web search was temporarily unavailable$/,
+    )
+    expect(describeSearchErrors(['a_1', 'b_2', 'c_3', 'd_4'], 2)).toBe('a_1; b_2')
+  })
+
+  it('is empty for no errors, so the caller can test it as falsy', () => {
+    expect(describeSearchErrors([])).toBe('')
   })
 })
 

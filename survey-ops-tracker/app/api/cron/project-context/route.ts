@@ -220,6 +220,15 @@ export async function GET(req: NextRequest) {
   let costUsd = 0
   let stoppedFor: string | null = null
   let attempted = 0
+  // Raw web-search error_codes across the whole sweep, counted by code.
+  //
+  // WHY: the run that produced three unusable briefings logged the cause
+  // nowhere. `ai_usage` has no `searches` column, so even the search count was
+  // only recoverable by subtracting token cost from `cost_usd` at $0.01 a search
+  // — which is how "max_uses was binding on every single call" was eventually
+  // established. A code per sweep is one cheap jsonb field and it makes the next
+  // one of these a glance instead of an investigation.
+  const searchErrors = new Map<string, number>()
 
   let cursor = 0
   const worker = async () => {
@@ -270,6 +279,9 @@ export async function GET(req: NextRequest) {
         admin,
       })
       costUsd += outcome.costUsd
+      for (const code of outcome.searchErrors) {
+        searchErrors.set(code, (searchErrors.get(code) ?? 0) + 1)
+      }
 
       // Always save: a success writes the new summary, a failure only stamps the
       // attempt + error so the previous good context survives untouched.
@@ -303,10 +315,17 @@ export async function GET(req: NextRequest) {
   await Promise.all(Array.from({ length: Math.min(CONCURRENCY, queue.length) }, worker))
 
   const remaining = Math.max(0, due.length - attempted)
+  // "max_uses_exceeded x3" — the one line that would have diagnosed this feature's
+  // first bad run without any arithmetic.
+  const searchErrorSummary = [...searchErrors.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([code, n]) => `${code} x${n}`)
+    .join(', ')
   const detail = [
     `${refreshed} refreshed`,
     empty ? `${empty} empty/uncorroborated` : null,
     failed ? `${failed} failed` : null,
+    searchErrorSummary ? `search errors: ${searchErrorSummary}` : null,
     saveFailed ? `${saveFailed} generated but NOT SAVED` : null,
     skippedClaimed ? `${skippedClaimed} already being refreshed` : null,
     `${active.length} active`,
@@ -343,6 +362,7 @@ export async function GET(req: NextRequest) {
       remaining,
       cost_usd: costUsd,
       stopped_for: stoppedFor,
+      search_errors: Object.fromEntries(searchErrors),
     },
   })
 

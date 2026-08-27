@@ -140,7 +140,9 @@ describe('ContextTab — states', () => {
     expect(screen.getByText(/search provider timed out/i)).toBeInTheDocument()
     // The stale-but-good brief is still on screen — not one or the other.
     expect(screen.getByText(/hotels are listing on the platform/i)).toBeInTheDocument()
-    expect(screen.getByText(/showing the last good version/i)).toBeInTheDocument()
+    // Deliberately NOT "the last good version": a failed run can now carry a
+    // partial brief of its own (see the comment on this copy in ContextTab).
+    expect(screen.getByText(/showing the brief from/i)).toBeInTheDocument()
   })
 
   it('shows only the failure when there is no earlier brief to fall back on', () => {
