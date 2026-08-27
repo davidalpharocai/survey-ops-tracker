@@ -54,6 +54,20 @@ describe('TOOLS registry shape', () => {
     const names = new Set(TOOLS.map(t => t.name))
     for (const r of READ) expect(names.has(r), `registry is missing read tool ${r}`).toBe(true)
   })
+
+  it('the series-membership tools exist and keep their preview-then-apply contract', () => {
+    // These two move a survey in or out of a rerun series, which renumbers every
+    // other wave in that series — so they must never commit on the first call.
+    // `confirm` in the schema is what makes confirmable() return a preview
+    // instead of applying (see lib/mcp/toolHelpers.ts), so losing it would turn
+    // a question into an irreversible edit of a whole series.
+    for (const name of ['add_survey_to_series', 'remove_survey_from_series']) {
+      const t = TOOLS.find(x => x.name === name)
+      expect(t, `registry is missing ${name}`).toBeDefined()
+      expect(t!.kind, `${name} must be a write`).toBe('write')
+      expect('confirm' in t!.schema, `${name} must accept confirm`).toBe(true)
+    }
+  })
 })
 
 describe('MCP route ⇄ registry parity', () => {

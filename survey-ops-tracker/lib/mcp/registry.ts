@@ -42,6 +42,7 @@ import { cloneProject } from '@/lib/server/clone'
 import {
   cadenceToMonths, createSeriesFromProject, setSeriesDefaults,
   pauseSeries, endSeries, resumeSeries, spawnNextWave,
+  attachProjectToSeries, detachProjectFromSeries,
 } from '@/lib/reruns/seriesOps'
 import {
   confirmable, describeChanges, fmtChangeVal, fieldLabel, describeUnrevertible, todayEastern, fetchDocTitle,
@@ -390,6 +391,116 @@ export const TOOLS: AssistantTool[] = [
           )
           meta.detail = { created_series: { id: series.id, base_type: args.base_type, cadence: args.cadence, service_mode: serviceMode } }
           return { ok: true, series_id: series.id, client: series.client, survey_name: series.survey_name, wave_count: waves.length }
+        }
+      )
+    },
+  },
+  {
+    name: 'add_survey_to_series',
+    description:
+      "Add an EXISTING survey to an EXISTING rerun series, so it is tracked as one of that series' waves. Use this when a wave was created by hand, or when a survey should have been part of a series but isn't — it is the fix for a survey that shows up on its own instead of grouped with the rest of the series on the client page. NOT the same as put_in_rerun_service, which promotes a project to Wave 1 of a BRAND-NEW series: using that on a survey whose family already has a series creates a second, duplicate series. Identify the survey by PR code or name, and the series by id or a client / survey-name query. The whole series is renumbered by date afterwards, so other waves' numbers can shift. Preview first; confirm to apply.",
+    kind: 'write',
+    schema: {
+      project: z.string(),
+      series: z.string(),
+      confirm: z.boolean().optional(),
+    },
+    handler: async (rawArgs, ctx, meta) => {
+      const args = rawArgs as { project: string; series: string; confirm?: boolean }
+      const { userEmail } = ctx
+      const p = await resolveProjectWritable(args.project)
+      if (!p) return { error: 'Project not found.' }
+      if ('error' in p) return p
+      if ('ambiguous' in p) return p
+      meta.project_id = p.id as string
+
+      const resolved = await data.resolveSeriesForWrite(args.series)
+      if ('error' in resolved) return resolved
+      if ('note' in resolved) return resolved
+      const { seriesId, label } = resolved
+
+      // Answer the two refusable cases HERE as well as in seriesOps, so the
+      // model gets a specific, actionable message at preview time rather than an
+      // exception after it has already asked the user to confirm.
+      if (p.series_id === seriesId) {
+        return { ok: true, already: true, series_id: seriesId, note: `Already a wave of ${label}.` }
+      }
+      if (p.series_id) {
+        return {
+          error:
+            'This survey is already in a different rerun series. Remove it from that one first (remove_survey_from_series), then add it here.',
+          series_id: p.series_id as string,
+        }
+      }
+
+      return confirmable(
+        args,
+        async () => ({
+          summary: `Add ${p.project_code ?? p.project_name} to ${label} as a wave`,
+          note: 'The whole series is renumbered by date afterwards, so other wave numbers may shift.',
+        }),
+        async () => {
+          const admin = createAdminClient()
+          const { series, waves } = await attachProjectToSeries(
+            admin,
+            seriesId,
+            p.id as string,
+            `${userEmail} via Claude`
+          )
+          meta.detail = { series_id: seriesId, action: 'add_survey_to_series', project: p.project_code }
+          return {
+            ok: true,
+            series_id: series.id,
+            survey_name: series.survey_name,
+            wave_count: waves.length,
+            waves: waves.map((w) => ({ wave: w.rerun_number, project_code: w.project_code, name: w.project_name })),
+          }
+        }
+      )
+    },
+  },
+  {
+    name: 'remove_survey_from_series',
+    description:
+      "Take a survey OUT of its rerun series, so it stands alone again. Clears the series link, the lineage pointer and any manual wave order, and resets its wave number. The remaining waves are renumbered, so their numbers may shift. Wave 1 cannot be removed — the series is anchored to it, so end the series instead (end_rerun) or add another survey first. Every cleared value is written to the change history, so this is recoverable. Identify the survey by PR code or name. Preview first; confirm to apply.",
+    kind: 'write',
+    schema: {
+      project: z.string(),
+      confirm: z.boolean().optional(),
+    },
+    handler: async (rawArgs, ctx, meta) => {
+      const args = rawArgs as { project: string; confirm?: boolean }
+      const { userEmail } = ctx
+      const p = await resolveProjectWritable(args.project)
+      if (!p) return { error: 'Project not found.' }
+      if ('error' in p) return p
+      if ('ambiguous' in p) return p
+      meta.project_id = p.id as string
+
+      if (!p.series_id) {
+        return { error: 'This survey is not in a rerun series, so there is nothing to remove it from.' }
+      }
+
+      return confirmable(
+        args,
+        async () => ({
+          summary: `Remove ${p.project_code ?? p.project_name} from its rerun series`,
+          note: 'The remaining waves are renumbered, so their wave numbers may shift. Recoverable from the change history.',
+        }),
+        async () => {
+          const admin = createAdminClient()
+          const { seriesId, waves } = await detachProjectFromSeries(
+            admin,
+            p.id as string,
+            `${userEmail} via Claude`
+          )
+          meta.detail = { series_id: seriesId, action: 'remove_survey_from_series', project: p.project_code }
+          return {
+            ok: true,
+            series_id: seriesId,
+            remaining_wave_count: waves.length,
+            waves: waves.map((w) => ({ wave: w.rerun_number, project_code: w.project_code, name: w.project_name })),
+          }
         }
       )
     },
