@@ -13,18 +13,19 @@ import {
   useDeleteBlast,
   type Blast,
 } from '@/lib/hooks/useProjectBlasts'
-import { blastTotal } from '@/lib/utils/blast'
+import { blastCost, unknownCostBlasts } from '@/lib/utils/blast'
 import type { SurveyProject } from '@/lib/hooks/useProjects'
 
 const TIP = {
   header:
-    'Log each B2B blast: its $/bid (the per-completion reward), when it went out, how many people it reached, and how many completed. A blast’s cost ($/bid × completes) counts toward the project’s spend — we only pay for completes, not everyone reached.',
+    'Log each B2B blast: its $/bid (the per-completion reward), when it went out, how many people it reached, and how many completed. A blast’s cost ($/bid × completes) counts toward the project’s spend — we only pay for completes, not everyone reached. Leave a figure blank until you actually know it: blank means “not recorded”, which is not the same as 0.',
   sent: 'When the blast actually went out — pick the date and time (AM/PM).',
-  people: 'How many people this blast reached. Informational — it does not drive the cost.',
+  people:
+    'How many people this blast reached. Informational — it does not drive the cost, but it is the denominator of the completion rate. Blank = not recorded; 0 means it genuinely reached nobody.',
   completes:
-    'How many of those people completed the survey. Trickles in after send — editable. Cost = $/bid × completes.',
-  bid: 'The per-completion reward (dollars paid per completed response). $/bid × completes = this blast’s cost.',
-  cost: 'This blast’s spend = $/bid × completes. Feeds the project’s actual spend.',
+    'How many of those people completed the survey. Trickles in for days after the send — fill it in when you know. Blank = NOT RECORDED YET, and the cost then shows as unknown; 0 means the blast really produced nothing. Cost = $/bid × completes.',
+  bid: 'The per-completion reward (dollars paid per completed response). $/bid × completes = this blast’s cost. Blank = not recorded; 0 means an unpaid send.',
+  cost: 'This blast’s spend = $/bid × completes, and it feeds the project’s actual spend. Shows “not recorded” while either figure is still blank — an unknown cost is never displayed as $0.',
   note: 'Optional note on who this blast targeted — e.g. “3PL companies + retailers”. Doesn’t affect the cost.',
 }
 
@@ -36,8 +37,9 @@ function money(v: number): string {
  * The Money-section blast display for B2B / Rerun projects. Mirrors
  * `NSegmentsEditor`: a collapsible subheader with a right-aligned "+ Log blast",
  * one inset block per blast (fields wired straight through the blast hooks), and
- * a ✕ remove with a session-level Undo bar. Cost per blast stays $/bid ×
- * completes (via `blastTotal`); the DB trigger recomputes `actual_spend`.
+ * a ✕ remove with a session-level Undo bar. Cost per blast is $/bid × completes
+ * (via `blastCost`, which returns null — shown as "not recorded" — while either
+ * figure is blank); the DB trigger recomputes `actual_spend`.
  */
 export function BlastBlocks({ project }: { project: SurveyProject }) {
   const supabase = createClient()
@@ -67,6 +69,11 @@ export function BlastBlocks({ project }: { project: SurveyProject }) {
 
   const list = blasts ?? []
   const count = list.length
+  const unknown = unknownCostBlasts(list)
+  // Completes actually written down, treating null as 0 — the sum data-health
+  // check 7b uses. Zero here alongside a project that HAS collected N is the
+  // legacy "nobody entered them" signal (see the second banner below).
+  const recordedCompletes = list.reduce((n, b) => n + (b.completes ?? 0), 0)
 
   // The per-block ✕ deletes via its own useDeleteBlast; here we just stash the
   // removed blast so the Undo bar can re-add it.
@@ -102,10 +109,16 @@ export function BlastBlocks({ project }: { project: SurveyProject }) {
           </button>
           <InfoTooltip text={TIP.header} />
         </span>
+        {/* bid / people / completes are OMITTED from the insert, not sent as null,
+            and that is what makes this correct on both sides of migration 091.
+            Pre-091 the columns are still `not null default 0`, so an explicit
+            null would be rejected and "+ Log blast" would be dead for everyone
+            until David runs the SQL; omitting lets the old defaults fire and
+            nothing changes. Post-091 the defaults are gone, so omitting is
+            exactly how a blast is born "not recorded" — which is the honest
+            state at the moment of logging, since completes cannot be known yet. */}
         <button
-          onClick={() =>
-            add.mutate({ bid: 0, people: 0, completes: 0, blast_at: null, note: '', created_by: userName })
-          }
+          onClick={() => add.mutate({ blast_at: null, note: '', created_by: userName })}
           disabled={add.isPending}
           className="text-sm font-medium text-primary hover:underline disabled:cursor-not-allowed disabled:opacity-40"
         >
@@ -120,6 +133,39 @@ export function BlastBlocks({ project }: { project: SurveyProject }) {
             ↩ Undo
           </button>
         </div>
+      )}
+
+      {/* The project's spend (and every margin figure derived from it) is
+          Σ(bid × completes), so a blast whose figures aren't in yet contributes
+          nothing and the total silently understates what we actually spent. Say
+          so here rather than letting Budget left, a few rows down in this same
+          Money section, look healthy. */}
+      {unknown > 0 && (
+        <p className="mb-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-2.5 py-1.5 text-[12px] text-amber-700 dark:text-amber-400">
+          ⚠ {unknown} of {count} blast{count === 1 ? '' : 's'} {unknown === 1 ? 'has' : 'have'} no cost recorded
+          yet — the project&rsquo;s spend excludes {unknown === 1 ? 'it' : 'them'}, so it is a floor, not the
+          total. Fill in $/bid and # completes.
+        </p>
+      )}
+
+      {/* THE LEGACY CASE, and the one that actually matters right now.
+          The banner above keys off NULL, which only exists on blasts logged after
+          migration 091. The eight projects that prompted this whole change have a
+          stored 0 instead — indistinguishable from a real zero, deliberately not
+          backfilled because guessing which zeros were real would destroy
+          information. So they would get no warning at all, on precisely the
+          screens where ~$2,500 of real spend is missing.
+          This is the same inference data-health check 7b makes: the project
+          collected N, so completes plainly arrived, yet every blast says zero.
+          That is provably unrecorded rather than a genuine nil result. Putting it
+          here rather than only in the connector means it is in front of the
+          person who can actually fix it, at the moment they are looking. */}
+      {unknown === 0 && count > 0 && recordedCompletes === 0 && (project.n_collected ?? 0) > 0 && (
+        <p className="mb-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-2.5 py-1.5 text-[12px] text-amber-700 dark:text-amber-400">
+          ⚠ This project collected {(project.n_collected ?? 0).toLocaleString('en-US')} responses, but every
+          blast here records 0 completes — so its blast spend reads $0 and the completion rate reads 0%.
+          Those completes were almost certainly never entered. Fill them in and the money corrects itself.
+        </p>
       )}
 
       {expanded && (
@@ -151,6 +197,7 @@ function BlastBlock({
   const update = useUpdateBlast(blast.project_id)
   const del = useDeleteBlast(blast.project_id)
   const save = (updates: Partial<Blast>) => update.mutate({ id: blast.id, updates })
+  const cost = blastCost(blast)
 
   function remove() {
     onRemove(blast)
@@ -188,26 +235,33 @@ function BlastBlock({
           value={blast.blast_at}
           onSave={iso => save({ blast_at: iso })}
         />
-        <NumberCell
-          label="$ / bid"
-          tooltip={TIP.bid}
-          value={blast.bid}
-          onSave={v => save({ bid: v ?? 0 })}
-        />
+        {/* Clearing a cell hands NumberCell's null straight through instead of
+            coercing it to 0 — that null IS the "not recorded" state (migration
+            091), and `v ?? 0` is precisely how a blank became an indistinguishable
+            zero in the first place. NumberCell already renders null as "— set",
+            so an unrecorded figure reads as absent, never as a result. */}
+        <NumberCell label="$ / bid" tooltip={TIP.bid} value={blast.bid} onSave={v => save({ bid: v })} />
         <NumberCell
           label="# people (reach)"
           tooltip={TIP.people}
           value={blast.people}
-          onSave={v => save({ people: v ?? 0 })}
+          onSave={v => save({ people: v })}
         />
         <NumberCell
           label="# completes"
           tooltip={TIP.completes}
           value={blast.completes}
-          onSave={v => save({ completes: v ?? 0 })}
+          onSave={v => save({ completes: v })}
         />
+        {/* blastCost, NOT blastTotal: blastTotal mirrors the SQL and returns 0 for
+            an unrecorded blast, and "$0" on screen is read as a result — a send
+            that cost us nothing. An unknown cost has to say it is unknown. */}
         <FieldCell label="Cost" tooltip={TIP.cost}>
-          <span className="tabular-nums">{money(blastTotal(blast))}</span>
+          {cost == null ? (
+            <span className="text-muted-foreground/60">— not recorded</span>
+          ) : (
+            <span className="tabular-nums">{money(cost)}</span>
+          )}
         </FieldCell>
       </div>
     </div>

@@ -5,6 +5,8 @@ import { InfoTooltip } from '@/components/shared/InfoTooltip'
 import { fmtNum } from '@/lib/utils/number'
 import { useProject } from '@/lib/hooks/useProjects'
 import { useProjectSegments } from '@/lib/hooks/useProjectSegments'
+import { useProjectBlasts } from '@/lib/hooks/useProjectBlasts'
+import { unknownCostBlasts } from '@/lib/utils/blast'
 import { useCapabilities, useCanViewFinancials } from '@/lib/hooks/useCapabilities'
 import {
   useProjectRates,
@@ -44,6 +46,14 @@ const TIP = {
     'What the job is worth priced at the N actually collected so far, rather than at target — Σ(rate × N collected) — and the margin that leaves against Actual $.',
   invoicedNoCost:
     'What the job is worth priced at the N actually collected so far, rather than at target — Σ(rate × N collected). No margin is shown next to it because nothing has been logged on the cost side yet: it would repeat this same number at 100%.',
+  // A THIRD state, distinct from "no cost logged". Some cost is recorded, so the
+  // two NoCost strings above ("nothing has been logged") would be a plain lie —
+  // and the number is worse than unknown here, it is knowably too high, because
+  // every unrecorded blast is missing from the subtraction.
+  marginPartialCost:
+    'Some of this project’s cost is not recorded yet: one or more blasts have no completes entered, and a blast only counts toward Actual $ once they are. So Actual $ is understated, and this margin is therefore OVERSTATED by whatever those blasts cost. Enter the completes on the blast lines above and it settles.',
+  invoicedPartialCost:
+    'What the job is worth priced at the N actually collected so far — Σ(rate × N collected). The margin beside it is marked indicative because one or more blasts have no completes recorded, so the cost being subtracted is incomplete and the margin reads higher than it is.',
   unpriced:
     'N belonging to segments with no rate — neither their own nor a project default. It is excluded from the blended rate and from the contract value, so both figures understate the job until it is priced.',
   ceiling:
@@ -237,9 +247,23 @@ export function PricingWidget({ projectId, budget, actualSpend }: PricingWidgetP
   // saying the figures understate the job, so staying quiet loses nothing.
   const overshoot = unpriced === 0 ? ceilingOvershoot(budget, contract?.low ?? null) : null
 
-  // Whether Actual $ means anything yet. Null or still 0 = nothing logged on the
-  // cost side, which must NOT render as a green 100% margin.
-  const costKnown = hasRecordedCost(actualSpend)
+  // Whether Actual $ means anything yet. Two ways it can fail, and the second one
+  // is newer and nastier.
+  //
+  //  1. Null or still 0 — nothing logged on the cost side at all, which must NOT
+  //     render as a green 100% margin.
+  //  2. PARTIALLY logged. actual_spend counts only the blasts whose completes
+  //     someone has recorded, so one recorded blast plus one unrecorded one gives
+  //     a spend that is > 0 and therefore passes hasRecordedCost() — while being
+  //     understated by the whole missing blast. The widget would then drop the
+  //     "(indicative)" qualifier and state a confident margin and margin %, both
+  //     too high, on the exact screen this change exists to make trustworthy.
+  //
+  // Same react-query key the Money section already reads, so this is a cache hit,
+  // not a second fetch.
+  const { data: blastRows = [] } = useProjectBlasts(projectId)
+  const unknownBlasts = unknownCostBlasts(blastRows)
+  const costKnown = hasRecordedCost(actualSpend) && unknownBlasts === 0
   const marginText =
     margins == null
       ? '—'
@@ -359,17 +383,24 @@ export function PricingWidget({ projectId, budget, actualSpend }: PricingWidgetP
         <div className="flex items-center justify-between">
           <span className="flex items-center text-xs text-muted-foreground">
             Margin{!costKnown && margins != null ? ' (indicative)' : ''}
-            <InfoTooltip text={costKnown ? TIP.margin : TIP.marginNoCost} />
+            <InfoTooltip text={costKnown ? TIP.margin : unknownBlasts > 0 ? TIP.marginPartialCost : TIP.marginNoCost} />
           </span>
           {margins == null ? (
             <span className="text-sm text-muted-foreground">—</span>
           ) : !costKnown ? (
-            // Nothing logged on the cost side yet, so this number IS the contract
-            // value. Neutral, and with no percentage: green and "100%" would sell
-            // an unknown cost as the best possible news.
+            // Neutral, and with no percentage: green and "100%" would sell an
+            // unknown cost as the best possible news. Two different reasons land
+            // here and they need different words — "no cost logged yet" is simply
+            // untrue when some blasts ARE recorded and others are not, and that
+            // second case is the more dangerous one, because the number is not
+            // merely unknown, it is knowably too high.
             <span className="text-sm tabular-nums text-muted-foreground">
               {marginText}
-              <span className="ml-1">· no cost logged yet</span>
+              <span className="ml-1">
+                {unknownBlasts > 0
+                  ? `· ${unknownBlasts} blast${unknownBlasts === 1 ? '' : 's'} with no completes recorded — overstated`
+                  : '· no cost logged yet'}
+              </span>
             </span>
           ) : (
             <span
@@ -396,7 +427,7 @@ export function PricingWidget({ projectId, budget, actualSpend }: PricingWidgetP
           <div className="flex items-center justify-between">
             <span className="flex items-center text-xs text-muted-foreground">
               At N collected
-              <InfoTooltip text={costKnown ? TIP.invoiced : TIP.invoicedNoCost} />
+              <InfoTooltip text={costKnown ? TIP.invoiced : unknownBlasts > 0 ? TIP.invoicedPartialCost : TIP.invoicedNoCost} />
             </span>
             <span className="text-sm tabular-nums text-foreground">
               {money(invoiced)}

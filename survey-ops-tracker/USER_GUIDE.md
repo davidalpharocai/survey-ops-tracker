@@ -84,7 +84,7 @@ Below the Summary, the Overview body is a Salesforce-style **field grid** — al
 
 - **Details** — Submitted / Launch / Due / Delivery dates, a **Rerun date** row (longitudinal projects only), **Type**, and **Survey IDs** (comma separated; auto-filled overnight from the Edwin sync — a mismatch surfaces an inline "Use Edwin ID / Keep current" banner above the grid rather than overwriting silently).
 - **N & Audience** — see *N Segments* below.
-- **Money** — by project type: **PS** shows **Suppliers**, grouped into **launches** (fielding waves) — each launch has its own **target** plus supplier rows with a **$/complete (CPI)** and a per-supplier **cap**; before completes it shows a cost **range** (target × cheapest…priciest CPI), and **＋ Add launch** starts a new wave pre-filled from the last one. **B2B** shows **Blast Configuration** — each blast's **$/bid**, **# of people** reached, **# of completes** (editable inline as they trickle in), a date/time, and a description; cost = $/bid × completes. A Rerun-tagged or not-yet-typed project shows both, since neither maps cleanly. A **Budget & spend** summary sits underneath: Total budget, computed actual spend, cost/complete, and a budget-used bar.
+- **Money** — by project type: **PS** shows **Suppliers**, grouped into **launches** (fielding waves) — each launch has its own **target** plus supplier rows with a **$/complete (CPI)** and a per-supplier **cap**; before completes it shows a cost **range** (target × cheapest…priciest CPI), and **＋ Add launch** starts a new wave pre-filled from the last one. **B2B** shows **Blast Configuration** — each blast's **$/bid**, **# of people** reached, **# of completes** (editable inline as they trickle in), a date/time, and a description; cost = $/bid × completes. **Blank is not zero.** A new blast starts with those three figures **unrecorded** (shown as “— set”), because completes can't be known at send time; while $/bid or # completes is blank the blast's **Cost** reads “— not recorded” rather than $0, and an amber line above the list tells you how many blasts the project's spend is therefore **excluding** — so the total is a floor, not the bill. Type **0** only when you mean it (a send that genuinely produced nothing, or an unpaid one); clearing a cell puts it back to unrecorded. A Rerun-tagged or not-yet-typed project shows both, since neither maps cleanly. A **Budget & spend** summary sits underneath: Total budget, computed actual spend, cost/complete, and a budget-used bar.
 - **Flags** — small color-coded, click-to-toggle chips — Longitudinal, Row-Level Data, Occam — each with an (i) explaining it.
 
 Alongside the grid, a slim right rail holds: **People** (Client — click to open their page; the **Requested by** contact; Captain; Salesperson; and, for **B2B** projects with a Slack channel set, a **Slack** row that opens the channel in the desktop app rather than the browser), **Rerun history** (every wave of a recurring survey in order, each linking to that wave's page with its dates and N; a stand-alone survey can **↻ Link this as a rerun of another survey**, and a linked wave can be unlinked), **Compliance** (only when the client requires a review — see §7b), and **Latest / Next Steps** (add a to-do with Ctrl+Enter; check one off and it moves to the "Latest" log with date + who; old imported notes live under "History"). **Linked Documents** now sits at the bottom of the main column, below the field grid — paste any URL (its title fills in automatically), rename via ✎ or unlink via ✕ (the file stays in Drive).
@@ -105,7 +105,7 @@ Split "N & Audience" into per-segment tracking — e.g. Buyers / Sellers — wit
 - **Insights (Beta)** — performance stats. A top **KPI row**: **N progress** (collected vs target), **Budget** (spend vs budget + a projected final cost), **Cost / complete**, and **Pace** — completes/day since fielding began, a projected finish date, and how much **buffer** you have before the due date (or how far past). Below it:
   - **Segment pace** (multi-segment projects only) — each segment tracked against **its own** target with an on-track / behind read; because over-collecting one segment doesn't cover a shortfall in another, a caveat calls it out when the total looks complete but a segment is lagging.
   - **Time in each stage** — a day-count bar per pipeline stage. The clock starts at **Doc Programming** (the Submitted → Doc Programming gap isn't tracked) and the current stage is marked "· now".
-  - Per-type **blast** (completion rate, cost/complete, best/worst send) or **launch & supplier** performance (fill rate per launch, supplier mix, best value).
+  - Per-type **blast** (completion rate, cost/complete, best/worst send) or **launch & supplier** performance (fill rate per launch, supplier mix, best value). A blast with no completes recorded shows **“—”**, not 0%, and is left out of the rates instead of counted as a failed send.
 
 ![The Insights (Beta) tab](/guide-img/insights-segment-pace.png)
 *The Insights tab: the KPI row (N progress, budget, cost/complete, pace) up top, then **Segment pace** — here Buyers are on track while Sellers are behind, and the amber note flags that a healthy total N can still hide a lagging segment.*
@@ -346,8 +346,11 @@ downloadable report, a risk triage, filtered project lists, and a project's fiel
 If you ask what questions were asked last time, Claude hands the linked questionnaire doc over to
 your Drive connector rather than guess at the content.
 
-**Corrections:** if a logged blast needs fixing, do that in the app — Claude can log new
-ones but won't edit or delete an existing entry.
+**Corrections:** logged blasts are editable by Claude — it can fill in the completes once they
+come in, change the $/bid, people, date or description, or remove a blast entirely (all
+preview-then-confirm). Ask it to leave a figure out rather than guess: unrecorded and 0 are
+stored as different things, and Claude will tell you when a project's blast spend is a floor
+because some blast still has no cost recorded. *(Manual **bids** are still app-only.)*
 
 **Revoking access:** the Connect page lists every Claude currently connected (device/client name,
 when it connected, when it was last used) with a **Revoke** button — click it to sign that Claude

@@ -125,6 +125,15 @@ describe('B2B breakdown', () => {
     expect(blastCompletionRate(blasts[0])).toBe(30)
     expect(blastCompletionRate({ people: 0, completes: 5, bid: 1, blast_at: null })).toBeNull()
   })
+  // Unrecorded completes (migration 091) are an ABSENT numerator, so the rate is
+  // unknown. Returning 0% here is what made 13 of 18 blasts look like total
+  // failures and inverted the apparent bid-vs-response relationship.
+  it('completion rate is null — not 0% — when completes are unrecorded', () => {
+    expect(blastCompletionRate({ people: 3000, completes: null, bid: 25, blast_at: null })).toBeNull()
+  })
+  it('a RECORDED zero still reports 0% — that blast really did fail', () => {
+    expect(blastCompletionRate({ people: 3000, completes: 0, bid: 25, blast_at: null })).toBe(0)
+  })
   it('cumulative completes are chronological', () => {
     const c = cumulativeCompletes(blasts)
     expect(c.map((x) => x.cumulative)).toEqual([300, 500])

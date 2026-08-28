@@ -179,13 +179,25 @@ export async function copyProjectBlasts(
     .select('bid, note')
     .eq('project_id', sourceProjectId)
   if (!srcBlasts || srcBlasts.length === 0) return
+  // people/completes are OMITTED, not set to 0 — the same choice BlastBlocks makes
+  // when logging a blast by hand, and for a sharper reason here.
+  //
+  // This runs unattended: spawnSeries.ts calls it for every auto-spawned rerun
+  // wave. A wave that has not sent anything yet has an UNKNOWN reach and an
+  // UNKNOWN completes count, and writing 0 states both as fact — the new wave
+  // would show "$0.00" as a settled cost, never trip the unrecorded-cost banner,
+  // and hard-fail data-health check 7b the moment it collects any N. That is the
+  // exact defect migration 091 exists to remove, manufactured on a cron.
+  //
+  // Omitting rather than sending null keeps this correct against BOTH schemas:
+  // pre-091 the `default 0` still fires (today's behaviour, nothing breaks), and
+  // post-091 the row is born genuinely unrecorded. `bid` DOES carry over — it is
+  // the rate agreed for the study, known in advance, and not a measurement.
   await admin.from('project_blasts').insert(
     srcBlasts.map((b) => ({
       project_id: targetProjectId,
       bid: b.bid,
       note: b.note,
-      people: 0,
-      completes: 0,
       created_by: createdBy,
     }))
   )

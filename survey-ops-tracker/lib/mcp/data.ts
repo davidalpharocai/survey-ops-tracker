@@ -1,6 +1,6 @@
 import 'server-only'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { totalBidDollars } from '@/lib/utils/blast'
+import { totalBidDollars, unknownCostBlasts } from '@/lib/utils/blast'
 import { beforeFieldingRequired, afterFieldingRequired, beforeFieldingMet, afterFieldingMet } from '@/lib/utils/compliance'
 import { VIEW_FINANCIALS } from '@/lib/auth/capabilityNames'
 import { isRestrictedAuditField } from '@/lib/utils/auditFormat'
@@ -322,6 +322,11 @@ export async function getProjectDetail(id: string, userId: string) {
     bids: bidsRes.data ?? [],
     blasts,
     blast_spend_total: totalBidDollars(blasts as never),
+    // blast_spend_total mirrors the SQL, so a blast whose $/bid or # completes is
+    // still unrecorded (migration 091) contributes $0 to it. When this count is
+    // non-zero the total is a FLOOR, not the cost — the reader has to be told, or
+    // "$0 blast spend" gets quoted as a fact about a project that really spent money.
+    blasts_with_unknown_cost: unknownCostBlasts(blasts as never),
     steps: stepsRes.data ?? [],
     activity: activityRes.data ?? [],
     deliverables: deliverablesRes.data ?? [],

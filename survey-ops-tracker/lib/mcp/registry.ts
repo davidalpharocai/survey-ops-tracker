@@ -7,7 +7,7 @@ import { complianceGate } from '@/lib/utils/compliance'
 import { occamOnboardingGate } from '@/lib/utils/occam'
 import { autoStamp } from '@/lib/utils/date'
 import { normalizeClientText, firmNameFrom } from '@/lib/utils/clientName'
-import { blastTotal, totalBidDollars } from '@/lib/utils/blast'
+import { blastTotal, isBlastCostUnknown, totalBidDollars, unknownCostBlasts } from '@/lib/utils/blast'
 import type { Database } from '@/lib/supabase/types'
 import * as data from '@/lib/mcp/data'
 import {
@@ -1666,13 +1666,17 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'log_blast',
     description:
-      "Log (or update) a B2B blast against a project — its $/bid (the per-completion reward), the # of people it went to, the # of those who COMPLETED the survey, when it ran (optional), and an optional description of the audience. Its cost is $/bid × # of completes (we only pay people who completed, not everyone reached), and that counts toward the project's spend. If $/bid or # of people is missing, ask. If completes aren't known yet, pass 0 (spend stays $0 for this blast) — then fill them in later by re-calling with the SAME idem_key (it upserts, like log_launch), or via update_blast. You can also ingest a blast-platform campaign screenshot: per blast, map Reward→bid, that blast's Sent→people, Rewards Count→completes (so spend matches the platform's Total Issued; NOT the higher \"Completed\" count), its Scheduled date/time→blast_at, and channel/audience/template→description; resolve the project by campaign name or Survey ID, and set idem_key to \"<SurveyID>#<BlastLabel>\" so re-importing the same screenshot updates that same blast instead of double-logging. Preview first (shows create vs update); confirm to apply.",
+      "Log (or update) a B2B blast against a project — its $/bid (the per-completion reward), the # of people it went to, the # of those who COMPLETED the survey, when it ran (optional), and an optional description of the audience. Its cost is $/bid × # of completes (we only pay people who completed, not everyone reached), and that counts toward the project's spend. UNRECORDED IS NOT ZERO: OMIT a figure you don't know and it is stored as \"not recorded\" (the app shows an em dash and reports the cost as unknown); pass 0 ONLY when you know the real answer is zero — a blast that genuinely produced nothing, or an unpaid send. Never substitute 0 for a number you haven't been told, because 0 is read as a result and it silently drags the project's spend and response rate down. Completes usually aren't known at send time — omit them, then fill them in later by re-calling with the SAME idem_key (it upserts, like log_launch; omitting a figure on the re-call LEAVES the recorded one alone rather than wiping it), or via update_blast. You can also ingest a blast-platform campaign screenshot: per blast, map Reward→bid, that blast's Sent→people, Rewards Count→completes (so spend matches the platform's Total Issued; NOT the higher \"Completed\" count), its Scheduled date/time→blast_at, and channel/audience/template→description; if the screenshot is the Overview tab and shows no Rewards Count, omit completes rather than sending 0. Resolve the project by campaign name or Survey ID, and set idem_key to \"<SurveyID>#<BlastLabel>\" so re-importing the same screenshot updates that same blast instead of double-logging. Preview first (shows create vs update); confirm to apply.",
     kind: 'write',
     schema: {
       project: z.string(),
-      bid: z.number().min(0),
-      people: z.number().int().min(0),
-      completes: z.number().int().min(0).optional(),
+      // All three are optional AND nullable: omitted (or explicitly null) means
+      // "not recorded yet", which migration 091 made a storable, distinct state
+      // from 0. bid/people used to be required, which is what forced callers to
+      // invent a 0 for a figure a screenshot simply didn't carry.
+      bid: z.number().min(0).nullable().optional(),
+      people: z.number().int().min(0).nullable().optional(),
+      completes: z.number().int().min(0).nullable().optional(),
       blast_at: z.string().optional(),
       description: z.string().max(1000).optional(),
       confirm: z.boolean().optional(),
@@ -1680,8 +1684,8 @@ export const TOOLS: AssistantTool[] = [
     },
     handler: async (rawArgs, ctx, meta) => {
       const args = rawArgs as {
-        project: string; bid: number; people: number; completes?: number; blast_at?: string
-        description?: string; confirm?: boolean; idem_key?: string
+        project: string; bid?: number | null; people?: number | null; completes?: number | null
+        blast_at?: string; description?: string; confirm?: boolean; idem_key?: string
       }
       const { userEmail } = ctx
       const p = await resolveProjectWritable(args.project)
@@ -1690,8 +1694,12 @@ export const TOOLS: AssistantTool[] = [
       if ('ambiguous' in p) return p
       meta.project_id = p.id as string
 
-      const completes = args.completes ?? 0
-      const thisBlastTotal = blastTotal({ bid: args.bid, completes })
+      // null = not recorded, all the way through. `?? 0` here is exactly the
+      // coercion that made "nobody counted" indistinguishable from "it produced
+      // nothing" on 8 of 12 blast projects (migration 091).
+      const bid = args.bid ?? null
+      const people = args.people ?? null
+      const completes = args.completes ?? null
       const currentSpend = (p.actual_spend as number | null) ?? 0
 
       // Upsert on idem_key: if a blast with this idem_key already exists on the
@@ -1699,34 +1707,57 @@ export const TOOLS: AssistantTool[] = [
       // instead of no-op'ing — parity with log_launch's label upsert. Only an
       // explicit idem_key can collide; a bare call gets a fresh UUID → always new.
       const existing = args.idem_key ? await resolveBlast(p.id as string, args.idem_key) : null
-      // Projected project spend: on update, swap this blast's OLD contribution for
-      // the new one; on create, add it.
+
+      // What the row will HOLD after the write. The RPC coalesces on upsert, so an
+      // omitted figure keeps the stored one — the projection has to model that or
+      // the preview would promise a spend the write doesn't produce.
+      const finalBid = bid ?? existing?.bid ?? null
+      const finalCompletes = completes ?? existing?.completes ?? null
+      const finalPeople = people ?? existing?.people ?? null
+
+      // blastTotal (not blastCost) on purpose: this projects survey_projects
+      // .actual_spend, which is the SQL sum, and there an unrecorded figure
+      // contributes 0. The SUMMARY is where the human learns it's unknown.
+      const thisBlastTotal = blastTotal({ bid: finalBid, completes: finalCompletes })
       const priorContribution = existing ? blastTotal({ bid: existing.bid, completes: existing.completes }) : 0
       const projectedSpend = currentSpend - priorContribution + thisBlastTotal
+      const costUnknown = isBlastCostUnknown({ bid: finalBid, completes: finalCompletes })
+      const fig = (v: number | null) => (v == null ? 'not recorded' : String(v))
 
       return confirmable(
         args,
         async () => ({
           summary:
-            `${existing ? 'Update' : 'Log'} blast on ${p.project_code}: ${completes} completes / ${args.people} people @ $${args.bid}/bid = ${money(thisBlastTotal)} → projected spend ${money(projectedSpend)}` +
-            (existing ? ' (updates the existing blast with this idem_key — no duplicate)' : ''),
+            `${existing ? 'Update' : 'Log'} blast on ${p.project_code}: ${fig(finalCompletes)} completes / ${fig(finalPeople)} people @ ${finalBid == null ? 'not recorded' : '$' + finalBid}/bid = ` +
+            (costUnknown
+              ? `cost UNKNOWN (adds $0 to spend until the missing figure is recorded) → spend stays ${money(projectedSpend)}`
+              : `${money(thisBlastTotal)} → projected spend ${money(projectedSpend)}`) +
+            (existing ? ' (updates the existing blast with this idem_key — no duplicate; omitted figures keep their recorded values)' : ''),
           mode: existing ? 'update' : 'create',
-          people: args.people, completes, bid: args.bid, blast_at: args.blast_at ?? null,
+          people: finalPeople, completes: finalCompletes, bid: finalBid,
+          cost_unknown: costUnknown,
+          blast_at: args.blast_at ?? null,
           projected_actual_spend: projectedSpend,
         }),
         async () => {
           const row = await runLogBlast({
-            projectId: p.id as string, bid: args.bid, people: args.people, completes,
+            projectId: p.id as string, bid, people, completes,
             blastAt: args.blast_at ?? null, note: args.description ?? null,
             createdBy: userEmail.split('@')[0], idemKey: args.idem_key ?? randomUUID(),
             actor: `${userEmail} via Claude`,
           })
-          const blast_spend_total = totalBidDollars(await listBlastsForProject(p.id as string) as never)
+          const after = await listBlastsForProject(p.id as string)
+          // blast_spend_total mirrors the SQL, so an unrecorded blast adds $0 to it.
+          // Ship the count of those alongside it — the number is a FLOOR whenever it
+          // is non-zero, and a total presented without that caveat is how $0 spend got
+          // read as a fact on 8 of 12 blast projects.
+          const blast_spend_total = totalBidDollars(after as never)
+          const blasts_with_unknown_cost = unknownCostBlasts(after)
           meta.detail = { [existing ? 'updated' : 'created']: { id: row.id, people: row.people, completes: row.completes, bid: row.bid } }
           return {
             ok: true, mode: existing ? 'updated' : 'created',
             blast: { id: row.id, people: row.people, completes: row.completes, bid: row.bid, blast_at: row.blast_at },
-            blast_spend_total,
+            blast_spend_total, blasts_with_unknown_cost,
           }
         }
       )
@@ -1944,21 +1975,24 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'update_blast',
     description:
-      "Update a B2B blast on a project — any of its $/bid, # of people, # of completes, when it ran (blast_at), or description. Identify it by `blast_ref` = its idem_key (e.g. \"<SurveyID>#<BlastLabel>\") or its id. Only the fields you pass change (idempotent). Cost = $/bid × completes recomputes into the project's spend. Use this to fill in completes on a blast logged from a campaign Overview tab. Preview first; confirm to apply.",
+      "Update a B2B blast on a project — any of its $/bid, # of people, # of completes, when it ran (blast_at), or description. Identify it by `blast_ref` = its idem_key (e.g. \"<SurveyID>#<BlastLabel>\") or its id. Only the fields you pass change (idempotent). Cost = $/bid × completes recomputes into the project's spend. This is the tool for filling in completes once they come in on a blast that was logged before they were known. THREE DISTINCT ACTIONS, don't confuse them: OMIT a field to leave it exactly as it is; pass a number to record it; pass null to UN-RECORD it (back to \"not recorded\", for a figure entered by mistake). Passing 0 asserts the real answer is zero — a blast that genuinely produced nothing — and it is NOT the way to say \"unknown\": 0 counts as a result, drags the response rate down, and makes the cost look settled at $0. Preview first; confirm to apply.",
     kind: 'write',
     schema: {
       project: z.string(),
       blast_ref: z.string(),
-      bid: z.number().min(0).optional(),
-      people: z.number().int().min(0).optional(),
-      completes: z.number().int().min(0).optional(),
+      // `.nullable()` is the un-record path (migration 091): the jsonb patch
+      // carries an explicit null, which is different from omitting the key.
+      bid: z.number().min(0).nullable().optional(),
+      people: z.number().int().min(0).nullable().optional(),
+      completes: z.number().int().min(0).nullable().optional(),
       blast_at: z.string().nullable().optional(),
       description: z.string().max(1000).nullable().optional(),
       confirm: z.boolean().optional(),
     },
     handler: async (rawArgs, ctx, meta) => {
       const args = rawArgs as {
-        project: string; blast_ref: string; bid?: number; people?: number; completes?: number
+        project: string; blast_ref: string; bid?: number | null; people?: number | null
+        completes?: number | null
         blast_at?: string | null; description?: string | null; confirm?: boolean
       }
       const { userEmail } = ctx
@@ -1980,25 +2014,44 @@ export const TOOLS: AssistantTool[] = [
       if (Object.keys(patch).length === 0) {
         return { needs: 'a change', message: 'Specify at least one of: bid, people, completes, blast_at, description.' }
       }
+      // "not recorded", spelled out — a preview that rendered a null as an empty
+      // string would read as "bid → $" and give nobody a chance to catch it.
       const desc = [
-        args.bid !== undefined ? `bid → $${args.bid}` : null,
-        args.people !== undefined ? `people → ${args.people}` : null,
-        args.completes !== undefined ? `completes → ${args.completes}` : null,
+        args.bid !== undefined ? `bid → ${args.bid == null ? 'not recorded' : '$' + args.bid}` : null,
+        args.people !== undefined ? `people → ${args.people ?? 'not recorded'}` : null,
+        args.completes !== undefined ? `completes → ${args.completes ?? 'not recorded'}` : null,
         args.blast_at !== undefined ? `blast_at → ${args.blast_at ?? '—'}` : null,
         args.description !== undefined ? `description → "${args.description ?? ''}"` : null,
       ].filter(Boolean).join(', ')
 
+      // What the row will hold afterwards = the patch over the current row. Warn
+      // when that leaves the cost unknowable, because the project's spend then
+      // silently excludes this blast.
+      const afterBid = args.bid !== undefined ? args.bid : blast.bid
+      const afterCompletes = args.completes !== undefined ? args.completes : blast.completes
+      const costUnknown = isBlastCostUnknown({ bid: afterBid, completes: afterCompletes })
+
       return confirmable(
         args,
-        async () => ({ summary: `Update blast ${blast.idem_key ? `"${blast.idem_key}"` : blast.id} on ${p.project_code}: ${desc}` }),
+        async () => ({
+          summary: `Update blast ${blast.idem_key ? `"${blast.idem_key}"` : blast.id} on ${p.project_code}: ${desc}` +
+            (costUnknown ? " — this blast's cost stays UNKNOWN afterwards, so it contributes $0 to the project's spend" : ''),
+          cost_unknown: costUnknown,
+        }),
         async () => {
           const row = await runUpdateBlast({ blastId: blast.id, patch, actor: `${userEmail} via Claude` })
-          const blast_spend_total = totalBidDollars(await listBlastsForProject(p.id as string) as never)
+          const after = await listBlastsForProject(p.id as string)
+          // blast_spend_total mirrors the SQL, so an unrecorded blast adds $0 to it.
+          // Ship the count of those alongside it — the number is a FLOOR whenever it
+          // is non-zero, and a total presented without that caveat is how $0 spend got
+          // read as a fact on 8 of 12 blast projects.
+          const blast_spend_total = totalBidDollars(after as never)
+          const blasts_with_unknown_cost = unknownCostBlasts(after)
           meta.detail = { updated_blast: { id: row.id, people: row.people, completes: row.completes, bid: row.bid } }
           return {
             ok: true,
             blast: { id: row.id, people: row.people, completes: row.completes, bid: row.bid, blast_at: row.blast_at },
-            blast_spend_total,
+            blast_spend_total, blasts_with_unknown_cost,
           }
         }
       )
@@ -2023,12 +2076,20 @@ export const TOOLS: AssistantTool[] = [
 
       return confirmable(
         args,
-        async () => ({ summary: `Remove blast ${blast.idem_key ? `"${blast.idem_key}"` : blast.id} (${blast.completes} completes @ $${blast.bid}/bid) from ${p.project_code}` }),
+        // An unrecorded figure has to say so here too — "null completes @ $null/bid"
+        // in a destructive confirmation prompt is how somebody deletes the wrong row.
+        async () => ({ summary: `Remove blast ${blast.idem_key ? `"${blast.idem_key}"` : blast.id} (${blast.completes ?? 'not recorded'} completes @ ${blast.bid == null ? 'an unrecorded' : '$' + blast.bid}/bid) from ${p.project_code}` }),
         async () => {
           await runRemoveBlast(blast.id, `${userEmail} via Claude`)
-          const blast_spend_total = totalBidDollars(await listBlastsForProject(p.id as string) as never)
+          const after = await listBlastsForProject(p.id as string)
+          // blast_spend_total mirrors the SQL, so an unrecorded blast adds $0 to it.
+          // Ship the count of those alongside it — the number is a FLOOR whenever it
+          // is non-zero, and a total presented without that caveat is how $0 spend got
+          // read as a fact on 8 of 12 blast projects.
+          const blast_spend_total = totalBidDollars(after as never)
+          const blasts_with_unknown_cost = unknownCostBlasts(after)
           meta.detail = { removed_blast: { id: blast.id, idem_key: blast.idem_key ?? null }, by: userEmail }
-          return { ok: true, removed: blast.idem_key ?? blast.id, blast_spend_total }
+          return { ok: true, removed: blast.idem_key ?? blast.id, blast_spend_total, blasts_with_unknown_cost }
         }
       )
     },

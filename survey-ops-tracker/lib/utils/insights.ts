@@ -152,9 +152,24 @@ export interface BlastLite {
   note?: string | null
 }
 
-/** Completion rate = completes ÷ people reached (%). null if no reach recorded. */
+/**
+ * Completion rate = completes ÷ people reached (%). null when the rate is
+ * UNKNOWN, which is either no reach recorded (no denominator) or no completes
+ * recorded (no numerator).
+ *
+ * The completes half is not defensive tidying. `completes ?? 0` here reported
+ * 0.00% for 13 of the 18 blasts that had a reach — every one of them a blast
+ * whose completes nobody had typed in yet (migration 091). Averaged together
+ * those fabricated zeros made the portfolio read as if HIGHER bids produced
+ * LOWER response, the exact opposite of the truth, because the expensive blasts
+ * happened to be the ones still awaiting their counts. An absent numerator has
+ * to propagate as "unknown" or it becomes evidence for a conclusion.
+ *
+ * A recorded 0 completes still yields 0.00% — that blast really did fail.
+ */
 export function blastCompletionRate(b: BlastLite): number | null {
-  return pctOf(b.completes ?? 0, b.people ?? 0)
+  if (b.completes == null) return null
+  return pctOf(b.completes, b.people ?? 0)
 }
 
 /** Cumulative completes over time (chronological by blast date). */

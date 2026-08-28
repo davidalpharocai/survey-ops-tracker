@@ -1008,10 +1008,10 @@ export type Database = {
           id: string
           project_id: string
           delivered: number
-          bid: number
+          bid: number | null
           blast_cost: number
-          people: number
-          completes: number
+          people: number | null
+          completes: number | null
           blast_at: string | null
           reward: number
           scheduled_at: string | null
@@ -1025,10 +1025,10 @@ export type Database = {
           id?: string
           project_id: string
           delivered?: number
-          bid?: number
+          bid?: number | null
           blast_cost?: number
-          people?: number
-          completes?: number
+          people?: number | null
+          completes?: number | null
           blast_at?: string | null
           reward?: number
           scheduled_at?: string | null
@@ -1042,10 +1042,10 @@ export type Database = {
           id?: string
           project_id?: string
           delivered?: number
-          bid?: number
+          bid?: number | null
           blast_cost?: number
-          people?: number
-          completes?: number
+          people?: number | null
+          completes?: number | null
           blast_at?: string | null
           reward?: number
           scheduled_at?: string | null
@@ -2057,9 +2057,11 @@ export type Database = {
       mcp_log_blast: {
         Args: {
           p_project: string
-          p_bid: number
-          p_people: number
-          p_completes: number
+          // Nullable since migration 091: null = the figure is NOT RECORDED YET,
+          // which the RPC's upsert coalesces so it never erases a recorded value.
+          p_bid: number | null
+          p_people: number | null
+          p_completes: number | null
           p_blast_at: string | null
           p_note: string
           p_created_by: string

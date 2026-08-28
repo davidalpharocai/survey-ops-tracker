@@ -415,8 +415,31 @@ export async function runEditStep(stepId: string, text: string, actor: string): 
   return data as ProjectStepRow
 }
 
+/** Postgres 23502 (not-null violation) on a blast figure can only mean one thing:
+ *  migration 091, which makes bid/people/completes nullable so "not recorded" is
+ *  representable, has not been applied yet. David applies migrations by hand days
+ *  after the code deploys, so this window is real. Translate it — the raw
+ *  "null value in column \"completes\" violates not-null constraint" tells the
+ *  caller nothing about what to do next. */
+function rethrowBlastWriteError(error: { code?: string; message: string }): never {
+  if (error.code === '23502') {
+    throw new Error(
+      'This blast figure cannot be left unrecorded until database migration 091 is applied — ' +
+      'pass an explicit number for now, or ask David to run supabase/migrations/091_blast_unrecorded.sql.',
+    )
+  }
+  throw new Error(error.message)
+}
+
+/** Log (or upsert, on idem_key) a blast. `bid` / `people` / `completes` accept
+ *  null = NOT RECORDED YET, which is a different fact from 0 (migration 091) —
+ *  0 says the blast produced nothing, null says nobody has counted. On an
+ *  idem_key upsert the RPC coalesces, so passing null LEAVES an already-recorded
+ *  figure alone rather than erasing it; use runUpdateBlast to un-record on
+ *  purpose. */
 export async function runLogBlast(opts: {
-  projectId: string; bid: number; people: number; completes: number; blastAt: string | null
+  projectId: string; bid: number | null; people: number | null; completes: number | null
+  blastAt: string | null
   note: string | null; createdBy: string; idemKey: string; actor: string
 }): Promise<ProjectBlastRow> {
   const supabase = createAdminClient()
@@ -431,7 +454,7 @@ export async function runLogBlast(opts: {
     p_idem: opts.idemKey,
     p_actor: opts.actor,
   })
-  if (error) throw new Error(error.message)
+  if (error) rethrowBlastWriteError(error)
   return data as ProjectBlastRow
 }
 
@@ -458,7 +481,14 @@ export async function listBlastsForProject(projectId: string): Promise<ProjectBl
 }
 
 /** Patch a blast by id — only keys present in `patch` change (jsonb-patch RPC,
- *  mirrors runUpdateSegment). Sets app.actor; the spend + audit triggers fire. */
+ *  mirrors runUpdateSegment). Sets app.actor; the spend + audit triggers fire.
+ *
+ *  A key present with a null value writes NULL, i.e. un-records that figure:
+ *  jsonb `?` is true for a key whose value is JSON null and `->>` yields SQL
+ *  NULL, so `{completes: null}` means "nobody has counted these yet" while
+ *  OMITTING the key means "leave whatever is there". This is the only path that
+ *  can walk a figure back to unrecorded — mcp_log_blast's upsert deliberately
+ *  coalesces so a re-import can't erase a hand-typed number. */
 export async function runUpdateBlast(opts: {
   blastId: string; patch: Record<string, unknown>; actor: string
 }): Promise<ProjectBlastRow> {
@@ -466,7 +496,7 @@ export async function runUpdateBlast(opts: {
   const { data, error } = await supabase.rpc('mcp_update_blast', {
     p_blast: opts.blastId, p_patch: opts.patch as unknown as Json, p_actor: opts.actor,
   })
-  if (error) throw new Error(error.message)
+  if (error) rethrowBlastWriteError(error)
   return data as ProjectBlastRow
 }
 

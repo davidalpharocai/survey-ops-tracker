@@ -10,10 +10,15 @@ import { isKnownSalesperson, ALL_SALESPERSON_VALUES } from '@/lib/utils/salespeo
 //   - pipelineThroughput: per-stage cycle time / WIP / aging from project_stage_history
 //
 // The canonical spend formula (recompute_project_spend, migration 060 + the third
-// term added by 080) is
-//   actual_spend = Σ(blast.bid × blast.completes) + Σ(supplier.cpi × supplier.n_collected)
-//                                                + Σ(cost.amount)
+// term added by 080 + the blast coalesce in 091) is
+//   actual_spend = Σ(coalesce(blast.bid,0) × coalesce(blast.completes,0))
+//                + Σ(supplier.cpi × supplier.n_collected)
+//                + Σ(cost.amount)
 // so a stored actual_spend that disagrees means the recompute trigger didn't fire.
+// `num()` below coalesces the same way, so check 1 still reconciles exactly once
+// blast figures can be NULL — and that is precisely why an unrecorded blast needs
+// its OWN check (7): check 1 sees stored and computed agree, both at $0, and
+// reports the project as perfectly consistent while its real cost is unknown.
 // This MUST stay in lockstep with the SQL: when 060 added the blast term, one read
 // that hadn't been updated with it reported $0 spend on every blast project until a
 // hotfix. Here the failure is louder still — a missing term makes the integrity
@@ -21,7 +26,12 @@ import { isKnownSalesperson, ALL_SALESPERSON_VALUES } from '@/lib/utils/salespeo
 
 type Row = Record<string, unknown>
 type SupRow = { cpi: number | null; n_collected: number | null }
-type BlastRow = { bid: number | null; completes: number | null }
+/** `blast_at` is here for check 7 (how long a blast has been waiting for its
+ *  completes). It must also be named in BOTH explicit selects below — an
+ *  explicit select that omits a column buildChecks reads does NOT error, it
+ *  just leaves the value undefined and the check silently never fires. That
+ *  mistake has been made in this file before; see the note on `salesperson`. */
+type BlastRow = { bid: number | null; completes: number | null; blast_at: string | null }
 type CostRow = { amount: number | null }
 type SegRow = { n_target: number | null; n_collected: number | null; n_actual: number | null }
 
@@ -154,6 +164,73 @@ function buildChecks(p: Row, sup: SupRow[], blasts: BlastRow[], costs: CostRow[]
     })
   }
 
+  // 7) Blast completes that were never logged.
+  //
+  //    Blast cost is $/bid × completes, so an unrecorded completes count makes a
+  //    blast contribute $0 to actual_spend — indistinguishable, in every total
+  //    downstream, from a blast that genuinely produced nothing. Check 1 cannot
+  //    catch it: the stored spend and the computed spend agree perfectly, both at
+  //    the wrong number. That is what makes this its own check rather than a
+  //    refinement of the spend one.
+  //
+  //    Two signals, weakest first:
+  //
+  //    7a) A blast sent more than 7 days ago with completes still unrecorded.
+  //        Completes trickle in for days, so a fresh blast having none is normal
+  //        and must not nag — hence ADVISORY and hence the 7-day floor. Only
+  //        blasts with a blast_at can be aged; one with no send date at all is
+  //        picked up by 7b if it produced anything.
+  //
+  //    7b) The project collected N while the sum of its blast completes is 0.
+  //        Not a heuristic — a PROOF that the completes were never logged, for a
+  //        B2B project whose only respondent source is its blasts: the responses
+  //        exist, so they came through some blast, so at least one blast's count
+  //        is missing. Measured 2026-08-28: 8 of the 12 projects with blasts were
+  //        in exactly this state (PR00307 collected 86, PR00309 26 across 6
+  //        blasts, PR00363 24, PR00270 34) and all 8 reported $0 blast spend.
+  //        A real issue, not advisory.
+  if (blasts.length) {
+    const DAYS_TO_RECORD = 7
+    const cutoff = Date.now() - DAYS_TO_RECORD * 86_400_000
+    const stale = blasts.filter(b =>
+      b.completes == null && b.blast_at != null && Date.parse(b.blast_at) < cutoff)
+    if (stale.length) {
+      checks.push({
+        check: 'blast_completes_unrecorded', ok: false, advisory: true,
+        expected: 0, actual: stale.length,
+        detail: `${stale.length} of ${blasts.length} blast(s) went out over ${DAYS_TO_RECORD} days ago with # completes still unrecorded — each contributes $0 to actual_spend, so the project's cost is a floor, not the total`,
+      })
+    }
+
+    // Sum treats unrecorded as 0 on purpose: this asks "did ANY blast get a
+    // count?", and both NULL and 0 answer no. `> 0` guards the direction — a
+    // project that collected nothing yet proves nothing about its blasts.
+    const blastCompletes = blasts.reduce((s, b) => s + num(b.completes), 0)
+    const nCollected = num(p.n_collected)
+    // Gated on the blasts being the ONLY respondent source, which is what makes
+    // this a proof rather than a guess. A project can legitimately run suppliers
+    // AND a blast (OverviewFieldGrid renders both widgets for Rerun and untyped
+    // projects), and there the N could have arrived entirely through the
+    // suppliers while the blast genuinely returned nothing — a correctly-recorded
+    // project that this would otherwise hard-fail. Every project with blasts in
+    // production today is blast-only, so the gate changes nothing now; it stops
+    // the first mixed-source project being accused.
+    const blastIsOnlySource = sup.length === 0
+    if (nCollected > 0 && blastCompletes === 0 && blastIsOnlySource) {
+      checks.push({
+        check: 'blast_completes_missing', ok: false, advisory: false,
+        expected: nCollected, actual: 0,
+        detail: `project collected ${nCollected.toLocaleString('en-US')} N but its ${blasts.length} blast(s) sum to 0 completes, and blasts are its only respondent source — the completes were never logged, so blast spend reads $0 and the response rate reads 0%`,
+      })
+    } else if (nCollected > 0 && blastCompletes === 0) {
+      checks.push({
+        check: 'blast_completes_missing', ok: false, advisory: true,
+        expected: nCollected, actual: 0,
+        detail: `project collected ${nCollected.toLocaleString('en-US')} N with 0 completes across its ${blasts.length} blast(s). It also has ${sup.length} supplier row(s), so the N may have come from those and the blast may genuinely have returned nothing — advisory rather than an error, but worth confirming the blast completes were not simply missed`,
+      })
+    }
+  }
+
   return checks
 }
 
@@ -198,7 +275,7 @@ export async function reconcileProject(projectRef: string) {
   const supabase = createAdminClient()
   const [supRes, blastRes, costRows, segRes] = await Promise.all([
     supabase.from('project_suppliers').select('cpi, n_collected').eq('project_id', pid),
-    supabase.from('project_blasts').select('bid, completes').eq('project_id', pid),
+    supabase.from('project_blasts').select('bid, completes, blast_at').eq('project_id', pid),
     fetchCosts(supabase, [pid]),
     supabase.from('project_segments').select('n_target, n_collected, n_actual').eq('project_id', pid),
   ])
@@ -271,7 +348,7 @@ export async function dataHealth(args: { active_only?: boolean; limit?: number }
 
   const [supRows, blastRows, costRows, segRows] = await Promise.all([
     inChunks<SupRow & { project_id: string }>(ids, c => supabase.from('project_suppliers').select('project_id, cpi, n_collected').in('project_id', c)),
-    inChunks<BlastRow & { project_id: string }>(ids, c => supabase.from('project_blasts').select('project_id, bid, completes').in('project_id', c)),
+    inChunks<BlastRow & { project_id: string }>(ids, c => supabase.from('project_blasts').select('project_id, bid, completes, blast_at').in('project_id', c)),
     fetchCosts(supabase, ids),
     inChunks<SegRow & { project_id: string }>(ids, c => supabase.from('project_segments').select('project_id, n_target, n_collected, n_actual').in('project_id', c)),
   ])

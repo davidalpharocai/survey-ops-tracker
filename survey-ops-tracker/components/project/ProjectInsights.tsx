@@ -11,6 +11,7 @@ import { useProjectSuppliers, type ProjectSupplier } from '@/lib/hooks/useProjec
 import { useProjectSegments } from '@/lib/hooks/useProjectSegments'
 import { useCanViewFinancials } from '@/lib/hooks/useCapabilities'
 import { projectEstimateRange, projectTarget, modalCap } from '@/lib/utils/suppliers'
+import { unknownCostBlasts } from '@/lib/utils/blast'
 import {
   pctOf, computePace, costPerComplete, projectedFinalCost,
   blastCompletionRate, cumulativeCompletes, supplierMix, bestValueSupplier, daysBetween, segmentPaces,
@@ -136,6 +137,23 @@ export function ProjectInsights({ project }: { project: SurveyProject }) {
   const nProgress = target != null && target > 0 ? collected / target : null
   const burningFast = budgetUsed != null && nProgress != null && budgetUsed - nProgress > 0.1
 
+  // Every cost figure on this row — spend, cost/complete, projected final — is
+  // actual_spend, which counts a blast only once its completes are recorded. So
+  // an unrecorded blast understates all three.
+  //
+  // The nastiest part is what it does to burningFast: that flag fires when spend
+  // outpaces collection, and understating spend is exactly what stops it firing.
+  // The projects with unknown cost are therefore the LEAST likely to raise the
+  // "spending ahead of collection" warning — the alarm is quietest precisely
+  // where the numbers are least trustworthy. Say so instead.
+  const unknownCost = unknownCostBlasts(blasts)
+  const legacyUnlogged =
+    unknownCost === 0 &&
+    blasts.length > 0 &&
+    collected > 0 &&
+    blasts.reduce((n, b) => n + (b.completes ?? 0), 0) === 0
+  const costUnderstated = unknownCost > 0 || legacyUnlogged
+
   // Pace vs due date — only while the project is still running.
   let paceNote: { text: string; tone: 'ok' | 'warn' } | null = null
   if (!delivered && pace.projectedFinishISO && project.due_date) {
@@ -171,13 +189,22 @@ export function ProjectInsights({ project }: { project: SurveyProject }) {
             {money(spend)}
             <span className="text-sm font-normal text-muted-foreground">{budget != null ? ` / ${money(budget)}` : ''}</span>
             {budgetUsed != null && <span className={`text-xs font-normal ${burningFast ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'}`}> · {pctStr(budgetUsed * 100)}</span>}
+            {costUnderstated && <span className="text-xs font-normal text-amber-600 dark:text-amber-400"> +</span>}
           </p>
-          <p className="text-[12px] text-muted-foreground mt-0.5">proj. final {money(projFinal)}</p>
+          <p className="text-[12px] text-muted-foreground mt-0.5">
+            proj. final {money(projFinal)}
+            {costUnderstated && <span className="text-amber-600 dark:text-amber-400"> · at least</span>}
+          </p>
         </KpiCard>
 
         <KpiCard label="Cost / complete" tooltip="Blended all-in cost per completed response = actual spend ÷ N collected.">
-          <p className="text-lg font-semibold text-foreground leading-tight">{money2(cpc)}</p>
-          <p className="text-[12px] text-muted-foreground mt-0.5">blended, to date</p>
+          <p className="text-lg font-semibold text-foreground leading-tight">
+            {money2(cpc)}
+            {costUnderstated && <span className="text-xs font-normal text-amber-600 dark:text-amber-400"> +</span>}
+          </p>
+          <p className="text-[12px] text-muted-foreground mt-0.5">
+            {costUnderstated ? 'blended — excludes unrecorded blasts' : 'blended, to date'}
+          </p>
         </KpiCard>
 
         <KpiCard label="Pace" tooltip="Completes per day since fielding started, and a linear projection of when the N target is reached. Stops projecting once the project is delivered.">
@@ -232,6 +259,10 @@ function B2BPerformance({ blasts, target }: { blasts: Blast[]; target: number | 
   const totalPeople = list.reduce((s, b) => s + (b.people ?? 0), 0)
   const totalCompletes = list.reduce((s, b) => s + (b.completes ?? 0), 0)
   const overallRate = pctOf(totalCompletes, totalPeople)
+  // Completes trickle in after a send and are typed by hand, so some blasts here
+  // will legitimately have none recorded. Their absence drags the overall rate
+  // and every total below toward zero, so the panel has to declare it.
+  const unrecorded = list.filter((b) => b.completes == null).length
   const cum = cumulativeCompletes(list).map((p) => p.cumulative)
   const rated = list.filter((b) => blastCompletionRate(b) != null)
   const best = rated.length ? rated.reduce((a, b) => (blastCompletionRate(b)! > blastCompletionRate(a)! ? b : a)) : null
@@ -241,9 +272,17 @@ function B2BPerformance({ blasts, target }: { blasts: Blast[]; target: number | 
     <div className={card}>
       <p className={sectionTitle}>
         Blast performance
-        <InfoTooltip text="Completion rate = completes ÷ people reached. Cost per complete is the $/bid (we only pay completes)." />
+        <InfoTooltip text="Completion rate = completes ÷ people reached. Cost per complete is the $/bid (we only pay completes). A blast whose completes haven't been recorded yet shows “—”, not 0% — and it is excluded from the figures rather than counted as a failure." />
         <span className="ml-auto normal-case tracking-normal text-foreground font-medium">{pctStr(overallRate)} completion</span>
       </p>
+
+      {unrecorded > 0 && (
+        <p className="mb-2 text-[12px] text-amber-600/90 dark:text-amber-400/90">
+          ⚠ {unrecorded} of {list.length} blast{list.length === 1 ? '' : 's'} {unrecorded === 1 ? 'has' : 'have'} no
+          completes recorded — every figure here is a floor, and the completion rate is understated until they are
+          filled in on the Overview tab.
+        </p>
+      )}
 
       <Sparkline points={cum} target={target} />
       <p className="text-[11px] text-muted-foreground/70 mb-2">cumulative completes over time{target != null ? ' (dashed = N target)' : ''}</p>
@@ -257,8 +296,10 @@ function B2BPerformance({ blasts, target }: { blasts: Blast[]; target: number | 
         {list.map((b) => (
           <div key={b.id} className="contents">
             <span className="text-foreground truncate">{shortDate(b.blast_at)}{b.note ? ` · ${b.note}` : ''}</span>
-            <span className="text-right tabular-nums text-foreground">{fmtNum(b.people ?? 0)}</span>
-            <span className="text-right tabular-nums text-foreground">{fmtNum(b.completes ?? 0)}</span>
+            {/* `?? 0` here printed a hard "0" for a figure nobody had recorded
+                yet, which reads as a result. Unrecorded is an em dash. */}
+            <span className="text-right tabular-nums text-foreground">{b.people == null ? '—' : fmtNum(b.people)}</span>
+            <span className="text-right tabular-nums text-foreground">{b.completes == null ? '—' : fmtNum(b.completes)}</span>
             <span className="text-right tabular-nums text-foreground">{pctStr(blastCompletionRate(b))}</span>
             <span className="text-right tabular-nums text-foreground">{money2(b.bid)}</span>
           </div>
