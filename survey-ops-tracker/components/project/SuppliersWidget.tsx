@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
+import { CalcMark } from './fields'
 import { useSuppliers, useAddSupplier } from '@/lib/hooks/useSuppliers'
 import {
   useProjectSuppliers,
@@ -260,10 +261,12 @@ function LaunchBlock({
                 <span className={overTarget ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'}>
                   Actual <span className="text-foreground font-medium">{money(actual)}</span> · {fmtNum(collected)} collected
                   {effTarget != null ? ` / ${fmtNum(effTarget)}` : ''}{overTarget ? ' · over' : ''}
+                  <CalcMark from="Σ (each supplier's CPI × its N collected) in this launch" />
                 </span>
               ) : range ? (
                 <span className="text-muted-foreground">
                   Est. <span className="text-foreground font-medium">{money(range.low)}–{money(range.high)}</span>
+                  <CalcMark from="this launch's target × the lowest .. highest supplier CPI on it" />
                 </span>
               ) : (
                 <span className="text-muted-foreground/60">set target + CPIs to estimate</span>
@@ -422,6 +425,7 @@ export function SuppliersWidget({
                 <div className="flex justify-between text-[12px]">
                   <span className="text-muted-foreground">
                     Actual cost <span className="text-foreground font-medium">{money(pActual)}</span>
+                    <CalcMark from="Σ (CPI × N collected) across every supplier in every launch" />
                   </span>
                   <span className="text-muted-foreground">
                     {fmtNum(pCollected)} collected{pTarget > 0 ? ` / ${fmtNum(pTarget)}` : ''} · blended {rate(pBlended)}
@@ -437,7 +441,8 @@ export function SuppliersWidget({
               <div className="flex justify-between text-[12px] text-muted-foreground">
                 <span>
                   {pRange ? (
-                    <>Est. <span className="text-foreground font-medium">{money(pRange.low)}–{money(pRange.high)}</span></>
+                    <>Est. <span className="text-foreground font-medium">{money(pRange.low)}–{money(pRange.high)}</span>
+                      <CalcMark from="the sum of every launch's estimate range" /></>
                   ) : (
                     'Set targets + CPIs to estimate'
                   )}

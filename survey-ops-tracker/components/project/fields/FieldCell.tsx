@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
+import { CalcMark } from './CalcMark'
 import { cn } from '@/lib/utils'
 
 /**
@@ -40,6 +41,19 @@ export interface FieldCellProps {
    * invalid HTML). The hover-reveal pencil still edits.
    */
   valueInteractive?: boolean
+  /**
+   * Mark this row as a CALCULATED figure — renders the `=` marker beside the
+   * label. Pass the formula as a string to spell it out in the marker's tooltip
+   * (e.g. "$/bid × completes").
+   *
+   * Explicit rather than inferred from `!editable`, on purpose. Not every
+   * read-only cell is a calculation: some are read-only because of who is
+   * signed in, or because the value is owned elsewhere. Labelling those "=" would
+   * be a confident lie, and a wrong explanation is worse than none — which is the
+   * whole reason this marker exists (the old Audience Size tooltip described the
+   * wrong quantity for a year).
+   */
+  computed?: boolean | string
   /** The value slot: the display node, or the editor when `editing`. */
   children: ReactNode
 }
@@ -59,6 +73,7 @@ export function FieldCell({
   onEdit,
   saved = false,
   valueInteractive = false,
+  computed = false,
   children,
 }: FieldCellProps) {
   const canEdit = editable && !editing
@@ -74,6 +89,7 @@ export function FieldCell({
       <div className="flex items-center gap-1 text-[12px] uppercase tracking-wide text-muted-foreground">
         <span className="truncate">{label}</span>
         {tooltip && <InfoTooltip text={tooltip} />}
+        {computed && <CalcMark from={typeof computed === 'string' ? computed : undefined} />}
         {saved && (
           <span
             aria-live="polite"

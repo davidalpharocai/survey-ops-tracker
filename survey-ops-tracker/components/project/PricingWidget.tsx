@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
+import { CalcMark } from './fields'
 import { fmtNum } from '@/lib/utils/number'
 import { useProject } from '@/lib/hooks/useProjects'
 import { useProjectSegments } from '@/lib/hooks/useProjectSegments'
@@ -177,6 +178,20 @@ export function PricingWidget({ projectId, budget, actualSpend }: PricingWidgetP
   const { data: rates } = useProjectRates(canViewFinancials ? projectId : '')
   const setProjectRate = useSetProjectRate(projectId)
   const setSegmentRate = useSetSegmentRate(projectId)
+  // MUST stay above the early returns below, with every other hook.
+  //
+  // This used to sit ~80 lines further down, beside the cost-confidence logic
+  // that consumes it — readable, and a violation of the rules of hooks that took
+  // the whole project page down. On the first render `isLoading` is true, the
+  // component returns null, and this line never runs; the moment capabilities
+  // resolve it does, so React sees more hooks than the render before and throws
+  // "Rendered more hooks than during the previous render". The page's error
+  // boundary then replaced the entire project view with "Something went wrong",
+  // for exactly the three people who can see financials.
+  //
+  // It reads the same react-query key the Money section already uses, so this is
+  // a cache hit rather than a second fetch — moving it up costs nothing.
+  const { data: blastRows = [] } = useProjectBlasts(projectId)
 
   // Hidden until the capability check has actually come back true.
   if (isLoading) return null
@@ -258,10 +273,6 @@ export function PricingWidget({ projectId, budget, actualSpend }: PricingWidgetP
   //     understated by the whole missing blast. The widget would then drop the
   //     "(indicative)" qualifier and state a confident margin and margin %, both
   //     too high, on the exact screen this change exists to make trustworthy.
-  //
-  // Same react-query key the Money section already reads, so this is a cache hit,
-  // not a second fetch.
-  const { data: blastRows = [] } = useProjectBlasts(projectId)
   const unknownBlasts = unknownCostBlasts(blastRows)
   const costKnown = hasRecordedCost(actualSpend) && unknownBlasts === 0
   const marginText =
@@ -343,6 +354,14 @@ export function PricingWidget({ projectId, budget, actualSpend }: PricingWidgetP
           <span className="flex items-center text-xs text-muted-foreground">
             Blended $ / N
             <InfoTooltip text={TIP.blended} />
+            {/* NOT "contract value ÷ total N" — that was wrong and shipped a
+                formula the reader could follow to the wrong number. `blended` is
+                revenue ÷ pricedN (lib/utils/pricing.ts:90): unpriced lines are
+                excluded from BOTH halves. The "at N …" beside it is the TOTAL
+                including unpriced, so on a partly-priced project dividing the two
+                figures on screen gives a number pricing.test.ts:72-83 exists to
+                forbid. Worded to match the (i) two pixels to its left. */}
+            <CalcMark from="Σ(rate × N) ÷ ΣN, priced segments only" />
           </span>
           <span className="text-sm tabular-nums text-foreground">
             {isRange ? (
@@ -363,6 +382,9 @@ export function PricingWidget({ projectId, budget, actualSpend }: PricingWidgetP
           <span className="flex items-center text-xs text-muted-foreground">
             Contract value
             <InfoTooltip text={TIP.contract} />
+            {/* Phrased to match the (i) beside it. Two wordings of one formula is
+                the drift this whole change exists to stop. */}
+            <CalcMark from="Σ (price / N × N target), min end .. max end" />
           </span>
           <span className="text-sm font-medium tabular-nums text-foreground">
             {contract == null
@@ -384,6 +406,7 @@ export function PricingWidget({ projectId, budget, actualSpend }: PricingWidgetP
           <span className="flex items-center text-xs text-muted-foreground">
             Margin{!costKnown && margins != null ? ' (indicative)' : ''}
             <InfoTooltip text={costKnown ? TIP.margin : unknownBlasts > 0 ? TIP.marginPartialCost : TIP.marginNoCost} />
+            <CalcMark from="Contract value − Actual $" />
           </span>
           {margins == null ? (
             <span className="text-sm text-muted-foreground">—</span>
@@ -428,6 +451,7 @@ export function PricingWidget({ projectId, budget, actualSpend }: PricingWidgetP
             <span className="flex items-center text-xs text-muted-foreground">
               At N collected
               <InfoTooltip text={costKnown ? TIP.invoiced : unknownBlasts > 0 ? TIP.invoicedPartialCost : TIP.invoicedNoCost} />
+              <CalcMark from="rate × N collected, then − Actual $ for the margin beside it" />
             </span>
             <span className="text-sm tabular-nums text-foreground">
               {money(invoiced)}

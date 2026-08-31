@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import { Caret } from '@/components/shared/Caret'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
+import { CalcMark } from './fields'
 import { FieldCell, DateCell, TextCell, SelectCell, useSavedFlash } from './fields'
 import {
   useProjectCosts,
@@ -264,6 +265,7 @@ export function CostLines({ projectId }: { projectId: string }) {
           <span className="flex items-center text-xs text-muted-foreground">
             Other costs total
             <InfoTooltip text={TIP.subtotal} />
+            <CalcMark from="the sum of the cost lines above" />
           </span>
           <span className="text-sm font-medium tabular-nums text-foreground">{money(subtotal)}</span>
         </div>

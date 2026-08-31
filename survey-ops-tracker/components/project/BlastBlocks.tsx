@@ -256,7 +256,7 @@ function BlastBlock({
         {/* blastCost, NOT blastTotal: blastTotal mirrors the SQL and returns 0 for
             an unrecorded blast, and "$0" on screen is read as a result — a send
             that cost us nothing. An unknown cost has to say it is unknown. */}
-        <FieldCell label="Cost" tooltip={TIP.cost}>
+        <FieldCell label="Cost" tooltip={TIP.cost} computed="$ / bid × # completes">
           {cost == null ? (
             <span className="text-muted-foreground/60">— not recorded</span>
           ) : (

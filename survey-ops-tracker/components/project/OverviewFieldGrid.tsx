@@ -132,6 +132,24 @@ export function OverviewFieldGrid({ project }: { project: SurveyProject }) {
       <FieldSection title="Money">
         {/* Full-width — the widgets below manage their own internal layout. */}
         <div className="sm:col-span-2 flex flex-col gap-3">
+          {/* The key to the `=` marker. David, 2026-08-31: "it's not clear which
+              fields i should edit vs which are calc fields." Money is where this
+              bites hardest, because a typed ceiling and a computed spend are both
+              just a dollar figure on a row — indistinguishable until you try to
+              click one. Stated once here rather than repeated per row; each
+              marker still carries its own formula on hover. */}
+          <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] text-muted-foreground/70">
+            <span
+              aria-hidden
+              className="rounded bg-muted px-1 font-mono text-[10px] leading-[1.35] text-muted-foreground/80"
+            >
+              =
+            </span>
+            <span>
+              marks a figure the app works out for you. Hover it for the formula. Everything else on
+              this panel you type in.
+            </span>
+          </p>
           {/* Rerun is a dimension, not a type — a rerun wave still carries its
               base type (PS/B2B) on project_type, so it maps to one widget
               below like any other project. PS -> Suppliers (PureSpectrum),

@@ -4,6 +4,7 @@ import { useUpdateProject } from '@/lib/hooks/useProjects'
 import { useCanViewFinancials } from '@/lib/hooks/useCapabilities'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
 import { costPerN } from '@/lib/utils/blast'
+import { CalcMark } from './fields'
 import { CostLines } from './CostLines'
 import { PricingWidget } from './PricingWidget'
 
@@ -134,6 +135,7 @@ export function BudgetWidget({ projectId, budget, nCollected, actualSpend }: Bud
             <span className="text-xs text-muted-foreground flex items-center">
               Actual $
               <InfoTooltip text="Actual spend to date — blasts ($/bid × completes), PS suppliers (CPI × N collected), and the flat vendor fees in Other costs. Computed, not typed." />
+              <CalcMark from="Σ blasts ($/bid × completes) + Σ suppliers (CPI × N collected) + Σ other costs" />
             </span>
             <span className="text-sm font-medium text-foreground">{money(actual)}</span>
           </div>
@@ -141,6 +143,7 @@ export function BudgetWidget({ projectId, budget, nCollected, actualSpend }: Bud
             <span className="text-xs text-muted-foreground flex items-center">
               Cost / N
               <InfoTooltip text="Actual $ ÷ N Collected — the all-in cost per completed response." />
+              <CalcMark from="Actual $ ÷ N Collected" />
             </span>
             <span className="text-sm text-foreground">{rate(cpn)}</span>
           </div>
@@ -159,6 +162,7 @@ export function BudgetWidget({ projectId, budget, nCollected, actualSpend }: Bud
                 <span className="text-xs text-muted-foreground flex items-center">
                   {over ? '⚠ Over budget' : 'Budget used'}
                   <InfoTooltip text="Actual $ ÷ Total budget. Spend against the ceiling only — for whether the job actually makes money, read Margin below." />
+                  <CalcMark from="Actual $ ÷ Total budget" />
                 </span>
                 <span className={`text-sm font-medium ${over ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
                   {Math.round(usedPct)}% · {over ? '-' : ''}{money(Math.abs(remaining!))} {over ? 'over' : 'left'}

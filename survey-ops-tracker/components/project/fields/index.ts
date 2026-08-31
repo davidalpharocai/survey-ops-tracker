@@ -4,6 +4,8 @@ export type { FieldSectionProps } from './FieldSection'
 export { FieldCell, useSavedFlash } from './FieldCell'
 export type { FieldCellProps } from './FieldCell'
 
+export { CalcMark } from './CalcMark'
+
 export { TextCell } from './TextCell'
 export type { TextCellProps } from './TextCell'
 
