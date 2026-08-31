@@ -22,15 +22,15 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!isAllowedEmail(user.email)) redirect('/login?unauthorized=1')
   if (profileError) redirect('/login')
 
-  // Fail closed on any tier that is not an analyst. Migration 085 added 'sales'
-  // to the tier enum, and every one of the ~73 RLS policies behind this app
-  // tests `my_role() = 'analyst'` — so a sales account reaching this layout
+  // The sales tier now has its own surface, so send them to it rather than
+  // turning them away. Same shape as the compliance redirect above.
+  if (profile?.role === 'sales') redirect('/sales')
+
+  // Fail closed on anything else. Every one of the ~73 RLS policies behind this
+  // app tests `my_role() = 'analyst'`, so an unknown tier reaching this layout
   // would render the whole tool with every query returning zero rows: no leak,
   // but a convincing impression that the data had vanished. Better to say
-  // plainly that there is no surface for them yet than to show an empty one.
-  //
-  // Remove this once the sales portal exists and has its own layout to redirect
-  // to, the way 'compliance' redirects to /portal above.
+  // plainly that there is no surface for them than to show an empty one.
   if (profile?.role !== 'analyst') redirect('/login?pending=1')
 
   return (

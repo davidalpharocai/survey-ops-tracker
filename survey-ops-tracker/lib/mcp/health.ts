@@ -373,6 +373,41 @@ export async function dataHealth(args: { active_only?: boolean; limit?: number }
   flagged.sort((a, b) => b.issues.length - a.issues.length)
   const limit = Math.min(args.limit ?? 50, 200)
   const shown = flagged.slice(0, limit)
+  // SALES SCOPING DRIFT — a system-level check, not a per-project one.
+  //
+  // Two lists name salespeople, on purpose and with different jobs: the
+  // `salespeople` TABLE (093) is what RLS resolves a signed-in account through,
+  // and SALESPEOPLE in lib/utils/salespeople.ts is what the project dropdown
+  // offers. They must agree, and nothing structural forces them to.
+  //
+  // The failure is silent and one-directional: add someone to the dropdown but
+  // not the table, projects get assigned to them, and when they sign in RLS
+  // matches nothing — they see an empty pipeline with no error. That is
+  // indistinguishable from having no work, so it would be reported as "the tool
+  // is broken" rather than "a row is missing". Cheap to detect, so detect it.
+  //
+  // Read through an untyped handle with the failure swallowed: David applies
+  // migrations by hand, so there is a window where `salespeople` does not exist
+  // yet, and data_health must not start failing because of a check about a table
+  // that has not been created.
+  let salesDrift: string[] = []
+  try {
+    const { data: spRows } = await (supabase as unknown as {
+      from: (t: string) => { select: (c: string) => Promise<{ data: { canonical_name: string; active: boolean }[] | null }> }
+    }).from('salespeople').select('canonical_name, active')
+    if (spRows) {
+      const inTable = new Set(spRows.map(r => r.canonical_name))
+      const missing = ALL_SALESPERSON_VALUES
+        .filter(n => n !== 'Internal' && !inTable.has(n))
+      if (missing.length) {
+        salesDrift = missing.map(n =>
+          `${n} can be set as a project's salesperson but has no row in the salespeople table — if they sign in, RLS will match none of their projects and they will see an empty pipeline`)
+      }
+    }
+  } catch {
+    // salespeople table not there yet (093 unapplied). Nothing to report.
+  }
+
   return {
     scanned: projects.length,
     with_issues: flagged.length,
@@ -380,6 +415,7 @@ export async function dataHealth(args: { active_only?: boolean; limit?: number }
     advisory_counts: advisoryCounts,
     projects: shown,
     truncated: flagged.length > shown.length,
+    ...(salesDrift.length ? { sales_scoping_drift: salesDrift } : {}),
     summary: flagged.length === 0
       ? `Scanned ${projects.length} project(s) — no data-integrity issues found.`
       : `${flagged.length}/${projects.length} project(s) have issues — ${Object.entries(countsByCheck).map(([k, v]) => `${k}: ${v}`).join(', ')}.`,

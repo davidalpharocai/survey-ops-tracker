@@ -521,6 +521,35 @@ export type Database = {
         }
         Relationships: []
       }
+      // ── Sales scoping (migration 093) ────────────────────────────────────────
+      // The authority for WHICH salesperson a signed-in account is. RLS reads it
+      // through my_salesperson_name(), so this is access-control data, not just
+      // reference data — hence one table rather than a copy of
+      // lib/utils/salespeople.ts's constant.
+      salespeople: {
+        Row: {
+          email: string
+          canonical_name: string
+          active: boolean
+          note: string | null
+          created_at: string
+        }
+        Insert: {
+          email: string
+          canonical_name: string
+          active?: boolean
+          note?: string | null
+          created_at?: string
+        }
+        Update: {
+          email?: string
+          canonical_name?: string
+          active?: boolean
+          note?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
       // ── Roles as permission bundles (migration 085) ──────────────────────────
       // Every entry below MUST end with `Relationships: []`. Omitting it on ONE
       // table collapses this ENTIRE schema type to `never` — hundreds of
@@ -2076,7 +2105,11 @@ export type Database = {
       }
     }
     Enums: {
-      profile_role: 'analyst' | 'compliance'
+      // 'sales' was added to the DB enum by migration 085 step 0. This file is
+      // hand-maintained, so it had drifted: every `role === 'sales'` comparison
+      // was a compile error claiming the types had no overlap, which is exactly
+      // the kind of "the code is wrong" signal that is really "the types are stale".
+      profile_role: 'analyst' | 'compliance' | 'sales'
       submission_status: 'pending_review' | 'approved' | 'rejected'
       question_type: 'open_text' | 'single_select' | 'multi_select' | 'scale' | 'other'
       recipient_role: 'alpharoc' | 'compliance'
