@@ -242,6 +242,9 @@ export async function copyProjectSegments(
     n_actual: null,
     audience: s.audience,
     audience_size: s.audience_size,
+    // audience_used is absent on purpose, twice over: it is run data (see
+    // cloneProject's note), and naming it in the select above would fail the
+    // whole read wherever migration 094 has not been applied.
     sort_order: s.sort_order,
     // The key is omitted ENTIRELY pre-082 — naming a column that doesn't exist
     // fails the insert, so "no prices" has to mean no key, not a null.
@@ -299,6 +302,12 @@ export async function cloneProject(opts: {
     if (src.requested_by_name) patch.requested_by_name = src.requested_by_name
   }
   if (on(c.audienceN)) {
+    // audience_size travels, audience_used does NOT. The pool the team handed
+    // over is a property of the study we are copying; how much of it has already
+    // been sent to is a property of the RUN, and clone resets run data (dates, N
+    // collected, stage). Carrying it would open a fresh wave already claiming a
+    // spent list, and AudienceRemaining would render "no contacts left" on a
+    // project that has not sent one message.
     if (src.audience != null) patch.audience = src.audience
     if (src.n_internal_target != null) patch.n_internal_target = src.n_internal_target
     if (src.audience_size != null) patch.audience_size = src.audience_size

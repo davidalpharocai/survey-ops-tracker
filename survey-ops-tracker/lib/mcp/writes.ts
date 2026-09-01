@@ -13,7 +13,7 @@ export const PROJECT_WRITE_FIELDS = [
   // n_target is the BOTTOM of the N range and n_target_max the top (migration
   // 078). Both are writable, and alignNRangePatch() below is why a caller may
   // name just one of them.
-  'n_target','n_target_max','n_collected','n_actual','n_internal_target','audience_size','budget',
+  'n_target','n_target_max','n_collected','n_actual','n_internal_target','audience_size','audience_used','budget',
   // voter_survey_qa, citation_language_needed and terminations are RETIRED flags
   // (no UI, no auto-set since migration 090) but stay writable here on purpose:
   // update_project takes a generic `fields` record, so nothing advertises them to
@@ -39,7 +39,7 @@ export const PROJECT_WRITE_FIELDS = [
 export const UNDOABLE_FIELDS = new Set<string>([
   'project_name', 'salesperson', 'priority', 'blocked_by',
   'submitted_date', 'launch_date', 'due_date', 'deliver_date', 'rerun_date',
-  'n_target', 'n_target_max', 'n_actual', 'n_internal_target', 'audience_size', 'budget',
+  'n_target', 'n_target_max', 'n_actual', 'n_internal_target', 'audience_size', 'audience_used', 'budget',
   'audience', 'category', 'objective', 'sprint_number',
   'longitudinal', 'voter_survey_qa', 'citation_language_needed', 'row_level_data', 'terminations',
   'latest_next_steps', 'survey_tool_id', 'slack_channel_url',

@@ -910,7 +910,7 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'reconcile_project',
     description:
-      "Cross-field consistency check for ONE project: does actual_spend match Σ(cpi×collected)+Σ(bid×completes); do segment N totals sum to the project N; is a survey-ID discrepancy flagged; are the dates in a sane order — plus advisory notes (supplier N collected vs the delivered N, which legitimately differ via QA attrition; sheet copy behind the app). Returns the failing `issues`, `advisories`, and the full `checks`. Use for “does <project>'s money/N add up”, “is anything off on <project>”, or to explain a spend/N number that looks wrong.",
+      "Cross-field consistency check for ONE project: does actual_spend match Σ(cpi×collected)+Σ(bid×completes); do segment N totals sum to the project N; is a survey-ID discrepancy flagged; are the dates in a sane order — plus advisory notes (supplier N collected vs the delivered N, which legitimately differ via QA attrition; sheet copy behind the app (RETIRED - the sheet write-back was deleted, so this advisory can no longer fire)). Returns the failing `issues`, `advisories`, and the full `checks`. Use for “does <project>'s money/N add up”, “is anything off on <project>”, or to explain a spend/N number that looks wrong.",
     kind: 'read',
     schema: { project: z.string() },
     handler: async (rawArgs) => {
@@ -1326,7 +1326,7 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'update_project',
     description:
-      "Update a project's fields (preview first; confirm to apply). Handles name, client, type, captain/co-captains, salesperson, priority, all dates, the N target RANGE (n_target is the minimum, n_target_max the maximum — pass both when the user gives a range; passing one end alone pulls the other end along to match, which the preview shows), n_internal_target/n_collected/n_actual, audience_size, the free-text audience, category, objective, sprint_number, budget (finance-only — refused if you don't hold finance access), the Y/N flags, survey_tool_id, slack channel, latest/next-steps, and the gen-pop N-floor override (n_floor_override + n_floor_override_reason). For status/stage moves use advance_project/approve_scoping/set_project_status; for compliance override, requested-by, or linked docs use their tools; for a project whose N is split into segments, use add_segment/update_segment/remove_segment.",
+      "Update a project's fields (preview first; confirm to apply). Handles name, client, type, captain/co-captains, salesperson, priority, all dates, the N target RANGE (n_target is the minimum, n_target_max the maximum — pass both when the user gives a range; passing one end alone pulls the other end along to match, which the preview shows), n_internal_target/n_collected/n_actual, the audience PAIR (audience_size is the total available contacts the team handed us; audience_used is how many of them we have drawn on — they are different numbers and neither is blast reach), the free-text audience, category, objective, sprint_number, budget (finance-only — refused if you don't hold finance access), the Y/N flags, survey_tool_id, slack channel, latest/next-steps, and the gen-pop N-floor override (n_floor_override + n_floor_override_reason). For status/stage moves use advance_project/approve_scoping/set_project_status; for compliance override, requested-by, or linked docs use their tools; for a project whose N is split into segments, use add_segment/update_segment/remove_segment.",
     kind: 'write',
     schema: {
       project: z.string(),
@@ -1528,7 +1528,7 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'update_segment',
     description:
-      "Edit an N segment's label or numbers (the target RANGE — target is the minimum, target_max the maximum — plus collected / actual). Identify the segment by its name or id. Moving one end of the range past the other pulls the other end along to match (shown in the preview). If it's unclear which segment, ask. Preview first; confirm to apply.",
+      "Edit an N segment's label, numbers or audience (the target RANGE — target is the minimum, target_max the maximum — plus collected / actual; audience is free text, audience_size is the total available contacts for THIS segment and audience_used how many have been drawn on). Identify the segment by its name or id. Moving one end of the range past the other pulls the other end along to match (shown in the preview). If it's unclear which segment, ask. Preview first; confirm to apply.",
     kind: 'write',
     schema: {
       project: z.string(),
@@ -1538,12 +1538,17 @@ export const TOOLS: AssistantTool[] = [
       target_max: z.number().int().nullable().optional(),
       collected: z.number().int().nullable().optional(),
       actual: z.number().int().nullable().optional(),
+      audience: z.string().max(500).nullable().optional(),
+      audience_size: z.number().int().nullable().optional(),
+      audience_used: z.number().int().nullable().optional(),
       confirm: z.boolean().optional(),
     },
     handler: async (rawArgs, ctx, meta) => {
       const args = rawArgs as {
         project: string; segment_ref: string; label?: string; target?: number | null; target_max?: number | null
-        collected?: number | null; actual?: number | null; confirm?: boolean
+        collected?: number | null; actual?: number | null
+        audience?: string | null; audience_size?: number | null; audience_used?: number | null
+        confirm?: boolean
       }
       const { userEmail } = ctx
       const p = await resolveProjectWritable(args.project)
@@ -1561,8 +1566,18 @@ export const TOOLS: AssistantTool[] = [
       if (args.target_max !== undefined) patch.n_target_max = args.target_max
       if (args.collected !== undefined) patch.n_collected = args.collected
       if (args.actual !== undefined) patch.n_actual = args.actual
+      // NEW in 094. `audience` and `audience_size` were never writable here — the
+      // segment RPC did not accept them — so a segmented project's audience could
+      // only ever be set in the browser. 094 taught mcp_update_segment all three.
+      if (args.audience !== undefined) patch.audience = args.audience
+      if (args.audience_size !== undefined) patch.audience_size = args.audience_size
+      if (args.audience_used !== undefined) patch.audience_used = args.audience_used
       if (Object.keys(patch).length === 0) {
-        return { needs: 'a change', message: 'Specify at least one of: label, target, target_max, collected, actual.' }
+        return {
+          needs: 'a change',
+          message:
+            'Specify at least one of: label, target, target_max, collected, actual, audience, audience_size, audience_used.',
+        }
       }
       // Only a pair the caller sent WHOLE can be transposed; one end on its own
       // is handled by alignNRangePatch below, not refused.
@@ -1578,6 +1593,9 @@ export const TOOLS: AssistantTool[] = [
         'n_target_max' in aligned ? `target max → ${fmtNum(aligned.n_target_max as number | null)}` : null,
         args.collected !== undefined ? `collected → ${fmtNum(args.collected ?? 0)}` : null,
         args.actual !== undefined ? `actual → ${fmtNum(args.actual)}` : null,
+        args.audience !== undefined ? `audience → ${args.audience ? `"${args.audience}"` : '—'}` : null,
+        args.audience_size !== undefined ? `total available audience → ${fmtNum(args.audience_size)}` : null,
+        args.audience_used !== undefined ? `audience used → ${fmtNum(args.audience_used)}` : null,
       ].filter(Boolean).join(', ')
       return confirmable(
         args,
@@ -1585,7 +1603,7 @@ export const TOOLS: AssistantTool[] = [
         async () => {
           const row = await runUpdateSegment(seg.id as string, aligned, `${userEmail} via Claude`)
           meta.detail = { segment_id: row.id, updated: aligned }
-          return { ok: true, segment: { id: row.id, label: row.label, n_target: row.n_target, n_target_max: row.n_target_max, n_collected: row.n_collected, n_actual: row.n_actual } }
+          return { ok: true, segment: { id: row.id, label: row.label, n_target: row.n_target, n_target_max: row.n_target_max, n_collected: row.n_collected, n_actual: row.n_actual, audience: row.audience, audience_size: row.audience_size, audience_used: row.audience_used } }
         }
       )
     },
@@ -2680,6 +2698,7 @@ export const TOOLS: AssistantTool[] = [
       n_target_max: z.number().int().positive().optional(),
       n_internal_target: z.number().int().optional(),
       audience_size: z.number().int().optional(),
+      audience_used: z.number().int().optional(),
       audience: z.string().optional(),
       budget: z.number().optional(),
       launch_date: z.string().optional(),
@@ -2699,7 +2718,8 @@ export const TOOLS: AssistantTool[] = [
         project_name: string; client: string; project_type?: 'PS' | 'B2B' | 'Rerun'
         captain?: string; salesperson?: string; requested_by?: string; due_date?: string
         n_target?: number; n_target_max?: number
-        n_internal_target?: number; audience_size?: number; audience?: string; budget?: number
+        n_internal_target?: number; audience_size?: number; audience_used?: number
+        audience?: string; budget?: number
         launch_date?: string; deliver_date?: string; submitted_date?: string
         row_level_data?: boolean; longitudinal?: boolean
         terminations?: boolean; latest_next_steps?: string
@@ -2809,6 +2829,7 @@ export const TOOLS: AssistantTool[] = [
       if (args.n_target_max != null) extras.n_target_max = args.n_target_max
       if (args.n_internal_target != null) extras.n_internal_target = args.n_internal_target
       if (args.audience_size != null) extras.audience_size = args.audience_size
+      if (args.audience_used != null) extras.audience_used = args.audience_used
       if (args.audience != null) extras.audience = args.audience
       // budget is finance-only to WRITE as well as to read (same rule as
       // update_project). Here it's DROPPED with a note rather than refused,

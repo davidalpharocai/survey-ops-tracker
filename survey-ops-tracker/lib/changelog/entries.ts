@@ -34,6 +34,23 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    date: '2026-08-31',
+    changes: [
+      {
+        kind: 'NEW',
+        text: '"Audience Size" is now two numbers: Total Available Audience Size (the contacts the team handed us) and Audience Size Used (how many we have actually sent to). Underneath them the project shows how many contacts are still available — the number that decides whether to send again or ask the team for more.',
+      },
+      {
+        kind: 'FIXED',
+        text: 'The old "Audience Size" tooltip described the wrong thing — the size of the whole market rather than the list we were given — so the box had been collecting both meanings. A handful of projects hold a number that is smaller than the responses they collected, which is impossible for a contact list; those now show up in the data-health check instead of sitting there unnoticed.',
+      },
+      {
+        kind: 'IMPROVED',
+        text: 'Claude can now set a segment’s audience and audience size. Until now it could give a segment a target but had no way to say who that target was for.',
+      },
+    ],
+  },
+  {
     date: '2026-08-27',
     changes: [
       {

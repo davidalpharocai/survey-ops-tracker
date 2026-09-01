@@ -58,7 +58,8 @@ export const REPORT_FIELDS: ReportField[] = [
   { key: 'n_target', label: 'N Target', get: r => r.n_target },
   { key: 'n_collected', label: 'N Collected', get: r => r.n_collected },
   { key: 'n_actual', label: 'N Actual', get: r => r.n_actual },
-  { key: 'audience_size', label: 'Audience Size', get: r => r.audience_size },
+  { key: 'audience_size', label: 'Total Available Audience Size', get: r => r.audience_size },
+  { key: 'audience_used', label: 'Audience Size Used', get: r => r.audience_used },
   { key: 'budget', label: 'Budget', get: r => r.budget, restricted: true },
   { key: 'actual_spend', label: 'Actual Spend', get: r => r.actual_spend },
   { key: 'longitudinal', label: 'Longitudinal', get: r => r.longitudinal },
@@ -124,7 +125,8 @@ export function resolvePeriod(a: {
 
 const BASE_SELECT =
   'project_code, project_name, client, project_type, phase, status, board_column, salesperson, ' +
-  'submitted_date, launch_date, due_date, deliver_date, n_target, n_collected, n_actual, audience_size, ' +
+  'submitted_date, launch_date, due_date, deliver_date, n_target, n_collected, n_actual, ' +
+  'audience_size, audience_used, ' +
   'budget, actual_spend, longitudinal, survey_tool_id, slack_channel_url, latest_next_steps, ' +
   'captain:team_members(name, initials)'
 

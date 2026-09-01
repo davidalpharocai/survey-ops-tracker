@@ -22,6 +22,7 @@ import { useUpdateProject, type SurveyProject } from '@/lib/hooks/useProjects'
 import { cn } from '@/lib/utils'
 import { commitNumber } from '@/lib/utils/formula'
 import { fmtNum } from '@/lib/utils/number'
+import { audienceState } from '@/lib/utils/audience'
 import {
   formatNRange,
   isInvertedNRange,
@@ -43,13 +44,79 @@ const TIP = {
   nCollected: 'Completes collected so far — also auto-syncs from the sheet.',
   nActual: 'Final usable response count after cleaning N Collected.',
   audienceSize:
-    'Total size of the panel or population being surveyed. Different from N (target responses).',
+    'How many contacts the team has handed us for this project. Our own supply — not an estimate of the market. Different from N (the responses we are collecting).',
+  audienceUsed:
+    'How many of those contacts we have actually drawn on so far. Leave blank if nobody has recorded it. Deliberately NOT the same as blast reach: re-sending to the same list raises reach without using up a single new contact.',
   audience:
     'Who the survey is fielded to — the target respondent profile (free text, e.g. "US adults 18+, likely voters").',
   segmentTotal:
     'The project N Target: the sum of the segment minimums through to the sum of the segment maximums.',
   segmentNote:
     'A note about THIS SEGMENT only — why its N is what it is, quota or audience quirks, who asked for it. The project has its own notes; this one travels with the segment.',
+}
+
+const WARN_TONE = 'text-amber-700 dark:text-amber-400'
+
+/**
+ * What is left of the contact list — the line that is the whole reason the
+ * audience field was split in two.
+ *
+ * "Total available" alone cannot answer the only question anyone asks of it:
+ * send to more of the list, or go ask the team for more contacts. The decision
+ * itself lives in audienceState() (lib/utils/audience.ts) with its tests; this
+ * component only renders it.
+ */
+function AudienceRemaining({ size, used }: { size: number | null; used: number | null }) {
+  const state = audienceState(size, used)
+
+  switch (state.kind) {
+    // Nothing is known, so say nothing — "— left" is noise.
+    case 'unknown':
+      return null
+
+    // Deliberately explicit rather than blank. 42 projects have a total and none
+    // has a used figure, so silence here would read as "nothing spent" on all
+    // of them.
+    case 'unrecorded':
+      return (
+        <p className="text-xs text-muted-foreground/70">
+          Fill in <span className="font-medium">Audience Size Used</span> to see how many contacts
+          are still available.
+        </p>
+      )
+
+    // Impossible for a pool, so one of the two numbers is wrong — four projects
+    // are in this state today, all from the era when this field had one
+    // ambiguous label. Named as a contradiction rather than rendered as a
+    // negative remainder, which would read as a real quantity. The database
+    // does NOT reject it: these cells save one field at a time and the two
+    // numbers arrive weeks apart, so a hard guard would reject the normal order
+    // of work (migration 094 explains at length).
+    case 'over':
+      return (
+        <p className={`text-xs ${WARN_TONE}`}>
+          Used ({fmtNum(state.used)}) is above the total available ({fmtNum(state.total)}) — one of
+          these two numbers is wrong.
+        </p>
+      )
+
+    case 'exhausted':
+      return (
+        <p className={`text-xs ${WARN_TONE}`}>
+          <span className="font-medium">No contacts left</span> — the list is fully used. More
+          responses means more incentive, or more contacts from the team.
+        </p>
+      )
+
+    case 'remaining':
+      return (
+        <p className={`text-xs ${state.nearlyGone ? WARN_TONE : 'text-muted-foreground'}`}>
+          <span className="font-medium">{fmtNum(state.left)}</span> of {fmtNum(state.total)} contacts
+          still available
+          {state.nearlyGone ? ' — nearly exhausted' : ''}
+        </p>
+      )
+  }
 }
 
 /**
@@ -105,6 +172,9 @@ export function NSegmentsEditor({ project }: { project: SurveyProject }) {
       n_actual: undo.n_actual,
       audience: undo.audience,
       audience_size: undo.audience_size,
+      // Restored too, or Undo hands back the list without the spend against it
+      // and "contacts still available" jumps back to the untouched full pool.
+      audience_used: undo.audience_used,
       sort_order: undo.sort_order,
     })
     setUndo(null)
@@ -150,11 +220,20 @@ export function NSegmentsEditor({ project }: { project: SurveyProject }) {
             onSave={v => saveProject({ audience: v || null })}
           />
           <NumberCell
-            label="Audience Size"
+            label="Total Available Audience Size"
             tooltip={TIP.audienceSize}
             value={project.audience_size}
             onSave={v => saveProject({ audience_size: v })}
           />
+          <NumberCell
+            label="Audience Size Used"
+            tooltip={TIP.audienceUsed}
+            value={project.audience_used}
+            onSave={v => saveProject({ audience_used: v })}
+          />
+          <div className="sm:col-span-2">
+            <AudienceRemaining size={project.audience_size} used={project.audience_used} />
+          </div>
         </>
       )}
 
@@ -203,6 +282,7 @@ export function NSegmentsEditor({ project }: { project: SurveyProject }) {
                 n_actual: project.n_actual ?? null,
                 audience: project.audience,
                 audience_size: project.audience_size,
+                audience_used: project.audience_used,
               })
             }
             className="text-sm font-medium text-primary hover:underline"
@@ -543,10 +623,25 @@ function SegmentBlock({
           onSave={v => save({ audience: v || null })}
         />
         <NumberCell
-          label="Audience Size"
+          label="Total Available Audience Size"
+          tooltip={TIP.audienceSize}
           value={segment.audience_size}
           onSave={v => save({ audience_size: v })}
         />
+        <NumberCell
+          label="Audience Size Used"
+          tooltip={TIP.audienceUsed}
+          value={segment.audience_used}
+          onSave={v => save({ audience_used: v })}
+        />
+        {/* Per segment, and never summed to the project. Two segments can draw on
+            the SAME handed-over list, so adding their pools would overstate
+            supply — the same double-count that made PR00309's blast reach three
+            times its actual audience. Migration 094 keeps audience out of
+            sync_segment_totals for this reason. */}
+        <div className="sm:col-span-2">
+          <AudienceRemaining size={segment.audience_size} used={segment.audience_used} />
+        </div>
         {noteSupported && (note || editingNote) && (
           <div className="sm:col-span-2">
             <SegmentNote

@@ -293,7 +293,7 @@ export async function getProjectDetail(id: string, userId: string) {
     supabase.from('project_steps').select('id, text, done, completed_at, created_at').eq('project_id', id).order('created_at', { ascending: false }).limit(50),
     supabase.from('project_activity').select('type, direction, sender, subject, snippet, occurred_at').eq('project_id', id).is('deleted_at', null).order('occurred_at', { ascending: false }).limit(10),
     supabase.from('deliverables').select('file_name, status, source_url, kind, created_at').eq('project_id', id).is('deleted_at', null).order('created_at', { ascending: false }),
-    supabase.from('project_segments').select('label, n_target, n_collected, n_actual, sort_order').eq('project_id', id).order('sort_order', { ascending: true }),
+    supabase.from('project_segments').select('label, n_target, n_target_max, n_collected, n_actual, audience, audience_size, audience_used, sort_order').eq('project_id', id).order('sort_order', { ascending: true }),
     supabase.from('clients').select('compliance_before_fielding, compliance_after_fielding').eq('id', p.client_id as string).maybeSingle(),
     supabase.from('question_submissions').select('phase, status, submitted_at').eq('project_id', id).order('submitted_at', { ascending: false }),
     supabase.from('reminders').select('id, text, due_date, done').eq('project_id', id).eq('user_id', userId).order('due_date', { ascending: true }),

@@ -12,7 +12,8 @@ export const FIELD_LABELS: Record<string, string> = {
   n_target_max: 'N Target max',
   n_collected: 'N Collected',
   n_actual: 'N Actual',
-  audience_size: 'Audience Size',
+  audience_size: 'Total Available Audience Size',
+  audience_used: 'Audience Size Used',
   budget: 'Budget',
   actual_spend: 'Actual Spend',
   submitted_date: 'Submitted',
@@ -44,7 +45,15 @@ const MONEY_FIELDS = new Set(['budget', 'actual_spend'])
  * Shared by the client panel and app/api/parse-project/route.ts so the two can't
  * drift. The gate is soft: it hides and refuses, it does not secure.
  */
-export const RESTRICTED_FIELDS = new Set(['budget'])
+// budget is finance-only. actual_spend is here for a different reason: it is
+// MAINTAINED BY A DATABASE TRIGGER (recompute_project_spend) from blasts,
+// suppliers and cost lines, so a typed value is not merely unauthorised, it is
+// wrong — the next child-row write silently overwrites it. The connector has
+// always refused it (PROJECT_WRITE_FIELDS omits it); the browser's AI intake
+// did not, so "Actual spend is 4200" in Quick Edit used to stick until the
+// trigger next fired. The `=` marker beside that figure now says there is
+// nothing to type there, which has to be true everywhere.
+export const RESTRICTED_FIELDS = new Set(['budget', 'actual_spend'])
 
 export function formatFieldValue(key: string, value: unknown): string {
   if (value == null || value === '') return '—'

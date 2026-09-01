@@ -16,9 +16,13 @@
  * borrow the amber/red vocabulary that means "look at this". It also has to
  * survive being the only signal for a colour-blind reader.
  *
- * Paired with the persistent pencil on editable cells (FieldCell): one mark for
- * each state, both visible without hovering, so the absence of a mark is never
- * the thing you have to notice.
+ * NOTE ON THE OTHER HALF: FieldCell's edit pencil is still hover-reveal
+ * (opacity-0 / group-hover:opacity-100), so at rest a marked cell says
+ * "calculated" and an unmarked one says nothing at all. That is the deliberate
+ * choice — most fields are editable, so marking the exception carries the signal
+ * and a pencil on every row would be noise — but it does mean the absence of a
+ * mark is doing work, which is why the Money section carries a one-line legend
+ * saying so outright. Do not describe the pencil as persistent; it is not.
  */
 export function CalcMark({ from }: { from?: string }) {
   // The formula rides on the glyph's own `title`, NOT a second InfoTooltip.

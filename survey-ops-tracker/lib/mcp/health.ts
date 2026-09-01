@@ -231,6 +231,70 @@ function buildChecks(p: Row, sup: SupRow[], blasts: BlastRow[], costs: CostRow[]
     }
   }
 
+  // 8) The audience pair (migration 094): total available vs used.
+  //
+  //    THE REASON THIS LIVES HERE and not in a CHECK constraint: 094 considered
+  //    a `used <= size` table constraint and rejected it, because these two
+  //    cells save ONE FIELD PER SAVE and the numbers arrive weeks apart — the
+  //    team hands over a list, sends happen later — so a hard guard would make
+  //    the normal order of work an error. 078 already paid that price for the
+  //    n_target range pair. The contradiction still has to surface, so it
+  //    surfaces here.
+  //
+  //    Found in production on 2026-08-31 — SIX rows, all from the era when this
+  //    field had one ambiguous label and half the team read it as "the target":
+  //      PR00054 size 17  vs 99 collected     PR00075 size 14  vs 120 collected
+  //      PR00060 size 1   vs 178 collected    PR00066 size 1   vs 78 collected
+  //      PR00101 size 50  vs 442 collected    PR00171 size 300 vs 400 collected
+  //    PR00101 is the ONLY row whose audience_size equals its own n_target
+  //    exactly (50/50) — the clearest single case of the label being read as
+  //    "the target".
+  //      (Migration 094's copy of this note says "four" and also names PR00182,
+  //       which is 108 vs a target of 110 and so is not an exact match. It was
+  //       written before the numbers were checked against the table and is left
+  //       alone because the migration is already applied; this is the corrected
+  //       count, verified by query.)
+  const aSize = p.audience_size == null ? null : Number(p.audience_size)
+  const aUsed = p.audience_used == null ? null : Number(p.audience_used)
+
+  // Used above total is a PURE internal contradiction — no second respondent
+  // source can explain it away, unlike the n_collected comparison below — so it
+  // is a real issue, not advisory.
+  if (aSize != null && aUsed != null && aUsed > aSize) {
+    checks.push({
+      check: 'audience_used_over_total', ok: false, advisory: false,
+      expected: aSize, actual: aUsed,
+      detail: `audience used ${aUsed.toLocaleString('en-US')} is above the total available ${aSize.toLocaleString('en-US')} — one of the two is wrong, and "contacts still available" reads as a negative number until it is fixed`,
+    })
+  }
+
+  // ADVISORY, and the gate is the point: more responses than contacts is
+  // impossible only if EVERY response came from this audience. A project running
+  // suppliers alongside a blast can legitimately exceed its blast list, and
+  // check 7 sets the precedent for not hard-failing a mixed-source project. So
+  // this reports the arithmetic and names both explanations rather than
+  // picking one.
+  if (aSize != null && aSize > 0 && num(p.n_collected) > aSize) {
+    checks.push({
+      check: 'audience_size_below_collected', ok: false, advisory: true,
+      expected: num(p.n_collected), actual: aSize,
+      detail: `total available audience ${aSize.toLocaleString('en-US')} is below the ${num(p.n_collected).toLocaleString('en-US')} responses collected — either the audience figure is wrong (this field meant two different things before 2026-08-31, and some rows hold the N target instead) or responses came from a source outside it`,
+    })
+  }
+
+  // ADVISORY: sends have happened and nobody recorded how much of the list they
+  // consumed. This is the gap that leaves "send again or buy more contacts"
+  // unanswerable — the pool is known, the spend against it is not. Gated on the
+  // blast having actually gone out, so a project still being set up is not
+  // nagged about a figure that does not exist yet.
+  if (aSize != null && aUsed == null && blasts.some(b => b.blast_at != null)) {
+    checks.push({
+      check: 'audience_used_unrecorded', ok: false, advisory: true,
+      expected: aSize, actual: null,
+      detail: `${aSize.toLocaleString('en-US')} contacts available and blast(s) already sent, but audience used was never recorded — so how much of the list is left is unknown, and blast reach cannot substitute for it (repeat sends over one list inflate reach: PR00309 reads 95,788 against a pool of 31,545)`,
+    })
+  }
+
   return checks
 }
 
@@ -336,7 +400,7 @@ export async function dataHealth(args: { active_only?: boolean; limit?: number }
     // buildChecks reads does not error — `p.salesperson` is simply undefined and the
     // check silently never fires, which is the quietest way for an integrity checker
     // to stop checking something.
-    .select('id, project_code, project_name, status, phase, board_column, n_target, n_collected, n_actual, actual_spend, survey_id_discrepancy, launch_date, deliver_date, salesperson')
+    .select('id, project_code, project_name, status, phase, board_column, n_target, n_collected, n_actual, actual_spend, survey_id_discrepancy, launch_date, deliver_date, salesperson, audience_size, audience_used')
     .is('deleted_at', null)
     .or('project_type.is.null,project_type.neq.Internal')
   if (error) throw error

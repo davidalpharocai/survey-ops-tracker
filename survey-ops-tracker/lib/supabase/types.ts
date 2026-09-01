@@ -27,6 +27,7 @@ export type Database = {
           n_actual: number | null
           audience: string | null
           audience_size: number | null
+          audience_used: number | null
           sort_order: number
           created_at: string
         }
@@ -41,6 +42,7 @@ export type Database = {
           n_actual?: number | null
           audience?: string | null
           audience_size?: number | null
+          audience_used?: number | null
           sort_order?: number
           created_at?: string
         }
@@ -55,6 +57,7 @@ export type Database = {
           n_actual?: number | null
           audience?: string | null
           audience_size?: number | null
+          audience_used?: number | null
           sort_order?: number
           created_at?: string
         }
@@ -205,6 +208,7 @@ export type Database = {
           n_collected: number
           n_last_synced: string | null
           audience_size: number | null
+          audience_used: number | null
           audience: string | null
           row_level_data: boolean
           terminations: boolean
@@ -285,6 +289,7 @@ export type Database = {
           n_collected?: number
           n_last_synced?: string | null
           audience_size?: number | null
+          audience_used?: number | null
           audience?: string | null
           row_level_data?: boolean
           occam?: boolean
@@ -365,6 +370,7 @@ export type Database = {
           n_collected?: number
           n_last_synced?: string | null
           audience_size?: number | null
+          audience_used?: number | null
           audience?: string | null
           row_level_data?: boolean
           occam?: boolean
