@@ -4,7 +4,7 @@ import { Caret } from '@/components/shared/Caret'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
-import { FieldCell, DateCell, NumberCell, TextCell } from './fields'
+import { FieldCell, DateCell, NumberCell, RateCell, TextCell } from './fields'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
 import {
   useProjectBlasts,
@@ -13,24 +13,41 @@ import {
   useDeleteBlast,
   type Blast,
 } from '@/lib/hooks/useProjectBlasts'
-import { blastCost, unknownCostBlasts } from '@/lib/utils/blast'
+import {
+  blastCost,
+  unknownCostBlasts,
+  sendCost,
+  blastAllInCost,
+  totalBidDollars,
+  totalSendDollars,
+  unknownSendBlasts,
+} from '@/lib/utils/blast'
 import type { SurveyProject } from '@/lib/hooks/useProjects'
 
 const TIP = {
   header:
-    'Log each B2B blast: its $/bid (the per-completion reward), when it went out, how many people it reached, and how many completed. A blast’s cost ($/bid × completes) counts toward the project’s spend — we only pay for completes, not everyone reached. Leave a figure blank until you actually know it: blank means “not recorded”, which is not the same as 0.',
+    'Log each B2B blast. It costs TWO things and both count toward the project’s spend: the reward ($/bid × completes — paid only for people who finished) and the send ($/send × # people — paid for every message that went out, answered or not). Leave a figure blank until you actually know it: blank means “not recorded”, which is not the same as 0.',
   sent: 'When the blast actually went out — pick the date and time (AM/PM).',
   people:
-    'How many people this blast reached. Informational — it does not drive the cost, but it is the denominator of the completion rate. Blank = not recorded; 0 means it genuinely reached nobody.',
+    'How many messages this blast sent. DRIVES THE SEND COST (# people × $/send) and is the denominator of the completion rate. Counts sends, not unique people: re-sending to the same list adds to this every time, and is charged every time. Blank = not recorded; 0 means it genuinely reached nobody.',
   completes:
     'How many of those people completed the survey. Trickles in for days after the send — fill it in when you know. Blank = NOT RECORDED YET, and the cost then shows as unknown; 0 means the blast really produced nothing. Cost = $/bid × completes.',
-  bid: 'The per-completion reward (dollars paid per completed response). $/bid × completes = this blast’s cost. Blank = not recorded; 0 means an unpaid send.',
-  cost: 'This blast’s spend = $/bid × completes, and it feeds the project’s actual spend. Shows “not recorded” while either figure is still blank — an unknown cost is never displayed as $0.',
+  bid: 'The per-completion reward (dollars paid per completed response). $/bid × completes = this blast’s REWARD cost, one of its two costs. Blank = not recorded; 0 means an unpaid send.',
+  costPerSend:
+    'What it costs to send ONE message on this blast — currently $0.02 across the board. Charged per send, not per person: three reminder passes over the same list are charged three times. This is NOT the cost of buying the contacts (that goes in Other costs as a flat fee); it is the cost of sending to them. Stored per blast, so changing the standard rate later re-prices new blasts and leaves this one alone.',
+  cost: 'Everything this blast cost = the reward ($/bid × completes) plus the send ($/send × # people). Both feed the project’s actual spend. Shows “not recorded” while any figure it needs is still blank — an unknown cost is never displayed as $0.',
   note: 'Optional note on who this blast targeted — e.g. “3PL companies + retailers”. Doesn’t affect the cost.',
 }
 
 function money(v: number): string {
   return '$' + v.toLocaleString('en-US', { maximumFractionDigits: 0 })
+}
+
+/** Money to the cent. The send cost needs it: at $0.02 a message the figure is
+ *  almost never a whole number, and rounding 95,788 × $0.02 to "$1,916" makes a
+ *  reader reconciling against an invoice think the app is wrong. */
+function money2(v: number): string {
+  return '$' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
 /**
@@ -70,6 +87,12 @@ export function BlastBlocks({ project }: { project: SurveyProject }) {
   const list = blasts ?? []
   const count = list.length
   const unknown = unknownCostBlasts(list)
+  // Tracked separately from `unknown`: a blast can have a known send cost and an
+  // unknown reward, and vice versa. Collapsing them would either over-warn or
+  // hide a real gap.
+  const unknownSend = unknownSendBlasts(list)
+  const rewardTotal = totalBidDollars(list)
+  const sendTotalAll = totalSendDollars(list)
   // Completes actually written down, treating null as 0 — the sum data-health
   // check 7b uses. Zero here alongside a project that HAS collected N is the
   // legacy "nobody entered them" signal (see the second banner below).
@@ -88,6 +111,12 @@ export function BlastBlocks({ project }: { project: SurveyProject }) {
         bid: undo.bid,
         people: undo.people,
         completes: undo.completes,
+        // Restored explicitly, INCLUDING when it is null. Omitting it lets the
+        // column default fire, which reprices the blast at today's configured
+        // rate — wrong for an SMS blast typed at a different rate, and wrong for
+        // one deliberately left unrecorded (it would also retract the "this
+        // total is a floor" warning).
+        cost_per_send: undo.cost_per_send,
         blast_at: undo.blast_at,
         note: undo.note,
         created_by: undo.created_by ?? userName,
@@ -168,6 +197,35 @@ export function BlastBlocks({ project }: { project: SurveyProject }) {
         </p>
       )}
 
+      {/* The project total, split the way the cost actually splits. David asked
+          for the send cost "on the blast segment and as a whole", and the whole
+          is where it lands hardest: across the portfolio the send side is
+          ~$4,100 that was previously invisible, and on PR00309 it is the ENTIRE
+          cost of the project — $1,916 of sends against no recorded completes.
+          Shown outside the `expanded` guard on purpose: the number that moved
+          the budget should not be hidden behind a disclosure triangle. */}
+      {count > 0 && (
+        <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 rounded-lg border border-border bg-background/60 px-2.5 py-1.5 text-[12px]">
+          <span className="text-muted-foreground">
+            Reward <span className="font-medium text-foreground tabular-nums">{money2(rewardTotal)}</span>
+            {' · '}
+            Send <span className="font-medium text-foreground tabular-nums">{money2(sendTotalAll)}</span>
+          </span>
+          <span className="text-muted-foreground">
+            Blast total{' '}
+            <span className="font-medium text-foreground tabular-nums">{money2(rewardTotal + sendTotalAll)}</span>
+            {/* Both totals mirror the SQL, so an unrecorded figure contributes
+                zero to them. Saying which ones are missing is the difference
+                between a total and a floor. */}
+            {(unknown > 0 || unknownSend > 0) && (
+              <span className="ml-1 text-amber-700 dark:text-amber-400">
+                — a floor; {Math.max(unknown, unknownSend)} of {count} incomplete
+              </span>
+            )}
+          </span>
+        </div>
+      )}
+
       {expanded && (
         <div className="flex flex-col gap-2">
           {list.map((b, i) => (
@@ -197,7 +255,11 @@ function BlastBlock({
   const update = useUpdateBlast(blast.project_id)
   const del = useDeleteBlast(blast.project_id)
   const save = (updates: Partial<Blast>) => update.mutate({ id: blast.id, updates })
-  const cost = blastCost(blast)
+  // The two halves separately as well as together: each can be known while the
+  // other is not, and the breakdown line says so per half.
+  const reward = blastCost(blast)
+  const send = sendCost(blast)
+  const allIn = blastAllInCost(blast)
 
   function remove() {
     onRemove(blast)
@@ -253,15 +315,48 @@ function BlastBlock({
           value={blast.completes}
           onSave={v => save({ completes: v })}
         />
+        {/* Editable, and pre-filled by the database rather than by this form:
+            095 makes the column default the CURRENT configured rate, so a blast
+            is born priced correctly and nobody has to remember to type $0.02.
+            Editable anyway because SMS almost certainly is not $0.02 — this
+            project's own blast list already contains SMS sends. */}
+        {/* RateCell, NOT NumberCell. NumberCell commits through commitNumber,
+            which Math.rounds, so $0.02 would save as 0 -- and because it seeds
+            from the stored value and commits on blur, merely opening this cell
+            and clicking away would zero the rate. 0 is a LEGAL rate after 095
+            (an owned list), so nothing downstream would flag it: the row would
+            read "send $0.00" as a fact and the project would quietly lose the
+            whole send cost. On PR00309 that is $1,915.76 destroyed by a stray
+            click. CostLines and PricingWidget both hit this and both wrote it
+            down; RateCell exists so the fourth caller does not repeat it. */}
+        <RateCell
+          label="$ / send"
+          tooltip={TIP.costPerSend}
+          value={blast.cost_per_send}
+          onSave={v => save({ cost_per_send: v })}
+        />
         {/* blastCost, NOT blastTotal: blastTotal mirrors the SQL and returns 0 for
             an unrecorded blast, and "$0" on screen is read as a result — a send
             that cost us nothing. An unknown cost has to say it is unknown. */}
-        <FieldCell label="Cost" tooltip={TIP.cost} computed="$ / bid × # completes">
-          {cost == null ? (
+        <FieldCell
+          label="Cost"
+          tooltip={TIP.cost}
+          computed="($ / bid × # completes) + ($ / send × # people)"
+        >
+          {allIn == null ? (
             <span className="text-muted-foreground/60">— not recorded</span>
           ) : (
-            <span className="tabular-nums">{money(cost)}</span>
+            <span className="tabular-nums">{money(allIn)}</span>
           )}
+          {/* The breakdown, always, even when the total is unknown — especially
+              then. A blast can have a fully known send cost and no completes at
+              all (PR00309 is $1,916 of sends against zero recorded completes),
+              and collapsing that to a bare "— not recorded" hides real money that
+              IS known. Each half says its own state. */}
+          <span className="mt-0.5 block text-[11px] text-muted-foreground/70">
+            reward {reward == null ? '—' : money2(reward)} · send{' '}
+            {send == null ? '—' : money2(send)}
+          </span>
         </FieldCell>
       </div>
     </div>

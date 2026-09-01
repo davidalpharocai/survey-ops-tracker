@@ -7,7 +7,16 @@ import { complianceGate } from '@/lib/utils/compliance'
 import { occamOnboardingGate } from '@/lib/utils/occam'
 import { autoStamp } from '@/lib/utils/date'
 import { normalizeClientText, firmNameFrom } from '@/lib/utils/clientName'
-import { blastTotal, isBlastCostUnknown, totalBidDollars, unknownCostBlasts } from '@/lib/utils/blast'
+import {
+  blastTotal,
+  isBlastCostUnknown,
+  isSendCostUnknown,
+  sendTotal,
+  totalBidDollars,
+  totalSendDollars,
+  unknownCostBlasts,
+  unknownSendBlasts,
+} from '@/lib/utils/blast'
 import type { Database } from '@/lib/supabase/types'
 import * as data from '@/lib/mcp/data'
 import {
@@ -1684,7 +1693,7 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'log_blast',
     description:
-      "Log (or update) a B2B blast against a project — its $/bid (the per-completion reward), the # of people it went to, the # of those who COMPLETED the survey, when it ran (optional), and an optional description of the audience. Its cost is $/bid × # of completes (we only pay people who completed, not everyone reached), and that counts toward the project's spend. UNRECORDED IS NOT ZERO: OMIT a figure you don't know and it is stored as \"not recorded\" (the app shows an em dash and reports the cost as unknown); pass 0 ONLY when you know the real answer is zero — a blast that genuinely produced nothing, or an unpaid send. Never substitute 0 for a number you haven't been told, because 0 is read as a result and it silently drags the project's spend and response rate down. Completes usually aren't known at send time — omit them, then fill them in later by re-calling with the SAME idem_key (it upserts, like log_launch; omitting a figure on the re-call LEAVES the recorded one alone rather than wiping it), or via update_blast. You can also ingest a blast-platform campaign screenshot: per blast, map Reward→bid, that blast's Sent→people, Rewards Count→completes (so spend matches the platform's Total Issued; NOT the higher \"Completed\" count), its Scheduled date/time→blast_at, and channel/audience/template→description; if the screenshot is the Overview tab and shows no Rewards Count, omit completes rather than sending 0. Resolve the project by campaign name or Survey ID, and set idem_key to \"<SurveyID>#<BlastLabel>\" so re-importing the same screenshot updates that same blast instead of double-logging. Preview first (shows create vs update); confirm to apply.",
+      "Log (or update) a B2B blast against a project — its $/bid (the per-completion reward), the # of people it went to, the # of those who COMPLETED the survey, when it ran (optional), and an optional description of the audience. It costs TWO things, both counting toward the project's spend: the REWARD, $/bid × completes (we only pay people who completed), and the SEND, $/send × people (paid for every message, answered or not). $/send defaults to the configured rate — currently $0.02 — so OMIT cost_per_send unless you have been told this blast was charged differently (e.g. SMS). It is charged PER SEND, not per unique person: re-sending to the same list costs again each time. UNRECORDED IS NOT ZERO: OMIT a figure you don't know and it is stored as \"not recorded\" (the app shows an em dash and reports the cost as unknown); pass 0 ONLY when you know the real answer is zero — a blast that genuinely produced nothing, or an unpaid send. Never substitute 0 for a number you haven't been told, because 0 is read as a result and it silently drags the project's spend and response rate down. Completes usually aren't known at send time — omit them, then fill them in later by re-calling with the SAME idem_key (it upserts, like log_launch; omitting a figure on the re-call LEAVES the recorded one alone rather than wiping it), or via update_blast. You can also ingest a blast-platform campaign screenshot: per blast, map Reward→bid, that blast's Sent→people, Rewards Count→completes (so spend matches the platform's Total Issued; NOT the higher \"Completed\" count), its Scheduled date/time→blast_at, and channel/audience/template→description; if the screenshot is the Overview tab and shows no Rewards Count, omit completes rather than sending 0. Resolve the project by campaign name or Survey ID, and set idem_key to \"<SurveyID>#<BlastLabel>\" so re-importing the same screenshot updates that same blast instead of double-logging. Preview first (shows create vs update); confirm to apply.",
     kind: 'write',
     schema: {
       project: z.string(),
@@ -1695,6 +1704,9 @@ export const TOOLS: AssistantTool[] = [
       bid: z.number().min(0).nullable().optional(),
       people: z.number().int().min(0).nullable().optional(),
       completes: z.number().int().min(0).nullable().optional(),
+      // Omit unless told otherwise: the column default supplies the configured
+      // rate at insert time, which is both correct and self-maintaining.
+      cost_per_send: z.number().min(0).nullable().optional(),
       blast_at: z.string().optional(),
       description: z.string().max(1000).optional(),
       confirm: z.boolean().optional(),
@@ -1703,6 +1715,7 @@ export const TOOLS: AssistantTool[] = [
     handler: async (rawArgs, ctx, meta) => {
       const args = rawArgs as {
         project: string; bid?: number | null; people?: number | null; completes?: number | null
+        cost_per_send?: number | null
         blast_at?: string; description?: string; confirm?: boolean; idem_key?: string
       }
       const { userEmail } = ctx
@@ -1736,24 +1749,44 @@ export const TOOLS: AssistantTool[] = [
       // blastTotal (not blastCost) on purpose: this projects survey_projects
       // .actual_spend, which is the SQL sum, and there an unrecorded figure
       // contributes 0. The SUMMARY is where the human learns it's unknown.
-      const thisBlastTotal = blastTotal({ bid: finalBid, completes: finalCompletes })
-      const priorContribution = existing ? blastTotal({ bid: existing.bid, completes: existing.completes }) : 0
+      const configuredSendRate = await data.configuredSendRate()
+      // 095: a blast contributes BOTH halves to actual_spend, so the projection
+      // has to carry both or the confirm gate quotes a figure the write will not
+      // produce. Before this fix a blast with 31,545 people and no completes
+      // previewed "cost UNKNOWN, spend stays $X" and then wrote $630.90.
+      //
+      // The rate the row will END UP with, which is not necessarily the one
+      // passed: omit it and the column default supplies the configured rate, and
+      // on an idem_key update the RPC keeps whatever is already stored.
+      const finalRate =
+        args.cost_per_send ?? existing?.cost_per_send ?? configuredSendRate
+      const thisBlastTotal =
+        blastTotal({ bid: finalBid, completes: finalCompletes }) +
+        sendTotal({ people: finalPeople, cost_per_send: finalRate })
+      const priorContribution = existing
+        ? blastTotal({ bid: existing.bid, completes: existing.completes }) +
+          sendTotal({ people: existing.people, cost_per_send: existing.cost_per_send })
+        : 0
       const projectedSpend = currentSpend - priorContribution + thisBlastTotal
-      const costUnknown = isBlastCostUnknown({ bid: finalBid, completes: finalCompletes })
+      // Either half unknown leaves the project's spend understating this blast.
+      const rewardUnknown = isBlastCostUnknown({ bid: finalBid, completes: finalCompletes })
+      const sendUnknown = isSendCostUnknown({ people: finalPeople, cost_per_send: finalRate })
+      const costUnknown = rewardUnknown || sendUnknown
       const fig = (v: number | null) => (v == null ? 'not recorded' : String(v))
 
       return confirmable(
         args,
         async () => ({
           summary:
-            `${existing ? 'Update' : 'Log'} blast on ${p.project_code}: ${fig(finalCompletes)} completes / ${fig(finalPeople)} people @ ${finalBid == null ? 'not recorded' : '$' + finalBid}/bid = ` +
+            `${existing ? 'Update' : 'Log'} blast on ${p.project_code}: ${fig(finalCompletes)} completes / ${fig(finalPeople)} people @ ${finalBid == null ? 'not recorded' : '$' + finalBid}/bid + ${finalRate == null ? 'not recorded' : '$' + finalRate}/send = ` +
             (costUnknown
-              ? `cost UNKNOWN (adds $0 to spend until the missing figure is recorded) → spend stays ${money(projectedSpend)}`
+              ? `${rewardUnknown && sendUnknown ? 'cost UNKNOWN' : rewardUnknown ? 'reward UNKNOWN' : 'send cost UNKNOWN'} (the missing half adds $0 to spend until it is recorded) → projected spend ${money(projectedSpend)}`
               : `${money(thisBlastTotal)} → projected spend ${money(projectedSpend)}`) +
             (existing ? ' (updates the existing blast with this idem_key — no duplicate; omitted figures keep their recorded values)' : ''),
           mode: existing ? 'update' : 'create',
           people: finalPeople, completes: finalCompletes, bid: finalBid,
-          cost_unknown: costUnknown,
+          cost_per_send: finalRate,
+          cost_unknown: costUnknown, reward_unknown: rewardUnknown, send_unknown: sendUnknown,
           blast_at: args.blast_at ?? null,
           projected_actual_spend: projectedSpend,
         }),
@@ -1763,19 +1796,32 @@ export const TOOLS: AssistantTool[] = [
             blastAt: args.blast_at ?? null, note: args.description ?? null,
             createdBy: userEmail.split('@')[0], idemKey: args.idem_key ?? randomUUID(),
             actor: `${userEmail} via Claude`,
+            // Was declared in the schema and documented for SMS, then dropped on
+            // the floor here: the RPC fell through to the default and the tool
+            // still answered ok. Null keeps that fallback deliberate.
+            costPerSend: args.cost_per_send ?? null,
           })
           const after = await listBlastsForProject(p.id as string)
           // blast_spend_total mirrors the SQL, so an unrecorded blast adds $0 to it.
           // Ship the count of those alongside it — the number is a FLOOR whenever it
           // is non-zero, and a total presented without that caveat is how $0 spend got
           // read as a fact on 8 of 12 blast projects.
-          const blast_spend_total = totalBidDollars(after as never)
+          // Split, because after 095 a blast costs a reward AND a send, and
+          // reporting only the reward as "blast_spend_total" would understate
+          // every project -- on PR00309 by its entire cost. Both mirror the SQL,
+          // so both are floors while anything is unrecorded; the two unknown
+          // counts are separate because the halves fail independently.
+          const blast_reward_total = totalBidDollars(after as never)
+          const blast_send_total = totalSendDollars(after as never)
+          const blast_spend_total = blast_reward_total + blast_send_total
           const blasts_with_unknown_cost = unknownCostBlasts(after)
+          const blasts_with_unknown_send = unknownSendBlasts(after)
           meta.detail = { [existing ? 'updated' : 'created']: { id: row.id, people: row.people, completes: row.completes, bid: row.bid } }
           return {
             ok: true, mode: existing ? 'updated' : 'created',
             blast: { id: row.id, people: row.people, completes: row.completes, bid: row.bid, blast_at: row.blast_at },
-            blast_spend_total, blasts_with_unknown_cost,
+            blast_spend_total, blast_reward_total, blast_send_total,
+            blasts_with_unknown_cost, blasts_with_unknown_send,
           }
         }
       )
@@ -1993,7 +2039,7 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'update_blast',
     description:
-      "Update a B2B blast on a project — any of its $/bid, # of people, # of completes, when it ran (blast_at), or description. Identify it by `blast_ref` = its idem_key (e.g. \"<SurveyID>#<BlastLabel>\") or its id. Only the fields you pass change (idempotent). Cost = $/bid × completes recomputes into the project's spend. This is the tool for filling in completes once they come in on a blast that was logged before they were known. THREE DISTINCT ACTIONS, don't confuse them: OMIT a field to leave it exactly as it is; pass a number to record it; pass null to UN-RECORD it (back to \"not recorded\", for a figure entered by mistake). Passing 0 asserts the real answer is zero — a blast that genuinely produced nothing — and it is NOT the way to say \"unknown\": 0 counts as a result, drags the response rate down, and makes the cost look settled at $0. Preview first; confirm to apply.",
+      "Update a B2B blast on a project — any of its $/bid, # of people, # of completes, $/send, when it ran (blast_at), or description. Identify it by `blast_ref` = its idem_key (e.g. \"<SurveyID>#<BlastLabel>\") or its id. Only the fields you pass change (idempotent). Cost = ($/bid × completes) + ($/send × people), and it recomputes into the project's spend — so changing the # of people now changes the money, not just the response rate. This is the tool for filling in completes once they come in on a blast that was logged before they were known. THREE DISTINCT ACTIONS, don't confuse them: OMIT a field to leave it exactly as it is; pass a number to record it; pass null to UN-RECORD it (back to \"not recorded\", for a figure entered by mistake). Passing 0 asserts the real answer is zero — a blast that genuinely produced nothing — and it is NOT the way to say \"unknown\": 0 counts as a result, drags the response rate down, and makes the cost look settled at $0. Preview first; confirm to apply.",
     kind: 'write',
     schema: {
       project: z.string(),
@@ -2003,6 +2049,7 @@ export const TOOLS: AssistantTool[] = [
       bid: z.number().min(0).nullable().optional(),
       people: z.number().int().min(0).nullable().optional(),
       completes: z.number().int().min(0).nullable().optional(),
+      cost_per_send: z.number().min(0).nullable().optional(),
       blast_at: z.string().nullable().optional(),
       description: z.string().max(1000).nullable().optional(),
       confirm: z.boolean().optional(),
@@ -2010,7 +2057,7 @@ export const TOOLS: AssistantTool[] = [
     handler: async (rawArgs, ctx, meta) => {
       const args = rawArgs as {
         project: string; blast_ref: string; bid?: number | null; people?: number | null
-        completes?: number | null
+        completes?: number | null; cost_per_send?: number | null
         blast_at?: string | null; description?: string | null; confirm?: boolean
       }
       const { userEmail } = ctx
@@ -2027,10 +2074,14 @@ export const TOOLS: AssistantTool[] = [
       if (args.bid !== undefined) patch.bid = args.bid
       if (args.people !== undefined) patch.people = args.people
       if (args.completes !== undefined) patch.completes = args.completes
+      if (args.cost_per_send !== undefined) patch.cost_per_send = args.cost_per_send
       if (args.blast_at !== undefined) patch.blast_at = args.blast_at
       if (args.description !== undefined) patch.note = args.description
       if (Object.keys(patch).length === 0) {
-        return { needs: 'a change', message: 'Specify at least one of: bid, people, completes, blast_at, description.' }
+        return {
+          needs: 'a change',
+          message: 'Specify at least one of: bid, people, completes, cost_per_send, blast_at, description.',
+        }
       }
       // "not recorded", spelled out — a preview that rendered a null as an empty
       // string would read as "bid → $" and give nobody a chance to catch it.
@@ -2038,6 +2089,7 @@ export const TOOLS: AssistantTool[] = [
         args.bid !== undefined ? `bid → ${args.bid == null ? 'not recorded' : '$' + args.bid}` : null,
         args.people !== undefined ? `people → ${args.people ?? 'not recorded'}` : null,
         args.completes !== undefined ? `completes → ${args.completes ?? 'not recorded'}` : null,
+        args.cost_per_send !== undefined ? `$/send → ${args.cost_per_send == null ? 'not recorded' : '$' + args.cost_per_send}` : null,
         args.blast_at !== undefined ? `blast_at → ${args.blast_at ?? '—'}` : null,
         args.description !== undefined ? `description → "${args.description ?? ''}"` : null,
       ].filter(Boolean).join(', ')
@@ -2047,13 +2099,23 @@ export const TOOLS: AssistantTool[] = [
       // silently excludes this blast.
       const afterBid = args.bid !== undefined ? args.bid : blast.bid
       const afterCompletes = args.completes !== undefined ? args.completes : blast.completes
-      const costUnknown = isBlastCostUnknown({ bid: afterBid, completes: afterCompletes })
+      const afterPeople = args.people !== undefined ? args.people : blast.people
+      const afterRate = args.cost_per_send !== undefined ? args.cost_per_send : blast.cost_per_send
+      const rewardUnknown = isBlastCostUnknown({ bid: afterBid, completes: afterCompletes })
+      const sendUnknown = isSendCostUnknown({ people: afterPeople, cost_per_send: afterRate })
+      // Either half missing leaves the project's spend understating this blast, so
+      // both have to reach the warning. Reporting only the reward would call a
+      // blast settled while its send cost is still unrecorded — and on PR00309 the
+      // send cost IS the entire cost of the project.
+      const costUnknown = rewardUnknown || sendUnknown
 
       return confirmable(
         args,
         async () => ({
           summary: `Update blast ${blast.idem_key ? `"${blast.idem_key}"` : blast.id} on ${p.project_code}: ${desc}` +
-            (costUnknown ? " — this blast's cost stays UNKNOWN afterwards, so it contributes $0 to the project's spend" : ''),
+            (costUnknown
+              ? ` — this blast's ${rewardUnknown && sendUnknown ? 'reward AND send cost stay' : rewardUnknown ? 'reward cost stays' : 'send cost stays'} UNKNOWN afterwards, so that much is missing from the project's spend`
+              : ''),
           cost_unknown: costUnknown,
         }),
         async () => {
@@ -2063,13 +2125,22 @@ export const TOOLS: AssistantTool[] = [
           // Ship the count of those alongside it — the number is a FLOOR whenever it
           // is non-zero, and a total presented without that caveat is how $0 spend got
           // read as a fact on 8 of 12 blast projects.
-          const blast_spend_total = totalBidDollars(after as never)
+          // Split, because after 095 a blast costs a reward AND a send, and
+          // reporting only the reward as "blast_spend_total" would understate
+          // every project -- on PR00309 by its entire cost. Both mirror the SQL,
+          // so both are floors while anything is unrecorded; the two unknown
+          // counts are separate because the halves fail independently.
+          const blast_reward_total = totalBidDollars(after as never)
+          const blast_send_total = totalSendDollars(after as never)
+          const blast_spend_total = blast_reward_total + blast_send_total
           const blasts_with_unknown_cost = unknownCostBlasts(after)
+          const blasts_with_unknown_send = unknownSendBlasts(after)
           meta.detail = { updated_blast: { id: row.id, people: row.people, completes: row.completes, bid: row.bid } }
           return {
             ok: true,
             blast: { id: row.id, people: row.people, completes: row.completes, bid: row.bid, blast_at: row.blast_at },
-            blast_spend_total, blasts_with_unknown_cost,
+            blast_spend_total, blast_reward_total, blast_send_total,
+            blasts_with_unknown_cost, blasts_with_unknown_send,
           }
         }
       )
@@ -2104,10 +2175,22 @@ export const TOOLS: AssistantTool[] = [
           // Ship the count of those alongside it — the number is a FLOOR whenever it
           // is non-zero, and a total presented without that caveat is how $0 spend got
           // read as a fact on 8 of 12 blast projects.
-          const blast_spend_total = totalBidDollars(after as never)
+          // Split, because after 095 a blast costs a reward AND a send, and
+          // reporting only the reward as "blast_spend_total" would understate
+          // every project -- on PR00309 by its entire cost. Both mirror the SQL,
+          // so both are floors while anything is unrecorded; the two unknown
+          // counts are separate because the halves fail independently.
+          const blast_reward_total = totalBidDollars(after as never)
+          const blast_send_total = totalSendDollars(after as never)
+          const blast_spend_total = blast_reward_total + blast_send_total
           const blasts_with_unknown_cost = unknownCostBlasts(after)
+          const blasts_with_unknown_send = unknownSendBlasts(after)
           meta.detail = { removed_blast: { id: blast.id, idem_key: blast.idem_key ?? null }, by: userEmail }
-          return { ok: true, removed: blast.idem_key ?? blast.id, blast_spend_total, blasts_with_unknown_cost }
+          return {
+            ok: true, removed: blast.idem_key ?? blast.id,
+            blast_spend_total, blast_reward_total, blast_send_total,
+            blasts_with_unknown_cost, blasts_with_unknown_send,
+          }
         }
       )
     },

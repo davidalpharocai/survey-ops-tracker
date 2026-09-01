@@ -21,9 +21,9 @@ import {
 
 const TIP = {
   header:
-    'Flat vendor fees on this project — the platform charge for pushing an SMS/email send out the door, and any bought contacts export (ZoomInfo, Apollo, …). Each is a dollar amount typed exactly as invoiced, not quantity × rate, and each counts toward the project’s actual spend. These are NOT respondent rewards: a reward is $/bid × completes on a blast, so logging one here as well would double-count it.',
+    'FLAT vendor fees on this project — a fixed platform charge, or a bought contacts export (ZoomInfo, Apollo, …). Each is a dollar amount typed exactly as invoiced, and each counts toward the project’s actual spend. Two things must NOT go here, because the app already counts them and entering them again double-charges the project: respondent rewards ($/bid × completes on the blast) and the per-message send charge ($/send × # people on the blast).',
   kind:
-    'SMS/Email Blast = the VENDOR SEND FEE, what the sending platform bills us for the send itself — owed whether or not a single person responds. It is not the respondents’ rewards (those are $/bid × completes on the blast). Contacts Export = a purchased contact list.',
+    'SMS/Email Blast = a FIXED platform fee that does not scale with how many messages went out — a subscription slice, a setup charge. Do NOT use it for the per-message send cost: that is $/send × # people on the blast itself and is already in the project’s spend, so entering it here charges it twice (this happened on PR00362, to the tune of $1,876.70). Contacts Export = a purchased contact list, i.e. what it cost to ACQUIRE the contacts, as opposed to sending to them.',
   amount:
     'The flat fee in dollars, exactly as invoiced — cents included. There is no quantity × rate here: what you type is the number. Feeds the project’s actual spend.',
   date: 'When the fee was incurred — the invoice or send date. Informational; it does not affect the total.',

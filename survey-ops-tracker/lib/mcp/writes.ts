@@ -441,6 +441,10 @@ export async function runLogBlast(opts: {
   projectId: string; bid: number | null; people: number | null; completes: number | null
   blastAt: string | null
   note: string | null; createdBy: string; idemKey: string; actor: string
+  /** Dollars per SEND (095). Omit/null and the RPC falls through to the column
+   *  default, i.e. the currently configured rate — so a caller that knows nothing
+   *  about this parameter still produces a correctly priced blast. */
+  costPerSend?: number | null
 }): Promise<ProjectBlastRow> {
   const supabase = createAdminClient()
   const { data, error } = await supabase.rpc('mcp_log_blast', {
@@ -453,6 +457,7 @@ export async function runLogBlast(opts: {
     p_created_by: opts.createdBy,
     p_idem: opts.idemKey,
     p_actor: opts.actor,
+    p_cost_per_send: opts.costPerSend ?? null,
   })
   if (error) rethrowBlastWriteError(error)
   return data as ProjectBlastRow

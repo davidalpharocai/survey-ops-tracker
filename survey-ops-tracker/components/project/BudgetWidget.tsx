@@ -134,8 +134,8 @@ export function BudgetWidget({ projectId, budget, nCollected, actualSpend }: Bud
           <div className="flex justify-between items-center">
             <span className="text-xs text-muted-foreground flex items-center">
               Actual $
-              <InfoTooltip text="Actual spend to date — blasts ($/bid × completes), PS suppliers (CPI × N collected), and the flat vendor fees in Other costs. Computed, not typed." />
-              <CalcMark from="Σ blasts ($/bid × completes) + Σ suppliers (CPI × N collected) + Σ other costs" />
+              <InfoTooltip text="Actual spend to date — blasts (both halves: $/bid × completes for the rewards AND $/send × # people for the sends), PS suppliers (CPI × N collected), and the flat vendor fees in Other costs. Computed, not typed." />
+              <CalcMark from="Σ blasts ($/bid × completes + $/send × # people) + Σ suppliers (CPI × N collected) + Σ other costs" />
             </span>
             <span className="text-sm font-medium text-foreground">{money(actual)}</span>
           </div>

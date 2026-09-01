@@ -34,6 +34,23 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    date: '2026-09-01',
+    changes: [
+      {
+        kind: 'NEW',
+        text: 'A blast now records what it cost to SEND, not just what we paid respondents. Every blast has a $/send rate (currently 2 cents, editable per blast) and the cost of the sends is added to the project’s spend alongside the rewards. Each blast shows the two halves separately, and the blast list shows the totals.',
+      },
+      {
+        kind: 'FIXED',
+        text: 'Blast spend was understating what we actually spend by about $4,500 across all projects, because the cost of sending was never recorded anywhere. Some projects will now show a much higher spend than yesterday — that is the real number arriving, not a new charge. The clearest case is a study that read $0 spent and had in fact used 85% of its budget, entirely on sends.',
+      },
+      {
+        kind: 'IMPROVED',
+        text: 'Money figures the app works out for you now carry a small “=” next to them, and hovering it shows the formula. Anything without one is a field you type in.',
+      },
+    ],
+  },
+  {
     date: '2026-08-31',
     changes: [
       {

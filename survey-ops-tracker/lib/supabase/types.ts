@@ -64,9 +64,9 @@ export type Database = {
         Relationships: []
       }
       app_config: {
-        Row: { id: number; ai_monthly_cap_usd: number; ai_hard_stop: boolean; updated_at: string }
-        Insert: { id?: number; ai_monthly_cap_usd?: number; ai_hard_stop?: boolean; updated_at?: string }
-        Update: { id?: number; ai_monthly_cap_usd?: number; ai_hard_stop?: boolean; updated_at?: string }
+        Row: { id: number; ai_monthly_cap_usd: number; ai_hard_stop: boolean; updated_at: string; blast_cost_per_send: number }
+        Insert: { id?: number; ai_monthly_cap_usd?: number; ai_hard_stop?: boolean; updated_at?: string; blast_cost_per_send?: number }
+        Update: { id?: number; ai_monthly_cap_usd?: number; ai_hard_stop?: boolean; updated_at?: string; blast_cost_per_send?: number }
         Relationships: []
       }
       ai_usage: {
@@ -1047,6 +1047,7 @@ export type Database = {
           blast_cost: number
           people: number | null
           completes: number | null
+          cost_per_send: number | null
           blast_at: string | null
           reward: number
           scheduled_at: string | null
@@ -1064,6 +1065,7 @@ export type Database = {
           blast_cost?: number
           people?: number | null
           completes?: number | null
+          cost_per_send?: number | null
           blast_at?: string | null
           reward?: number
           scheduled_at?: string | null
@@ -1081,6 +1083,7 @@ export type Database = {
           blast_cost?: number
           people?: number | null
           completes?: number | null
+          cost_per_send?: number | null
           blast_at?: string | null
           reward?: number
           scheduled_at?: string | null

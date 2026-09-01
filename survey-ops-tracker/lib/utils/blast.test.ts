@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   blastTotal, blastCost, isBlastCostUnknown, unknownCostBlasts,
   totalBidDollars, totalPeople, totalCompletes, blendedBid, costPerN,
+  sendCost, sendTotal, isSendCostUnknown, totalSendDollars, unknownSendBlasts, blastAllInCost,
 } from './blast'
 import type { Blast } from './blast'
 
@@ -105,5 +106,76 @@ describe('costPerN', () => {
   })
   it('is null when nothing collected', () => {
     expect(costPerN(216, 0)).toBeNull()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// THE SEND COST (migration 095)
+// ---------------------------------------------------------------------------
+
+describe('send cost', () => {
+  const s = (people: number | null, rate: number | null) => ({ people, cost_per_send: rate })
+
+  it('is people × rate', () => {
+    expect(sendCost(s(10_000, 0.02))).toBeCloseTo(200)
+    expect(sendTotal(s(10_000, 0.02))).toBeCloseTo(200)
+  })
+
+  // The real shape that motivated the whole feature: PR00309 sent to the same
+  // 31,545-person list three times. It is charged PER SEND, so 95,788 × $0.02,
+  // not 31,545 × $0.02. Per unique contact it would be $630.90.
+  it('charges per send, so repeat passes over one list cost every time', () => {
+    expect(sendCost(s(95_788, 0.02))).toBeCloseTo(1915.76)
+    expect(sendCost(s(31_545, 0.02))).toBeCloseTo(630.9)
+  })
+
+  // Same discipline as 091: an unrecorded figure is unknown, never zero. Two of
+  // 35 live blasts have no sent count, and "$0" would read as a free send.
+  it('is unknown, not zero, when either figure is missing', () => {
+    expect(sendCost(s(null, 0.02))).toBeNull()
+    expect(sendCost(s(10_000, null))).toBeNull()
+    expect(isSendCostUnknown(s(null, 0.02))).toBe(true)
+    expect(isSendCostUnknown(s(10_000, null))).toBe(true)
+    expect(isSendCostUnknown(s(0, 0))).toBe(false)
+  })
+
+  // A rate of 0 is a real answer (an owned list), distinct from "not recorded".
+  it('treats a zero rate as recorded', () => {
+    expect(sendCost(s(10_000, 0))).toBe(0)
+    expect(isSendCostUnknown(s(10_000, 0))).toBe(false)
+  })
+
+  // sendTotal mirrors the SQL's coalesce-to-0 so it can reconcile against
+  // actual_spend; sendCost must NOT, so a human never sees a fabricated $0.
+  it('sendTotal mirrors the SQL where sendCost refuses to', () => {
+    expect(sendTotal(s(null, 0.02))).toBe(0)
+    expect(sendCost(s(null, 0.02))).toBeNull()
+  })
+
+  it('totals across blasts, counting unrecorded as zero, and says how many', () => {
+    const rows = [s(10_000, 0.02), s(5_000, 0.02), s(null, 0.02)]
+    expect(totalSendDollars(rows)).toBeCloseTo(300)
+    expect(unknownSendBlasts(rows)).toBe(1)
+  })
+})
+
+describe('blastAllInCost', () => {
+  it('adds the reward and the send', () => {
+    expect(blastAllInCost({ bid: 25, completes: 10, people: 10_000, cost_per_send: 0.02 }))
+      .toBeCloseTo(450) // 250 reward + 200 send
+  })
+
+  // PR00309's exact state: every send recorded, no completes ever entered. The
+  // all-in is unknown, but the send half is emphatically NOT — which is why the
+  // UI renders the two halves separately rather than one "not recorded".
+  it('is null when either half is unknown, while the known half survives', () => {
+    const b = { bid: null, completes: null, people: 95_788, cost_per_send: 0.02 }
+    expect(blastAllInCost(b)).toBeNull()
+    expect(sendCost(b)).toBeCloseTo(1915.76)
+    expect(blastCost(b)).toBeNull()
+  })
+
+  it('is null when the send half is unknown but the reward is known', () => {
+    expect(blastAllInCost({ bid: 25, completes: 10, people: null, cost_per_send: 0.02 })).toBeNull()
   })
 })

@@ -6,6 +6,9 @@ export type { FieldCellProps } from './FieldCell'
 
 export { CalcMark } from './CalcMark'
 
+export { RateCell } from './RateCell'
+export type { RateCellProps } from './RateCell'
+
 export { TextCell } from './TextCell'
 export type { TextCellProps } from './TextCell'
 

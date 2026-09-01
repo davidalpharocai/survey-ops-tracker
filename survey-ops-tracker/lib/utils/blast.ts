@@ -2,8 +2,14 @@ import type { Tables } from '@/lib/supabase/types'
 
 export type Blast = Tables<'project_blasts'>
 
-/** The three hand-entered figures on a blast, any of which may be unrecorded. */
+/** The hand-entered figures on a blast, any of which may be unrecorded. */
 type BlastFigures = { bid?: number | null; completes?: number | null }
+
+/** A blast's SEND side: how many messages went out, and the rate charged for
+ *  each. Separate from BlastFigures because the two costs answer different
+ *  questions and are unknown independently — a blast can have a known send cost
+ *  and an unknown reward, which is the state 5 of 12 blast projects are in. */
+type SendFigures = { people?: number | null; cost_per_send?: number | null }
 
 /**
  * NULL vs 0 on a blast (migration 091). `bid`, `people` and `completes` are
@@ -74,6 +80,75 @@ export function totalBidDollars(blasts: Blast[]): number {
  *  `totalBidDollars` is missing rather than zero. 0 means the total is complete. */
 export function unknownCostBlasts(blasts: BlastFigures[]): number {
   return blasts.reduce((n, b) => n + (isBlastCostUnknown(b) ? 1 : 0), 0)
+}
+
+// ---------------------------------------------------------------------------
+// THE SEND COST (migration 095)
+//
+// A blast costs two things and they are independent:
+//   · the REWARD  — $/bid × completes, what the respondent is paid for finishing
+//   · the SEND    — people × cost_per_send, what it costs to put the message in
+//                   front of them, paid whether or not anyone answers
+//
+// PER SEND, NOT PER UNIQUE CONTACT. Three reminder passes over one 31,545-person
+// list is 94,635 sends and is charged three times. PR00309 is exactly that shape:
+// 95,788 sends over 31,545 people, $1,915.76 per send versus $630.90 if it were
+// per person. David settled it as per send, and the field is named cost_per_send
+// rather than cost_per_contact so the reading cannot drift — "contact" means a
+// person, and a name that reads two ways is how audience_size spent a year
+// meaning two different things (094).
+//
+// This is also NOT the cost of acquiring the list. Buying 10,000 contacts is a
+// flat project_costs line (092's quantity gives it a per-contact rate); sending
+// to them is this. They stack.
+// ---------------------------------------------------------------------------
+
+/** True when a blast's SEND cost is unknown rather than zero — the sent count or
+ *  the rate has never been recorded. Distinct from the reward being unknown:
+ *  PR00309 has a fully known send cost and no recorded completes at all. */
+export function isSendCostUnknown(b: SendFigures): boolean {
+  return b.people == null || b.cost_per_send == null
+}
+
+/** Send cost of one blast FOR DISPLAY — people × rate, or null when either is
+ *  unrecorded. Render null as "not recorded", never as $0: 2 of 35 live blasts
+ *  have no sent count, and $0 would read as a send that was free. */
+export function sendCost(b: SendFigures): number | null {
+  return isSendCostUnknown(b) ? null : (b.people as number) * (b.cost_per_send as number)
+}
+
+/** Send cost AS THE DATABASE COMPUTES IT — unrecorded counted as 0, mirroring
+ *  095's `coalesce(people,0) * coalesce(cost_per_send,0)`. Use for reconciling
+ *  against survey_projects.actual_spend; never for display. */
+export function sendTotal(b: SendFigures): number {
+  return (b.people ?? 0) * (b.cost_per_send ?? 0)
+}
+
+/** Total send spend for a project, mirroring the SQL. A floor when any blast has
+ *  an unrecorded sent count — pair with `unknownSendBlasts`. */
+export function totalSendDollars(blasts: SendFigures[]): number {
+  return blasts.reduce((s, b) => s + sendTotal(b), 0)
+}
+
+/** How many blasts have an unknown SEND cost, i.e. how much of
+ *  `totalSendDollars` is missing rather than zero. */
+export function unknownSendBlasts(blasts: SendFigures[]): number {
+  return blasts.reduce((n, b) => n + (isSendCostUnknown(b) ? 1 : 0), 0)
+}
+
+/** Everything one blast costs, for display: reward + send, or null when EITHER
+ *  half is unknown.
+ *
+ *  Null-if-either is deliberate and is the conservative choice. Returning the
+ *  known half alone would render a confident total that is missing a real cost —
+ *  the same failure the margin row had to be taught to avoid, where one recorded
+ *  blast beside one unrecorded one produced an overstated margin stated without
+ *  qualification. Callers wanting the halves separately have `blastCost` and
+ *  `sendCost`. */
+export function blastAllInCost(b: BlastFigures & SendFigures): number | null {
+  const reward = blastCost(b)
+  const send = sendCost(b)
+  return reward == null || send == null ? null : reward + send
 }
 
 /** Total # of people reached across all blasts (unrecorded reach adds nothing). */

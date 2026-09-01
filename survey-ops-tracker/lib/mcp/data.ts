@@ -1,6 +1,6 @@
 import 'server-only'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { totalBidDollars, unknownCostBlasts } from '@/lib/utils/blast'
+import { totalBidDollars, totalSendDollars, unknownCostBlasts } from '@/lib/utils/blast'
 import { beforeFieldingRequired, afterFieldingRequired, beforeFieldingMet, afterFieldingMet } from '@/lib/utils/compliance'
 import { VIEW_FINANCIALS } from '@/lib/auth/capabilityNames'
 import { isRestrictedAuditField } from '@/lib/utils/auditFormat'
@@ -289,7 +289,7 @@ export async function getProjectDetail(id: string, userId: string) {
     clientRes, submissionsRes, remindersRes,
   ] = await Promise.all([
     supabase.from('project_bids').select('amount, blasts, note, created_at').eq('project_id', id).order('created_at', { ascending: false }),
-    supabase.from('project_blasts').select('bid, people, completes, blast_at, note, created_at').eq('project_id', id).order('created_at', { ascending: false }),
+    supabase.from('project_blasts').select('bid, people, completes, cost_per_send, blast_at, note, created_at').eq('project_id', id).order('created_at', { ascending: false }),
     supabase.from('project_steps').select('id, text, done, completed_at, created_at').eq('project_id', id).order('created_at', { ascending: false }).limit(50),
     supabase.from('project_activity').select('type, direction, sender, subject, snippet, occurred_at').eq('project_id', id).is('deleted_at', null).order('occurred_at', { ascending: false }).limit(10),
     supabase.from('deliverables').select('file_name, status, source_url, kind, created_at').eq('project_id', id).is('deleted_at', null).order('created_at', { ascending: false }),
@@ -321,7 +321,12 @@ export async function getProjectDetail(id: string, userId: string) {
     linked_documents: parseLinkedDocuments(p.linked_documents),
     bids: bidsRes.data ?? [],
     blasts,
-    blast_spend_total: totalBidDollars(blasts as never),
+    // Reward + send (095). Reported split as well as combined so a reader
+    // can see which half is driving the number -- on a project with no
+    // recorded completes the send cost is the whole of it.
+    blast_spend_total: totalBidDollars(blasts as never) + totalSendDollars(blasts as never),
+    blast_reward_total: totalBidDollars(blasts as never),
+    blast_send_total: totalSendDollars(blasts as never),
     // blast_spend_total mirrors the SQL, so a blast whose $/bid or # completes is
     // still unrecorded (migration 091) contributes $0 to it. When this count is
     // non-zero the total is a FLOOR, not the cost — the reader has to be told, or
@@ -1290,4 +1295,26 @@ export async function getTeamInitials(): Promise<string[]> {
   const { data, error } = await supabase.from('team_members').select('initials')
   if (error) throw error
   return (data ?? []).map(t => t.initials)
+}
+
+/**
+ * The currently configured $/send for a blast (migration 095).
+ *
+ * Used only to make log_blast's PREVIEW accurate: a new blast that does not
+ * specify a rate will be given this one by the column default, so a preview that
+ * assumed "no rate" would tell the user the send cost is unknown and then write a
+ * real charge. Reading it rather than hardcoding 0.02 keeps the preview honest
+ * after the rate changes.
+ *
+ * Falls back to 0.02 rather than throwing. Two cases: app_config.blast_cost_per_send
+ * does not exist yet (095 unapplied — PostgREST 400s the whole request), or the
+ * singleton row is missing. Neither should take down the blast tool, and 0.02 is
+ * what the SQL default itself falls back to.
+ */
+export async function configuredSendRate(): Promise<number> {
+  const supabase = createAdminClient()
+  const { data, error } = await supabase
+    .from('app_config').select('blast_cost_per_send').eq('id', 1).maybeSingle()
+  if (error || data?.blast_cost_per_send == null) return 0.02
+  return Number(data.blast_cost_per_send)
 }

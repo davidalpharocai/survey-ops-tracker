@@ -10,8 +10,9 @@ import { isKnownSalesperson, ALL_SALESPERSON_VALUES } from '@/lib/utils/salespeo
 //   - pipelineThroughput: per-stage cycle time / WIP / aging from project_stage_history
 //
 // The canonical spend formula (recompute_project_spend, migration 060 + the third
-// term added by 080 + the blast coalesce in 091) is
+// term added by 080 + the blast coalesce in 091 + the SEND term in 095) is
 //   actual_spend = Σ(coalesce(blast.bid,0) × coalesce(blast.completes,0))
+//                + Σ(coalesce(blast.people,0) × coalesce(blast.cost_per_send,0))
 //                + Σ(supplier.cpi × supplier.n_collected)
 //                + Σ(cost.amount)
 // so a stored actual_spend that disagrees means the recompute trigger didn't fire.
@@ -31,8 +32,18 @@ type SupRow = { cpi: number | null; n_collected: number | null }
  *  explicit select that omits a column buildChecks reads does NOT error, it
  *  just leaves the value undefined and the check silently never fires. That
  *  mistake has been made in this file before; see the note on `salesperson`. */
-type BlastRow = { bid: number | null; completes: number | null; blast_at: string | null }
-type CostRow = { amount: number | null }
+type BlastRow = {
+  bid: number | null; completes: number | null; blast_at: string | null
+  /** 095: a blast's SEND cost is people x cost_per_send, independent of the
+   *  reward. Both columns must stay named in BOTH selects below -- an omitted
+   *  column does not error here, it just leaves the value undefined and the
+   *  check silently never fires. */
+  people: number | null; cost_per_send: number | null
+}
+/** `kind` is here for check 9 (the send-cost double count) and must stay named in
+ *  fetchCosts' select below — an omitted column does not error, it just leaves
+ *  the value undefined and the check silently never fires. */
+type CostRow = { amount: number | null; kind: string | null }
 type SegRow = { n_target: number | null; n_collected: number | null; n_actual: number | null }
 
 const num = (v: unknown): number => (v == null ? 0 : Number(v))
@@ -66,7 +77,16 @@ function buildChecks(p: Row, sup: SupRow[], blasts: BlastRow[], costs: CostRow[]
   //    them out of the gate and a costs-only project gets told its money is
   //    "not reconcilable against the current model" when in fact it reconciles exactly.
   const supSpend = sup.reduce((s, r) => s + num(r.cpi) * num(r.n_collected), 0)
-  const blastSpend = blasts.reduce((s, r) => s + num(r.bid) * num(r.completes), 0)
+  // 095: a blast costs a reward AND a send. This expression is a hand-copy of
+  // recompute_project_spend and its whole job is to agree with the SQL to the
+  // cent — omitting the send term here would have reported EVERY blast project
+  // as having a broken recompute trigger, because the stored spend would be
+  // higher than this by exactly the send cost ($4,096 portfolio-wide).
+  // coalesce-to-0 on both, matching the SQL's treatment of an unrecorded figure.
+  const blastSpend = blasts.reduce(
+    (s, r) => s + num(r.bid) * num(r.completes) + num(r.people) * num(r.cost_per_send),
+    0
+  )
   const costSpend = costs.reduce((s, r) => s + num(r.amount), 0)
   const expectedSpend = Math.round(supSpend + blastSpend + costSpend)
   const actualSpend = Math.round(num(p.actual_spend))
@@ -75,7 +95,7 @@ function buildChecks(p: Row, sup: SupRow[], blasts: BlastRow[], costs: CostRow[]
     checks.push({
       check: 'spend', ok, advisory: false, expected: expectedSpend, actual: actualSpend,
       detail: ok
-        ? 'actual_spend matches Σ(cpi×collected)+Σ(bid×completes)+Σ(cost amount)'
+        ? 'actual_spend matches Σ(cpi×collected)+Σ(bid×completes)+Σ(people×$/send)+Σ(cost amount)'
         : `stored actual_spend $${actualSpend.toLocaleString('en-US')} ≠ computed $${expectedSpend.toLocaleString('en-US')} — the recompute trigger may not have fired`,
     })
   } else if (num(p.actual_spend) > 0) {
@@ -295,6 +315,40 @@ function buildChecks(p: Row, sup: SupRow[], blasts: BlastRow[], costs: CostRow[]
     })
   }
 
+  // 9) The send cost, recorded twice.
+  //
+  //    Migration 080 gave project_costs a kind called `sms_email_blast`, which
+  //    CostLines described as "the VENDOR SEND FEE, what the sending platform
+  //    bills us for the send itself". Migration 095 then started COMPUTING that
+  //    same cost as people × cost_per_send on the blast. Two ways to record one
+  //    charge — and 095's header ruled project_costs out against the WRONG kind
+  //    (contacts_export, from 092) without ever looking at this one.
+  //
+  //    It was not hypothetical. PR00362 held a hand-computed row of $1,876.70
+  //    described "93,835 contacts x $0.02" — the send cost, typed in by a human
+  //    before the app could work it out. 095 charged the same sends again and
+  //    took the project to $4,228.58, or 141% of a $3,000 budget, when the true
+  //    all-in was $2,351.88 and it was NOT over budget.
+  //
+  //    Nothing else can catch this. Check 1 reconciles actual_spend against the
+  //    same formula the trigger uses, so a doubled figure reconciles PERFECTLY:
+  //    the money is internally consistent and simply wrong. Hence a check on the
+  //    SHAPE of the data rather than its arithmetic.
+  //
+  //    ADVISORY, because the two CAN legitimately coexist: a fixed platform
+  //    charge that does not scale with volume is a real cost and belongs on a
+  //    cost line. This reports the overlap and lets a human judge.
+  const sendSpend = blasts.reduce((s, b) => s + num(b.people) * num(b.cost_per_send), 0)
+  const sendFeeLines = costs.filter(c => c.kind === 'sms_email_blast' && num(c.amount) > 0)
+  if (sendSpend > 0 && sendFeeLines.length > 0) {
+    const lineTotal = sendFeeLines.reduce((s, c) => s + num(c.amount), 0)
+    checks.push({
+      check: 'send_cost_double_counted', ok: false, advisory: true,
+      expected: Math.round(sendSpend), actual: Math.round(sendSpend + lineTotal),
+      detail: `this project computes $${sendSpend.toFixed(2)} of send cost from its blasts AND carries $${lineTotal.toFixed(2)} of hand-entered "SMS/Email Blast" cost line(s) — if that line is the per-message send charge, it is now counted twice and the project's spend is overstated by that much. The app works the per-message cost out from # people × $/send; a cost line should only hold a FIXED platform fee that does not scale with volume.`,
+    })
+  }
+
   return checks
 }
 
@@ -319,7 +373,7 @@ async function fetchCosts(
   try {
     return await inChunks<CostRow & { project_id: string }>(
       projectIds,
-      c => supabase.from('project_costs').select('project_id, amount').in('project_id', c),
+      c => supabase.from('project_costs').select('project_id, amount, kind').in('project_id', c),
     )
   } catch (err) {
     console.error('[health] project_costs read failed — treating as no cost lines:', err)
@@ -339,7 +393,7 @@ export async function reconcileProject(projectRef: string) {
   const supabase = createAdminClient()
   const [supRes, blastRes, costRows, segRes] = await Promise.all([
     supabase.from('project_suppliers').select('cpi, n_collected').eq('project_id', pid),
-    supabase.from('project_blasts').select('bid, completes, blast_at').eq('project_id', pid),
+    supabase.from('project_blasts').select('bid, completes, people, cost_per_send, blast_at').eq('project_id', pid),
     fetchCosts(supabase, [pid]),
     supabase.from('project_segments').select('n_target, n_collected, n_actual').eq('project_id', pid),
   ])
@@ -412,7 +466,7 @@ export async function dataHealth(args: { active_only?: boolean; limit?: number }
 
   const [supRows, blastRows, costRows, segRows] = await Promise.all([
     inChunks<SupRow & { project_id: string }>(ids, c => supabase.from('project_suppliers').select('project_id, cpi, n_collected').in('project_id', c)),
-    inChunks<BlastRow & { project_id: string }>(ids, c => supabase.from('project_blasts').select('project_id, bid, completes, blast_at').in('project_id', c)),
+    inChunks<BlastRow & { project_id: string }>(ids, c => supabase.from('project_blasts').select('project_id, bid, completes, people, cost_per_send, blast_at').in('project_id', c)),
     fetchCosts(supabase, ids),
     inChunks<SegRow & { project_id: string }>(ids, c => supabase.from('project_segments').select('project_id, n_target, n_collected, n_actual').in('project_id', c)),
   ])
