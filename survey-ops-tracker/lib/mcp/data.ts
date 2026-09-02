@@ -1,6 +1,11 @@
 import 'server-only'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { totalBidDollars, totalSendDollars, unknownCostBlasts } from '@/lib/utils/blast'
+import {
+  totalBidDollars,
+  totalSendDollars,
+  unknownCostBlasts,
+  unknownSendBlasts,
+} from '@/lib/utils/blast'
 import { beforeFieldingRequired, afterFieldingRequired, beforeFieldingMet, afterFieldingMet } from '@/lib/utils/compliance'
 import { VIEW_FINANCIALS } from '@/lib/auth/capabilityNames'
 import { isRestrictedAuditField } from '@/lib/utils/auditFormat'
@@ -332,6 +337,11 @@ export async function getProjectDetail(id: string, userId: string) {
     // non-zero the total is a FLOOR, not the cost — the reader has to be told, or
     // "$0 blast spend" gets quoted as a fact about a project that really spent money.
     blasts_with_unknown_cost: unknownCostBlasts(blasts as never),
+    // Reported separately because the two halves fail independently, and
+    // because log_blast / update_blast / remove_blast all return both — a
+    // reader comparing get_project against them would otherwise see a blast
+    // count go missing.
+    blasts_with_unknown_send: unknownSendBlasts(blasts as never),
     steps: stepsRes.data ?? [],
     activity: activityRes.data ?? [],
     deliverables: deliverablesRes.data ?? [],

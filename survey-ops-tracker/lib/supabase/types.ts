@@ -2105,6 +2105,12 @@ export type Database = {
           p_created_by: string
           p_idem: string
           p_actor: string
+          /** Migration 095. Null falls through to the column default, i.e. the
+           *  currently configured rate, so an older caller still prices a blast
+           *  correctly. Declared here because supabase-js does NOT
+           *  excess-property-check RPC arguments: without this line the extra
+           *  argument writes.ts passes is invisible to tsc. */
+          p_cost_per_send?: number | null
         }
         Returns: unknown
       }

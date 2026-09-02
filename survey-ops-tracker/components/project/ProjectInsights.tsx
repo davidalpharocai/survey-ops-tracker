@@ -11,7 +11,7 @@ import { useProjectSuppliers, type ProjectSupplier } from '@/lib/hooks/useProjec
 import { useProjectSegments } from '@/lib/hooks/useProjectSegments'
 import { useCanViewFinancials } from '@/lib/hooks/useCapabilities'
 import { projectEstimateRange, projectTarget, modalCap } from '@/lib/utils/suppliers'
-import { unknownCostBlasts } from '@/lib/utils/blast'
+import { unknownCostBlasts, unknownSendBlasts } from '@/lib/utils/blast'
 import {
   pctOf, computePace, costPerComplete, projectedFinalCost,
   blastCompletionRate, cumulativeCompletes, supplierMix, bestValueSupplier, daysBetween, segmentPaces,
@@ -138,15 +138,20 @@ export function ProjectInsights({ project }: { project: SurveyProject }) {
   const burningFast = budgetUsed != null && nProgress != null && budgetUsed - nProgress > 0.1
 
   // Every cost figure on this row — spend, cost/complete, projected final — is
-  // actual_spend, which counts a blast only once its completes are recorded. So
-  // an unrecorded blast understates all three.
+  // actual_spend, and a blast contributes to it in TWO parts (095): its reward
+  // once completes are recorded, and its send cost once the sent count is. Either
+  // one missing understates all three figures.
   //
   // The nastiest part is what it does to burningFast: that flag fires when spend
   // outpaces collection, and understating spend is exactly what stops it firing.
   // The projects with unknown cost are therefore the LEAST likely to raise the
   // "spending ahead of collection" warning — the alarm is quietest precisely
   // where the numbers are least trustworthy. Say so instead.
-  const unknownCost = unknownCostBlasts(blasts)
+  //
+  // Both halves counted here, because they go missing independently: a blast can
+  // have every completion recorded and no sent count, and counting only the
+  // reward would call that project's cost settled.
+  const unknownCost = unknownCostBlasts(blasts) + unknownSendBlasts(blasts)
   const legacyUnlogged =
     unknownCost === 0 &&
     blasts.length > 0 &&
@@ -272,7 +277,7 @@ function B2BPerformance({ blasts, target }: { blasts: Blast[]; target: number | 
     <div className={card}>
       <p className={sectionTitle}>
         Blast performance
-        <InfoTooltip text="Completion rate = completes ÷ people reached. Cost per complete is the $/bid (we only pay completes). A blast whose completes haven't been recorded yet shows “—”, not 0% — and it is excluded from the figures rather than counted as a failure." />
+        <InfoTooltip text="Completion rate = completes ÷ messages sent. Cost per complete HERE is the reward only ($/bid — we only reward people who finished); the project’s all-in Cost / complete above also carries the send cost, so the two differ on purpose. A blast whose completes haven’t been recorded yet shows “—”, not 0% — and it is excluded from the figures rather than counted as a failure." />
         <span className="ml-auto normal-case tracking-normal text-foreground font-medium">{pctStr(overallRate)} completion</span>
       </p>
 

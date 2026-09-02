@@ -8,7 +8,8 @@ type BlastFigures = { bid?: number | null; completes?: number | null }
 /** A blast's SEND side: how many messages went out, and the rate charged for
  *  each. Separate from BlastFigures because the two costs answer different
  *  questions and are unknown independently — a blast can have a known send cost
- *  and an unknown reward, which is the state 5 of 12 blast projects are in. */
+ *  and an unknown reward — PR00309's shape: every send recorded, no completes
+ *  ever entered. */
 type SendFigures = { people?: number | null; cost_per_send?: number | null }
 
 /**
@@ -23,19 +24,30 @@ type SendFigures = { people?: number | null; cost_per_send?: number | null }
  * project_financials.price_per_n (migration 082): unknown renders as unknown,
  * never as zero.
  *
- * There are therefore TWO cost functions, and picking the wrong one is the whole
- * bug class:
- *   · `blastTotal` / `totalBidDollars` — mirror the SQL. Use for reconciling
- *     against survey_projects.actual_spend.
- *   · `blastCost` / `unknownCostBlasts` — for DISPLAY. Use anywhere a human
- *     reads the number and would take $0 as a fact.
+ * There are therefore TWO FAMILIES of cost function, and picking the wrong one is
+ * the whole bug class. Since 095 each family covers both halves of a blast's cost:
+ *
+ *   MIRROR THE SQL (unrecorded counts as 0) — for reconciling against
+ *   survey_projects.actual_spend, never for display:
+ *     · `blastTotal` / `totalBidDollars`   — the reward half
+ *     · `sendTotal`  / `totalSendDollars`  — the send half
+ *
+ *   FOR DISPLAY (unrecorded returns null) — anywhere a human reads the number and
+ *   would take $0 as a fact:
+ *     · `blastCost` / `unknownCostBlasts`  — the reward half
+ *     · `sendCost`  / `unknownSendBlasts`  — the send half
+ *     · `blastAllInCost`                   — both, null if either is unknown
  */
 
 /**
  * Cost of one blast AS THE DATABASE COMPUTES IT = $/bid × # of COMPLETES, with
  * an unrecorded figure counted as 0. The bid is a per-completion reward, so we
  * only pay for people who actually completed the survey — not everyone it was
- * sent to (`people` is the reach, informational only).
+ * sent to. This is the REWARD HALF ONLY — it mirrors the FIRST term of
+ * recompute_project_spend. Since 095 `people` is also a billing quantity (the
+ * send cost is people x cost_per_send), so it is emphatically NOT
+ * "informational": for the whole blast cost use `blastAllInCost`, or add
+ * `sendTotal` when mirroring the SQL.
  *
  * This deliberately mirrors recompute_project_spend (migration 060, third term
  * added by 080, coalesced by 091): `sum(coalesce(bid,0) * coalesce(completes,0))`.
@@ -68,10 +80,14 @@ export function blastCost(b: BlastFigures): number | null {
   return isBlastCostUnknown(b) ? null : (b.bid as number) * (b.completes as number)
 }
 
-/** Total blast spend for a project = Σ($/bid × # completes), mirroring the SQL —
- *  an unrecorded figure contributes 0, exactly as `sum()` skipping a NULL row
- *  does. Pair it with `unknownCostBlasts` before showing it to anyone: on its own
- *  it is a FLOOR, not the cost. */
+/** Total REWARD spend for a project = Σ($/bid × # completes), mirroring the SQL's
+ *  first blast term. An unrecorded figure contributes 0, exactly as `sum()`
+ *  skipping a NULL row does.
+ *
+ *  NOT the total blast spend — add `totalSendDollars` for that. The name predates
+ *  the send cost and is kept because ~15 callers use it; the "Bid" in it is the
+ *  clue that it is one half. Pair it with `unknownCostBlasts` before showing it to
+ *  anyone: on its own it is a FLOOR, not the cost. */
 export function totalBidDollars(blasts: Blast[]): number {
   return blasts.reduce((s, b) => s + blastTotal(b), 0)
 }
@@ -111,8 +127,10 @@ export function isSendCostUnknown(b: SendFigures): boolean {
 }
 
 /** Send cost of one blast FOR DISPLAY — people × rate, or null when either is
- *  unrecorded. Render null as "not recorded", never as $0: 2 of 35 live blasts
- *  have no sent count, and $0 would read as a send that was free. */
+ *  unrecorded. Render null as "not recorded", never as $0 — $0 reads as a send
+ *  that was free. (Counts of how many live blasts are in that state are
+ *  deliberately not quoted here: the figure written yesterday was wrong by the
+ *  next morning. data_health checks 7c/7d report the current ones.) */
 export function sendCost(b: SendFigures): number | null {
   return isSendCostUnknown(b) ? null : (b.people as number) * (b.cost_per_send as number)
 }

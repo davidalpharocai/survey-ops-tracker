@@ -54,9 +54,11 @@ function money2(v: number): string {
  * The Money-section blast display for B2B / Rerun projects. Mirrors
  * `NSegmentsEditor`: a collapsible subheader with a right-aligned "+ Log blast",
  * one inset block per blast (fields wired straight through the blast hooks), and
- * a ✕ remove with a session-level Undo bar. Cost per blast is $/bid × completes
- * (via `blastCost`, which returns null — shown as "not recorded" — while either
- * figure is blank); the DB trigger recomputes `actual_spend`.
+ * a ✕ remove with a session-level Undo bar. A blast costs TWO things (095) —
+ * the reward, $/bid × completes, and the send, $/send × # people — shown via
+ * `blastAllInCost`, which returns null (rendered "not recorded") while EITHER
+ * half is blank, with each half also displayed on its own so a known one is
+ * never hidden by an unknown one. The DB trigger recomputes `actual_spend`.
  */
 export function BlastBlocks({ project }: { project: SurveyProject }) {
   const supabase = createClient()
@@ -93,6 +95,11 @@ export function BlastBlocks({ project }: { project: SurveyProject }) {
   const unknownSend = unknownSendBlasts(list)
   const rewardTotal = totalBidDollars(list)
   const sendTotalAll = totalSendDollars(list)
+  // How many blasts are missing ANY figure their cost needs. NOT
+  // Math.max(unknown, unknownSend): those count two independent sets, so two
+  // blasts with opposite gaps would report "1 of 2 incomplete". blastAllInCost
+  // is null exactly when either half is unknown, which is the union.
+  const incompleteCount = list.filter(b => blastAllInCost(b) == null).length
   // Completes actually written down, treating null as 0 — the sum data-health
   // check 7b uses. Zero here alongside a project that HAS collected N is the
   // legacy "nobody entered them" signal (see the second banner below).
@@ -165,7 +172,7 @@ export function BlastBlocks({ project }: { project: SurveyProject }) {
       )}
 
       {/* The project's spend (and every margin figure derived from it) is
-          Σ(bid × completes), so a blast whose figures aren't in yet contributes
+          Σ(bid × completes) + Σ(people × $/send), so a blast whose figures aren't in yet contributes
           nothing and the total silently understates what we actually spent. Say
           so here rather than letting Budget left, a few rows down in this same
           Money section, look healthy. */}
@@ -173,7 +180,7 @@ export function BlastBlocks({ project }: { project: SurveyProject }) {
         <p className="mb-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-2.5 py-1.5 text-[12px] text-amber-700 dark:text-amber-400">
           ⚠ {unknown} of {count} blast{count === 1 ? '' : 's'} {unknown === 1 ? 'has' : 'have'} no cost recorded
           yet — the project&rsquo;s spend excludes {unknown === 1 ? 'it' : 'them'}, so it is a floor, not the
-          total. Fill in $/bid and # completes.
+          total. Fill in whichever is blank — $/bid and # completes for the reward, # people for the send.
         </p>
       )}
 
@@ -200,7 +207,7 @@ export function BlastBlocks({ project }: { project: SurveyProject }) {
       {/* The project total, split the way the cost actually splits. David asked
           for the send cost "on the blast segment and as a whole", and the whole
           is where it lands hardest: across the portfolio the send side is
-          ~$4,100 that was previously invisible, and on PR00309 it is the ENTIRE
+          thousands of dollars that were previously invisible, and on PR00309 it is the ENTIRE
           cost of the project — $1,916 of sends against no recorded completes.
           Shown outside the `expanded` guard on purpose: the number that moved
           the budget should not be hidden behind a disclosure triangle. */}
@@ -219,7 +226,7 @@ export function BlastBlocks({ project }: { project: SurveyProject }) {
                 between a total and a floor. */}
             {(unknown > 0 || unknownSend > 0) && (
               <span className="ml-1 text-amber-700 dark:text-amber-400">
-                — a floor; {Math.max(unknown, unknownSend)} of {count} incomplete
+                — a floor; {incompleteCount} of {count} incomplete
               </span>
             )}
           </span>
@@ -335,9 +342,15 @@ function BlastBlock({
           value={blast.cost_per_send}
           onSave={v => save({ cost_per_send: v })}
         />
-        {/* blastCost, NOT blastTotal: blastTotal mirrors the SQL and returns 0 for
-            an unrecorded blast, and "$0" on screen is read as a result — a send
-            that cost us nothing. An unknown cost has to say it is unknown. */}
+        {/* The DISPLAY functions, not the SQL-mirroring ones: blastTotal and
+            sendTotal return 0 for an unrecorded blast, and "$0" on screen is read
+            as a result — a send that cost us nothing. An unknown cost has to say
+            it is unknown.
+
+            money2 rather than money throughout, because the breakdown underneath
+            is in cents and at $0.02 a send almost no total is a whole number: a
+            "$1,916" headline above "reward $0.00 · send $1,915.76" reads as an
+            app that cannot add up. */}
         <FieldCell
           label="Cost"
           tooltip={TIP.cost}
@@ -346,7 +359,7 @@ function BlastBlock({
           {allIn == null ? (
             <span className="text-muted-foreground/60">— not recorded</span>
           ) : (
-            <span className="tabular-nums">{money(allIn)}</span>
+            <span className="tabular-nums">{money2(allIn)}</span>
           )}
           {/* The breakdown, always, even when the total is unknown — especially
               then. A blast can have a fully known send cost and no completes at

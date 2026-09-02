@@ -168,6 +168,15 @@ export async function copySupplierLaunches(
  * Deliberately NOT called by `cloneProject` below — a Clone is a brand-new
  * project, and blasts belong to the source project they were actually sent
  * from, not a copy (see the CloneCarry doc + `components/project/CloneProjectModal.tsx`). */
+/**
+ * cost_per_send is deliberately NOT copied, and this note exists because two
+ * separate reviewers filed its absence as a bug. A cloned wave is a FUTURE
+ * send and should be priced at the rate in force when it goes out, which is
+ * exactly what the column default gives it. Copying the source's rate would
+ * pin a new wave to a historical price. (Naming the column in the select here
+ * would also have broken cloning outright on any environment where 095 had not
+ * yet been applied.)
+ */
 export async function copyProjectBlasts(
   admin: Admin,
   sourceProjectId: string,

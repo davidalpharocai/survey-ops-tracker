@@ -919,7 +919,7 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'reconcile_project',
     description:
-      "Cross-field consistency check for ONE project: does actual_spend match Σ(cpi×collected)+Σ(bid×completes); do segment N totals sum to the project N; is a survey-ID discrepancy flagged; are the dates in a sane order — plus advisory notes (supplier N collected vs the delivered N, which legitimately differ via QA attrition; sheet copy behind the app (RETIRED - the sheet write-back was deleted, so this advisory can no longer fire)). Returns the failing `issues`, `advisories`, and the full `checks`. Use for “does <project>'s money/N add up”, “is anything off on <project>”, or to explain a spend/N number that looks wrong.",
+      "Cross-field consistency check for ONE project: does actual_spend match Σ(cpi×collected)+Σ(bid×completes)+Σ(people×$/send)+Σ(cost amount); do segment N totals sum to the project N; is a survey-ID discrepancy flagged; are the dates in a sane order — plus advisory notes (supplier N collected vs the delivered N, which legitimately differ via QA attrition; sheet copy behind the app (RETIRED - the sheet write-back was deleted, so this advisory can no longer fire)). Returns the failing `issues`, `advisories`, and the full `checks`. Use for “does <project>'s money/N add up”, “is anything off on <project>”, or to explain a spend/N number that looks wrong.",
     kind: 'read',
     schema: { project: z.string() },
     handler: async (rawArgs) => {

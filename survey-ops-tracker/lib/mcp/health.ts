@@ -81,7 +81,9 @@ function buildChecks(p: Row, sup: SupRow[], blasts: BlastRow[], costs: CostRow[]
   // recompute_project_spend and its whole job is to agree with the SQL to the
   // cent — omitting the send term here would have reported EVERY blast project
   // as having a broken recompute trigger, because the stored spend would be
-  // higher than this by exactly the send cost ($4,096 portfolio-wide).
+  // higher than this by exactly the send cost (which was $4,096 across the
+  // portfolio on 2026-09-01 and $9,074 a day later — hence a dated figure
+  // rather than a bare one).
   // coalesce-to-0 on both, matching the SQL's treatment of an unrecorded figure.
   const blastSpend = blasts.reduce(
     (s, r) => s + num(r.bid) * num(r.completes) + num(r.people) * num(r.cost_per_send),
@@ -218,7 +220,7 @@ function buildChecks(p: Row, sup: SupRow[], blasts: BlastRow[], costs: CostRow[]
       checks.push({
         check: 'blast_completes_unrecorded', ok: false, advisory: true,
         expected: 0, actual: stale.length,
-        detail: `${stale.length} of ${blasts.length} blast(s) went out over ${DAYS_TO_RECORD} days ago with # completes still unrecorded — each contributes $0 to actual_spend, so the project's cost is a floor, not the total`,
+        detail: `${stale.length} of ${blasts.length} blast(s) went out over ${DAYS_TO_RECORD} days ago with # completes still unrecorded — each contributes $0 of REWARD cost to actual_spend (its send cost still counts), so the project's cost is a floor, not the total`,
       })
     }
 
@@ -347,6 +349,43 @@ function buildChecks(p: Row, sup: SupRow[], blasts: BlastRow[], costs: CostRow[]
       expected: Math.round(sendSpend), actual: Math.round(sendSpend + lineTotal),
       detail: `this project computes $${sendSpend.toFixed(2)} of send cost from its blasts AND carries $${lineTotal.toFixed(2)} of hand-entered "SMS/Email Blast" cost line(s) — if that line is the per-message send charge, it is now counted twice and the project's spend is overstated by that much. The app works the per-message cost out from # people × $/send; a cost line should only hold a FIXED platform fee that does not scale with volume.`,
     })
+    // 7c) A SENT COUNT that is provably wrong rather than merely absent.
+    //
+    //     Check 7a/7b do this for completes; there was no equivalent for the
+    //     sent count, even though 095 made it a money field. The proof is the
+    //     same shape: completes cannot arrive from a send that reached nobody,
+    //     so `people = 0` alongside recorded completes is not a result, it is a
+    //     figure nobody entered.
+    //
+    //     Live example this was written from (2026-09-02): PR00375 has two
+    //     blasts at people = 0 with 39 and 17 completes. Its send cost therefore
+    //     reads $0, and no other check objects.
+    //
+    //     NULL is handled by the plain-unrecorded arm below rather than here,
+    //     because a null sent count on a blast logged minutes ago is normal.
+    const provablyUnsentCounted = blasts.filter(
+      b => (b.people ?? 0) === 0 && (b.completes ?? 0) > 0
+    )
+    if (provablyUnsentCounted.length) {
+      checks.push({
+        check: 'blast_sent_count_missing', ok: false, advisory: false,
+        expected: null, actual: 0,
+        detail: `${provablyUnsentCounted.length} blast(s) record 0 sent but a non-zero number of completes — nobody can complete a survey they were never sent, so the sent count was never entered. Its send cost ($/send × # people) therefore reads $0 and the completion rate reads as divide-by-zero`,
+      })
+    }
+
+    // 7d) A sent count simply not recorded yet, on a blast old enough that it
+    //     should be. Mirrors 7a's shape and cutoff for completes.
+    const staleSend = blasts.filter(
+      b => b.people == null && b.blast_at != null && Date.parse(b.blast_at) < Date.now() - 7 * 86_400_000
+    )
+    if (staleSend.length) {
+      checks.push({
+        check: 'blast_sent_count_unrecorded', ok: false, advisory: true,
+        expected: 0, actual: staleSend.length,
+        detail: `${staleSend.length} of ${blasts.length} blast(s) went out over 7 days ago with the sent count still unrecorded — each contributes $0 of send cost, so the project's spend is a floor`,
+      })
+    }
   }
 
   return checks

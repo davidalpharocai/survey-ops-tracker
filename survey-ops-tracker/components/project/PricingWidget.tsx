@@ -7,7 +7,7 @@ import { fmtNum } from '@/lib/utils/number'
 import { useProject } from '@/lib/hooks/useProjects'
 import { useProjectSegments } from '@/lib/hooks/useProjectSegments'
 import { useProjectBlasts } from '@/lib/hooks/useProjectBlasts'
-import { unknownCostBlasts } from '@/lib/utils/blast'
+import { unknownCostBlasts, unknownSendBlasts } from '@/lib/utils/blast'
 import { useCapabilities, useCanViewFinancials } from '@/lib/hooks/useCapabilities'
 import {
   useProjectRates,
@@ -52,9 +52,9 @@ const TIP = {
   // and the number is worse than unknown here, it is knowably too high, because
   // every unrecorded blast is missing from the subtraction.
   marginPartialCost:
-    'Some of this project’s cost is not recorded yet: one or more blasts have no completes entered, and a blast only counts toward Actual $ once they are. So Actual $ is understated, and this margin is therefore OVERSTATED by whatever those blasts cost. Enter the completes on the blast lines above and it settles.',
+    'Some of this project’s cost is not recorded yet: one or more blasts is missing a figure its cost needs — the completes for the reward half, or the sent count for the send half — and a blast only counts toward Actual $ once it has them. So Actual $ is understated, and this margin is therefore OVERSTATED by whatever those blasts cost. Fill in the blank figures on the blast lines above and it settles.',
   invoicedPartialCost:
-    'What the job is worth priced at the N actually collected so far — Σ(rate × N collected). The margin beside it is marked indicative because one or more blasts have no completes recorded, so the cost being subtracted is incomplete and the margin reads higher than it is.',
+    'What the job is worth priced at the N actually collected so far — Σ(rate × N collected). The margin beside it is marked indicative because one or more blasts is missing a figure its cost needs (completes, or the sent count), so the cost being subtracted is incomplete and the margin reads higher than it is.',
   unpriced:
     'N belonging to segments with no rate — neither their own nor a project default. It is excluded from the blended rate and from the contract value, so both figures understate the job until it is priced.',
   ceiling:
@@ -274,7 +274,16 @@ export function PricingWidget({ projectId, budget, actualSpend }: PricingWidgetP
   //     "(indicative)" qualifier and state a confident margin and margin %, both
   //     too high, on the exact screen this change exists to make trustworthy.
   const unknownBlasts = unknownCostBlasts(blastRows)
-  const costKnown = hasRecordedCost(actualSpend) && unknownBlasts === 0
+  // BOTH halves. 095 made a blast cost the reward AND the send, and they are
+  // unknown independently: a blast can have every completion recorded and no
+  // sent count, which leaves unknownBlasts at 0 while the spend is still
+  // knowably short. Counting only the reward here would drop the
+  // "(indicative)" qualifier and state a confident margin off an understated
+  // cost, which is precisely what the note above says this code exists to
+  // stop. Reachable through "+ Log blast", which starts a blast with no
+  // sent count on purpose.
+  const unknownSend = unknownSendBlasts(blastRows)
+  const costKnown = hasRecordedCost(actualSpend) && unknownBlasts === 0 && unknownSend === 0
   const marginText =
     margins == null
       ? '—'
