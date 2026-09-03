@@ -4,6 +4,7 @@ import { RealtimeSync } from '@/components/shared/RealtimeSync'
 import { AssistantPanel } from '@/components/assistant/AssistantPanel'
 import { CommandPalette } from '@/components/shared/CommandPalette'
 import { TopNav } from '@/components/shared/TopNav'
+import { ImpersonationBanner } from '@/components/shared/ImpersonationBanner'
 import { isAllowedEmail } from '@/lib/utils/allowedDomain'
 
 export const dynamic = 'force-dynamic'
@@ -36,6 +37,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div className="min-h-screen bg-background text-foreground">
       <RealtimeSync />
+      <ImpersonationBanner />
       <TopNav />
       <main className="px-6 pt-3 pb-6">
         {children}

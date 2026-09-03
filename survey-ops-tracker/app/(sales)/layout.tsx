@@ -1,3 +1,5 @@
+import { ImpersonationBanner } from '@/components/shared/ImpersonationBanner'
+
 export const dynamic = 'force-dynamic'
 
 /**
@@ -15,6 +17,10 @@ export const dynamic = 'force-dynamic'
 export default function SalesShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-background text-foreground">
+      {/* Above the nav, not inside it: an admin viewing as a salesperson must
+          see it before they read a single number. Renders nothing when nobody
+          is impersonating. */}
+      <ImpersonationBanner />
       <nav className="flex items-center gap-3 border-b border-border bg-card px-6 py-3">
         <span className="text-sm font-bold">AlphaROC</span>
         <span className="text-sm text-muted-foreground/60">/</span>

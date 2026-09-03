@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
+import { ViewAsButton } from './ViewAsButton'
 import { useCanManagePermissions } from '@/lib/hooks/useCapabilities'
 import {
   useAccessCatalogue,
@@ -24,6 +25,11 @@ const ROLE_STYLE: Record<string, string> = {
 }
 const roleStyle = (r: string) =>
   ROLE_STYLE[r] ?? 'bg-muted text-muted-foreground border-border'
+
+// Offered only for the tiers the database makes read-only. Kept in sync with
+// IMPERSONATABLE_ROLES in lib/auth/impersonation.ts, which is what the server
+// actually enforces — this list only decides whether to draw the button.
+const VIEW_AS_TIERS = new Set(['sales', 'compliance'])
 
 const TIER_LABEL: Record<string, string> = {
   analyst: 'Internal',
@@ -179,6 +185,9 @@ function PersonRow({
       </span>
 
       <span className="flex items-center gap-1 flex-wrap justify-end shrink-0">
+        {VIEW_AS_TIERS.has(person.tier) && person.email && (
+          <ViewAsButton email={person.email} tier={TIER_LABEL[person.tier] ?? person.tier} />
+        )}
         {person.roles.map((r) => (
           <span
             key={r}
