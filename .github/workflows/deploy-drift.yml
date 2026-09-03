@@ -1,0 +1,101 @@
+# Does production actually have what `main` has?
+#
+# WHY THIS EXISTS
+#
+# On 2026-08-28 a lint-level error (react-hooks/rules-of-hooks in PricingWidget)
+# started failing `next build`. Every production deploy failed from that moment.
+# Nothing said so:
+#   * the live site kept serving the last good build, so it looked healthy
+#   * `tsc --noEmit` does not run ESLint, so typechecks passed
+#   * the dev server only WARNS on that rule, so local work looked fine
+#   * `vitest` passed, all 1,255 of them
+#   * `git log` showed the commits merged, because they had
+# Production sat four days behind main and was only found because a colleague
+# could not use a feature that had been "shipped" three days earlier — the sales
+# tier, whose /sales route returned 404 in production the whole time.
+#
+# Four days is how long it took a HUMAN to notice. This check notices in one.
+#
+# WHY A GITHUB ACTION AND NOT A VERCEL CRON
+#
+# The failure being watched for is "Vercel is not deploying". A watchdog that
+# runs ON Vercel would itself be stuck on the old deployment — and worse, a
+# watchdog ADDED in a commit that fails to deploy would never exist at all. This
+# runs on GitHub, which is the system that still works when the other one does
+# not. It needs no secrets: the built-in GITHUB_TOKEN can read deployments.
+#
+# HOW IT ALERTS
+#
+# By failing. GitHub emails the repo owner when a scheduled workflow fails, so
+# there is no webhook, no Resend key and nothing else to keep alive. The one
+# thing to know: GitHub disables scheduled workflows in repos with no activity
+# for 60 days, which is not a risk on a repo committed to daily.
+name: deploy drift
+
+on:
+  schedule:
+    # Daily, 13:20 UTC (~09:20 ET). After the working day has started, so a
+    # failure email is seen rather than buried overnight. Vercel Hobby limits
+    # only apply to vercel.json crons, not to this.
+    - cron: '20 13 * * *'
+  # So it can be run by hand from the Actions tab right after a suspicious merge
+  # instead of waiting for the next morning.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  deployments: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Compare the live production deployment against main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          MAIN_SHA=$(gh api "repos/$REPO/commits/main" --jq '.sha')
+
+          # The most recent PRODUCTION deployment, and the state of its latest
+          # status. A deployment RECORD existing proves nothing — all three of
+          # the failed deploys in August created records and then failed.
+          DEP=$(gh api "repos/$REPO/deployments?environment=production&per_page=1" --jq '.[0].id // empty')
+          if [ -z "$DEP" ]; then
+            echo "::error::No production deployment found at all for $REPO."
+            exit 1
+          fi
+          DEP_SHA=$(gh api "repos/$REPO/deployments/$DEP" --jq '.sha')
+          STATE=$(gh api "repos/$REPO/deployments/$DEP/statuses?per_page=1" --jq '.[0].state // "none"')
+
+          echo "main:                 $MAIN_SHA"
+          echo "latest production:    $DEP_SHA  ($STATE)"
+
+          # A failed newest deployment is the actual August signature: the
+          # deployment for the newest commit exists and failed, so what is being
+          # SERVED is some older commit. Catch this first, because it names the
+          # cause rather than just the symptom.
+          if [ "$STATE" = "failure" ] || [ "$STATE" = "error" ]; then
+            echo "::error::The most recent production deployment ($DEP_SHA) is in state '$STATE'. Production is serving an OLDER build. Read the real reason with: npx vercel inspect <deployment-id> --logs (this works without being logged in). In August the cause was an ESLint error that next build treats as fatal but tsc and vitest do not see."
+            exit 1
+          fi
+
+          # Drift with no failed deployment: a push that never triggered a build
+          # at all. Seen twice in August on squash-merges. The fix is an
+          # empty-commit re-trigger against the same tree.
+          if [ "$MAIN_SHA" != "$DEP_SHA" ]; then
+            echo "::error::Production is on $DEP_SHA but main is $MAIN_SHA — a push did not produce a deployment. Re-trigger with an empty commit on the same tree: NEW=\$(git commit-tree \"origin/main^{tree}\" -p origin/main -m 're-trigger deploy'); git push origin \$NEW:main"
+            exit 1
+          fi
+
+          # `pending` on a fresh push is normal, not drift — the SHAs match and a
+          # build is simply in flight. Say so rather than passing silently, so a
+          # green run always states what it actually observed.
+          if [ "$STATE" != "success" ]; then
+            echo "Production matches main; its deployment is '$STATE' (a build in flight is normal)."
+            exit 0
+          fi
+
+          echo "Production is on main and its deployment succeeded."
