@@ -19,8 +19,11 @@ interface PipelineProgressProps {
 
 export function PipelineProgress({ project }: PipelineProgressProps) {
   // Advance mechanism + compliance gate live in the shared hook so this legacy
-  // checkbox row and the command-bar PipelineSpine behave identically.
-  const { toggleStage, gate, setGate, occamGate, setOccamGate } = usePipelineStage(project)
+  // stage row and the command-bar PipelineSpine behave identically. Clicking a
+  // stage MOVES the project to it (2026-09-03); it is no longer a done/undone
+  // toggle, so clicking the stage you are already in does nothing and you step
+  // back by clicking the earlier stage.
+  const { goToStage, gate, setGate, occamGate, setOccamGate } = usePipelineStage(project)
 
   return (
     <div>
@@ -37,7 +40,7 @@ export function PipelineProgress({ project }: PipelineProgressProps) {
           return (
             <div key={stage} className={`flex items-center gap-1 ${STAGE_GROW[stage] ?? 'flex-1'} min-w-0`}>
               <button
-                onClick={() => isClickable && toggleStage(stage)}
+                onClick={() => isClickable && goToStage(stage)}
                 disabled={!isClickable}
                 title={
                   isClickable

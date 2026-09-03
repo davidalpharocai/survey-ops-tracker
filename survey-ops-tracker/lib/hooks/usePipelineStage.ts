@@ -1,6 +1,6 @@
 'use client'
 import { useState } from 'react'
-import { STAGE_ORDER } from '@/lib/utils/stage'
+import { getCheckboxesForColumn } from '@/lib/utils/stage'
 import { useUpdateProject } from '@/lib/hooks/useProjects'
 import { useCurrentMember } from '@/lib/hooks/useCurrentMember'
 import { useComplianceState } from '@/lib/hooks/useComplianceState'
@@ -26,17 +26,12 @@ export const STAGE_TO_FIELD: Record<string, keyof Pick<SurveyProject,
   'Delivery': 'stage_delivery',
 }
 
-// Derive the board column from the six stage booleans: the current column is
-// the first stage whose checkbox is still unchecked (all delivered => Delivery).
-function deriveColumn(updates: Record<string, boolean>): BoardColumn {
-  if (!updates['stage_doc_programming']) return 'Submitted'
-  if (!updates['stage_survey_programming']) return 'Doc Programming'
-  if (!updates['stage_edwin_qa']) return 'Survey Programming'
-  if (!updates['stage_fielding']) return 'EdWin QA'
-  if (!updates['stage_data_qa']) return 'Fielding'
-  if (!updates['stage_delivery']) return 'Data QA'
-  return 'Delivery'
-}
+// deriveColumn used to live here — a verbatim second copy of
+// deriveCurrentStage in lib/utils/stage.ts. It is gone: goToStage below sets the
+// flags with getCheckboxesForColumn, which IS that function's inverse (proved by
+// lib/utils/stage.test.ts), so the destination column is simply the stage
+// clicked and nothing needs deriving. One fewer copy of a definition that had
+// already drifted once.
 
 export interface PipelineGate {
   message: string
@@ -124,42 +119,35 @@ export function usePipelineStage(project: SurveyProject) {
     applyMove(newState, newColumn, complianceNote)
   }
 
-  function toggleStage(stage: string) {
-    const field = STAGE_TO_FIELD[stage]
-    if (!field) return // Submitted has no checkbox
+  /**
+   * Move the project TO `stage`. Clicking a stage lands the project in it,
+   * whether that is forwards or backwards.
+   *
+   * IT USED TO BE A TOGGLE, and David asked for this change on 2026-09-03 after
+   * hitting the consequence: "when i move a survey back to fielding, it goes to
+   * EdwinQA instead and only then can i move it to fielding". Clicking a
+   * COMPLETED stage flipped its flag off, and a project with stage_fielding
+   * false is by definition before Fielding — so a backwards click landed one
+   * stage early while a forwards click landed on the stage clicked. The same
+   * gesture did two different things depending on direction, which is what made
+   * it feel broken rather than merely surprising.
+   *
+   * The whole body is now getCheckboxesForColumn(stage): every stage up to and
+   * including the destination reached, everything after it not. That function is
+   * the tested inverse of deriveCurrentStage, so the flags and the column cannot
+   * disagree — which is the bug fixed in the same change (10 live rows were
+   * self-contradictory).
+   *
+   * WHAT YOU LOSE: clicking the CURRENT stage is now a no-op rather than
+   * un-ticking it. To step back, click the earlier stage — which is the gesture
+   * David expected in the first place. Every stage stays reachable in one click
+   * from anywhere.
+   */
+  function goToStage(stage: string) {
+    if (!STAGE_TO_FIELD[stage]) return // Submitted has no node to click
 
-    const newValue = !project[field]
-
-    // Build new checkbox state: if checking, also check all prior stages
-    const newState: Record<string, boolean> = {
-      stage_doc_programming: project.stage_doc_programming,
-      stage_survey_programming: project.stage_survey_programming,
-      stage_edwin_qa: project.stage_edwin_qa,
-      stage_fielding: project.stage_fielding,
-      stage_data_qa: project.stage_data_qa,
-      stage_delivery: project.stage_delivery,
-    }
-
-    if (newValue) {
-      // Check this stage and all prior stages
-      for (const s of STAGE_ORDER.slice(1)) { // skip 'Submitted'
-        const f = STAGE_TO_FIELD[s]
-        if (!f) continue
-        newState[f] = true
-        if (s === stage) break
-      }
-    } else {
-      // Uncheck this stage and all subsequent stages
-      let unchecking = false
-      for (const s of STAGE_ORDER.slice(1)) {
-        const f = STAGE_TO_FIELD[s]
-        if (!f) continue
-        if (s === stage) unchecking = true
-        if (unchecking) newState[f] = false
-      }
-    }
-
-    const newColumn = deriveColumn(newState)
+    const newColumn = stage as BoardColumn
+    const newState: Record<string, boolean> = getCheckboxesForColumn(newColumn)
 
     // Compliance guardrail: block fielding/delivery when the client's review
     // isn't approved; allow an explicit, recorded override.
@@ -215,5 +203,5 @@ export function usePipelineStage(project: SurveyProject) {
     proceedToDelivery(newState, newColumn, willMarkDelivered)
   }
 
-  return { toggleStage, gate, setGate, occamGate, setOccamGate }
+  return { goToStage, gate, setGate, occamGate, setOccamGate }
 }

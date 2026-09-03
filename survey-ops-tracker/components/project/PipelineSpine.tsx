@@ -18,7 +18,7 @@ interface PipelineSpineProps {
  * so clicking a dot or the CTA behaves identically to the legacy checkbox row.
  */
 export function PipelineSpine({ project }: PipelineSpineProps) {
-  const { toggleStage, gate, setGate, occamGate, setOccamGate } = usePipelineStage(project)
+  const { goToStage, gate, setGate, occamGate, setOccamGate } = usePipelineStage(project)
   const updateProject = useUpdateProject()
 
   // CTA state: the next stage to advance into is the one right after the
@@ -42,7 +42,7 @@ export function PipelineSpine({ project }: PipelineSpineProps) {
           // current node is ALWAYS the accent dot, and later nodes stay hollow
           // even if a later checkbox was toggled. Delivered is terminal, so its
           // (last) node reads done rather than "current". Click behavior below
-          // is unchanged — every node still calls toggleStage(stage).
+          // is unchanged — every node still calls goToStage(stage).
           const nodeState: 'done' | 'current' | 'upcoming' =
             i < currentIdx
               ? 'done'
@@ -68,12 +68,12 @@ export function PipelineSpine({ project }: PipelineSpineProps) {
                 />
                 <button
                   type="button"
-                  onClick={() => isClickable && toggleStage(stage)}
+                  onClick={() => isClickable && goToStage(stage)}
                   disabled={!isClickable}
                   aria-current={isCurrent ? 'step' : undefined}
                   title={
                     isClickable
-                      ? `${STAGE_DESCRIPTIONS[stage] ?? stage} Click to toggle this stage done/undone.${isCurrent ? ' (Current stage.)' : ''}`
+                      ? `${STAGE_DESCRIPTIONS[stage] ?? stage} Click to move the project to this stage.${isCurrent ? ' (Already here.)' : ''}`
                       : `${STAGE_DESCRIPTIONS[stage] ?? stage}${isCurrent ? ' (Current stage.)' : ''}`
                   }
                   className={`shrink-0 flex items-center justify-center w-7 h-7 rounded-full border text-xs leading-none transition-colors ${
@@ -119,7 +119,7 @@ export function PipelineSpine({ project }: PipelineSpineProps) {
         ) : willDeliver ? (
           <button
             type="button"
-            onClick={() => toggleStage('Delivery')}
+            onClick={() => goToStage('Delivery')}
             title="Mark this project delivered — the deliverable has been sent to the client."
             className="inline-flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition-colors shrink-0"
           >
@@ -128,7 +128,7 @@ export function PipelineSpine({ project }: PipelineSpineProps) {
         ) : nextStage ? (
           <button
             type="button"
-            onClick={() => toggleStage(nextStage)}
+            onClick={() => goToStage(nextStage)}
             title={`${STAGE_DESCRIPTIONS[nextStage] ?? ''} Advances this project to ${stageLabel(nextStage)}.`}
             className="inline-flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground transition-colors shrink-0"
           >
