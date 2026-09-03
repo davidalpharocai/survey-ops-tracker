@@ -70,6 +70,22 @@ describe('deriveCurrentStage', () => {
   })
 })
 
+// THESE FOUR ASSERTIONS WERE REVERSED ON 2026-09-02, deliberately, because they
+// asserted the bug.
+//
+// They encoded "the destination stage itself is NOT checked", taken from
+// getCheckboxesForColumn's old docstring. The deriveCurrentStage block IN THIS
+// SAME FILE asserts the opposite — "returns Fielding when first 4 checked", the
+// fourth being stage_fielding — so the file contradicted itself and nobody ever
+// composed the two halves. Composing them is now its own test
+// (lib/utils/stage.test.ts): deriveCurrentStage(getCheckboxesForColumn(X)) must
+// equal X, which failed for six of seven columns.
+//
+// Which half was right was settled by the live data, not by argument: 20 of 25
+// open projects matched deriveCurrentStage, and the 5 that did not were exactly
+// the rows written through getCheckboxesForColumn — self-contradictory rows
+// sitting in one column with flags meaning the previous one. David hit it as
+// "when i move a survey back to fielding, it goes to EdwinQA instead".
 describe('getCheckboxesForColumn', () => {
   it('returns all false for Submitted', () => {
     const r = getCheckboxesForColumn('Submitted')
@@ -77,32 +93,33 @@ describe('getCheckboxesForColumn', () => {
     expect(r.stage_survey_programming).toBe(false)
     expect(r.stage_delivery).toBe(false)
   })
-  it('returns all false for Doc Programming (no prior checkboxes)', () => {
+  it('checks doc for Doc Programming — a flag means the stage is REACHED', () => {
     const r = getCheckboxesForColumn('Doc Programming')
-    expect(r.stage_doc_programming).toBe(false)  // Doc Programming is the destination, not yet done
-    expect(r.stage_survey_programming).toBe(false)
-  })
-  it('checks doc=true for Survey Programming (doc is prior stage)', () => {
-    const r = getCheckboxesForColumn('Survey Programming')
     expect(r.stage_doc_programming).toBe(true)
     expect(r.stage_survey_programming).toBe(false)
   })
-  it('checks all stages before Fielding (not Fielding itself)', () => {
+  it('checks doc + survey for Survey Programming', () => {
+    const r = getCheckboxesForColumn('Survey Programming')
+    expect(r.stage_doc_programming).toBe(true)
+    expect(r.stage_survey_programming).toBe(true)
+    expect(r.stage_edwin_qa).toBe(false)
+  })
+  it('checks Fielding itself, and not Data QA', () => {
     const r = getCheckboxesForColumn('Fielding')
     expect(r.stage_doc_programming).toBe(true)
     expect(r.stage_survey_programming).toBe(true)
     expect(r.stage_edwin_qa).toBe(true)
-    expect(r.stage_fielding).toBe(false)
+    expect(r.stage_fielding).toBe(true)
     expect(r.stage_data_qa).toBe(false)
     expect(r.stage_delivery).toBe(false)
   })
-  it('checks all 5 before Delivery', () => {
+  it('checks all six for Delivery, matching stageColumnsFor(markDelivered)', () => {
     const r = getCheckboxesForColumn('Delivery')
     expect(r.stage_doc_programming).toBe(true)
     expect(r.stage_survey_programming).toBe(true)
     expect(r.stage_edwin_qa).toBe(true)
     expect(r.stage_fielding).toBe(true)
     expect(r.stage_data_qa).toBe(true)
-    expect(r.stage_delivery).toBe(false)
+    expect(r.stage_delivery).toBe(true)
   })
 })
