@@ -1,0 +1,110 @@
+# The gate that did not exist.
+#
+# WHY THIS EXISTS
+#
+# Until 2026-09-02 this repo had no CI at all. Every check was a human running it
+# by hand, and the week of 2026-08-27 is what that costs:
+#
+#   * Production served four-day-old code (2026-08-27 to 08-31). A
+#     react-hooks/rules-of-hooks error made `next build` exit 1, so every deploy
+#     failed while the last good build kept serving. Nothing noticed, because
+#     `tsc --noEmit` does NOT run ESLint and the dev server only WARNS on that
+#     rule. Types passed. All 1,255 tests passed. The site looked healthy. It
+#     surfaced only when a colleague could not use a feature merged three days
+#     earlier.
+#   * A test file asserted a bug for months (__tests__/lib/utils/stage.test.ts),
+#     because its two halves contradicted each other and nothing ever composed
+#     them.
+#
+# The lesson is specifically that `npm run build` is the only command that runs
+# ALL THREE of compile, typecheck and lint — and it was the one nobody ran.
+#
+# So: build on every push, and treat a failure as blocking.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# A newer push makes an in-flight run irrelevant; don't queue behind it.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        # The Next app is a subdirectory; the repo root holds several projects.
+        working-directory: survey-ops-tracker
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: survey-ops-tracker/package-lock.json
+
+      - run: npm ci
+
+      # FIRST, and on its own, because this is the step whose absence froze
+      # production for four days. `next build` compiles, typechecks AND lints,
+      # and treats a rules-of-hooks violation as fatal where tsc and vitest see
+      # nothing. If only one step ever runs here, it is this one.
+      #
+      # The heap bump is not cosmetic: this build exhausts the default limit on
+      # a large TypeScript project and dies mid-typecheck with a bare exit 127,
+      # which reads as a broken toolchain rather than as out-of-memory.
+      #
+      # Env vars are dummies. The build must not need real credentials — if it
+      # ever does, that is itself the bug, because it would mean a page is
+      # reaching the database at build time instead of rendering dynamically.
+      - name: Build (compile + typecheck + lint)
+        run: npm run build
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
+          SUPABASE_SERVICE_ROLE_KEY: placeholder-service-key
+
+      # --no-file-parallelism is required, not a preference: without it this
+      # suite is order-dependent and fails intermittently.
+      - name: Tests
+        run: npx vitest run --no-file-parallelism
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
+          SUPABASE_SERVICE_ROLE_KEY: placeholder-service-key
+
+      # Belt and braces. `next build` already typechecks, so this only earns its
+      # place by failing FASTER to read: it names every error at once, where the
+      # build stops at the first. Non-blocking so it can never be the reason a
+      # good build is rejected.
+      - name: Typecheck (advisory)
+        continue-on-error: true
+        run: npx tsc --noEmit
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+
+  # A guard against the specific class of bug found on 2026-09-02: two functions
+  # that are supposed to be inverses of each other, drifting apart because
+  # nothing composed them. That one corrupted 10 of 360 live rows and had a test
+  # file asserting the broken half.
+  #
+  # Not a lint rule — it is a reminder in the run log, aimed at whoever is
+  # reading a failure. Cheap, and it puts the question in front of a human at the
+  # moment they are already looking.
+  invariants:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - run: |
+          echo "::notice title=Paired definitions::If this change touched a formula or a"
+          echo "::notice::definition that exists in more than one place, add a test that"
+          echo "::notice::COMPOSES them rather than testing each half. The spend formula"
+          echo "::notice::is hand-copied across 7 files; getCheckboxesForColumn and"
+          echo "::notice::deriveCurrentStage were inverses that disagreed for months."
