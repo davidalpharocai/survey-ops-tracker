@@ -228,6 +228,10 @@ export type Database = {
           survey_tool_id: string | null
           client_id: string | null
           budget: number | null
+          /** 100: what this survey costs the client, in credits. NULL = not
+           *  priced yet, which is NOT zero. */
+          credits: number | null
+          term_id: string | null
           actual_spend: number | null
           longitudinal: boolean
           salesperson: string | null
@@ -309,6 +313,8 @@ export type Database = {
           survey_tool_id?: string | null
           client_id?: string | null
           budget?: number | null
+          credits?: number | null
+          term_id?: string | null
           actual_spend?: number | null
           longitudinal?: boolean
           salesperson?: string | null
@@ -390,6 +396,8 @@ export type Database = {
           survey_tool_id?: string | null
           client_id?: string | null
           budget?: number | null
+          credits?: number | null
+          term_id?: string | null
           actual_spend?: number | null
           longitudinal?: boolean
           salesperson?: string | null
@@ -698,6 +706,10 @@ export type Database = {
           compliance_after_fielding: boolean
           compliance_contact: string | null
           compliance_notes: string | null
+          /** 100: the account owner, matching salespeople.canonical_name.
+           *  Imported from CCM's Relationship Manager. This is what scopes the
+           *  sales view. */
+          salesperson: string | null
           created_at: string
           deleted_at: string | null
         }
@@ -710,6 +722,7 @@ export type Database = {
           compliance_after_fielding?: boolean
           compliance_contact?: string | null
           compliance_notes?: string | null
+          salesperson?: string | null
           created_at?: string
           deleted_at?: string | null
         }
@@ -722,8 +735,78 @@ export type Database = {
           compliance_after_fielding?: boolean
           compliance_contact?: string | null
           compliance_notes?: string | null
+          salesperson?: string | null
           created_at?: string
           deleted_at?: string | null
+        }
+        Relationships: []
+      }
+      client_terms: {
+        Row: {
+          id: string
+          client_id: string
+          name: string
+          /** The credit pool. NUMERIC in the database because repeat-wave
+           *  discounts produce fractions. NULL = never recorded, not zero. */
+          credits_total: number | null
+          starts_on: string | null
+          renews_on: string | null
+          note: string | null
+          source: string | null
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+        }
+        Insert: {
+          id?: string
+          client_id: string
+          name: string
+          credits_total?: number | null
+          starts_on?: string | null
+          renews_on?: string | null
+          note?: string | null
+          source?: string | null
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+        }
+        Update: {
+          id?: string
+          client_id?: string
+          name?: string
+          credits_total?: number | null
+          starts_on?: string | null
+          renews_on?: string | null
+          note?: string | null
+          source?: string | null
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+        }
+        Relationships: []
+      }
+      /** Split from client_terms because dollars_total is CONTRACT VALUE, which
+       *  085's view_financials covers, and RLS cannot hide a column from a row it
+       *  admits. Same shape and same can_view_financials() gate as
+       *  project_financials — one financial gate in this codebase, not two. */
+      client_term_financials: {
+        Row: {
+          term_id: string
+          dollars_total: number | null
+          updated_by: string | null
+          updated_at: string
+        }
+        Insert: {
+          term_id: string
+          dollars_total?: number | null
+          updated_by?: string | null
+          updated_at?: string
+        }
+        Update: {
+          term_id?: string
+          dollars_total?: number | null
+          updated_by?: string | null
+          updated_at?: string
         }
         Relationships: []
       }
