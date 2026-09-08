@@ -22,6 +22,7 @@ import { LinkedDocuments } from '@/components/project/LinkedDocuments'
 import { SlackChannel } from '@/components/project/SlackChannel'
 import { InfoTooltip, HelpTip } from '@/components/shared/InfoTooltip'
 import { Skeleton } from '@/components/shared/Skeleton'
+import { DocumentTitle } from '@/components/shared/DocumentTitle'
 import { ProjectInsights } from '@/components/project/ProjectInsights'
 import { ContextTab } from '@/components/project/ContextTab'
 import { CompliancePanel } from '@/components/compliance/CompliancePanel'
@@ -267,6 +268,10 @@ export default function ProjectDetailPage() {
 
   return (
     <div className="max-w-6xl mx-auto">
+      {/* The open study's name in the browser tab. Mounted on THIS branch only —
+          not on the loading or not-found returns — so a tab never advertises a
+          study that is still loading or does not exist. */}
+      <DocumentTitle title={project.project_name} />
       {/* Header */}
       <div className="flex items-center gap-3 mb-6 flex-wrap">
         <button
