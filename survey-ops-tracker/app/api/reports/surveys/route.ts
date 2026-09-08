@@ -8,16 +8,42 @@ import {
   type SurveyEvent, type SurveyType,
 } from '@/lib/mcp/reports'
 import { canViewFinancials } from '@/lib/auth/capabilities'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { isAllowedEmail } from '@/lib/utils/allowedDomain'
 
 export const dynamic = 'force-dynamic'
 
 // Downloadable .xlsx survey report. The connector's survey_report tool returns a
 // link here; the (already-signed-in) analyst clicks it in their browser and the
 // spreadsheet downloads. Auth is the normal app session — never anonymous.
+//
+// GATED TO INTERNAL ANALYSTS, and it has to be, because surveyRows() reads
+// through createAdminClient() (lib/mcp/reports.ts:141) and therefore BYPASSES
+// RLS. Until 2026-09-08 the only check here was "is anyone signed in", which
+// meant every non-analyst account could download the whole portfolio: five of
+// them existed, including two EXTERNAL compliance reviewers at
+// holoceneadvisors.com and the sales tier. Money was gated (canViewFinancials
+// below) so what walked out was rows — every client name, project, date, N and
+// salesperson in the organisation, to a client's own reviewer.
+//
+// Same shape as /api/mcp, the other route that hands over bulk data: read the
+// profile LIVE and require both the analyst tier and an internal address.
+// isAllowedEmail alone is not enough — a compliance reviewer could be given an
+// alpharoc.ai address — and the tier alone is not enough either, which is why
+// /api/mcp checks both.
 export async function GET(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.redirect(new URL('/login', req.url))
+
+  const gate = createAdminClient()
+  const { data: profile, error: profileError } = await gate
+    .from('profiles').select('role, email').eq('id', user.id).maybeSingle()
+  // A transient database failure is not proof of entitlement. Fail closed.
+  if (profileError || !profile || profile.role !== 'analyst' || !isAllowedEmail(profile.email)) {
+    return NextResponse.json(
+      { error: 'This report is for internal analysts.' }, { status: 403 })
+  }
 
   const sp = req.nextUrl.searchParams
   const event = sp.get('event') as SurveyEvent | null
