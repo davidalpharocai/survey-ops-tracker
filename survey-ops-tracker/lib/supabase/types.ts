@@ -1994,6 +1994,48 @@ export type Database = {
        * faithful to the base table instead, since the WHERE cannot produce a
        * null id.
        */
+      /** Migration 105. Column-restricted, self-scoped projections for the
+       *  sales tier, same pattern as sales_projects. The ABSENT columns are the
+       *  point: clients' compliance_* group and drive_folder_id, contacts'
+       *  occam_invited_* and created_by, terms' note and source — and terms
+       *  carry CREDITS ONLY, never dollars, which live in the finance-gated
+       *  client_term_financials. Adding a field here without adding it to the
+       *  view's SELECT gives a lie that tsc will believe. */
+      sales_clients: {
+        Row: {
+          id: string
+          name: string
+          code: string | null
+          salesperson: string | null
+          created_at: string
+        }
+        Relationships: []
+      }
+      sales_contacts: {
+        Row: {
+          id: string
+          client_id: string
+          first_name: string | null
+          last_name: string | null
+          email: string | null
+          title: string | null
+          phone: string | null
+          created_at: string
+        }
+        Relationships: []
+      }
+      sales_terms: {
+        Row: {
+          id: string
+          client_id: string
+          name: string
+          credits_total: number | null
+          starts_on: string | null
+          renews_on: string | null
+          created_at: string
+        }
+        Relationships: []
+      }
       sales_projects: {
         Row: {
           id: string

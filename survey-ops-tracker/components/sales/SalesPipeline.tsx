@@ -255,7 +255,11 @@ export function SalesPipeline({ rows }: { rows: SalesRow[] }) {
                   <td className="px-4 py-3">
                     {/* A real link, so right-click and cmd-click work — the
                         standing rule for every hyperlinked element in this app. */}
-                    <Link href={`/projects/${r.id}`} className="block font-medium hover:underline">
+                    {/* /sales/surveys/, NOT /projects/. app/(app)/layout.tsx redirects
+                        role==='sales' to /sales before rendering, so the (app) link
+                        bounced the user back to this very list — the one interaction
+                        the page offered was a loop. */}
+                    <Link href={`/sales/surveys/${r.id}`} className="block font-medium hover:underline">
                       {r.project_name}
                     </Link>
                     {r.project_code && (

@@ -26,13 +26,79 @@
 
 export type ChangeKind = 'NEW' | 'IMPROVED' | 'FIXED'
 
+/**
+ * Who may read a bullet.
+ *
+ * DEFAULT-DENY, and that is the whole design: an entry with no `audience` is
+ * internal-only. Tagging is an act of disclosure, so forgetting to tag hides a
+ * bullet rather than leaking one — the failure mode has to be the safe one,
+ * because the person adding a line at the end of a Friday is not thinking about
+ * the sales tier.
+ *
+ * Why this exists at all: the sales portal gets a What's-new page, and this file
+ * already contained our spend figures ("understating what we actually spend by
+ * about $4,500", "had in fact used 85% of its budget"), what the client pays and
+ * the resulting margin, the names of who holds the finance role, a disclosed past
+ * vulnerability, and — flatly — that an internal target exists distinct from the
+ * client-facing one, which is the single fact David asked to keep from sales.
+ * Shipping the page without this would have handed all of it over.
+ *
+ * 'all' means a salesperson may read it. Ask of every bullet: would I be relaxed
+ * if this were forwarded to the client? Anything about money we spend, what we
+ * charge, margin, internal targets, who can see what, or a past security gap is
+ * NOT 'all'.
+ */
+export type ChangeAudience = 'all' | 'internal'
+
+export interface ChangeItem {
+  kind: ChangeKind
+  text: string
+  /** Omit for internal-only. Only `audience: 'all'` reaches the sales portal. */
+  audience?: ChangeAudience
+}
+
 export interface ChangelogEntry {
   /** ISO date (YYYY-MM-DD) the change reached the live site. */
   date: string
-  changes: { kind: ChangeKind; text: string }[]
+  changes: ChangeItem[]
+}
+
+/**
+ * The changelog as a given reader may see it.
+ *
+ * Filters the bullets, then drops any date whose bullets all filtered out — a
+ * date heading with nothing under it reads as a bug, and a run of them tells a
+ * salesperson exactly how much they are not being shown, which is its own kind
+ * of disclosure.
+ */
+export function changelogFor(audience: ChangeAudience): ChangelogEntry[] {
+  if (audience === 'internal') return CHANGELOG
+  return CHANGELOG
+    .map(e => ({ ...e, changes: e.changes.filter(c => c.audience === 'all') }))
+    .filter(e => e.changes.length > 0)
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    date: '2026-09-09',
+    changes: [
+      {
+        kind: 'NEW',
+        audience: 'all',
+        text: 'Your own workspace. Surveys, Accounts, Contacts and What’s new across the top, with search on every list, sortable columns and a column picker you can set to whatever you actually use.',
+      },
+      {
+        kind: 'NEW',
+        audience: 'all',
+        text: 'Account pages. Every account you own has a page with its contacts, its surveys and its credit position, and you can export it as a PDF to send on.',
+      },
+      {
+        kind: 'IMPROVED',
+        audience: 'all',
+        text: 'Clicking a survey opens it. Previously it bounced you back to the list.',
+      },
+    ],
+  },
   {
     date: '2026-09-01',
     changes: [
@@ -84,7 +150,11 @@ export const CHANGELOG: ChangelogEntry[] = [
       },
       {
         kind: 'IMPROVED',
-        text: 'Project names, clients and contacts are real links everywhere. Right-click to open in a new tab, middle-click, or Cmd/Ctrl-click all work now — on the board, the list, the calendar, and the client and contact pages.',
+        audience: 'all',
+        // Reworded when this was tagged for sales: the original listed the
+        // board, the calendar and the analyst client pages, none of which the
+        // sales tier can open. The improvement itself is real for them.
+        text: 'Survey names, accounts and contacts are real links everywhere. Right-click to open in a new tab, middle-click, or Cmd/Ctrl-click all work now.',
       },
       {
         kind: 'IMPROVED',
@@ -123,6 +193,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     changes: [
       {
         kind: 'NEW',
+        audience: 'all',
         text: 'N target can be a range — a minimum and a maximum — instead of a single number, per segment, rolling up to the project.',
       },
       {
@@ -152,6 +223,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     changes: [
       {
         kind: 'NEW',
+        audience: 'all',
         text: 'Cut-off values — survey IDs especially — can be read in full on hover and copied with one click.',
       },
       {
