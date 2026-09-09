@@ -64,9 +64,9 @@ export type Database = {
         Relationships: []
       }
       app_config: {
-        Row: { id: number; ai_monthly_cap_usd: number; ai_hard_stop: boolean; updated_at: string; blast_cost_per_send: number }
-        Insert: { id?: number; ai_monthly_cap_usd?: number; ai_hard_stop?: boolean; updated_at?: string; blast_cost_per_send?: number }
-        Update: { id?: number; ai_monthly_cap_usd?: number; ai_hard_stop?: boolean; updated_at?: string; blast_cost_per_send?: number }
+        Row: { id: number; ai_monthly_cap_usd: number; ai_hard_stop: boolean; updated_at: string; blast_cost_per_send: number; zoominfo_cost_per_contact: number }
+        Insert: { id?: number; ai_monthly_cap_usd?: number; ai_hard_stop?: boolean; updated_at?: string; blast_cost_per_send?: number; zoominfo_cost_per_contact?: number }
+        Update: { id?: number; ai_monthly_cap_usd?: number; ai_hard_stop?: boolean; updated_at?: string; blast_cost_per_send?: number; zoominfo_cost_per_contact?: number }
         Relationships: []
       }
       ai_usage: {

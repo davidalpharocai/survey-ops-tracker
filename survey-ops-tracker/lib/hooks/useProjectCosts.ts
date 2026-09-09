@@ -99,3 +99,29 @@ export function useDeleteCost(projectId: string) {
     onSettled: () => invalidateAll(qc, projectId),
   })
 }
+
+/**
+ * The configured ZoomInfo rate (migration 104), for the suggested contacts-export
+ * line. Its own tiny query rather than a field on useAppConfig, because that hook
+ * is the AI-spend cap and is loaded on the observability screen, not on a project
+ * page.
+ *
+ * `retry: false` and a null fallback: before 104 is applied the column does not
+ * exist and the select 400s, and a project page must not break over a suggestion.
+ * A null rate simply means no suggestion is offered.
+ */
+export function useZoomInfoRate() {
+  const supabase = createClient()
+  return useQuery({
+    queryKey: ['zoominfo-rate'],
+    queryFn: async (): Promise<number | null> => {
+      const { data, error } = await supabase
+        .from('app_config').select('zoominfo_cost_per_contact').eq('id', 1).maybeSingle()
+      if (error) return null
+      const v = (data as { zoominfo_cost_per_contact?: number } | null)?.zoominfo_cost_per_contact
+      return v == null ? null : Number(v)
+    },
+    retry: false,
+    staleTime: 300_000,
+  })
+}

@@ -39,22 +39,20 @@ const TIP = {
     'The weighted average price per N = Σ(rate × N) ÷ ΣN. Shown at both ends of the N range because the segment mix — and therefore the average — shifts between the minimum and maximum N. Segments with no rate at all are left out of both halves of that division, so an unpriced segment can’t make the average look like a discount.',
   contract:
     'Contract value = Σ(rate × N target min) .. Σ(rate × N target max). Two numbers, not one, because the N target is a range: the low end is what we earn delivering the minimum we committed to, the high end if the client takes the full range.',
-  margin:
-    'Contract value minus Actual $ (the trigger-computed spend: blasts + suppliers + flat vendor fees). Margin against money already committed, not a forecast against the budget.',
-  marginNoCost:
-    'Nothing has been logged on the cost side yet — no blast, no supplier, no flat vendor fee — so Actual $ is still nothing and this figure is the contract value, not a margin. It is shown without a percentage on purpose: a 100% margin here would read as pure profit when the honest statement is that we don’t know yet what running this costs.',
+  profit:
+    'What this survey has actually MADE: what the client is billable for at the N collected so far — Σ(rate × N collected) — minus Actual $, the trigger-computed spend (blasts + suppliers + flat vendor fees). This is the real position, and it moves as N lands.',
+  profitNoN:
+    'Nothing has been collected yet, so nothing is billable yet and there is no profit to state. Any spend already incurred is shown as the hole it currently is, which is the honest reading before fielding delivers.',
+  profitNoCost:
+    'Nothing has been logged on the cost side yet — no blast, no supplier, no flat vendor fee — so this figure is the billable amount, not a profit. Shown without a percentage on purpose: 100% would read as pure profit when the honest statement is that we do not yet know what running this costs.',
+  profitPartialCost:
+    'Some of this project’s cost is not recorded yet: a blast is missing either its completes (the reward half) or its sent count (the send half), and a blast only counts toward Actual $ once it has them. So the cost being subtracted is short and this profit is OVERSTATED. Fill in the blanks on the blast lines above and it settles.',
+  profitUnpriced:
+    'No price per N is set, so there is no revenue side and no profit to compute. Set the rate above.',
+  forecast:
+    'What the job would be worth if it delivers to its N TARGET — contract value minus Actual $ — shown as a range because the target is a range. This is a PROJECTION, not a result: it assumes an N that has not been collected yet. The Profit row above is the actual position.',
   invoiced:
-    'What the job is worth priced at the N actually collected so far, rather than at target — Σ(rate × N collected) — and the margin that leaves against Actual $.',
-  invoicedNoCost:
-    'What the job is worth priced at the N actually collected so far, rather than at target — Σ(rate × N collected). No margin is shown next to it because nothing has been logged on the cost side yet: it would repeat this same number at 100%.',
-  // A THIRD state, distinct from "no cost logged". Some cost is recorded, so the
-  // two NoCost strings above ("nothing has been logged") would be a plain lie —
-  // and the number is worse than unknown here, it is knowably too high, because
-  // every unrecorded blast is missing from the subtraction.
-  marginPartialCost:
-    'Some of this project’s cost is not recorded yet: one or more blasts is missing a figure its cost needs — the completes for the reward half, or the sent count for the send half — and a blast only counts toward Actual $ once it has them. So Actual $ is understated, and this margin is therefore OVERSTATED by whatever those blasts cost. Fill in the blank figures on the blast lines above and it settles.',
-  invoicedPartialCost:
-    'What the job is worth priced at the N actually collected so far — Σ(rate × N collected). The margin beside it is marked indicative because one or more blasts is missing a figure its cost needs (completes, or the sent count), so the cost being subtracted is incomplete and the margin reads higher than it is.',
+    'Σ(rate × N collected) — what the client is billable for on what has actually been delivered so far, before cost. The first of the two numbers behind Profit above.',
   unpriced:
     'N belonging to segments with no rate — neither their own nor a project default. It is excluded from the blended rate and from the contract value, so both figures understate the job until it is priced.',
   ceiling:
@@ -283,6 +281,12 @@ export function PricingWidget({ projectId, budget, actualSpend }: PricingWidgetP
   // stop. Reachable through "+ Log blast", which starts a blast with no
   // sent count on purpose.
   const unknownSend = unknownSendBlasts(blastRows)
+
+  // N actually collected across the priced lines — the divisor behind "billable
+  // now", and what decides whether there is any profit to state at all.
+  const nCollectedTotal = lines.reduce((t, l) => t + Number(l.nCollected ?? 0), 0)
+  // Once delivered, "so far" is misleading — the number is final, not partial.
+  const isDelivered = project?.board_column === 'Delivery' || project?.delivered_at != null
   const costKnown = hasRecordedCost(actualSpend) && unknownBlasts === 0 && unknownSend === 0
   const marginText =
     margins == null
@@ -411,40 +415,101 @@ export function PricingWidget({ projectId, budget, actualSpend }: PricingWidgetP
           </p>
         )}
 
+        {/* PROFIT — the headline, and it is computed from what the client is
+            actually billable for (rate x N collected), NOT from the contract
+            value at target.
+
+            This used to be the other way round: the row labelled "Margin" was
+            contract-at-target minus spend, and the honest figure was the muted
+            grey line beneath it. On PR00402 that read "Margin $513 - $8,013"
+            while the real position was 11 delivered x $500 - $4,486.81 =
+            $1,013. On PR00425 it read "$5,000" against 8 of 250 N collected and
+            nothing spent, where the earned figure was $160. A forecast wearing
+            the label of a result, in the one place the number is used to make
+            decisions. */}
         <div className="flex items-center justify-between">
           <span className="flex items-center text-xs text-muted-foreground">
-            Margin{!costKnown && margins != null ? ' (indicative)' : ''}
-            <InfoTooltip text={costKnown ? TIP.margin : unknownBlasts > 0 ? TIP.marginPartialCost : TIP.marginNoCost} />
-            <CalcMark from="Contract value − Actual $" />
+            Profit{nCollectedTotal > 0 && !isDelivered ? ' so far' : ''}
+            {!costKnown && invoiced != null ? ' (indicative)' : ''}
+            <InfoTooltip
+              text={
+                invoiced == null
+                  ? TIP.profitUnpriced
+                  : nCollectedTotal === 0
+                    ? TIP.profitNoN
+                    : costKnown
+                      ? TIP.profit
+                      : unknownBlasts > 0 || unknownSend > 0
+                        ? TIP.profitPartialCost
+                        : TIP.profitNoCost
+              }
+            />
+            <CalcMark from="(rate × N collected) − Actual $" />
           </span>
-          {margins == null ? (
+          {invoiced == null ? (
             <span className="text-sm text-muted-foreground">—</span>
-          ) : !costKnown ? (
-            // Neutral, and with no percentage: green and "100%" would sell an
-            // unknown cost as the best possible news. Two different reasons land
-            // here and they need different words — "no cost logged yet" is simply
-            // untrue when some blasts ARE recorded and others are not, and that
-            // second case is the more dangerous one, because the number is not
-            // merely unknown, it is knowably too high.
+          ) : nCollectedTotal === 0 ? (
+            // Nothing collected yet, so there is nothing earned yet. Showing
+            // -Actual$ in red would be true but useless before fielding starts;
+            // say what is actually the case.
             <span className="text-sm tabular-nums text-muted-foreground">
-              {marginText}
+              {hasRecordedCost(actualSpend) ? `${money(-(actualSpend ?? 0))} · spent, nothing collected yet` : '— · not started'}
+            </span>
+          ) : !costKnown ? (
+            <span className="text-sm tabular-nums text-muted-foreground">
+              {money(margin(invoiced, actualSpend))}
               <span className="ml-1">
-                {unknownBlasts > 0
-                  ? `· ${unknownBlasts} blast${unknownBlasts === 1 ? '' : 's'} with no completes recorded — overstated`
+                {unknownBlasts > 0 || unknownSend > 0
+                  ? '· cost incomplete — overstated'
                   : '· no cost logged yet'}
               </span>
             </span>
           ) : (
             <span
               className={`text-sm font-medium tabular-nums ${
-                margins.low < 0
+                margin(invoiced, actualSpend) < 0
                   ? 'text-red-600 dark:text-red-400'
                   : 'text-emerald-600 dark:text-emerald-400'
               }`}
             >
+              {money(margin(invoiced, actualSpend))}
+              <span className="ml-1 font-normal text-muted-foreground">
+                · {pctText(marginPct(invoiced, actualSpend))}
+              </span>
+            </span>
+          )}
+        </div>
+
+        {/* The two inputs to it, spelled out, so the headline is checkable. */}
+        {invoiced != null && (
+          <div className="flex items-center justify-between pl-3">
+            <span className="flex items-center text-[11px] text-muted-foreground">
+              Billable at N {fmtNum(nCollectedTotal)}
+              <InfoTooltip text={TIP.invoiced} />
+              <CalcMark from="Σ(rate × N collected)" />
+            </span>
+            <span className="text-xs tabular-nums text-muted-foreground">
+              {money(invoiced)} − {hasRecordedCost(actualSpend) ? money(actualSpend) : '$0.00'} spent
+            </span>
+          </div>
+        )}
+
+        {/* FORECAST — the old headline, demoted and relabelled. Still worth
+            showing: it is what the job is worth if it delivers to target, which
+            is the number you price against. It is just not a result. */}
+        <div className="flex items-center justify-between">
+          <span className="flex items-center text-xs text-muted-foreground">
+            Forecast at target
+            <InfoTooltip text={TIP.forecast} />
+            <CalcMark from="Contract value − Actual $, at N target" />
+          </span>
+          {margins == null ? (
+            <span className="text-sm text-muted-foreground">—</span>
+          ) : (
+            <span className="text-sm tabular-nums text-muted-foreground">
               {marginText}
-              {contract && (
-                <span className="ml-1 font-normal text-muted-foreground">
+              {contract && costKnown && (
+                <span className="ml-1">
                   ·{' '}
                   {contract.high > contract.low
                     ? `${pctText(marginPct(contract.low, actualSpend))}–${pctText(marginPct(contract.high, actualSpend))}`
@@ -454,31 +519,6 @@ export function PricingWidget({ projectId, budget, actualSpend }: PricingWidgetP
             </span>
           )}
         </div>
-
-        {invoiced != null && (
-          <div className="flex items-center justify-between">
-            <span className="flex items-center text-xs text-muted-foreground">
-              At N collected
-              <InfoTooltip text={costKnown ? TIP.invoiced : unknownBlasts > 0 ? TIP.invoicedPartialCost : TIP.invoicedNoCost} />
-              <CalcMark from="rate × N collected, then − Actual $ for the margin beside it" />
-            </span>
-            <span className="text-sm tabular-nums text-foreground">
-              {money(invoiced)}
-              <span className="ml-1 text-muted-foreground">
-                {costKnown ? (
-                  <>
-                    · margin {money(margin(invoiced, actualSpend))} ·{' '}
-                    {pctText(marginPct(invoiced, actualSpend))}
-                  </>
-                ) : (
-                  // Same reason as the Margin row: with no cost recorded, the
-                  // margin here would just be this number again, at 100%.
-                  <>· no cost logged yet</>
-                )}
-              </span>
-            </span>
-          </div>
-        )}
 
         {overshoot != null && (
           <div className="mt-1 flex items-start gap-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 px-2.5 py-1.5 text-xs text-amber-700 dark:text-amber-400">

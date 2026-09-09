@@ -16,8 +16,12 @@ import {
   totalCostLines,
   costKindLabel,
   COST_KINDS,
+  useZoomInfoRate,
   type ProjectCost,
 } from '@/lib/hooks/useProjectCosts'
+import { useProject } from '@/lib/hooks/useProjects'
+import { resolveCostMoney } from '@/lib/utils/cost'
+import { fmtNum } from '@/lib/utils/number'
 
 const TIP = {
   header:
@@ -29,8 +33,16 @@ const TIP = {
   date: 'When the fee was incurred — the invoice or send date. Informational; it does not affect the total.',
   description:
     'Optional note on what this fee was for — e.g. “Twilio send, 40k numbers” or “ZoomInfo pull, 3PL contacts”. Doesn’t affect the cost.',
+  zoominfo:
+    'Suggested, not charged. It is audience USED × the configured ZoomInfo rate — never the total available audience, which costs nothing until it is pulled. Adding it creates an ordinary Contacts Export line you can edit or delete, and the suggestion disappears once this project has one, so it cannot be added twice.',
   subtotal:
     'Σ of the flat vendor fees above. Already included in Actual $ — it is one of the three terms behind that number (blasts, suppliers, these).',
+}
+
+/** A per-unit rate, which needs more than 2dp — $0.07 and $0.0725 are both real
+ *  rates and toFixed(2) would flatten the second to the first. */
+function rateText(v: number): string {
+  return '$' + (Math.round(v * 10000) / 10000).toString()
 }
 
 function money(v: number | null): string {
@@ -158,6 +170,8 @@ export function CostLines({ projectId }: { projectId: string }) {
   const supabase = createClient()
   const { data: costs, isError } = useProjectCosts(projectId)
   const add = useAddCost(projectId)
+  const { data: project } = useProject(projectId)
+  const { data: zoomRate } = useZoomInfoRate()
 
   const { data: user } = useQuery({
     queryKey: ['auth-user'],
@@ -204,6 +218,19 @@ export function CostLines({ projectId }: { projectId: string }) {
     )
   }
 
+  // audience_USED, never audience_size. 094 split them precisely so this
+  // arithmetic could not reach for the wrong one: total available is what the
+  // team handed us and costs nothing until it is pulled. David was explicit —
+  // "the cost should not be multiplied against the total available audience".
+  const used = project?.audience_used ?? null
+  const alreadyHasExport = list.some(c => c.kind === 'contacts_export')
+  const priced = used != null && used > 0 && zoomRate != null && zoomRate > 0
+    ? resolveCostMoney({ unitCost: zoomRate, quantity: used })
+    : null
+  const suggestion = !alreadyHasExport && priced?.ok
+    ? { used, rate: zoomRate as number, amount: priced.amount }
+    : null
+
   return (
     <div>
       <div className="mb-2 flex items-center justify-between">
@@ -235,6 +262,42 @@ export function CostLines({ projectId }: { projectId: string }) {
           {add.isPending ? 'Adding…' : '+ Add cost'}
         </button>
       </div>
+
+      {/* THE ZOOMINFO SUGGESTION (migration 104).
+          Offered, never charged automatically. audience_used x rate is a real
+          cost, but making it a term in recompute_project_spend would double-count
+          the moment someone backfills audience_used on a project that already has
+          a hand-entered contacts_export line — PR00402 is exactly that, sitting
+          there waiting. So it becomes a normal, visible, editable cost line that
+          a person chose to create.
+
+          Suppressed once ANY contacts_export line exists, for the same reason:
+          the second one is the double count. */}
+      {suggestion && (
+        <div className="mb-2 flex items-center justify-between gap-2 rounded-lg border border-primary/30 bg-primary/5 px-2.5 py-1.5 text-xs">
+          <span className="text-muted-foreground">
+            Audience used is {fmtNum(suggestion.used)} — ZoomInfo at {rateText(suggestion.rate)}/contact is{' '}
+            <span className="font-medium tabular-nums text-foreground">{money(suggestion.amount)}</span>.
+            <InfoTooltip text={TIP.zoominfo} />
+          </span>
+          <button
+            onClick={() =>
+              add.mutate({
+                kind: 'contacts_export',
+                amount: suggestion.amount,
+                quantity: suggestion.used,
+                description: `ZoomInfo — ${fmtNum(suggestion.used)} contacts @ ${rateText(suggestion.rate)}`,
+                incurred_on: new Date().toISOString().slice(0, 10),
+                created_by: userName,
+              })
+            }
+            disabled={add.isPending}
+            className="shrink-0 font-medium text-primary hover:underline disabled:opacity-40"
+          >
+            {add.isPending ? 'Adding…' : 'Add it'}
+          </button>
+        </div>
+      )}
 
       {undo && (
         <div className="mb-2 flex items-center justify-between gap-2 rounded-lg border border-border bg-muted/30 px-2.5 py-1.5 text-xs text-muted-foreground">
