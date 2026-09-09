@@ -27,7 +27,22 @@ var PROCESSED_LABEL = 'deliverables-filed';
 // when the backing inbox also receives normal email — otherwise every internal email with an attachment
 // or a Google/Occam/Edwin link would get ingested.
 var SOURCE_LABEL = 'Deliverables';
-var MAX_ATTACHMENT_BYTES = 26214400; // ~25 MB; skip larger so the POST stays well under limits
+// VERCEL REJECTS A SERVERLESS REQUEST BODY OVER 4.5 MB, and that is a platform
+// limit no route config can raise. This was 26214400 (~25 MB) with a comment
+// claiming it kept the POST "well under limits" — off by roughly six times, and
+// worse than it looks: base64 inflates bytes by a third, so the cap really
+// allowed a ~33 MB body.
+//
+// The visible cost was a 9.2 MB Bain Occam forward returning HTTP 413 every two
+// hours from 2026-09-09 — 01:05, 03:03, 05:08, 07:13, 09:13, 11:18 — never
+// filed, never replied to, retrying forever because a thread is only labelled
+// done when every message posts OK.
+//
+// 3 MB of attachment is ~4 MB encoded, which leaves room for the body text and
+// the JSON envelope inside 4.5 MB. The TOTAL is what matters, not any single
+// file, so the budget below is spent across all of a message's attachments.
+var MAX_TOTAL_ATTACHMENT_BYTES = 3145728;  // 3 MB of raw bytes per message
+var MAX_ATTACHMENT_BYTES = 3145728;        // and no single file larger than that
 
 function processInbox() {
   var props = PropertiesService.getScriptProperties();
@@ -59,6 +74,46 @@ function processInbox() {
 }
 
 /**
+ * How many times a given message has failed to post.
+ *
+ * Kept in Script Properties beside the processed-id map, and pruned the same
+ * way, so a long-lived failure cannot grow the property without bound. Exists so
+ * a forward that can never succeed is reported ONCE and then left alone, instead
+ * of emailing every two hours forever.
+ */
+var MAX_ATTEMPTS = 3;
+var ATTEMPTS_KEY = 'INGEST_ATTEMPTS';
+
+function readAttempts() {
+  var raw = PropertiesService.getScriptProperties().getProperty(ATTEMPTS_KEY);
+  if (!raw) return {};
+  try { return JSON.parse(raw); } catch (e) { return {}; }
+}
+function writeAttempts(map) {
+  var keys = Object.keys(map);
+  // Only failing messages are in here, so this stays tiny; the cap is a
+  // belt-and-braces guard against a pathological run.
+  if (keys.length > 200) {
+    var trimmed = {};
+    for (var i = keys.length - 200; i < keys.length; i++) trimmed[keys[i]] = map[keys[i]];
+    map = trimmed;
+  }
+  PropertiesService.getScriptProperties().setProperty(ATTEMPTS_KEY, JSON.stringify(map));
+}
+function bumpAttempts(id) {
+  var map = readAttempts();
+  map[id] = (map[id] || 0) + 1;
+  writeAttempts(map);
+  return map[id];
+}
+function clearAttempts(id) {
+  var map = readAttempts();
+  if (map[id] === undefined) return;
+  delete map[id];
+  writeAttempts(map);
+}
+
+/**
  * POST every submission message in each thread to the ingest endpoint, then label the thread done.
  * isSubmission(msg) decides which messages in a thread are real submissions; the rest (original thread
  * siblings — teammates' or the client's mail, or the client's later replies) must never be ingested or
@@ -76,16 +131,29 @@ function processThreads(threads, isSubmission, url, secret, label, failures) {
       if (!isSubmission(msg)) continue;
 
       var attachments = [];
+      var skipped = [];
+      var budget = MAX_TOTAL_ATTACHMENT_BYTES;
       // includeInlineImages:false drops signature logos / tracking pixels at the source.
       var atts = msg.getAttachments({ includeInlineImages: false, includeAttachments: true });
+      // Smallest first, so one oversized file cannot crowd out the small ones
+      // that would have fitted. Filing three of four deliverables beats filing
+      // none, which is what happened before.
+      atts.sort(function (x, y) { return x.getSize() - y.getSize(); });
       for (var a = 0; a < atts.length; a++) {
         var blob = atts[a];
-        var bytes = blob.getBytes();
-        if (bytes.length > MAX_ATTACHMENT_BYTES) continue;
+        var size = blob.getSize();
+        if (size > MAX_ATTACHMENT_BYTES || size > budget) {
+          // RECORDED, not silently dropped. The server files the email with a
+          // note naming what did not come through, so a missing deliverable is
+          // visible in the review queue instead of being a gap nobody sees.
+          skipped.push({ filename: blob.getName(), mimeType: blob.getContentType(), bytes: size });
+          continue;
+        }
+        budget -= size;
         attachments.push({
           filename: blob.getName(),
           mimeType: blob.getContentType(),
-          base64: Utilities.base64Encode(bytes)
+          base64: Utilities.base64Encode(blob.getBytes())
         });
       }
 
@@ -97,7 +165,10 @@ function processThreads(threads, isSubmission, url, secret, label, failures) {
         date: msg.getDate().toUTCString(),
         messageId: msg.getId(),
         body: msg.getPlainBody(),
-        attachments: attachments
+        attachments: attachments,
+        // Present only when something was left behind, so the ingest route can
+        // flag the email rather than file it as if it were complete.
+        skippedAttachments: skipped
       };
 
       var res = UrlFetchApp.fetch(url, {
@@ -109,9 +180,26 @@ function processThreads(threads, isSubmission, url, secret, label, failures) {
       });
       var code = res.getResponseCode();
       if (code < 200 || code >= 300) {
-        allOk = false;
-        failures.push('HTTP ' + code + ' — ' + msg.getSubject());
-        Logger.log('Ingest failed (' + code + ') for message ' + msg.getId() + ': ' + res.getContentText());
+        // A 413 CANNOT SUCCEED ON RETRY — the body is the size it is. Retrying
+        // it every two hours forever is how one Bain forward produced six
+        // identical failure emails in a morning and would have produced them
+        // indefinitely. Count the attempts and give up loudly.
+        var permanent = (code === 413 || code === 400);
+        var tries = bumpAttempts(msg.getId());
+        if (permanent || tries >= MAX_ATTEMPTS) {
+          failures.push('GIVING UP after ' + tries + ' attempt(s) — HTTP ' + code + ' — ' + msg.getSubject() +
+                        (code === 413 ? ' (payload too large even after trimming attachments)' : ''));
+          Logger.log('Dead-lettered ' + msg.getId() + ' (HTTP ' + code + '): ' + res.getContentText());
+          // Deliberately does NOT set allOk = false: the thread gets labelled so
+          // it stops being picked up. It has been reported once, which is the
+          // point — a permanent failure should surface, not repeat.
+        } else {
+          allOk = false;
+          failures.push('HTTP ' + code + ' — ' + msg.getSubject() + ' (attempt ' + tries + ' of ' + MAX_ATTEMPTS + ')');
+          Logger.log('Ingest failed (' + code + ') for message ' + msg.getId() + ': ' + res.getContentText());
+        }
+      } else {
+        clearAttempts(msg.getId());
       }
     }
 

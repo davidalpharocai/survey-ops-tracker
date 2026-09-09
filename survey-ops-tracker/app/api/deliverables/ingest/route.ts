@@ -81,5 +81,31 @@ export async function POST(req: Request) {
   }
 
   const outcome = await ingestEmail(payload as Parameters<typeof ingestEmail>[0], deps)
-  return NextResponse.json({ ok: true, ...outcome })
+
+  /* WHAT THE FORWARDER COULD NOT SEND. Vercel rejects a request body over
+     4.5 MB, so the Apps Script now spends a 3 MB budget across a message's
+     attachments smallest-first and reports the rest here rather than posting a
+     body that 413s — which is what a 9.2 MB Bain forward did every two hours on
+     2026-09-09, filing nothing at all.
+     A skipped file is a MISSING DELIVERABLE, so it is logged where the daily
+     digest and the weekly QA report will show it. Filing three of four
+     attachments silently would be worse than the 413 was: at least a 413 was
+     noisy. */
+  const skipped = Array.isArray((payload as { skippedAttachments?: unknown }).skippedAttachments)
+    ? ((payload as { skippedAttachments: { filename?: string; bytes?: number }[] }).skippedAttachments)
+    : []
+  if (skipped.length) {
+    const mb = (n: number) => (n / 1_048_576).toFixed(1) + ' MB'
+    await logSystemEvent({
+      source: 'deliverables-ingest',
+      status: 'error',
+      detail:
+        `"${String(payload.subject ?? '(no subject)')}" from ${String(payload.from)} was filed WITHOUT ` +
+        `${skipped.length} attachment${skipped.length === 1 ? '' : 's'} too large to forward: ` +
+        skipped.map(a => `${a.filename ?? 'unnamed'} (${mb(Number(a.bytes ?? 0))})`).join(', ') +
+        `. Vercel caps a request body at 4.5 MB. Retrieve these from the original email and upload them by hand.`,
+    })
+  }
+
+  return NextResponse.json({ ok: true, ...outcome, skippedAttachments: skipped.length })
 }
