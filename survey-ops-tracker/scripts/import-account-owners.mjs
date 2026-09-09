@@ -32,7 +32,35 @@ const db = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_
 
 const salesFile = readFileSync('lib/utils/salespeople.ts', 'utf8')
 const block = salesFile.slice(salesFile.indexOf('export const SALESPEOPLE = ['))
-const VALID = new Set([...block.slice(0, block.indexOf(']')).matchAll(/'([^']+)'/g)].map(m => m[1]))
+const CANON = [...block.slice(0, block.indexOf(']')).matchAll(/'([^']+)'/g)].map(m => m[1])
+const VALID = new Set(CANON)
+
+/**
+ * Resolve what a human actually typed to a canonical name.
+ *
+ * The first pass of this script demanded an exact match and rejected all 15
+ * filled-in rows because David typed "Alex" rather than "Alex Pinsky" — which is
+ * a validator being pedantic about something entirely unambiguous, and the cost
+ * of that pedantry is a person redoing a spreadsheet.
+ *
+ * So: exact wins; otherwise a UNIQUE case-insensitive match on the full name or
+ * the first name is accepted and the resolution is printed, so nothing is
+ * coerced silently. Two people sharing a first name would make it ambiguous
+ * again, and that is still refused rather than guessed — the failure mode of
+ * guessing is an account assigned to the wrong person.
+ */
+function resolveName(raw) {
+  const t = raw.trim()
+  if (VALID.has(t)) return { name: t }
+  const low = t.toLowerCase()
+  const hits = CANON.filter(c =>
+    c.toLowerCase() === low ||
+    c.toLowerCase().split(' ')[0] === low ||
+    c.toLowerCase().startsWith(low + ' '))
+  if (hits.length === 1) return { name: hits[0], resolvedFrom: t }
+  if (hits.length > 1) return { error: `"${t}" matches ${hits.join(' and ')} — write the full name.` }
+  return { error: `"${t}" is not a salesperson (${CANON.join(', ')}).` }
+}
 
 // XLSX.read on a buffer, not XLSX.readFile: the ESM build needs fs bound via
 // XLSX.set_fs() before readFile works, and reading the bytes ourselves avoids
@@ -44,7 +72,7 @@ console.log(`${rows.length} rows in ${file}\n`)
 const { data: clients } = await db.from('clients').select('id, name, salesperson').is('deleted_at', null)
 const byId = Object.fromEntries(clients.map(c => [c.id, c]))
 
-const todo = [], skipped = [], problems = []
+const todo = [], skipped = [], problems = [], resolutions = []
 for (const [i, r] of rows.entries()) {
   const line = i + 2
   const id = String(r['Client ID (do not edit)'] ?? '').trim()
@@ -53,21 +81,26 @@ for (const [i, r] of rows.entries()) {
   const c = byId[id]
   if (!c) { problems.push(`row ${line}: client ${id} not found (deleted or merged since the export)`); continue }
   if (!name) { skipped.push(`${c.name} — left blank`); continue }
-  if (!VALID.has(name)) {
-    problems.push(`row ${line}: "${name}" is not a canonical salesperson (${[...VALID].join(', ')}) — for ${c.name}`)
+  const res = resolveName(name)
+  if (res.error) { problems.push(`row ${line}: ${res.error} — for ${c.name}`); continue }
+  const resolved = res.name
+  if (res.resolvedFrom) resolutions.push(`${c.name}: "${res.resolvedFrom}" -> ${resolved}`)
+  if (c.salesperson && c.salesperson !== resolved && !FORCE) {
+    problems.push(`row ${line}: ${c.name} is ALREADY owned by ${c.salesperson}; the sheet says ${resolved}. Someone set it since the export — re-run with --force only if the sheet is right.`)
     continue
   }
-  if (c.salesperson && c.salesperson !== name && !FORCE) {
-    problems.push(`row ${line}: ${c.name} is ALREADY owned by ${c.salesperson}; the sheet says ${name}. Someone set it since the export — re-run with --force only if the sheet is right.`)
-    continue
-  }
-  if (c.salesperson === name) { skipped.push(`${c.name} — already ${name}`); continue }
-  todo.push({ id, name, was: c.salesperson, account: c.name })
+  if (c.salesperson === resolved) { skipped.push(`${c.name} — already ${resolved}`); continue }
+  todo.push({ id, name: resolved, was: c.salesperson, account: c.name })
 }
 
 if (problems.length) {
   console.log(`PROBLEMS (${problems.length}) — nothing below is applied until these are resolved or the rows removed:`)
   for (const p of problems) console.log('  ! ' + p)
+  console.log('')
+}
+if (resolutions.length) {
+  console.log(`RESOLVED what you typed to a full name (${resolutions.length}) — check these read right:`)
+  for (const r of resolutions) console.log('  · ' + r)
   console.log('')
 }
 console.log(`WOULD SET (${todo.length}):`)

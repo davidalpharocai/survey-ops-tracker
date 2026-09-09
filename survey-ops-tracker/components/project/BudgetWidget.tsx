@@ -6,6 +6,7 @@ import { InfoTooltip } from '@/components/shared/InfoTooltip'
 import { costPerN } from '@/lib/utils/blast'
 import { CalcMark } from './fields'
 import { CostLines } from './CostLines'
+import { ProjectCredits } from './ProjectCredits'
 import { PricingWidget } from './PricingWidget'
 
 interface BudgetWidgetProps {
@@ -15,6 +16,11 @@ interface BudgetWidgetProps {
   /** Combined actual spend (blasts + PS suppliers + flat cost lines) — the DB
    *  source of truth, maintained by recompute_project_spend. */
   actualSpend: number | null
+  /** For the credits block. Public, unlike budget and pricing — credits are
+   *  what the CLIENT spends, and sales can see them. */
+  clientId: string | null
+  credits: number | null
+  termId: string | null
 }
 
 function money(value: number | null): string {
@@ -84,7 +90,7 @@ function EditableAmount({
  * restricted to holders of `view_financials`. The gate is soft: it hides, it does
  * not secure.
  */
-export function BudgetWidget({ projectId, budget, nCollected, actualSpend }: BudgetWidgetProps) {
+export function BudgetWidget({ projectId, budget, nCollected, actualSpend, clientId, credits, termId }: BudgetWidgetProps) {
   const updateProject = useUpdateProject()
   // False until the capability check settles true, so a restricted figure can
   // never flash on screen while the answer is still in flight.
@@ -110,6 +116,11 @@ export function BudgetWidget({ projectId, budget, nCollected, actualSpend }: Bud
           which already draw the hairline this block sits under, so CostLines
           renders none of its own. Public: this is cost to run. */}
       <CostLines projectId={projectId} />
+
+      {/* Credits sit between cost-to-run and the finance-gated budget block:
+          they are the client's side of the ledger and are PUBLIC, so they must
+          not end up inside the capability gate below. */}
+      <ProjectCredits projectId={projectId} clientId={clientId} credits={credits} termId={termId} />
 
       <div className="border-t border-border pt-3">
         <p className="text-xs text-muted-foreground uppercase tracking-widest mb-3 font-medium flex items-center">

@@ -23,6 +23,7 @@ import * as data from '@/lib/mcp/data'
 import {
   resolveProjectWritable, resolveStep, resolveContact, resolveSegment, loadGateInput,
   runLogCost, runUpdateCost, runRemoveCost, resolveCost, findCostByIdemKey, listCostsForProject,
+  runCreateTerm, runUpdateTerm, resolveTerm, listTermsForClient, runSetProjectCredits, type TermPatch,
   runAddStep, runCompleteStep, runEditStep, runProjectWrite, runLogBlast,
   resolveBlast, listBlastsForProject, runUpdateBlast, runRemoveBlast,
   runAddSegment, runUpdateSegment, runRemoveSegment,
@@ -2144,6 +2145,222 @@ export const TOOLS: AssistantTool[] = [
             blast_spend_total, blast_reward_total, blast_send_total,
             blasts_with_unknown_cost, blasts_with_unknown_send,
           }
+        }
+      )
+    },
+  },
+  {
+    name: 'add_contract',
+    description:
+      "Record a CONTRACT on a client — an allowance of CREDITS the client has bought, which their surveys then draw down. " +
+      "Credits are the client's unit of spend with us; they are NOT our cost to run a survey (that is blasts, suppliers and cost lines) and NOT dollars. " +
+      "`credits` may be omitted when the contract does not state one: blank means NOT RECORDED, which is a different fact from a contract that bought zero, and the consumption figures shown to clients depend on that distinction. " +
+      "Dates are optional for the same reason — 44 of the 48 contracts in the CCM export carry none. " +
+      "The DOLLAR value of a contract cannot be set here: it lives in a separate finance-gated table by design. " +
+      "A contract on its own draws down nothing — attach surveys to it with set_survey_credits. Preview first; confirm to apply.",
+    kind: 'write',
+    schema: {
+      client: z.string(),
+      name: z.string().min(1).max(200),
+      credits: z.number().min(0).optional(),
+      starts_on: z.string().optional(),
+      renews_on: z.string().optional(),
+      note: z.string().max(1000).optional(),
+      confirm: z.boolean().optional(),
+    },
+    handler: async (rawArgs, ctx, meta) => {
+      const args = rawArgs as {
+        client: string; name: string; credits?: number
+        starts_on?: string; renews_on?: string; note?: string; confirm?: boolean
+      }
+      const { userEmail } = ctx
+      const c = await data.resolveClient(args.client)
+      if (!c) return { error: `No client found matching "${args.client}".` }
+      if ('ambiguous' in c) return c
+      meta.client_id = c.id as string
+
+      for (const [k, v] of [['starts_on', args.starts_on], ['renews_on', args.renews_on]] as const) {
+        if (v && !DUE_DATE_RE.test(v)) return { error: `${k} must be YYYY-MM-DD, got "${v}".` }
+      }
+      if (args.starts_on && args.renews_on && args.renews_on < args.starts_on) {
+        return { error: `renews_on (${args.renews_on}) is before starts_on (${args.starts_on}).` }
+      }
+
+      // A same-named contract on the same client is almost always a re-send or a
+      // misremembered name, and two of them would split one client's drawdown
+      // across both. Warned, not blocked: a genuine renewal may reuse a name.
+      const existing = await listTermsForClient(c.id as string)
+      const twin = existing.find(t => t.name.toLowerCase() === args.name.trim().toLowerCase())
+
+      return confirmable(
+        args,
+        async () => ({
+          summary:
+            `Add contract "${args.name}" to ${c.name}` +
+            `${args.credits != null ? ` — ${fmtNum(args.credits)} credits` : ' — credits not recorded'}` +
+            `${args.starts_on ? `, from ${args.starts_on}` : ''}${args.renews_on ? ` to ${args.renews_on}` : ''}` +
+            (twin ? ` ⚠ ${c.name} ALREADY has a contract called "${twin.name}". Confirming creates a SECOND one and each draws down separately — use update_contract if you meant to change that one.` : ''),
+          client: c.name,
+          existing_contracts: existing.map(t => ({ name: t.name, credits: t.credits_total })),
+        }),
+        async () => {
+          const row = await runCreateTerm({
+            clientId: c.id as string,
+            name: args.name.trim(),
+            creditsTotal: args.credits ?? null,
+            startsOn: args.starts_on ?? null,
+            renewsOn: args.renews_on ?? null,
+            note: args.note ?? null,
+            createdBy: userEmail.split('@')[0],
+          })
+          meta.detail = { created_contract: { id: row.id, name: row.name, credits: row.credits_total } }
+          return {
+            ok: true,
+            contract: { id: row.id, name: row.name, credits: row.credits_total, starts_on: row.starts_on, renews_on: row.renews_on },
+            note: 'No surveys are attached yet, so this contract shows zero consumed. Use set_survey_credits to attach and price them.',
+          }
+        }
+      )
+    },
+  },
+  {
+    name: 'update_contract',
+    description:
+      "Change a contract on a client — its name, credit allowance, dates or note. Identify it by `contract` = its name or its id. Only the fields you pass change; pass null to un-record a value. The dollar value is finance-gated and cannot be set here. Preview first; confirm to apply.",
+    kind: 'write',
+    schema: {
+      client: z.string(),
+      contract: z.string(),
+      name: z.string().min(1).max(200).optional(),
+      credits: z.number().min(0).nullable().optional(),
+      starts_on: z.string().nullable().optional(),
+      renews_on: z.string().nullable().optional(),
+      note: z.string().max(1000).nullable().optional(),
+      confirm: z.boolean().optional(),
+    },
+    handler: async (rawArgs, ctx, meta) => {
+      const args = rawArgs as {
+        client: string; contract: string; name?: string
+        credits?: number | null; starts_on?: string | null; renews_on?: string | null
+        note?: string | null; confirm?: boolean
+      }
+      const c = await data.resolveClient(args.client)
+      if (!c) return { error: `No client found matching "${args.client}".` }
+      if ('ambiguous' in c) return c
+      meta.client_id = c.id as string
+
+      const t = await resolveTerm(c.id as string, args.contract)
+      if (!t) return { error: `No contract matching "${args.contract}" on ${c.name}.` }
+      if ('ambiguous' in t) {
+        return { ambiguous: t.ambiguous, message: `Several contracts on ${c.name} match "${args.contract}". Name one exactly.` }
+      }
+
+      const patch: TermPatch = {}
+      if (args.name !== undefined) patch.name = args.name.trim()
+      if (args.credits !== undefined) patch.credits_total = args.credits
+      if (args.starts_on !== undefined) patch.starts_on = args.starts_on
+      if (args.renews_on !== undefined) patch.renews_on = args.renews_on
+      if (args.note !== undefined) patch.note = args.note
+      if (Object.keys(patch).length === 0) {
+        return { needs: 'a change', message: 'Specify at least one of: name, credits, starts_on, renews_on, note.' }
+      }
+      for (const k of ['starts_on', 'renews_on'] as const) {
+        const v = patch[k] as string | null | undefined
+        if (v && !DUE_DATE_RE.test(v)) return { error: `${k} must be YYYY-MM-DD, got "${v}".` }
+      }
+
+      const desc = Object.entries(patch)
+        .map(([k, v]) => `${k} ${fmtChangeVal((t as Record<string, unknown>)[k])} → ${fmtChangeVal(v)}`)
+        .join('; ')
+
+      return confirmable(
+        args,
+        async () => ({ summary: `Update contract "${t.name}" on ${c.name}: ${desc}` }),
+        async () => {
+          const row = await runUpdateTerm(t.id, patch)
+          meta.detail = { updated_contract: { id: row.id, updated: patch } }
+          return { ok: true, contract: { id: row.id, name: row.name, credits: row.credits_total, starts_on: row.starts_on, renews_on: row.renews_on } }
+        }
+      )
+    },
+  },
+  {
+    name: 'set_survey_credits',
+    description:
+      "Price a survey in CREDITS and attach it to the client's contract — the two halves of one decision, because a priced survey attached to nothing draws down nothing, and an attached survey with no price counts as unknown rather than zero. " +
+      "Credits are entered when the scope is confirmed, i.e. when the survey moves to an active stage. " +
+      "PASSING null FOR `credits` UN-PRICES IT, which is NOT the same as 0: blank means not priced yet and the client-facing totals report it as unknown, whereas 0 asserts the work was genuinely free. " +
+      "`contract` takes the contract's name or id; pass null to detach. Omit either argument to leave it alone. Preview first; confirm to apply.",
+    kind: 'write',
+    schema: {
+      project: z.string(),
+      credits: z.number().min(0).nullable().optional(),
+      contract: z.string().nullable().optional(),
+      confirm: z.boolean().optional(),
+    },
+    handler: async (rawArgs, ctx, meta) => {
+      const args = rawArgs as {
+        project: string; credits?: number | null; contract?: string | null; confirm?: boolean
+      }
+      const p = await resolveProjectWritable(args.project)
+      if (!p) return { error: 'Project not found.' }
+      if ('error' in p) return p
+      if ('ambiguous' in p) return p
+      meta.project_id = p.id as string
+
+      if (args.credits === undefined && args.contract === undefined) {
+        return { needs: 'a change', message: 'Pass `credits`, `contract`, or both.' }
+      }
+
+      const patch: { credits?: number | null; term_id?: string | null } = {}
+      if (args.credits !== undefined) patch.credits = args.credits
+      let termName: string | null = null
+
+      if (args.contract !== undefined) {
+        if (args.contract === null) {
+          patch.term_id = null
+        } else {
+          const clientId = p.client_id as string | null
+          if (!clientId) return { error: 'This survey has no client, so it cannot be attached to a contract.' }
+          const t = await resolveTerm(clientId, args.contract)
+          if (!t) {
+            const have = await listTermsForClient(clientId)
+            return {
+              error: `No contract matching "${args.contract}" on ${p.client}.`,
+              contracts_on_this_client: have.map(x => x.name),
+              hint: have.length === 0 ? 'This client has no contracts yet — add_contract creates one.' : undefined,
+            }
+          }
+          if ('ambiguous' in t) {
+            return { ambiguous: t.ambiguous, message: `Several contracts match "${args.contract}". Name one exactly.` }
+          }
+          patch.term_id = t.id
+          termName = t.name
+        }
+      }
+
+      const creditsWord = args.credits === null ? 'un-priced (back to not recorded)'
+        : args.credits !== undefined ? `${fmtNum(args.credits)} credits` : null
+      const contractWord = args.contract === null ? 'detached from its contract'
+        : termName ? `attached to "${termName}"` : null
+
+      return confirmable(
+        args,
+        async () => ({
+          summary: `${p.project_code}: ${[creditsWord, contractWord].filter(Boolean).join(', ')}`,
+          // The state that makes a client-facing total wrong rather than merely
+          // absent, named before it is committed.
+          warning:
+            patch.credits != null && patch.term_id === null
+              ? 'Priced but not attached to a contract, so it will draw down nothing.'
+              : patch.credits === null && termName
+                ? `Attached to "${termName}" but unpriced, so it counts as unknown against it, not as zero.`
+                : undefined,
+        }),
+        async () => {
+          await runSetProjectCredits(p.id as string, patch)
+          meta.detail = { survey_credits: { project: p.project_code, ...patch } }
+          return { ok: true, project: p.project_code, credits: patch.credits, contract: termName }
         }
       )
     },

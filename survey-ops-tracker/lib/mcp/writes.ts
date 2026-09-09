@@ -872,3 +872,91 @@ export async function runRenameClient(clientId: string, newName: string, actor: 
   })
   if (error) throw new Error(error.message)
 }
+
+// ---- Contracts (client_terms; the UI calls them contracts) ----
+
+export type ClientTermRow = {
+  id: string; client_id: string; name: string
+  credits_total: number | null; starts_on: string | null; renews_on: string | null
+  note: string | null; source: string | null; created_by: string | null
+  created_at: string; deleted_at: string | null
+}
+
+/** Contracts on a client, newest first. Excludes soft-deleted. */
+export async function listTermsForClient(clientId: string): Promise<ClientTermRow[]> {
+  const supabase = createAdminClient()
+  const { data, error } = await supabase
+    .from('client_terms').select('*').eq('client_id', clientId).is('deleted_at', null)
+    .order('starts_on', { ascending: false, nullsFirst: false })
+  if (error) throw new Error(error.message)
+  return (data ?? []) as unknown as ClientTermRow[]
+}
+
+/** Resolve a contract on a client by id or by name (case-insensitive, exact
+ *  before partial). Ambiguity is REPORTED rather than guessed: contracts are
+ *  named things like "2026 Contract" and "2026 Contract - Renewal", and picking
+ *  the first partial match would attach a survey's credits to the wrong one. */
+export async function resolveTerm(
+  clientId: string, ref: string
+): Promise<ClientTermRow | { ambiguous: string[] } | null> {
+  const rows = await listTermsForClient(clientId)
+  const r = ref.trim().toLowerCase()
+  const byId = rows.find(x => x.id === ref.trim())
+  if (byId) return byId
+  const exact = rows.filter(x => x.name.toLowerCase() === r)
+  if (exact.length === 1) return exact[0]
+  const partial = rows.filter(x => x.name.toLowerCase().includes(r))
+  if (partial.length === 1) return partial[0]
+  if (partial.length > 1) return { ambiguous: partial.map(x => x.name) }
+  return null
+}
+
+export async function runCreateTerm(opts: {
+  clientId: string; name: string; creditsTotal: number | null
+  startsOn: string | null; renewsOn: string | null; note: string | null; createdBy: string
+}): Promise<ClientTermRow> {
+  const supabase = createAdminClient()
+  const { data, error } = await supabase
+    .from('client_terms')
+    .insert({
+      client_id: opts.clientId, name: opts.name, credits_total: opts.creditsTotal,
+      starts_on: opts.startsOn, renews_on: opts.renewsOn, note: opts.note,
+      // Distinguishes a connector-created contract from one typed in the app or
+      // imported from CCM, which 100 put this column here for.
+      source: 'connector', created_by: opts.createdBy,
+    })
+    .select().single()
+  if (error) throw new Error(error.message)
+  return data as unknown as ClientTermRow
+}
+
+/** Patch shape spelled out rather than Record<string, unknown>: supabase-js
+ *  excess-property-checks an .update(), so a loose record is rejected at compile
+ *  time — and naming the fields is also what stops a caller patching `source` or
+ *  `client_id` through this path. */
+export type TermPatch = {
+  name?: string
+  credits_total?: number | null
+  starts_on?: string | null
+  renews_on?: string | null
+  note?: string | null
+}
+
+export async function runUpdateTerm(termId: string, patch: TermPatch): Promise<ClientTermRow> {
+  const supabase = createAdminClient()
+  const { data, error } = await supabase
+    .from('client_terms').update(patch).eq('id', termId).select().single()
+  if (error) throw new Error(error.message)
+  return data as unknown as ClientTermRow
+}
+
+/** Point a survey at a contract, and optionally price it. Both in one call
+ *  because they are one decision — a survey attached but unpriced draws down
+ *  nothing, and a priced survey attached to nothing counts toward nothing. */
+export async function runSetProjectCredits(
+  projectId: string, patch: { credits?: number | null; term_id?: string | null }
+): Promise<void> {
+  const supabase = createAdminClient()
+  const { error } = await supabase.from('survey_projects').update(patch).eq('id', projectId)
+  if (error) throw new Error(error.message)
+}

@@ -9,6 +9,7 @@ import { useUpdateClient } from '@/lib/hooks/useClients'
 import { useTeamMembers } from '@/lib/hooks/useTeamMembers'
 import { useCanViewFinancials } from '@/lib/hooks/useCapabilities'
 import { ClientContacts } from '@/components/client/ClientContacts'
+import { ClientContracts } from '@/components/client/ClientContracts'
 import { ClientNotes } from '@/components/client/ClientNotes'
 import { ClientNameHeading } from '@/components/client/ClientNameHeading'
 import { NewProjectModal } from '@/components/board/NewProjectModal'
@@ -712,8 +713,12 @@ export default function ClientPage() {
           )}
         </div>
 
-        {/* Rail — contacts, notes, and the compliance control */}
+        {/* Rail — contracts, contacts, notes, and the compliance control.
+            Contracts lead: they are the commercial frame the rest sits inside,
+            and the credit drawdown is the thing anyone opens this page to check
+            once a client is on a contract. */}
         <div className="flex flex-col gap-4">
+          <ClientContracts clientId={clientId} />
           <ClientContacts clientId={clientId} />
           <ClientNotes clientId={clientId} />
           <ClientComplianceCard client={c} />
