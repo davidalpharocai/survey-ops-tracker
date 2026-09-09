@@ -55,6 +55,65 @@ describe('TOOLS registry shape', () => {
     for (const r of READ) expect(names.has(r), `registry is missing read tool ${r}`).toBe(true)
   })
 
+  it('the cost-line tools exist and keep their preview-then-apply contract', () => {
+    // These write money into actual_spend (migration 101 -> the project_costs
+    // spend trigger), so committing on the first call would move a project's
+    // recorded spend with nobody having seen the figure. `confirm` in the schema
+    // is what makes confirmable() preview instead of apply.
+    for (const name of ['add_cost', 'update_cost', 'remove_cost']) {
+      const t = TOOLS.find(x => x.name === name)
+      expect(t, `registry is missing ${name}`).toBeDefined()
+      expect(t!.kind, `${name} must be a write`).toBe('write')
+      expect('confirm' in t!.schema, `${name} must accept confirm`).toBe(true)
+      expect('project' in t!.schema, `${name} must take a project`).toBe(true)
+    }
+
+    // add_cost is the only one that may invent a line, so it is the only one
+    // that takes an idem_key; the other two address an existing line by ref.
+    const add = TOOLS.find(x => x.name === 'add_cost')!
+    expect('idem_key' in add.schema).toBe(true)
+    for (const name of ['update_cost', 'remove_cost']) {
+      expect('cost_ref' in TOOLS.find(x => x.name === name)!.schema, `${name} takes cost_ref`).toBe(true)
+      // NOT idem_key: these address a row by its primary key. Giving them one
+      // would invite the confusion that add_cost's probe was originally built
+      // wrong for — an id passed where a key was expected.
+      expect('idem_key' in TOOLS.find(x => x.name === name)!.schema, `${name} must NOT take idem_key`).toBe(false)
+    }
+  })
+
+  it('pins the exact set of tools that accept an idem_key', () => {
+    // app/api/assistant/route.ts mints a stable idem_key for any tool whose
+    // SCHEMA carries one, because its confirmation tokens are stateless HMAC
+    // with no single-use record — the key is the replay defence. That check used
+    // to read `tool.name === 'log_blast'`, so every tool added afterwards
+    // silently inherited no protection: add_cost and create_project both move
+    // real state and both were excluded.
+    //
+    // This list is therefore a REPLAY-SAFETY inventory, not a style assertion.
+    // If it fails because you added an idem_key to a tool, good — confirm the
+    // route still pins it (it keys off the schema, so it should) and add the
+    // name here. If it fails because one went MISSING, a write lost its replay
+    // defence.
+    const withIdemKey = TOOLS.filter(t => 'idem_key' in t.schema).map(t => t.name).sort()
+    expect(withIdemKey).toEqual(['add_cost', 'create_project', 'log_blast'])
+    for (const name of withIdemKey) {
+      expect(TOOLS.find(t => t.name === name)!.kind, `${name} takes an idem_key so it must be a write`).toBe('write')
+    }
+
+    // The kind enum must stay exactly migration 080's CHECK constraint. A third
+    // value here would be accepted by zod and then rejected by Postgres, so the
+    // caller would get a database error instead of a usable tool.
+    for (const name of ['add_cost', 'update_cost']) {
+      const shape = TOOLS.find(x => x.name === name)!.schema as Record<string, z.ZodTypeAny>
+      // update_cost's kind is optional, so unwrap before reading the options.
+      const k = shape.kind as unknown as { _def: { innerType?: z.ZodEnum<never> } } & z.ZodEnum<never>
+      const inner = (k._def.innerType ?? k) as unknown as { options: string[] }
+      expect(new Set(inner.options), `${name} kind enum`).toEqual(
+        new Set(['sms_email_blast', 'contacts_export'])
+      )
+    }
+  })
+
   it('the series-membership tools exist and keep their preview-then-apply contract', () => {
     // These two move a survey in or out of a rerun series, which renumbers every
     // other wave in that series — so they must never commit on the first call.

@@ -17,10 +17,12 @@ import {
   unknownCostBlasts,
   unknownSendBlasts,
 } from '@/lib/utils/blast'
+import { resolveCostMoney, projectSpendAfter, toCents, normalizeIdemKey } from '@/lib/utils/cost'
 import type { Database } from '@/lib/supabase/types'
 import * as data from '@/lib/mcp/data'
 import {
   resolveProjectWritable, resolveStep, resolveContact, resolveSegment, loadGateInput,
+  runLogCost, runUpdateCost, runRemoveCost, resolveCost, findCostByIdemKey, listCostsForProject,
   runAddStep, runCompleteStep, runEditStep, runProjectWrite, runLogBlast,
   resolveBlast, listBlastsForProject, runUpdateBlast, runRemoveBlast,
   runAddSegment, runUpdateSegment, runRemoveSegment,
@@ -152,7 +154,7 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'get_project',
     description:
-      'Get full detail for one survey project by PR-code or name (bids, blasts, steps, activity, deliverables, segments, compliance, your reminders on it).',
+      'Get full detail for one survey project by PR-code or name (cost lines, blasts, steps, activity, deliverables, segments, compliance, your reminders on it).',
     kind: 'read',
     schema: { project: z.string() },
     handler: async (rawArgs, ctx) => {
@@ -2141,6 +2143,293 @@ export const TOOLS: AssistantTool[] = [
             blast: { id: row.id, people: row.people, completes: row.completes, bid: row.bid, blast_at: row.blast_at },
             blast_spend_total, blast_reward_total, blast_send_total,
             blasts_with_unknown_cost, blasts_with_unknown_send,
+          }
+        }
+      )
+    },
+  },
+  {
+    name: 'add_cost',
+    description:
+      "Record a FLAT COST on a project — a bought contact list, or a fixed platform fee — so it counts toward actual spend. " +
+      "THIS IS NOT A BLAST, and that is the whole point: a blast carries a reward, a send count and completes, so filing a data purchase as one lands the right dollars while inflating contacts-sent and the response rate. " +
+      "KIND is a closed set of two, enforced by the database, not a default: 'contacts_export' = what it cost to ACQUIRE contacts. 'sms_email_blast' = a FIXED platform charge that does NOT scale with messages sent — the per-message cost is $/send on the blast itself and is already in spend, so putting it here charges it twice. " +
+      "A cost that is neither of those — translation, a panel fee, an incentive paid outside a blast — has NO home yet: say so and tell the user a new kind needs adding, rather than filing it under whichever is closer, because kind is what the double-count check reads. " +
+      "MONEY, one of two ways: `amount` for a flat invoice, or `unit_cost` + `quantity` when it is per-unit (0.07 × 22,121 → $1,548.47) — the product is computed here, shown in the preview, and stored, and `quantity` is kept so cost-per-unit stays derivable. Passing both is fine only if they agree. " +
+      "IDEMPOTENCY: without an idem_key a second call ADDS A SECOND LINE and spend counts both, so pass one whenever a retry is possible. With one, a re-send updates that same line, and any field you OMIT keeps its recorded value rather than being blanked — use update_cost to un-record something deliberately. The key must be one you chose; an id put there matches nothing and inserts a duplicate. " +
+      "Preview says create vs update and warns if the project already carries a line of the same kind and amount; confirm to apply.",
+    kind: 'write',
+    schema: {
+      project: z.string(),
+      kind: z.enum(['contacts_export', 'sms_email_blast']),
+      amount: z.number().min(0).optional(),
+      unit_cost: z.number().min(0).optional(),
+      quantity: z.number().int().positive().optional(),
+      description: z.string().max(1000).optional(),
+      incurred_on: z.string().optional(),
+      idem_key: z.string().optional(),
+      confirm: z.boolean().optional(),
+    },
+    handler: async (rawArgs, ctx, meta) => {
+      const args = rawArgs as {
+        project: string; kind: 'contacts_export' | 'sms_email_blast'
+        amount?: number; unit_cost?: number; quantity?: number
+        description?: string; incurred_on?: string; idem_key?: string; confirm?: boolean
+      }
+      const { userEmail } = ctx
+      const p = await resolveProjectWritable(args.project)
+      if (!p) return { error: 'Project not found.' }
+      if ('error' in p) return p
+      if ('ambiguous' in p) return p
+      meta.project_id = p.id as string
+
+      // THE ARITHMETIC HAPPENS ONCE, in lib/utils/cost.ts, which is unit-tested.
+      // The RPC stores what it is given and does not multiply, so there is
+      // exactly one definition of this number. Doing it in both places is the
+      // failure that double-charged PR00362.
+      const money_ = resolveCostMoney({
+        amount: args.amount, unitCost: args.unit_cost, quantity: args.quantity,
+      })
+      if (!money_.ok) {
+        return money_.reason === 'no-money'
+          ? { needs: 'the money', message: money_.message }
+          : { error: money_.message }
+      }
+      const { amount, quantity, fromUnitPair } = money_
+
+      // NORMALISE THE KEY ONCE, at the top, and use only this value below.
+      // Previously `args.idem_key ? …` skipped the lookup for "" while
+      // `args.idem_key ?? null` passed "" through to the write — so an empty
+      // string was stored as a REAL key that 101's partial unique index then
+      // enforces, and the second such call silently upserted over the first
+      // while previewing "Add" and reporting "created". Trimming to null here
+      // makes the two ends agree: no key means no key, at both.
+      const idemKey = normalizeIdemKey(args.idem_key)
+
+      const onProject = await listCostsForProject(p.id as string)
+      // findCostByIdemKey, NOT resolveCost — the probe has to ask exactly the
+      // question mcp_log_cost's `on conflict (project_id, idem_key)` will ask.
+      // resolveCost matches `id` first, which made an id-shaped idem_key report
+      // a row the upsert would never find: preview said "update, no duplicate"
+      // and the RPC inserted a second line.
+      const existing = idemKey ? await findCostByIdemKey(p.id as string, idemKey) : null
+      const priorAmount = existing ? Number(existing.amount ?? 0) : 0
+      const spendNow = (p as Record<string, unknown>).actual_spend as number | null
+      const projectedSpend = projectSpendAfter(spendNow, priorAmount, amount)
+
+      // DUPLICATE WARNING, not a duplicate BLOCK. Nothing in the database stops
+      // two identical cost lines and nothing should — two invoices can genuinely
+      // be for the same amount. But a caller who re-sends without an idem_key
+      // because the first call's result never came back is the exact shape of
+      // the PR00362 double count, and the caller cannot see the table. So the
+      // preview names the collision and lets them decide.
+      const twins = existing
+        ? []
+        : onProject.filter(c => c.kind === args.kind && Math.abs(Number(c.amount ?? 0) - amount) < 0.005)
+      // The advice deliberately does NOT say "pass its id" — add_cost has no id
+      // parameter, and a caller who put an id in `idem_key` instead used to hit
+      // the double count this warning exists to prevent. update_cost is the only
+      // way to reach a line that carries no key.
+      const dupeWarning = twins.length
+        ? ` ⚠ ${p.project_code} ALREADY has ${twins.length === 1 ? 'a' : `${twins.length}`} ${args.kind} line at $${amount.toFixed(2)}` +
+          `${twins[0].description ? ` ("${twins[0].description}")` : ''}. Confirming ADDS ANOTHER and spend counts both.` +
+          (twins.some(t => t.idem_key)
+            ? ` If you are retrying a call that may already have landed, re-send with that line's idem_key ("${twins.find(t => t.idem_key)!.idem_key}") so it updates in place.`
+            : ' Those lines carry no idem_key, so add_cost cannot address them:' +
+              ` if you meant to change one, call update_cost with cost_ref "${twins[0].id}".`)
+        : ''
+
+      const unitNote = fromUnitPair
+        ? ` (${fmtNum(args.quantity as number)} × $${args.unit_cost})`
+        : ''
+
+      // ON A RETRY THE RPC COALESCES. 101's ON CONFLICT does
+      // `quantity = coalesce(excluded.quantity, project_costs.quantity)`, so a
+      // re-send that omits the unit pair leaves the STORED quantity in place —
+      // the preview must not claim it becomes null. Same for description and
+      // incurred_on. Report what will actually be there afterwards.
+      const effectiveQuantity = existing && quantity == null ? existing.quantity : quantity
+
+      return confirmable(
+        args,
+        async () => ({
+          summary:
+            `${existing ? 'Update' : 'Add'} cost line on ${p.project_code}: ${args.kind} $${amount.toFixed(2)}${unitNote}` +
+            `${args.description ? ` — "${args.description}"` : ''} -> projected spend ${money(projectedSpend)}` +
+            (existing ? ' (updates the existing line with this idem_key — no duplicate)' : '') +
+            (existing && quantity == null && existing.quantity != null
+              ? ` Its recorded quantity of ${fmtNum(existing.quantity)} is KEPT — a re-send that omits the unit pair does not clear it. Use update_cost to un-record one.`
+              : '') +
+            dupeWarning,
+          mode: existing ? 'update' : 'create',
+          amount, kind: args.kind,
+          // The quantity that will actually be stored, not the one passed in.
+          quantity: effectiveQuantity,
+          projected_actual_spend: projectedSpend,
+          ...(twins.length
+            ? { duplicate_risk: twins.map(t => ({ id: t.id, idem_key: t.idem_key, amount: t.amount, description: t.description })) }
+            : {}),
+        }),
+        async () => {
+          const row = await runLogCost({
+            projectId: p.id as string,
+            kind: args.kind,
+            amount,
+            quantity,
+            description: args.description ?? null,
+            incurredOn: args.incurred_on ?? null,
+            createdBy: userEmail.split('@')[0],
+            idemKey,
+            actor: `${userEmail} via Claude`,
+          })
+          const after = await listCostsForProject(p.id as string)
+          meta.detail = { [existing ? 'updated' : 'created']: { id: row.id, kind: row.kind, amount: row.amount } }
+          return {
+            ok: true, mode: existing ? 'updated' : 'created',
+            cost: { id: row.id, kind: row.kind, amount: row.amount, quantity: row.quantity, description: row.description, incurred_on: row.incurred_on },
+            cost_total: after.reduce((t, c) => t + Number(c.amount ?? 0), 0),
+            cost_lines: after.length,
+          }
+        }
+      )
+    },
+  },
+  {
+    name: 'update_cost',
+    description:
+      "Change a cost line on a project — its kind, amount, quantity, description or date. Identify it by `cost_ref` = its idem_key or its id. Only the fields you pass change. Pass `unit_cost` with `quantity` to recompute the amount from the pair. The project's actual spend recomputes. Preview first; confirm to apply.",
+    kind: 'write',
+    schema: {
+      project: z.string(),
+      cost_ref: z.string(),
+      kind: z.enum(['contacts_export', 'sms_email_blast']).optional(),
+      amount: z.number().min(0).optional(),
+      unit_cost: z.number().min(0).optional(),
+      quantity: z.number().int().positive().nullable().optional(),
+      description: z.string().max(1000).nullable().optional(),
+      incurred_on: z.string().nullable().optional(),
+      confirm: z.boolean().optional(),
+    },
+    handler: async (rawArgs, ctx, meta) => {
+      const args = rawArgs as {
+        project: string; cost_ref: string
+        kind?: 'contacts_export' | 'sms_email_blast'
+        amount?: number; unit_cost?: number; quantity?: number | null
+        description?: string | null; incurred_on?: string | null; confirm?: boolean
+      }
+      const { userEmail } = ctx
+      const p = await resolveProjectWritable(args.project)
+      if (!p) return { error: 'Project not found.' }
+      if ('error' in p) return p
+      if ('ambiguous' in p) return p
+      meta.project_id = p.id as string
+      const cost = await resolveCost(p.id as string, args.cost_ref)
+      if (!cost) return { error: `No cost line found matching "${args.cost_ref}" on this project.` }
+
+      const patch: Record<string, unknown> = {}
+      if (args.kind !== undefined) patch.kind = args.kind
+      if (args.description !== undefined) patch.description = args.description
+      if (args.incurred_on !== undefined) patch.incurred_on = args.incurred_on
+
+      // unit_cost x quantity recomputes the amount, using the stored quantity
+      // when only the unit price moved — repricing a known number of contacts is
+      // the common edit.
+      if (args.unit_cost != null) {
+        // An EXPLICIT `quantity: null` is the schema's un-record path, so it must
+        // not fall through `??` to the stored count: clearing the quantity and
+        // repricing by it are contradictory instructions, and silently doing the
+        // second while appearing to accept the first re-asserts a count the
+        // caller just asked to remove.
+        if (args.quantity === null) {
+          return {
+            error: 'unit_cost and `quantity: null` contradict each other — one prices the line by a count, the other erases the count. Pass a quantity to reprice, or pass `amount` with `quantity: null` to make it a flat fee.',
+          }
+        }
+        const qty = args.quantity ?? cost.quantity
+        if (qty == null) {
+          return { error: 'unit_cost needs a quantity — this line has none stored, so pass one.' }
+        }
+        // `amount` forwarded so the same disagree check add_cost relies on fires
+        // here too. Without it a caller who sent both had their amount silently
+        // overruled by the product — the exact "two definitions of one number"
+        // failure this whole path is built to avoid.
+        const repriced = resolveCostMoney({ amount: args.amount, unitCost: args.unit_cost, quantity: qty })
+        if (!repriced.ok) return { error: repriced.message }
+        patch.amount = repriced.amount
+        patch.quantity = qty
+      } else {
+        if (args.amount !== undefined) patch.amount = toCents(args.amount)
+        if (args.quantity !== undefined) patch.quantity = args.quantity
+      }
+
+      if (Object.keys(patch).length === 0) {
+        return {
+          needs: 'a change',
+          message: 'Specify at least one of: kind, amount, unit_cost + quantity, quantity, description, incurred_on.',
+        }
+      }
+
+      const afterAmount = patch.amount !== undefined ? Number(patch.amount) : Number(cost.amount ?? 0)
+      const projectedSpend = projectSpendAfter(
+        (p as Record<string, unknown>).actual_spend as number | null,
+        Number(cost.amount ?? 0),
+        afterAmount
+      )
+      const desc = Object.entries(patch)
+        .map(([k, v]) => `${k} -> ${v == null ? 'not recorded' : k === 'amount' ? '$' + Number(v).toFixed(2) : String(v)}`)
+        .join(', ')
+
+      return confirmable(
+        args,
+        async () => ({
+          summary: `Update cost line ${cost.idem_key ? `"${cost.idem_key}"` : cost.id} on ${p.project_code}: ${desc} -> projected spend ${money(projectedSpend)}`,
+          projected_actual_spend: projectedSpend,
+        }),
+        async () => {
+          const row = await runUpdateCost({ costId: cost.id, patch, actor: `${userEmail} via Claude` })
+          const after = await listCostsForProject(p.id as string)
+          meta.detail = { updated_cost: { id: row.id, updated: patch } }
+          return {
+            ok: true,
+            cost: { id: row.id, kind: row.kind, amount: row.amount, quantity: row.quantity, description: row.description, incurred_on: row.incurred_on },
+            cost_total: after.reduce((t, c) => t + Number(c.amount ?? 0), 0),
+          }
+        }
+      )
+    },
+  },
+  {
+    name: 'remove_cost',
+    description:
+      "Remove a cost line from a project. Identify it by `cost_ref` = its idem_key or id. Destructive — the project's spend recomputes without it. Preview first; confirm to apply.",
+    kind: 'write',
+    schema: { project: z.string(), cost_ref: z.string(), confirm: z.boolean().optional() },
+    handler: async (rawArgs, ctx, meta) => {
+      const args = rawArgs as { project: string; cost_ref: string; confirm?: boolean }
+      const { userEmail } = ctx
+      const p = await resolveProjectWritable(args.project)
+      if (!p) return { error: 'Project not found.' }
+      if ('error' in p) return p
+      if ('ambiguous' in p) return p
+      meta.project_id = p.id as string
+      const cost = await resolveCost(p.id as string, args.cost_ref)
+      if (!cost) return { error: `No cost line found matching "${args.cost_ref}" on this project.` }
+
+      return confirmable(
+        args,
+        // Says the amount and the description in a destructive prompt: "remove
+        // cost line abc123" gives nobody enough to notice it is the wrong row.
+        async () => ({
+          summary: `Remove cost line ${cost.idem_key ? `"${cost.idem_key}"` : cost.id} from ${p.project_code}: ${cost.kind} $${Number(cost.amount ?? 0).toFixed(2)}${cost.description ? ` — "${cost.description}"` : ''}`,
+        }),
+        async () => {
+          await runRemoveCost(cost.id, `${userEmail} via Claude`)
+          const after = await listCostsForProject(p.id as string)
+          meta.detail = { removed_cost: { id: cost.id, kind: cost.kind, amount: cost.amount } }
+          return {
+            ok: true, removed: cost.idem_key ?? cost.id,
+            cost_total: after.reduce((t, c) => t + Number(c.amount ?? 0), 0),
+            cost_lines: after.length,
           }
         }
       )

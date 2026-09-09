@@ -457,6 +457,12 @@ export type Database = {
           project_id: string
           kind: string
           amount: number
+          /** 092: how many units the amount covers, e.g. 22,121 contacts.
+           *  A DIVISOR (092 CHECKs > 0), so unit cost is derivable and is
+           *  deliberately not stored as well. NULL = a flat fee. */
+          quantity: number | null
+          /** 101: optional idempotency key for connector writes. */
+          idem_key: string | null
           description: string | null
           incurred_on: string | null
           created_by: string | null
@@ -467,6 +473,8 @@ export type Database = {
           project_id: string
           kind: string
           amount?: number
+          quantity?: number | null
+          idem_key?: string | null
           description?: string | null
           incurred_on?: string | null
           created_by?: string | null
@@ -477,6 +485,8 @@ export type Database = {
           project_id?: string
           kind?: string
           amount?: number
+          quantity?: number | null
+          idem_key?: string | null
           description?: string | null
           incurred_on?: string | null
           created_by?: string | null
@@ -1968,6 +1978,60 @@ export type Database = {
       }
     }
     Views: {
+      /**
+       * Migration 102. Column-restricted, self-scoped projection of
+       * survey_projects for the sales tier — the ONLY path a sales session has
+       * to a project row, since 102 dropped both sales policies on the base
+       * table.
+       *
+       * THE ABSENT COLUMNS ARE THE POINT. budget, actual_spend and
+       * n_internal_target are not listed because the view does not select them,
+       * and a sales session must not be able to read them. Adding a field here
+       * without adding it to the view's SELECT gives a lie that tsc will
+       * believe; adding it to BOTH is a disclosure decision about every
+       * salesperson. Nullability mirrors survey_projects, except that a view
+       * makes every column nullable to PostgREST's type generator — kept
+       * faithful to the base table instead, since the WHERE cannot produce a
+       * null id.
+       */
+      sales_projects: {
+        Row: {
+          id: string
+          project_code: string | null
+          project_name: string
+          client: string
+          client_id: string | null
+          project_type: Database['public']['Enums']['project_type'] | null
+          category: string | null
+          objective: string | null
+          phase: Database['public']['Enums']['project_phase']
+          status: Database['public']['Enums']['project_status']
+          scoping_stage: Database['public']['Enums']['scoping_stage'] | null
+          board_column: Database['public']['Enums']['board_column']
+          submitted_date: string | null
+          launch_date: string | null
+          due_date: string | null
+          deliver_date: string | null
+          delivered_at: string | null
+          created_at: string
+          updated_at: string
+          n_target: number | null
+          n_target_max: number | null
+          n_collected: number
+          n_actual: number | null
+          credits: number | null
+          term_id: string | null
+          requested_by_name: string | null
+          requested_by_contact_id: string | null
+          salesperson: string | null
+          longitudinal: boolean
+          rerun_date: string | null
+          rerun_number: number
+          series_id: string | null
+          wave_order: number | null
+        }
+        Relationships: []
+      }
       rerun_status: {
         Row: {
           id: string
@@ -2199,6 +2263,31 @@ export type Database = {
       }
       mcp_rename_client: {
         Args: { p_id: string; p_new_name: string; p_actor: string }
+        Returns: undefined
+      }
+      /** Migration 101. p_amount is the FINAL dollars — the RPC stores it and
+       *  does not multiply p_quantity by anything, so unit x qty has exactly one
+       *  definition and it lives in the calling tool. */
+      mcp_log_cost: {
+        Args: {
+          p_project: string
+          p_kind: string
+          p_amount: number
+          p_quantity: number | null
+          p_description: string | null
+          p_incurred_on: string | null
+          p_created_by: string
+          p_idem: string | null
+          p_actor: string
+        }
+        Returns: unknown
+      }
+      mcp_update_cost: {
+        Args: { p_cost: string; p_patch: Json; p_actor: string }
+        Returns: unknown
+      }
+      mcp_remove_cost: {
+        Args: { p_cost: string; p_actor: string }
         Returns: undefined
       }
     }

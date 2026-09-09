@@ -6,35 +6,36 @@ export const dynamic = 'force-dynamic'
 /**
  * The salesperson's own pipeline.
  *
- * Reads as the USER, not the admin client. Migrations 093 and 100 scope
- * survey_projects for the sales tier — by the account's owner
- * (clients.salesperson) and by the project's own salesperson — so the scoping is
- * Postgres's job and there is no `.eq()` here that a later edit could drop. The
- * absence of a filter below is the design, not an omission; verified as Alex
- * with a real token on 2026-09-08: 27 accounts, 238 surveys, zero rows belonging
- * to anyone else.
+ * Reads `sales_projects`, NOT `survey_projects`. That is the whole security
+ * design and it is not interchangeable — see migration 102. The view is a
+ * definer projection carrying an allowlist of columns and doing its own
+ * scoping, and 102 dropped both sales policies on the base table, so this view
+ * is the only path a sales session has to a project row.
+ *
+ * Until 102 this page relied on NOT ASKING for the sensitive columns, which was
+ * cosmetic: RLS is row-level and cannot hide a column, so a sales session could
+ * read budget, actual_spend and n_internal_target straight off PostgREST. Proved
+ * on 2026-09-09 with Alex's own JWT — $124,375 of budget across 26 projects and
+ * 84 internal targets, including the DE Shaw 150-vs-100 gap. Do NOT "optimise"
+ * this back to the base table.
+ *
+ * Scoping is still Postgres's job and there is no `.eq()` here that a later edit
+ * could drop — the view's WHERE reproduces 093 + 100 exactly. The absence of a
+ * filter below is the design, not an omission; verified as Alex with a real
+ * token: 241 rows, every one on his accounts.
  *
  * FETCHES EVERY STATUS, not just Open. David asked for "a breakdown between
  * whats been completed, whats being scoped, whats active", and that cannot be
- * computed from a list already filtered to open work. It is ~230 rows for the
+ * computed from a list already filtered to open work. It is ~240 rows for the
  * largest account holder, so one query and client-side filtering beats five
  * round trips.
- *
- * WHAT IS DELIBERATELY NOT SELECTED: budget, actual_spend and n_internal_target.
- * The first two are cost, and David has been explicit that sales see revenue and
- * never cost or margin. The third he asked to remove outright ("they dont need
- * to see the internal target"), and it was still on screen until now.
- *
- * Note this is a soft gate, and the real one is still owed: RLS is row-level, so
- * a sales session CAN read those columns directly even though this page does not
- * ask for them. Closing that properly is the open architecture question.
  */
 export default async function SalesPipelinePage() {
   const { supabase, user } = await requireSalesUser('/sales')
   const name = await mySalespersonName(supabase, user.email)
 
   const { data, error } = await supabase
-    .from('survey_projects')
+    .from('sales_projects')
     // One literal string, not concatenated: PostgREST parses the select at
     // compile time for its types, and a `+` defeats that inference — the rows
     // come back as GenericStringError[] and the cast below stops being checked.

@@ -25,7 +25,7 @@ const TIP = {
   kind:
     'SMS/Email Blast = a FIXED platform fee that does not scale with how many messages went out — a subscription slice, a setup charge. Do NOT use it for the per-message send cost: that is $/send × # people on the blast itself and is already in the project’s spend, so entering it here charges it twice (this happened on PR00362, to the tune of $1,876.70). Contacts Export = a purchased contact list, i.e. what it cost to ACQUIRE the contacts, as opposed to sending to them.',
   amount:
-    'The flat fee in dollars, exactly as invoiced — cents included. There is no quantity × rate here: what you type is the number. Feeds the project’s actual spend.',
+    'The fee in dollars, exactly as invoiced — cents included. Type the TOTAL, not a rate: this box is never multiplied by anything. Feeds the project’s actual spend. (If the invoice was priced per unit — 22,121 contacts at $0.07 — the connector’s add_cost takes the unit price and the count, does the multiplication, and records the count alongside the total; here, do the arithmetic yourself and put the workings in the note.)',
   date: 'When the fee was incurred — the invoice or send date. Informational; it does not affect the total.',
   description:
     'Optional note on what this fee was for — e.g. “Twilio send, 40k numbers” or “ZoomInfo pull, 3PL contacts”. Doesn’t affect the cost.',

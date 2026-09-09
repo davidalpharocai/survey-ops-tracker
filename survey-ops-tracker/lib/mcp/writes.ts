@@ -512,6 +512,114 @@ export async function runRemoveBlast(blastId: string, actor: string): Promise<vo
   if (error) throw new Error(error.message)
 }
 
+// ---- Cost-line runners (project_costs; spend + audit kept by triggers) ----
+
+export interface ProjectCostRow {
+  id: string
+  project_id: string
+  kind: string
+  amount: number
+  quantity: number | null
+  description: string | null
+  incurred_on: string | null
+  idem_key: string | null
+  created_at: string
+}
+
+/** Add a flat cost line, upserting on idem_key (101). The amount is computed by
+ *  the CALLER when it is unit x quantity — the RPC stores what it is given and
+ *  does not multiply, so there is exactly one place that arithmetic happens. */
+export async function runLogCost(opts: {
+  projectId: string; kind: string; amount: number; quantity: number | null
+  description: string | null; incurredOn: string | null
+  createdBy: string; idemKey: string | null; actor: string
+}): Promise<ProjectCostRow> {
+  const supabase = createAdminClient()
+  const { data, error } = await supabase.rpc('mcp_log_cost', {
+    p_project: opts.projectId,
+    p_kind: opts.kind,
+    p_amount: opts.amount,
+    p_quantity: opts.quantity,
+    p_description: opts.description,
+    p_incurred_on: opts.incurredOn,
+    p_created_by: opts.createdBy,
+    p_idem: opts.idemKey,
+    p_actor: opts.actor,
+  })
+  if (error) throw new Error(error.message)
+  return data as ProjectCostRow
+}
+
+export async function runUpdateCost(opts: {
+  costId: string; patch: Record<string, unknown>; actor: string
+}): Promise<ProjectCostRow> {
+  const supabase = createAdminClient()
+  const { data, error } = await supabase.rpc('mcp_update_cost', {
+    p_cost: opts.costId, p_patch: opts.patch as unknown as Json, p_actor: opts.actor,
+  })
+  if (error) throw new Error(error.message)
+  return data as ProjectCostRow
+}
+
+export async function runRemoveCost(costId: string, actor: string): Promise<void> {
+  const supabase = createAdminClient()
+  const { error } = await supabase.rpc('mcp_remove_cost', { p_cost: costId, p_actor: actor })
+  if (error) throw new Error(error.message)
+}
+
+/** Resolve a cost line on a project by id OR idem_key — for update_cost and
+ *  remove_cost, which address an existing row by its primary key and so may
+ *  accept either handle.
+ *
+ *  DO NOT USE THIS AS AN IDEMPOTENCY PROBE. See findCostByIdemKey below: an
+ *  upsert's conflict target is (project_id, idem_key), and matching on `id` here
+ *  would tell add_cost a row exists that the ON CONFLICT clause will never
+ *  find. */
+export async function resolveCost(projectId: string, ref: string): Promise<ProjectCostRow | null> {
+  const supabase = createAdminClient()
+  const { data, error } = await supabase
+    .from('project_costs').select('*').eq('project_id', projectId)
+  if (error) throw new Error(error.message)
+  const rows = (data ?? []) as unknown as ProjectCostRow[]
+  const r = ref.trim()
+  return rows.find(x => x.id === r) ?? rows.find(x => x.idem_key === r) ?? null
+}
+
+/** Find a cost line by idem_key ALONE — the probe add_cost must use.
+ *
+ *  WHY THIS IS NOT resolveCost. mcp_log_cost's arbiter is
+ *  `on conflict (project_id, idem_key)`. resolveCost matches `id` first, so
+ *  passing an existing line's id as `idem_key` made it report a row — add_cost
+ *  then previewed "updates the existing line, no duplicate", computed a
+ *  projected spend that subtracted the found row's amount, and suppressed its
+ *  own duplicate warning. The RPC meanwhile found no row carrying that key and
+ *  INSERTED, so spend rose by the full amount rather than the quoted delta and
+ *  the project ended up with two lines. That is the 095/PR00362 double-count
+ *  shape, reached through the retry flow the tool itself recommends.
+ *
+ *  The probe must therefore ask exactly the question the database will ask.
+ *  Empty and whitespace-only keys resolve to null so they cannot match the rows
+ *  whose idem_key is genuinely absent. */
+export async function findCostByIdemKey(projectId: string, key: string): Promise<ProjectCostRow | null> {
+  const k = key.trim()
+  if (!k) return null
+  const supabase = createAdminClient()
+  const { data, error } = await supabase
+    .from('project_costs').select('*').eq('project_id', projectId).eq('idem_key', k)
+  if (error) throw new Error(error.message)
+  return ((data ?? []) as unknown as ProjectCostRow[])[0] ?? null
+}
+
+/** Every cost line on a project, newest first — for the after-write echo, so a
+ *  caller sees the resulting total rather than having to ask again. */
+export async function listCostsForProject(projectId: string): Promise<ProjectCostRow[]> {
+  const supabase = createAdminClient()
+  const { data, error } = await supabase
+    .from('project_costs').select('*').eq('project_id', projectId).order('created_at')
+  if (error) throw new Error(error.message)
+  return (data ?? []) as unknown as ProjectCostRow[]
+}
+
 // ---- Segment runners (project_segments; parent N totals kept by trigger) ----
 
 /** Add a segment. `targetMax` is the top of the segment's N range (migration 078

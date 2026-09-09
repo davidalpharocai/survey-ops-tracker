@@ -192,9 +192,19 @@ export async function POST(req: NextRequest) {
                   meta
                 )
                 if (outcome.kind === 'pending') {
-                  // log_blast affects spend; pin a stable idem_key into the token
-                  // args so re-redeeming the same token can't double-count.
-                  if (tool.name === 'log_blast' && args.idem_key == null) {
+                  // Pin a stable idem_key into the token args so re-redeeming
+                  // the same token cannot write twice. These tokens are
+                  // stateless HMAC with no single-use record, so the key IS the
+                  // replay defence.
+                  //
+                  // KEYED ON THE SCHEMA, NOT THE TOOL NAME. This read
+                  // `tool.name === 'log_blast'`, which meant every tool added
+                  // afterwards was excluded by default — add_cost is the second
+                  // spend-moving idem_key-capable tool and inherited no
+                  // protection at all. Asking whether the tool accepts an
+                  // idem_key is the property that actually matters, and it keeps
+                  // working for the next one without anybody remembering.
+                  if (args.idem_key == null && 'idem_key' in tool.schema) {
                     args.idem_key = randomUUID()
                   }
                   const token = signAction({ tool: tool.name, args, userEmail })

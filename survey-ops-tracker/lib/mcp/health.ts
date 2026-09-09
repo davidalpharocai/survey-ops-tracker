@@ -25,14 +25,14 @@ import { isKnownSalesperson, ALL_SALESPERSON_VALUES } from '@/lib/utils/salespeo
 // hotfix. Here the failure is louder still — a missing term makes the integrity
 // checker itself accuse a perfectly-consistent project of a trigger failure.
 
-type Row = Record<string, unknown>
-type SupRow = { cpi: number | null; n_collected: number | null }
+export type Row = Record<string, unknown>
+export type SupRow = { cpi: number | null; n_collected: number | null }
 /** `blast_at` is here for check 7 (how long a blast has been waiting for its
  *  completes). It must also be named in BOTH explicit selects below — an
  *  explicit select that omits a column buildChecks reads does NOT error, it
  *  just leaves the value undefined and the check silently never fires. That
  *  mistake has been made in this file before; see the note on `salesperson`. */
-type BlastRow = {
+export type BlastRow = {
   bid: number | null; completes: number | null; blast_at: string | null
   /** 095: a blast's SEND cost is people x cost_per_send, independent of the
    *  reward. Both columns must stay named in BOTH selects below -- an omitted
@@ -43,8 +43,8 @@ type BlastRow = {
 /** `kind` is here for check 9 (the send-cost double count) and must stay named in
  *  fetchCosts' select below — an omitted column does not error, it just leaves
  *  the value undefined and the check silently never fires. */
-type CostRow = { amount: number | null; kind: string | null }
-type SegRow = { n_target: number | null; n_collected: number | null; n_actual: number | null }
+export type CostRow = { amount: number | null; kind: string | null }
+export type SegRow = { n_target: number | null; n_collected: number | null; n_actual: number | null }
 
 const num = (v: unknown): number => (v == null ? 0 : Number(v))
 
@@ -66,8 +66,15 @@ export interface Check {
 }
 
 /** The consistency checks for one project, given its child rows. Pure — no I/O —
- *  so reconcileProject and dataHealth share exactly one definition. */
-function buildChecks(p: Row, sup: SupRow[], blasts: BlastRow[], costs: CostRow[], segs: SegRow[]): Check[] {
+ *  so reconcileProject and dataHealth share exactly one definition.
+ *
+ *  EXPORTED FOR TESTS. This file had no test file at all, which is how check 7c
+ *  came to be nested inside check 9's `if` and therefore unreachable for every
+ *  project in the database — including PR00375, the one its own comment names as
+ *  the live example. Pure input-to-output is the easiest thing in this codebase
+ *  to test; there was no reason for it to be untested except that nothing forced
+ *  it. See health.test.ts. */
+export function buildChecks(p: Row, sup: SupRow[], blasts: BlastRow[], costs: CostRow[], segs: SegRow[]): Check[] {
   const checks: Check[] = []
 
   // 1) actual_spend vs the canonical recompute formula — only when there's a
@@ -349,43 +356,60 @@ function buildChecks(p: Row, sup: SupRow[], blasts: BlastRow[], costs: CostRow[]
       expected: Math.round(sendSpend), actual: Math.round(sendSpend + lineTotal),
       detail: `this project computes $${sendSpend.toFixed(2)} of send cost from its blasts AND carries $${lineTotal.toFixed(2)} of hand-entered "SMS/Email Blast" cost line(s) — if that line is the per-message send charge, it is now counted twice and the project's spend is overstated by that much. The app works the per-message cost out from # people × $/send; a cost line should only hold a FIXED platform fee that does not scale with volume.`,
     })
-    // 7c) A SENT COUNT that is provably wrong rather than merely absent.
-    //
-    //     Check 7a/7b do this for completes; there was no equivalent for the
-    //     sent count, even though 095 made it a money field. The proof is the
-    //     same shape: completes cannot arrive from a send that reached nobody,
-    //     so `people = 0` alongside recorded completes is not a result, it is a
-    //     figure nobody entered.
-    //
-    //     Live example this was written from (2026-09-02): PR00375 has two
-    //     blasts at people = 0 with 39 and 17 completes. Its send cost therefore
-    //     reads $0, and no other check objects.
-    //
-    //     NULL is handled by the plain-unrecorded arm below rather than here,
-    //     because a null sent count on a blast logged minutes ago is normal.
-    const provablyUnsentCounted = blasts.filter(
-      b => (b.people ?? 0) === 0 && (b.completes ?? 0) > 0
-    )
-    if (provablyUnsentCounted.length) {
-      checks.push({
-        check: 'blast_sent_count_missing', ok: false, advisory: false,
-        expected: null, actual: 0,
-        detail: `${provablyUnsentCounted.length} blast(s) record 0 sent but a non-zero number of completes — nobody can complete a survey they were never sent, so the sent count was never entered. Its send cost ($/send × # people) therefore reads $0 and the completion rate reads as divide-by-zero`,
-      })
-    }
+  }
 
-    // 7d) A sent count simply not recorded yet, on a blast old enough that it
-    //     should be. Mirrors 7a's shape and cutoff for completes.
-    const staleSend = blasts.filter(
-      b => b.people == null && b.blast_at != null && Date.parse(b.blast_at) < Date.now() - 7 * 86_400_000
-    )
-    if (staleSend.length) {
-      checks.push({
-        check: 'blast_sent_count_unrecorded', ok: false, advisory: true,
-        expected: 0, actual: staleSend.length,
-        detail: `${staleSend.length} of ${blasts.length} blast(s) went out over 7 days ago with the sent count still unrecorded — each contributes $0 of send cost, so the project's spend is a floor`,
-      })
-    }
+  // 7c) A SENT COUNT that is provably wrong rather than merely absent.
+    //
+  //     Check 7a/7b do this for completes; there was no equivalent for the
+  //     sent count, even though 095 made it a money field. The proof is the
+  //     same shape: completes cannot arrive from a send that reached nobody,
+  //     so `people = 0` alongside recorded completes is not a result, it is a
+  //     figure nobody entered.
+  //
+  //     Live example this was written from (2026-09-02): PR00375 has two
+  //     blasts at people = 0 with 39 and 17 completes. Its send cost therefore
+  //     reads $0, and no other check objects.
+  //
+  //     NULL is handled by the plain-unrecorded arm below rather than here,
+  //     because a null sent count on a blast logged minutes ago is normal.
+  //
+  //     THESE TWO SIT OUTSIDE CHECK 9's `if`, and that is the whole point of
+  //     where they are. They were originally nested inside it, so they only ran
+  //     on a project that both computed send cost from its blasts AND carried an
+  //     sms_email_blast cost line — the double-count condition, which is very
+  //     nearly the OPPOSITE of what they test. A project whose blasts all record
+  //     people = 0 or null has sendSpend = 0, so the outer condition was false
+  //     and neither check could ever fire. PR00375, named above as the live
+  //     example 7c was written for, was itself unreachable by it.
+  //     `b.people === 0`, NOT `(b.people ?? 0) === 0`. The coalescing version
+  //     swept NULL into this arm, contradicting the paragraph above and firing a
+  //     NON-ADVISORY "provably wrong" issue on any blast logged with completes
+  //     before its sent count — the normal order of events, minutes old. 0 is an
+  //     assertion that the send reached nobody; NULL is nobody having typed it
+  //     yet. The whole point of 7d existing separately, with a 7-day cutoff, is
+  //     to give NULL somewhere kinder to go. Caught by health.test.ts.
+  const provablyUnsentCounted = blasts.filter(
+    b => b.people === 0 && (b.completes ?? 0) > 0
+  )
+  if (provablyUnsentCounted.length) {
+    checks.push({
+      check: 'blast_sent_count_missing', ok: false, advisory: false,
+      expected: null, actual: 0,
+      detail: `${provablyUnsentCounted.length} blast(s) record 0 sent but a non-zero number of completes — nobody can complete a survey they were never sent, so the sent count was never entered. Its send cost ($/send × # people) therefore reads $0 and the completion rate reads as divide-by-zero`,
+    })
+  }
+
+  // 7d) A sent count simply not recorded yet, on a blast old enough that it
+  //     should be. Mirrors 7a's shape and cutoff for completes.
+  const staleSend = blasts.filter(
+    b => b.people == null && b.blast_at != null && Date.parse(b.blast_at) < Date.now() - 7 * 86_400_000
+  )
+  if (staleSend.length) {
+    checks.push({
+      check: 'blast_sent_count_unrecorded', ok: false, advisory: true,
+      expected: 0, actual: staleSend.length,
+      detail: `${staleSend.length} of ${blasts.length} blast(s) went out over 7 days ago with the sent count still unrecorded — each contributes $0 of send cost, so the project's spend is a floor`,
+    })
   }
 
   return checks

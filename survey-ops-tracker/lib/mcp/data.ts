@@ -290,10 +290,24 @@ export async function getProjectDetail(id: string, userId: string) {
   const p = project as unknown as Row
 
   const [
-    bidsRes, blastsRes, stepsRes, activityRes, deliverablesRes, segmentsRes,
+    costsRes, blastsRes, stepsRes, activityRes, deliverablesRes, segmentsRes,
     clientRes, submissionsRes, remindersRes,
   ] = await Promise.all([
-    supabase.from('project_bids').select('amount, blasts, note, created_at').eq('project_id', id).order('created_at', { ascending: false }),
+    // COST LINES, not the dead `project_bids`. project_bids is migration 015's
+    // bid-budget log: superseded by the blast rework, 10 legacy rows, and NOT a
+    // term in recompute_project_spend — so a number from it is not spend. It was
+    // still being returned here as `bids`, which is what led a later handoff to
+    // propose writing costs into it. project_costs IS in the spend formula and is
+    // where a non-blast cost belongs (080, 092, 101).
+    // `select('*')` and NOT a column list, deliberately, matching resolveCost and
+    // listCostsForProject in writes.ts. A column list here has to name idem_key
+    // to return it, and idem_key does not exist until David hand-applies 101 —
+    // at which point PostgREST rejects the WHOLE select with 42703 and every
+    // field of it is lost, not just the new one. Verified against production:
+    // the column list returned `column project_costs.idem_key does not exist`
+    // while `select('*')` returned PR00402's real $1,548.47 line. A star select
+    // simply gains the column the moment the migration lands.
+    supabase.from('project_costs').select('*').eq('project_id', id).order('incurred_on', { ascending: false, nullsFirst: false }),
     supabase.from('project_blasts').select('bid, people, completes, cost_per_send, blast_at, note, created_at').eq('project_id', id).order('created_at', { ascending: false }),
     supabase.from('project_steps').select('id, text, done, completed_at, created_at').eq('project_id', id).order('created_at', { ascending: false }).limit(50),
     supabase.from('project_activity').select('type, direction, sender, subject, snippet, occurred_at').eq('project_id', id).is('deleted_at', null).order('occurred_at', { ascending: false }).limit(10),
@@ -304,6 +318,18 @@ export async function getProjectDetail(id: string, userId: string) {
     supabase.from('reminders').select('id, text, due_date, done').eq('project_id', id).eq('user_id', userId).order('due_date', { ascending: true }),
   ])
 
+  // A FAILED MONEY READ IS NOT $0. Both of these used `?? []`, which turns any
+  // error — a missing column, an outage, a permission change — into an empty
+  // list and therefore into a confident total of zero, sitting beside an
+  // actual_spend that includes the very rows that failed to load. That is the
+  // NULL-vs-0 conflation this codebase has already been burned by, and on a
+  // money field it produces a wrong answer stated as a fact. When the read
+  // fails, the totals go NULL and an explicit `*_unavailable` reason ships
+  // alongside: the connector's instructions already tell a caller that a
+  // missing field means WITHHELD rather than empty.
+  const costsFailed = costsRes.error ? costsRes.error.message : null
+  const blastsFailed = blastsRes.error ? blastsRes.error.message : null
+  const costLines = costsRes.data ?? []
   const blasts = blastsRes.data ?? []
   const submissions = (submissionsRes.data ?? []) as { phase: string; status: string }[]
   const client = clientRes.data as { compliance_before_fielding: boolean; compliance_after_fielding: boolean } | null
@@ -324,14 +350,31 @@ export async function getProjectDetail(id: string, userId: string) {
   return {
     ...slimProject(p, canViewFinancials),
     linked_documents: parseLinkedDocuments(p.linked_documents),
-    bids: bidsRes.data ?? [],
+    // Renamed from `bids` deliberately. The old key pointed at a dead table and
+    // reading it as spend was wrong; a reader that still asks for `bids` should
+    // get an obvious absence rather than a plausible wrong number.
+    cost_lines: costLines,
+    cost_total: costsFailed ? null : costLines.reduce((s, c) => s + Number(c.amount ?? 0), 0),
+    ...(costsFailed
+      ? {
+          cost_lines_unavailable:
+            `Could not read this project's flat cost lines (${costsFailed}), so the count above is NOT "none" and cost_total is unknown, not $0. ` +
+            `Any part of actual_spend that comes from a cost line is unaccounted for here. Do not report this project as having no cost lines.`,
+        }
+      : {}),
     blasts,
     // Reward + send (095). Reported split as well as combined so a reader
     // can see which half is driving the number -- on a project with no
     // recorded completes the send cost is the whole of it.
-    blast_spend_total: totalBidDollars(blasts as never) + totalSendDollars(blasts as never),
-    blast_reward_total: totalBidDollars(blasts as never),
-    blast_send_total: totalSendDollars(blasts as never),
+    blast_spend_total: blastsFailed ? null : totalBidDollars(blasts as never) + totalSendDollars(blasts as never),
+    blast_reward_total: blastsFailed ? null : totalBidDollars(blasts as never),
+    blast_send_total: blastsFailed ? null : totalSendDollars(blasts as never),
+    ...(blastsFailed
+      ? {
+          blasts_unavailable:
+            `Could not read this project's blasts (${blastsFailed}), so the blast totals are unknown, not $0.`,
+        }
+      : {}),
     // blast_spend_total mirrors the SQL, so a blast whose $/bid or # completes is
     // still unrecorded (migration 091) contributes $0 to it. When this count is
     // non-zero the total is a FLOOR, not the cost — the reader has to be told, or
