@@ -131,22 +131,71 @@ const byCm = new Map((existing ?? []).filter(b => b.cm_blast_id != null).map(b =
 const exByProject = {}
 for (const b of existing ?? []) (exByProject[b.project_id] ??= []).push(b)
 
-/** Is this existing hand-logged blast the same send as this CSV row? Same day,
- *  same sent count, same completes. Deliberately NOT matching on bid alone —
- *  several blasts on a project share a reward — and deliberately requiring the
- *  sent count, which is the discriminating field. */
-function sameSend(b, r) {
-  if (b.cm_blast_id != null) return false
+/**
+ * Pair CSV rows against a project's hand-logged blasts.
+ *
+ * TWO GRADES OF MATCH, and the second one is the reason this is not a one-liner.
+ *
+ *   EXACT — same day, same sent, same completes. Certainly the same send,
+ *   correctly transcribed. Adopt it.
+ *
+ *   RESTATED — same day and same reward, but the counts differ. Also the same
+ *   send, transcribed WRONG, and the CSV is Campaign Manager's own record so it
+ *   is the authority. Adopt and correct, and list every one in the report with
+ *   its before and after, because silently rewriting somebody's numbers is not
+ *   something a script should do quietly.
+ *
+ * Without the second grade the import inserts alongside the bad row and the
+ * project ends up with both. PR00375 is the case that forced it: SOCC has
+ * people=0/completes=39 and people=0/completes=17 — the impossible shape health
+ * check 7c exists to flag — where the CSV has sent=32/completes=12 and
+ * sent=19/completes=9. Two rows would have become four, and the spend with them.
+ *
+ * Pairing is GREEDY AND ONE-TO-ONE in time order, because several blasts on one
+ * project routinely share a day and a reward (PR00363 sent three at $25 on
+ * 2026-08-26). Each existing row can be claimed once.
+ */
+const sameDay = (b, r) => {
   const d1 = String(b.blast_at ?? '').slice(0, 10)
   const d2 = whenOf(r).slice(0, 10)
-  if (!d1 || d1 !== d2) return false
-  return numOrNull(b.people) === numOrNull(r.sent_count) && numOrNull(b.completes) === numOrNull(r.completes)
+  return !!d1 && d1 === d2
+}
+const sameCounts = (b, r) =>
+  numOrNull(b.people) === numOrNull(r.sent_count) &&
+  numOrNull(b.completes) === numOrNull(r.completes)
+
+/** Claim an unclaimed existing blast for this CSV row. Returns
+ *  {row, grade} or null. */
+function claim(pool, r) {
+  const free = pool.filter(b => b.cm_blast_id == null && !b.__claimed && sameDay(b, r))
+  if (!free.length) return null
+  const exact = free.find(b => sameCounts(b, r))
+  if (exact) { exact.__claimed = true; return { row: exact, grade: 'exact' } }
+  // Among same-day, same-reward candidates, take the one whose recorded sent
+  // count is CLOSEST to the CSV's. Several blasts routinely go out on one day at
+  // one reward, and taking the first free row swapped two of PR00309's on
+  // 2026-08-13 — the totals came out right but each row's completes attached to
+  // the wrong send. A blast with no sent count recorded sorts last, since it
+  // gives no evidence either way.
+  const byBid = free.filter(b => numOrNull(b.bid) === numOrNull(r.reward))
+  if (byBid.length) {
+    const target = numOrNull(r.sent_count)
+    const dist = b => {
+      const v = numOrNull(b.people)
+      return v == null || target == null ? Number.MAX_SAFE_INTEGER : Math.abs(v - target)
+    }
+    byBid.sort((a, b) => dist(a) - dist(b))
+    byBid[0].__claimed = true
+    return { row: byBid[0], grade: 'restated' }
+  }
+  return null
 }
 
 // ---------------------------------------------------------------- plan
-const plan = { insert: [], update: [], adopt: [], skipUnmatched: [], skipAmbiguous: [], ambiguousAdopt: [] }
+const plan = { insert: [], update: [], adopt: [], restated: [], skipUnmatched: [], skipAmbiguous: [] }
 const perProject = {}
 
+considered.sort((a, b) => whenOf(a).localeCompare(whenOf(b)))
 for (const r of considered) {
   const { projects: hits, via } = resolve(r)
   if (hits.length === 0) { plan.skipUnmatched.push(r); continue }
@@ -174,23 +223,24 @@ for (const r of considered) {
     cm_blast_id: cm,
   }
 
+  const e = (perProject[p.id] ??= { p, insert: 0, adopt: 0, restate: 0, update: 0, reward: 0, send: 0 })
   const already = cm != null ? byCm.get(cm) : null
-  if (already) { plan.update.push({ r, p, fields, existing: already }); }
-  else {
-    const twins = (exByProject[p.id] ?? []).filter(b => sameSend(b, r))
-    if (twins.length === 1) plan.adopt.push({ r, p, fields, existing: twins[0] })
-    else if (twins.length > 1) plan.ambiguousAdopt.push({ r, p, twins })
-    else plan.insert.push({ r, p, fields })
+  if (already) {
+    plan.update.push({ r, p, fields, existing: already })
+    e.update++
+    continue
   }
-
-  const e = (perProject[p.id] ??= { p, insert: 0, adopt: 0, update: 0, reward: 0, send: 0 })
-  if (already) e.update++
-  else if ((exByProject[p.id] ?? []).some(b => sameSend(b, r))) e.adopt++
-  else {
-    e.insert++
-    e.reward += num(r.reward) * num(r.completes)
-    e.send += num(r.sent_count) * SEND_RATE
+  const hit = claim(exByProject[p.id] ?? [], r)
+  if (hit) {
+    plan.adopt.push({ r, p, fields, existing: hit.row, grade: hit.grade })
+    if (hit.grade === 'restated') { plan.restated.push({ r, p, fields, existing: hit.row }); e.restate++ }
+    else e.adopt++
+    continue
   }
+  plan.insert.push({ r, p, fields })
+  e.insert++
+  e.reward += num(r.reward) * num(r.completes)
+  e.send += num(r.sent_count) * SEND_RATE
 }
 
 // ---------------------------------------------------------------- report
@@ -246,9 +296,22 @@ if (plan.skipUnmatched.length) {
 say('')
 say('## What this run does')
 say(`- insert new blasts: **${plan.insert.length}**`)
-say(`- adopt hand-logged blasts (stamp cm_blast_id, no duplicate): **${plan.adopt.length}**`)
+say(`- adopt hand-logged blasts unchanged (same day, same figures): **${plan.adopt.length - plan.restated.length}**`)
+say(`- adopt and CORRECT hand-logged blasts (same day and reward, different figures): **${plan.restated.length}**`)
 say(`- update already-imported: **${plan.update.length}**`)
-if (plan.ambiguousAdopt.length) say(`- ⚠ ${plan.ambiguousAdopt.length} rows matched MORE THAN ONE existing blast and were left alone for review`)
+
+if (plan.restated.length) {
+  say('')
+  say('### Figures corrected from Campaign Manager')
+  say('These blasts are already in SOCC but with different numbers. Campaign Manager is its own record of what it sent, so the import treats it as the authority — but every change is listed, because rewriting a colleague’s figures should not happen quietly. Nothing is duplicated: these UPDATE the existing row.')
+  say('')
+  say('| project | date | sent: was → now | completes: was → now | reward: was → now |')
+  say('|---|---|---|---|---|')
+  const fmt = (a, b) => `${a ?? '—'} → ${b ?? '—'}`
+  for (const x of plan.restated.sort((a, b) => a.p.project_code.localeCompare(b.p.project_code))) {
+    say(`| ${x.p.project_code} | ${String(x.fields.blast_at ?? '').slice(0, 10)} | ${fmt(x.existing.people, x.fields.people)} | ${fmt(x.existing.completes, x.fields.completes)} | ${fmt(x.existing.bid, x.fields.bid)} |`)
+  }
+}
 
 const addReward = Object.values(perProject).reduce((t, e) => t + e.reward, 0)
 const addSend = Object.values(perProject).reduce((t, e) => t + e.send, 0)
@@ -258,11 +321,11 @@ say(`- reward Σ(bid × completes): **${money(addReward)}**`)
 say(`- send Σ(sent) × $${SEND_RATE}: **${money(addSend)}**`)
 say(`- **total ${money(addReward + addSend)}** across ${Object.values(perProject).filter(e => e.insert).length} projects`)
 say('')
-say('| project | client | +blasts | adopted | reward $ | send $ | spend now |')
-say('|---|---|---:|---:|---:|---:|---:|')
+say('| project | client | +new | adopted | corrected | reward $ | send $ | spend now |')
+say('|---|---|---:|---:|---:|---:|---:|---:|')
 for (const e of Object.values(perProject).sort((a, b) => (b.reward + b.send) - (a.reward + a.send))) {
-  if (!e.insert && !e.adopt && !e.update) continue
-  say(`| ${e.p.project_code} | ${String(e.p.client).slice(0, 22)} | ${e.insert} | ${e.adopt} | ${money(e.reward)} | ${money(e.send)} | ${money(Number(e.p.actual_spend ?? 0))} |`)
+  if (!e.insert && !e.adopt && !e.restate && !e.update) continue
+  say(`| ${e.p.project_code} | ${String(e.p.client).slice(0, 22)} | ${e.insert} | ${e.adopt} | ${e.restate} | ${money(e.reward)} | ${money(e.send)} | ${money(Number(e.p.actual_spend ?? 0))} |`)
 }
 
 if (reportPath) { writeFileSync(reportPath, L.join('\n') + '\n'); console.log(`\nreport written to ${reportPath}`) }
@@ -289,7 +352,7 @@ for (const { fields, existing: b } of plan.update) {
   const { error } = await db.from('project_blasts').update(rest).eq('id', b.id)
   if (error) { err++; console.error(`  update failed cm#${fields.cm_blast_id}: ${error.message}`) } else upd++
 }
-console.log(`inserted ${ins}, adopted ${ado}, updated ${upd}${err ? `, ${err} FAILED` : ''}`)
+console.log(`inserted ${ins}, adopted ${ado} (of which ${plan.restated.length} had their figures corrected), updated ${upd}${err ? `, ${err} FAILED` : ''}`)
 
 // Verify against the database rather than trusting the plan.
 const { data: after } = await db.from('project_blasts').select('id, cm_blast_id, project_id')
