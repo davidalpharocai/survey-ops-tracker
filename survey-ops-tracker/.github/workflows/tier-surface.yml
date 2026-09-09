@@ -1,0 +1,71 @@
+name: tier-surface
+
+# Assert what each tier can actually reach, against the real database, with real
+# user JWTs. Three column leaks were found by hand in one week (migrations 102,
+# 105 and 107) and each was found because somebody remembered to run a probe.
+# This is that probe, on a schedule and on every push.
+#
+# WHY IT IS NOT PART OF `ci`. It needs production credentials and network access
+# to Supabase, while the unit suite is hermetic and runs on every fork's PR. A
+# separate job can be skipped when the secret is absent without the main build
+# appearing to have checked something it did not.
+#
+# Requires the repository secrets SUPABASE_URL, SUPABASE_ANON_KEY and
+# SUPABASE_SERVICE_ROLE_KEY.
+
+on:
+  push:
+    branches: [main]
+    # Only when something that could move a boundary changed. A copy tweak does
+    # not need a live database round trip.
+    paths:
+      - 'supabase/migrations/**'
+      - 'lib/auth/**'
+      - 'scripts/check-tier-surface.mjs'
+      - '.github/workflows/tier-surface.yml'
+  # And once a day regardless: a policy can be changed in the Supabase dashboard
+  # without any commit at all, which is exactly how 030 went unapplied for
+  # months without anyone noticing.
+  schedule:
+    - cron: '0 12 * * *'
+  workflow_dispatch:
+
+jobs:
+  surface:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Check the secret is present
+        id: gate
+        run: |
+          if [ -z "${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" ]; then
+            echo "have=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::No Supabase credentials — the tier-surface check did NOT run."
+          else
+            echo "have=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - if: steps.gate.outputs.have == 'true'
+        run: npm ci
+
+      # The script reads .env.local when the env vars are absent, so write one
+      # rather than teaching it a second configuration path.
+      - if: steps.gate.outputs.have == 'true'
+        run: |
+          cat > .env.local <<EOF
+          NEXT_PUBLIC_SUPABASE_URL=${{ secrets.SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          EOF
+
+      - if: steps.gate.outputs.have == 'true'
+        name: Assert the tier surface
+        run: node scripts/check-tier-surface.mjs --verbose
+
+      - if: always()
+        run: rm -f .env.local

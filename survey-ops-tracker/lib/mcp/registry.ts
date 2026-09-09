@@ -2370,15 +2370,14 @@ export const TOOLS: AssistantTool[] = [
     description:
       "Record a FLAT COST on a project — a bought contact list, or a fixed platform fee — so it counts toward actual spend. " +
       "THIS IS NOT A BLAST, and that is the whole point: a blast carries a reward, a send count and completes, so filing a data purchase as one lands the right dollars while inflating contacts-sent and the response rate. " +
-      "KIND is a closed set of two, enforced by the database, not a default: 'contacts_export' = what it cost to ACQUIRE contacts. 'sms_email_blast' = a FIXED platform charge that does NOT scale with messages sent — the per-message cost is $/send on the blast itself and is already in spend, so putting it here charges it twice. " +
-      "A cost that is neither of those — translation, a panel fee, an incentive paid outside a blast — has NO home yet: say so and tell the user a new kind needs adding, rather than filing it under whichever is closer, because kind is what the double-count check reads. " +
+      "KIND is a closed set, enforced by the database: 'contacts_export' = what it cost to ACQUIRE contacts. 'sms_email_blast' = a FIXED platform charge that does NOT scale with messages sent — the per-message cost is $/send on the blast itself and is already in spend, so putting it here charges it twice. 'other' = anything else — translation, a panel fee, an incentive paid outside a blast — and it REQUIRES a description saying what it was. Reach for 'other' rather than filing a cost under whichever of the first two is closer: kind is what the double-count check reads, and a mislabelled row is a false positive there forever. " +
       "MONEY, one of two ways: `amount` for a flat invoice, or `unit_cost` + `quantity` when it is per-unit (0.07 × 22,121 → $1,548.47) — the product is computed here, shown in the preview, and stored, and `quantity` is kept so cost-per-unit stays derivable. Passing both is fine only if they agree. " +
       "IDEMPOTENCY: without an idem_key a second call ADDS A SECOND LINE and spend counts both, so pass one whenever a retry is possible. With one, a re-send updates that same line, and any field you OMIT keeps its recorded value rather than being blanked — use update_cost to un-record something deliberately. The key must be one you chose; an id put there matches nothing and inserts a duplicate. " +
       "Preview says create vs update and warns if the project already carries a line of the same kind and amount; confirm to apply.",
     kind: 'write',
     schema: {
       project: z.string(),
-      kind: z.enum(['contacts_export', 'sms_email_blast']),
+      kind: z.enum(['contacts_export', 'sms_email_blast', 'other']),
       amount: z.number().min(0).optional(),
       unit_cost: z.number().min(0).optional(),
       quantity: z.number().int().positive().optional(),
@@ -2389,7 +2388,7 @@ export const TOOLS: AssistantTool[] = [
     },
     handler: async (rawArgs, ctx, meta) => {
       const args = rawArgs as {
-        project: string; kind: 'contacts_export' | 'sms_email_blast'
+        project: string; kind: 'contacts_export' | 'sms_email_blast' | 'other'
         amount?: number; unit_cost?: number; quantity?: number
         description?: string; incurred_on?: string; idem_key?: string; confirm?: boolean
       }
@@ -2399,6 +2398,17 @@ export const TOOLS: AssistantTool[] = [
       if ('error' in p) return p
       if ('ambiguous' in p) return p
       meta.project_id = p.id as string
+
+      // 'other' exists so a cost with no home is not MISLABELLED as one of the
+      // other two. Filed bare it is just an unexplained number, and its whole
+      // value is that the description accumulates into evidence for what the
+      // real third category should be.
+      if (args.kind === 'other' && !args.description?.trim()) {
+        return {
+          needs: 'a description',
+          message: "kind 'other' needs a description saying what the cost was — 'Other $900' tells a later reader nothing. Use contacts_export or sms_email_blast where one genuinely fits.",
+        }
+      }
 
       // THE ARITHMETIC HAPPENS ONCE, in lib/utils/cost.ts, which is unit-tested.
       // The RPC stores what it is given and does not multiply, so there is
@@ -2519,7 +2529,7 @@ export const TOOLS: AssistantTool[] = [
     schema: {
       project: z.string(),
       cost_ref: z.string(),
-      kind: z.enum(['contacts_export', 'sms_email_blast']).optional(),
+      kind: z.enum(['contacts_export', 'sms_email_blast', 'other']).optional(),
       amount: z.number().min(0).optional(),
       unit_cost: z.number().min(0).optional(),
       quantity: z.number().int().positive().nullable().optional(),
@@ -2530,7 +2540,7 @@ export const TOOLS: AssistantTool[] = [
     handler: async (rawArgs, ctx, meta) => {
       const args = rawArgs as {
         project: string; cost_ref: string
-        kind?: 'contacts_export' | 'sms_email_blast'
+        kind?: 'contacts_export' | 'sms_email_blast' | 'other'
         amount?: number; unit_cost?: number; quantity?: number | null
         description?: string | null; incurred_on?: string | null; confirm?: boolean
       }

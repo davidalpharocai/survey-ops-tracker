@@ -16,9 +16,23 @@ type CostUpdate = Database['public']['Tables']['project_costs']['Update']
 export const COST_KINDS = [
   { value: 'sms_email_blast', label: 'SMS/Email Blast' },
   { value: 'contacts_export', label: 'Contacts Export' },
+  // 108. The escape hatch, added because a closed two-value list forced a
+  // translation invoice or a panel fee to be MISLABELLED as one of the other
+  // two — and the kind is load-bearing: health check 9 reads sms_email_blast to
+  // find the send-cost double count, so a mislabelled row is a permanent false
+  // positive there. Its description is required (see needsDescription below),
+  // because "Other $900" tells nobody anything, and those descriptions are the
+  // evidence for what the real third category should eventually be.
+  { value: 'other', label: 'Other' },
 ] as const
 
 export type CostKind = (typeof COST_KINDS)[number]['value']
+
+/** 'other' says nothing on its own, so it may not be saved bare. Exported so the
+ *  form and the connector enforce one rule rather than two that drift. */
+export function needsDescription(kind: string): boolean {
+  return kind === 'other'
+}
 
 /** Slug → label, falling back to the raw slug so a kind added in SQL ahead of
  *  the UI still renders something readable instead of a blank. */

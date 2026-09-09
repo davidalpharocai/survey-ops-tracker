@@ -16,6 +16,7 @@ import {
   totalCostLines,
   costKindLabel,
   COST_KINDS,
+  needsDescription,
   useZoomInfoRate,
   type ProjectCost,
 } from '@/lib/hooks/useProjectCosts'
@@ -27,7 +28,7 @@ const TIP = {
   header:
     'FLAT vendor fees on this project — a fixed platform charge, or a bought contacts export (ZoomInfo, Apollo, …). Each is a dollar amount typed exactly as invoiced, and each counts toward the project’s actual spend. Two things must NOT go here, because the app already counts them and entering them again double-charges the project: respondent rewards ($/bid × completes on the blast) and the per-message send charge ($/send × # people on the blast).',
   kind:
-    'SMS/Email Blast = a FIXED platform fee that does not scale with how many messages went out — a subscription slice, a setup charge. Do NOT use it for the per-message send cost: that is $/send × # people on the blast itself and is already in the project’s spend, so entering it here charges it twice (this happened on PR00362, to the tune of $1,876.70). Contacts Export = a purchased contact list, i.e. what it cost to ACQUIRE the contacts, as opposed to sending to them.',
+    'SMS/Email Blast = a FIXED platform fee that does not scale with how many messages went out — a subscription slice, a setup charge. Do NOT use it for the per-message send cost: that is $/send × # people on the blast itself and is already in the project’s spend, so entering it here charges it twice (this happened on PR00362, to the tune of $1,876.70). Contacts Export = a purchased contact list, i.e. what it cost to ACQUIRE the contacts, as opposed to sending to them. Other = anything that is neither — translation, a panel fee, an incentive paid outside a blast — and it needs a description, because the kind alone then says nothing. Reach for Other rather than filing a cost under whichever of the first two is closest: the kind drives the double-count check, so a mislabelled row is a false alarm there forever.',
   amount:
     'The fee in dollars, exactly as invoiced — cents included. Type the TOTAL, not a rate: this box is never multiplied by anything. Feeds the project’s actual spend. (If the invoice was priced per unit — 22,121 contacts at $0.07 — the connector’s add_cost takes the unit price and the count, does the multiplication, and records the count alongside the total; here, do the arithmetic yourself and put the workings in the note.)',
   date: 'When the fee was incurred — the invoice or send date. Informational; it does not affect the total.',
@@ -393,6 +394,12 @@ function CostBlock({
           value={cost.incurred_on}
           onSave={iso => save({ incurred_on: iso })}
         />
+        {needsDescription(cost.kind) && !cost.description?.trim() && (
+          <p className="sm:col-span-2 -mt-1 mb-1 text-[11px] text-amber-600 dark:text-amber-400">
+            &ldquo;Other&rdquo; needs a description — on its own it is an unexplained number, and these
+            notes are what tell us whether this deserves a kind of its own.
+          </p>
+        )}
         <div className="sm:col-span-2">
           <TextCell
             label="Description"
