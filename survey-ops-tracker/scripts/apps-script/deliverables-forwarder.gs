@@ -239,6 +239,43 @@ function sentToDeliverables(msg) {
  * the owner. This runs in Gmail — independent of the app / Vercel / Slack — so it still fires during an
  * env outage, which is exactly when the in-app monitors go dark. Throttled to at most one alert every 2h.
  */
+/**
+ * Turn the failure list into advice about the errors that ACTUALLY occurred.
+ *
+ * The alert used to end with a fixed paragraph saying "a 401 almost always means your WEBHOOK_SECRET
+ * is stale" — on every alert, including the 413s in September 2026. So the one line telling the
+ * reader what to do was about a different error than the one they had, and it sent David looking at
+ * a secret that was fine. An alert that misdirects is worse than one with no advice at all.
+ */
+function adviceFor(failures) {
+  var text = failures.join(' ');
+  var tips = [];
+  if (text.indexOf('401') >= 0 || text.indexOf('403') >= 0) {
+    tips.push('401/403 - the WEBHOOK_SECRET in this script no longer matches Vercel. Fix it in Project ' +
+      'Settings -> Script properties (WEBHOOK_SECRET). These retry automatically.');
+  }
+  if (text.indexOf('413') >= 0) {
+    tips.push('413 - the forward was too big. Vercel caps a serverless request body at 4.5 MB and ' +
+      'base64 inflates attachments by about a third. These are DEAD-LETTERED, not retried, because a ' +
+      'body is the size it is and trying again cannot help. Share the file from Drive and forward the ' +
+      'link, or file it by hand in the app. The per-message budget is MAX_ATTACHMENT_BYTES at the top ' +
+      'of this script.');
+  }
+  if (text.indexOf('404') >= 0) {
+    tips.push('404 - the ingest route is missing. Check the deploy went out, and that INGEST_URL in ' +
+      'Script properties still points at the live domain.');
+  }
+  if (text.indexOf('500') >= 0 || text.indexOf('502') >= 0 || text.indexOf('504') >= 0) {
+    tips.push('5xx - the app errored or timed out. These retry automatically; if they keep failing, ' +
+      'check the Vercel logs for /api/deliverables/ingest.');
+  }
+  if (!tips.length) {
+    tips.push('No specific guidance for these codes. Check the Vercel logs for ' +
+      '/api/deliverables/ingest. Everything except 400 and 413 retries automatically.');
+  }
+  return tips.join('\n\n');
+}
+
 function maybeAlert(props, failures) {
   if (!failures.length) return;
   var lastAlert = Number(props.getProperty('LAST_ALERT_MS') || 0);
@@ -246,11 +283,8 @@ function maybeAlert(props, failures) {
   MailApp.sendEmail(
     Session.getEffectiveUser().getEmail(),
     '⚠️ Deliverables forwarder: ' + failures.length + ' submission(s) NOT filed',
-    'The deliverables forwarder got non-2xx responses from the ingest endpoint, so these were NOT filed ' +
-      'and no reply was sent:\n\n' + failures.join('\n') + '\n\n' +
-      'A 401 almost always means this script\'s WEBHOOK_SECRET no longer matches Vercel. Fix it in ' +
-      'Project Settings -> Script properties (WEBHOOK_SECRET); the failed items retry automatically on ' +
-      'the next run.'
+    'The deliverables forwarder got non-2xx responses from the ingest endpoint, so these were NOT ' +
+      'filed and no reply was sent:\n\n' + failures.join('\n') + '\n\n' + adviceFor(failures)
   );
   props.setProperty('LAST_ALERT_MS', String(Date.now()));
 }
