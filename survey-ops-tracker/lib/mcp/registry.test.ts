@@ -108,8 +108,12 @@ describe('TOOLS registry shape', () => {
       // update_cost's kind is optional, so unwrap before reading the options.
       const k = shape.kind as unknown as { _def: { innerType?: z.ZodEnum<never> } } & z.ZodEnum<never>
       const inner = (k._def.innerType ?? k) as unknown as { options: string[] }
+      // 'other' added by migration 108 — the escape hatch for a cost that is
+      // neither, so it stops being MISLABELLED as whichever is closer. The set
+      // must stay identical to 108's CHECK constraint: a value zod accepts that
+      // Postgres rejects gives the caller a database error instead of a tool.
       expect(new Set(inner.options), `${name} kind enum`).toEqual(
-        new Set(['sms_email_blast', 'contacts_export'])
+        new Set(['sms_email_blast', 'contacts_export', 'other'])
       )
     }
   })
