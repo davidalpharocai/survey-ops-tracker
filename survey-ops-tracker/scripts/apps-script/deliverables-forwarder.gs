@@ -51,12 +51,13 @@ function processInbox() {
   if (!url || !secret) throw new Error('Set INGEST_URL and WEBHOOK_SECRET in Script Properties.');
 
   var label = GmailApp.getUserLabelByName(PROCESSED_LABEL) || GmailApp.createLabel(PROCESSED_LABEL);
+  var failCodes = []; // the ACTUAL HTTP codes, so advice is never inferred from a subject line
   var failures = []; // non-2xx ingest responses this run — surfaced via a throttled alert email below
 
   // 1. Group-delivered mail (forwards, and BCC/CC from other people), labeled by the Gmail `list:` filter.
   processThreads(
     GmailApp.search('label:' + SOURCE_LABEL + ' -label:' + PROCESSED_LABEL + ' newer_than:7d', 0, 50),
-    cameViaDeliverables, url, secret, label, failures
+    cameViaDeliverables, url, secret, label, failures, failCodes
   );
 
   // 2. Your own outbound that BCC'd/CC'd deliverables@ — Gmail suppresses the Group's echo of your own
@@ -67,10 +68,10 @@ function processInbox() {
     GmailApp.search(
       'in:sent -label:' + PROCESSED_LABEL + ' newer_than:7d ' +
         '(bcc:deliverables@alpharoc.ai OR cc:deliverables@alpharoc.ai)', 0, 50),
-    sentToDeliverables, url, secret, label, failures
+    sentToDeliverables, url, secret, label, failures, failCodes
   );
 
-  maybeAlert(props, failures);
+  maybeAlert(props, failures, failCodes);
 }
 
 /**
@@ -120,7 +121,7 @@ function clearAttempts(id) {
  * replied to. A thread is labeled done only when every submission in it posted OK, so a transient
  * failure retries next run (the server is idempotent on message id + file hash).
  */
-function processThreads(threads, isSubmission, url, secret, label, failures) {
+function processThreads(threads, isSubmission, url, secret, label, failures, failCodes) {
   for (var t = 0; t < threads.length; t++) {
     var thread = threads[t];
     var messages = thread.getMessages();
@@ -187,6 +188,7 @@ function processThreads(threads, isSubmission, url, secret, label, failures) {
         var permanent = (code === 413 || code === 400);
         var tries = bumpAttempts(msg.getId());
         if (permanent || tries >= MAX_ATTEMPTS) {
+          failCodes.push(code);
           failures.push('GIVING UP after ' + tries + ' attempt(s) — HTTP ' + code + ' — ' + msg.getSubject() +
                         (code === 413 ? ' (payload too large even after trimming attachments)' : ''));
           Logger.log('Dead-lettered ' + msg.getId() + ' (HTTP ' + code + '): ' + res.getContentText());
@@ -195,6 +197,7 @@ function processThreads(threads, isSubmission, url, secret, label, failures) {
           // point — a permanent failure should surface, not repeat.
         } else {
           allOk = false;
+          failCodes.push(code);
           failures.push('HTTP ' + code + ' — ' + msg.getSubject() + ' (attempt ' + tries + ' of ' + MAX_ATTEMPTS + ')');
           Logger.log('Ingest failed (' + code + ') for message ' + msg.getId() + ': ' + res.getContentText());
         }
@@ -246,26 +249,34 @@ function sentToDeliverables(msg) {
  * is stale" — on every alert, including the 413s in September 2026. So the one line telling the
  * reader what to do was about a different error than the one they had, and it sent David looking at
  * a secret that was fine. An alert that misdirects is worse than one with no advice at all.
+ *
+ * IT TAKES THE CODES, NOT THE PROSE. The first version scanned failures.join(' ') for the substring
+ * '401', and every failure line embeds msg.getSubject() — which anyone who can email deliverables@
+ * controls. A message titled "PO 401 - Bain" failing with a genuine 404 therefore led with the
+ * stale-secret paragraph, and a subject containing any of these digits suppressed the "no specific
+ * guidance" fallback. That is the same misdirection this function was written to remove, arriving
+ * through a different door, so the codes are now carried separately and matched exactly.
  */
-function adviceFor(failures) {
-  var text = failures.join(' ');
+function adviceFor(codes) {
+  var has = {};
+  for (var i = 0; i < codes.length; i++) has[String(codes[i])] = true;
   var tips = [];
-  if (text.indexOf('401') >= 0 || text.indexOf('403') >= 0) {
+  if (has['401'] || has['403']) {
     tips.push('401/403 - the WEBHOOK_SECRET in this script no longer matches Vercel. Fix it in Project ' +
       'Settings -> Script properties (WEBHOOK_SECRET). These retry automatically.');
   }
-  if (text.indexOf('413') >= 0) {
+  if (has['413']) {
     tips.push('413 - the forward was too big. Vercel caps a serverless request body at 4.5 MB and ' +
       'base64 inflates attachments by about a third. These are DEAD-LETTERED, not retried, because a ' +
       'body is the size it is and trying again cannot help. Share the file from Drive and forward the ' +
       'link, or file it by hand in the app. The per-message budget is MAX_ATTACHMENT_BYTES at the top ' +
       'of this script.');
   }
-  if (text.indexOf('404') >= 0) {
+  if (has['404']) {
     tips.push('404 - the ingest route is missing. Check the deploy went out, and that INGEST_URL in ' +
       'Script properties still points at the live domain.');
   }
-  if (text.indexOf('500') >= 0 || text.indexOf('502') >= 0 || text.indexOf('504') >= 0) {
+  if (has['500'] || has['502'] || has['503'] || has['504']) {
     tips.push('5xx - the app errored or timed out. These retry automatically; if they keep failing, ' +
       'check the Vercel logs for /api/deliverables/ingest.');
   }
@@ -276,7 +287,7 @@ function adviceFor(failures) {
   return tips.join('\n\n');
 }
 
-function maybeAlert(props, failures) {
+function maybeAlert(props, failures, failCodes) {
   if (!failures.length) return;
   var lastAlert = Number(props.getProperty('LAST_ALERT_MS') || 0);
   if (Date.now() - lastAlert <= 2 * 60 * 60 * 1000) return;
@@ -284,7 +295,7 @@ function maybeAlert(props, failures) {
     Session.getEffectiveUser().getEmail(),
     '⚠️ Deliverables forwarder: ' + failures.length + ' submission(s) NOT filed',
     'The deliverables forwarder got non-2xx responses from the ingest endpoint, so these were NOT ' +
-      'filed and no reply was sent:\n\n' + failures.join('\n') + '\n\n' + adviceFor(failures)
+      'filed and no reply was sent:\n\n' + failures.join('\n') + '\n\n' + adviceFor(failCodes)
   );
   props.setProperty('LAST_ALERT_MS', String(Date.now()));
 }
