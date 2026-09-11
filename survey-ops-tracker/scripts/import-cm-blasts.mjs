@@ -70,9 +70,26 @@ const SEND_RATE = 0.02
 const SINCE = '2026-06-01'
 
 // ---------------------------------------------------------------- filter
-const isB2B = r => `${r.survey_title} ${r.survey_id}`.toUpperCase().includes('B2B_')
+/* THE PREFIX FILTER IS GONE, DELIBERATELY.
+ *
+ * This used to require "B2B_" in the survey title or id, because the first pass
+ * was scoped to "the 611 confirmed B2B across the 83 distinct". That scoping was
+ * meant to be temporary — David's instruction continued "and then tackle the
+ * remaining" — and it was never lifted, so 194 blasts worth $50,375.70 sat
+ * outside the import with nothing reporting them as missing. They were not
+ * skipped, they were never looked at, which is worse: the report said
+ * "unmatched: 0" and meant "0 of the ones I considered".
+ *
+ * The prefix was only ever a proxy for "is this survey ours". The REAL test is
+ * whether a project carries the survey id, and that test already exists below —
+ * an id resolving to no project, or to more than one, is reported and skipped
+ * and nothing is created. So widening the intake cannot invent a blast; it can
+ * only stop hiding one. Ids in the export legitimately begin SC…, PII…, AL…,
+ * SL… and with an analyst's own name.
+ */
+const TEST_SURVEYS = new Set(['test-9', 'xxtest_signup', 'xxtest_signup_v2'])
 const whenOf = r => (r.scheduled_at_utc || r.blast_date_utc || '').trim()
-const b2b = rows.filter(isB2B)
+const b2b = rows.filter(r => !TEST_SURVEYS.has(r.survey_id))
 const failed = b2b.filter(r => r.blast_status === 'FAILED')
 const failedThatSent = failed.filter(r => num(r.sent_count) > 0)
 const considered = b2b.filter(r =>
@@ -192,7 +209,7 @@ function claim(pool, r) {
 }
 
 // ---------------------------------------------------------------- plan
-const plan = { insert: [], update: [], adopt: [], restated: [], skipUnmatched: [], skipAmbiguous: [] }
+const plan = { insert: [], update: [], adopt: [], restated: [], skipUnmatched: [], skipAmbiguous: [], moved: [] }
 const perProject = {}
 
 considered.sort((a, b) => whenOf(a).localeCompare(whenOf(b)))
@@ -227,6 +244,16 @@ for (const r of considered) {
   const already = cm != null ? byCm.get(cm) : null
   if (already) {
     plan.update.push({ r, p, fields, existing: already })
+    /* THIS BLAST IS NOT WHERE ITS SURVEY ID SAYS IT SHOULD BE.
+       The apply step deliberately does NOT rewrite project_id (see the update
+       loop), because a blast may have been moved on purpose — POS 3.0 is one
+       survey fielded across June and July and split across the two monthly
+       projects, and dragging it back every run would undo that silently.
+       But NOT moving it must not be silent either: an id on the wrong project is
+       exactly how a Colorado survey id sat on a Maine project unnoticed. So the
+       divergence is reported and left alone, which is the only combination that
+       cannot lose information. */
+    if (already.project_id !== p.id) plan.moved.push({ r, p, existing: already })
     e.update++
     continue
   }
@@ -252,7 +279,7 @@ say(`# Campaign Manager blast import — ${APPLY ? 'APPLIED' : 'DRY RUN'}`)
 say(`source: ${file.split(/[\\/]/).pop()}`)
 say('')
 say('## Rows')
-say(`- ${rows.length} rows read; ${b2b.length} are B2B (survey_title or survey_id contains "B2B_") across ${new Set(b2b.map(r => r.survey_id)).size} distinct survey ids`)
+say(`- ${rows.length} rows read; ${b2b.length} in intake across ${new Set(b2b.map(r => r.survey_id)).size} distinct survey ids (${rows.length - b2b.length} platform-test rows excluded by name: ${[...TEST_SURVEYS].join(', ')})`)
 say(`- ${considered.length} considered — COMPLETED (${b2b.filter(r => r.blast_status === 'COMPLETED').length}) plus SCHEDULED (${b2b.filter(r => r.blast_status === 'SCHEDULED').length})`)
 say(`- ${failed.length} FAILED rows EXCLUDED on your instruction. Only ${failedThatSent.length} of them actually sent anything — ${money(failedThatSent.reduce((t, r) => t + num(r.sent_count), 0) * SEND_RATE)} of send cost, no rewards, no completes. That money is not recorded anywhere.`)
 say('')
@@ -260,6 +287,24 @@ say('## Matching')
 say(`- resolved to one project: ${plan.insert.length + plan.update.length + plan.adopt.length} rows`)
 say(`- **unmatched** (no project carries the survey id): ${plan.skipUnmatched.length} rows across ${new Set(plan.skipUnmatched.map(r => r.survey_id)).size} surveys — skipped, nothing created`)
 say(`- **ambiguous** (id maps to >1 project): ${plan.skipAmbiguous.length} rows — skipped`)
+say(`- **sitting elsewhere** (already on a DIFFERENT project than the survey id resolves to): ${plan.moved.length} rows — figures updated, project left alone`)
+
+if (plan.moved.length) {
+  say('')
+  say('### Sitting elsewhere — deliberate, or a mistake?')
+  say('These blasts already exist on a project OTHER than the one their survey id resolves to. Their figures are refreshed from Campaign Manager; their project is NOT changed. If any of these is wrong, move it in the app — the import will keep reporting it here either way.')
+  const g = {}
+  for (const { r, p, existing } of plan.moved) {
+    const k = `${r.survey_id} -> ${p.project_code}`
+    ;(g[k] ??= { n: 0, sits: new Set(), sid: r.survey_id, resolves: p }).n++
+    g[k].sits.add(existing.project_id)
+  }
+  for (const k of Object.keys(g)) {
+    const e = g[k]
+    const where = [...e.sits].map(id => projects.find(x => x.id === id)?.project_code ?? id).join(', ')
+    say(`- \`${e.sid}\` resolves to ${e.resolves.project_code} but ${e.n} of its blasts sit on ${where}`)
+  }
+}
 
 if (plan.skipAmbiguous.length) {
   say('')
