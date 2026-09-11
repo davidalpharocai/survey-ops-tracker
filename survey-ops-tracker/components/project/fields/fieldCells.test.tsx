@@ -152,3 +152,35 @@ describe('SelectCell', () => {
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
   })
 })
+
+/* A COPYABLE FIELD MUST STILL LOOK EDITABLE.
+   TextCell sets valueInteractive = copyable && hasValue, which hands the value's
+   click to the copy control. That left the hover-reveal pencil as the only route
+   into the editor — and a field whose sole affordance is invisible reads as
+   read-only. David hit exactly this on PR00426's Survey IDs and reported the
+   field as uneditable. The same field was ALSO inconsistent with itself: empty it
+   was click-to-edit, filled it was click-to-copy. */
+describe('TextCell: the edit affordance survives copyable', () => {
+  it('keeps the pencil visible when the value click is taken by copy', () => {
+    render(<TextCell label="Survey IDs" value="AWRVTUK20260908" copyable onSave={vi.fn()} />)
+    const pencil = screen.getByRole('button', { name: /edit survey ids/i })
+    expect(pencil.className).toContain('opacity-100')
+    expect(pencil.className).not.toContain('opacity-0')
+  })
+
+  it('still opens the editor from that pencil', () => {
+    const onSave = vi.fn()
+    render(<TextCell label="Survey IDs" value="AWRVTUK20260908" copyable onSave={onSave} />)
+    fireEvent.click(screen.getByRole('button', { name: /edit survey ids/i }))
+    const input = screen.getByRole('textbox')
+    expect(input).toHaveValue('AWRVTUK20260908')
+    fireEvent.change(input, { target: { value: 'AWRVTUK20260908, AWRVTFR20260908' } })
+    fireEvent.blur(input)
+    expect(onSave).toHaveBeenCalledWith('AWRVTUK20260908, AWRVTFR20260908')
+  })
+
+  it('leaves the pencil hover-only on an ordinary field, where clicking the value also edits', () => {
+    render(<TextCell label="Objective" value="Some text" onSave={vi.fn()} />)
+    expect(screen.getByRole('button', { name: /edit objective/i }).className).toContain('opacity-0')
+  })
+})

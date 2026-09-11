@@ -119,7 +119,23 @@ export function FieldCell({
           onClick={onEdit}
           aria-label={`Edit ${label}`}
           title="Edit"
-          className="absolute right-1 top-1.5 text-xs leading-none text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus:opacity-100 group-hover:opacity-100"
+          /* THE PENCIL IS ONLY ALLOWED TO HIDE WHEN IT IS REDUNDANT.
+             Normally clicking the value edits too, so a hover-reveal pencil is a
+             second way into the same thing and hiding it costs nothing. But when
+             valueInteractive is set, the value click is taken — a Survey ID copies,
+             a link navigates — and the pencil becomes the ONLY way to edit. Hidden
+             until hover, at text-xs, in a corner, that is indistinguishable from a
+             read-only field: David could not edit the Survey IDs on PR00426 and
+             reasonably concluded the field was broken.
+             Worse, it was inconsistent with itself — `valueInteractive` is
+             `copyable && hasValue`, so the same field was click-to-edit while empty
+             and click-to-copy once filled. */
+          className={cn(
+            'absolute right-1 top-1.5 text-xs leading-none transition-opacity hover:text-foreground focus:opacity-100 group-hover:opacity-100',
+            valueInteractive
+              ? 'text-foreground/70 opacity-100'
+              : 'text-muted-foreground opacity-0',
+          )}
         >
           ✎
         </button>
