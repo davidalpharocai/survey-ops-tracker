@@ -1,4 +1,5 @@
 import 'server-only'
+import { overTargetCheck } from '@/lib/utils/overTarget'
 import { randomUUID } from 'crypto'
 import { z } from 'zod'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -1777,6 +1778,21 @@ export const TOOLS: AssistantTool[] = [
       const costUnknown = rewardUnknown || sendUnknown
       const fig = (v: number | null) => (v == null ? 'not recorded' : String(v))
 
+      /* STOP-AT-TARGET. Revenue is rate x min(n_actual, n_target), so N delivered
+         above target is not chargeable — 27,749 N and $60,161 of the book bought
+         nothing billable. The preview is the last moment before the money moves,
+         so it is where this belongs. Advisory only: over-delivery is sometimes
+         deliberate (a cushion against cleaning loss), and the check is tuned to
+         stay quiet rather than to catch everything. See lib/utils/overTarget. */
+      const overTarget = overTargetCheck({
+        n_target: p.n_target as number | null,
+        n_collected: p.n_collected as number | null,
+        n_internal_target: p.n_internal_target as number | null,
+        n_actual: p.n_actual as number | null,
+        project_type: p.project_type as string | null,
+        nextBlastCost: existing ? null : thisBlastTotal,
+      })
+
       return confirmable(
         args,
         async () => ({
@@ -1785,7 +1801,11 @@ export const TOOLS: AssistantTool[] = [
             (costUnknown
               ? `${rewardUnknown && sendUnknown ? 'cost UNKNOWN' : rewardUnknown ? 'reward UNKNOWN' : 'send cost UNKNOWN'} (the missing half adds $0 to spend until it is recorded) → projected spend ${money(projectedSpend)}`
               : `${money(thisBlastTotal)} → projected spend ${money(projectedSpend)}`) +
-            (existing ? ' (updates the existing blast with this idem_key — no duplicate; omitted figures keep their recorded values)' : ''),
+            (existing ? ' (updates the existing blast with this idem_key — no duplicate; omitted figures keep their recorded values)' : '') +
+            (overTarget.over ? `
+
+⚠ ${overTarget.message}` : ''),
+          over_target: overTarget.over ? { excess_n: overTarget.excess, projected_n: overTarget.projected, target: overTarget.target } : null,
           mode: existing ? 'update' : 'create',
           people: finalPeople, completes: finalCompletes, bid: finalBid,
           cost_per_send: finalRate,

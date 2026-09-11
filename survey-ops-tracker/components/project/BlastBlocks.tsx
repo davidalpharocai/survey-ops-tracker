@@ -1,4 +1,5 @@
 'use client'
+import { overTargetCheck } from '@/lib/utils/overTarget'
 import { Caret } from '@/components/shared/Caret'
 
 import { useState } from 'react'
@@ -63,6 +64,13 @@ function money2(v: number): string {
 export function BlastBlocks({ project }: { project: SurveyProject }) {
   const supabase = createClient()
   const { data: blasts, isError } = useProjectBlasts(project.id)
+  const overTarget = overTargetCheck({
+    n_target: project.n_target,
+    n_collected: project.n_collected,
+    n_internal_target: project.n_internal_target,
+    n_actual: project.n_actual,
+    project_type: project.project_type,
+  })
   const add = useAddBlast(project.id)
 
   const { data: user } = useQuery({
@@ -201,6 +209,19 @@ export function BlastBlocks({ project }: { project: SurveyProject }) {
           ⚠ This project collected {(project.n_collected ?? 0).toLocaleString('en-US')} responses, but every
           blast here records 0 completes — so its blast spend reads $0 and the completion rate reads 0%.
           Those completes were almost certainly never entered. Fill them in and the money corrects itself.
+        </p>
+      )}
+
+      {/* STOP-AT-TARGET. Revenue is rate x min(n_actual, n_target), so N delivered
+          above target is not chargeable — 27,749 N and $60,161 of the book bought
+          nothing billable. This sits above the blast list rather than in a report,
+          because the decision it informs is "do I send another one", and that is
+          made here. Advisory, never blocking: over-delivery is sometimes a
+          deliberate cushion, and the check is tuned to stay silent (91% precision
+          on the backtest) rather than to catch everything. */}
+      {overTarget.over && (
+        <p className="mb-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-2.5 py-1.5 text-[12px] text-amber-700 dark:text-amber-400">
+          ⚠ {overTarget.message}
         </p>
       )}
 
