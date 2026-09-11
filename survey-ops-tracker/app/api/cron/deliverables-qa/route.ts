@@ -36,6 +36,10 @@ export async function GET(req: NextRequest) {
         .is('deleted_at', null)
         .limit(2000),
       // Rejected forwards (ingest 401s) in the last 7 days — the silent-outage signal.
+      // This pair (source + status) IS the alarm's definition, so anything else the
+      // ingest route logs as an error must use a DIFFERENT source or it rings this
+      // bell by accident — which the skipped-attachment log did until it was moved to
+      // source 'deliverables-skipped-attachment'.
       admin
         .from('system_events')
         .select('*', { count: 'exact', head: true })

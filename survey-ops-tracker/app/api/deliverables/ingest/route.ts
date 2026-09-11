@@ -97,7 +97,16 @@ export async function POST(req: Request) {
   if (skipped.length) {
     const mb = (n: number) => (n / 1_048_576).toFixed(1) + ' MB'
     await logSystemEvent({
-      source: 'deliverables-ingest',
+      // NOT 'deliverables-ingest'. app/api/cron/deliverables-qa counts
+      // source='deliverables-ingest' AND status='error' as authRejections7d —
+      // "rejected forwards (ingest 401s), the silent-outage signal" — and
+      // qa-report gates pipelineHealth.healthy on that count being zero. Logging
+      // an oversized attachment under the same pair made a routine too-big file
+      // indistinguishable from the forwarder losing its secret, and pinned the
+      // weekly report to unhealthy for a week. A skipped attachment is a
+      // completeness problem, not an auth outage; it gets its own source so each
+      // alarm keeps meaning one thing.
+      source: 'deliverables-skipped-attachment',
       status: 'error',
       detail:
         `"${String(payload.subject ?? '(no subject)')}" from ${String(payload.from)} was filed WITHOUT ` +
