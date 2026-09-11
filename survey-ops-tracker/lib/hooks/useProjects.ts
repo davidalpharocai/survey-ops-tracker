@@ -37,6 +37,11 @@ const SLIM_PROJECT_COLUMNS = [
   'deliver_date',
   'rerun_date',
   'n_target',
+  // Needed by the risk flag's over-delivery check: it is the team's own
+  // raw-completes cushion and the only signal precise enough to use (91% vs 63%).
+  // NOT finance data — budget and actual_spend stay OUT of this select on
+  // purpose, which is what keeps the board free of the ceiling comparison.
+  'n_internal_target',
   'n_collected',
   'n_actual',
   'board_column',

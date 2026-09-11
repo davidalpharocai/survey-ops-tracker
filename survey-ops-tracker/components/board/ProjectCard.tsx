@@ -15,6 +15,7 @@ import type { SlimProject } from '@/lib/hooks/useProjects'
 import { useLatestSubmissionStatuses } from '@/lib/hooks/useSubmissions'
 import { isRerunProject } from '@/lib/reruns/isRerun'
 import { RerunChip } from '@/components/reruns/RerunChip'
+import { riskOf, RISK_STYLE } from '@/lib/utils/risk'
 
 // Due-date urgency: a neutral card box plus a strong colored LEFT bar (so a
 // board full of overdue cards doesn't become an undifferentiated wall of red).
@@ -71,6 +72,13 @@ export function ProjectCard({ project, onClick, isNew }: ProjectCardProps) {
   // treatment — they're done, cancelled, or paused, so red/orange/amber (and
   // "overdue") would be misleading.
   const urgency = onHold || closed || cancelled || delivered ? null : getDueUrgency(project.due_date)
+  const risk = riskOf({
+    board_column: project.board_column, status: project.status, phase: project.phase,
+    due_date: project.due_date, n_target: project.n_target,
+    n_internal_target: project.n_internal_target, n_collected: project.n_collected,
+    n_actual: project.n_actual, project_type: project.project_type,
+    includeBudget: false,
+  })
   const badlyOverdue = urgency === 'overdue' && daysOverdue(project.due_date) > BADLY_OVERDUE_DAYS
   const urgencyBorder = urgency
     ? badlyOverdue
@@ -149,6 +157,28 @@ export function ProjectCard({ project, onClick, isNew }: ProjectCardProps) {
           {project.project_name}
         </Link>
         <span className="flex items-center gap-1 flex-wrap justify-end shrink-0">
+          {/* RISK FLAG. David (2026-09-11): "we should add a risk flag to surveys
+              so they are touched on more when at risk." The judgement already
+              existed inside the whats_at_risk connector tool, but you had to ASK
+              for it; this puts the same verdict where somebody sees it without
+              asking. Same module both sides, so the board and the assistant
+              cannot disagree about which projects are in trouble.
+              DELIVERY RISK ONLY here: budget and actual_spend are deliberately
+              absent from the slim select (that exclusion is what keeps the
+              ceiling comparison off a surface everyone can see), so the card
+              cannot judge over-budget and says so in the tooltip. The full
+              verdict, including money, is on the project page behind the
+              finance gate. */}
+          {risk.level !== 'none' && (
+            <span
+              className={`text-[11px] px-1.5 py-0.5 rounded-full border whitespace-nowrap ${RISK_STYLE[risk.level].className}`}
+              title={`${risk.reasons.map(r => r.label).join(' · ')}
+
+Delivery risk only — budget is judged on the project page.`}
+            >
+              {RISK_STYLE[risk.level].label}
+            </span>
+          )}
           {stale && (
             <span
               className="text-[12px] px-1.5 py-0.5 rounded-full bg-muted border border-muted-foreground/40 text-muted-foreground whitespace-nowrap"
