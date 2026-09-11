@@ -49,3 +49,9 @@ scripts/project-id-mapping.csv
 
 # generated data exports
 exports/
+
+# Analysis scratch. Every _-prefixed script under scripts/ is a throwaway probe
+# written to answer one question — 340 of them accumulated in a single week of
+# cost analysis. They are not part of the build and they made `git status`
+# unreadable, which is how a real modified file gets missed in the noise.
+scripts/_*
