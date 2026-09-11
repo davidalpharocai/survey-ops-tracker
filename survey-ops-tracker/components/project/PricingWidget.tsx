@@ -23,7 +23,8 @@ import {
   marginRange,
   marginPct,
   hasRecordedCost,
-  invoicedAtCollected,
+  invoicedBillable,
+  overage,
   ceilingOvershoot,
   type PriceLine,
 } from '@/lib/utils/pricing'
@@ -40,19 +41,21 @@ const TIP = {
   contract:
     'Contract value = Σ(rate × N target min) .. Σ(rate × N target max). Two numbers, not one, because the N target is a range: the low end is what we earn delivering the minimum we committed to, the high end if the client takes the full range.',
   profit:
-    'What this survey has actually MADE: what the client is billable for at the N collected so far — Σ(rate × N collected) — minus Actual $, the trigger-computed spend (blasts + suppliers + flat vendor fees). This is the real position, and it moves as N lands.',
+    'What this survey has actually MADE: what the client is billable for — Σ(rate × min(N actual, target)) — minus Actual $, the trigger-computed spend (blasts + suppliers + flat vendor fees). Billable N is capped at target because delivery above target is not charged to the client, and it uses N actual rather than N collected because the cleaned figure is what gets invoiced. This is the real position, and it moves as N lands.',
   profitNoN:
     'Nothing has been collected yet, so nothing is billable yet and there is no profit to state. Any spend already incurred is shown as the hole it currently is, which is the honest reading before fielding delivers.',
   profitNoCost:
     'Nothing has been logged on the cost side yet — no blast, no supplier, no flat vendor fee — so this figure is the billable amount, not a profit. Shown without a percentage on purpose: 100% would read as pure profit when the honest statement is that we do not yet know what running this costs.',
   profitPartialCost:
     'Some of this project’s cost is not recorded yet: a blast is missing either its completes (the reward half) or its sent count (the send half), and a blast only counts toward Actual $ once it has them. So the cost being subtracted is short and this profit is OVERSTATED. Fill in the blanks on the blast lines above and it settles.',
+  overage:
+    'N delivered ABOVE the target, and what it would have been worth at this project’s rate. The client is not charged for it — "any N delivered above the target is not charged to the client" (David 2026-09-10) — but we paid the reward and the send cost to collect it, so it is pure margin leak. Capped per SEGMENT, not across the project: a surplus on one segment does not offset a shortfall on another, because the client did not ask for it there. Nothing in SOCC showed this figure before.',
   profitUnpriced:
     'No price per N is set, so there is no revenue side and no profit to compute. Set the rate above.',
   forecast:
     'What the job would be worth if it delivers to its N TARGET — contract value minus Actual $ — shown as a range because the target is a range. This is a PROJECTION, not a result: it assumes an N that has not been collected yet. The Profit row above is the actual position.',
   invoiced:
-    'Σ(rate × N collected) — what the client is billable for on what has actually been delivered so far, before cost. The first of the two numbers behind Profit above.',
+    'Σ(rate × min(N actual, target)) — what the client is billable for on what has actually been delivered, before cost. The first of the two numbers behind Profit above. Two deliberate caps: the CLEANED N actual, not the raw N collected, and never more than the target, because N delivered above target is not chargeable.',
   unpriced:
     'N belonging to segments with no rate — neither their own nor a project default. It is excluded from the blended rate and from the contract value, so both figures understate the job until it is priced.',
   ceiling:
@@ -230,6 +233,7 @@ export function PricingWidget({ projectId, budget, actualSpend }: PricingWidgetP
         nMin: s.n_target,
         nMax: s.n_target_max,
         nCollected: s.n_collected,
+        nActual: s.n_actual,
       }))
     : [
         {
@@ -237,6 +241,7 @@ export function PricingWidget({ projectId, budget, actualSpend }: PricingWidgetP
           nMin: project?.n_target ?? null,
           nMax: project?.n_target_max ?? null,
           nCollected: project?.n_collected ?? null,
+          nActual: project?.n_actual ?? null,
         },
       ]
 
@@ -244,7 +249,13 @@ export function PricingWidget({ projectId, budget, actualSpend }: PricingWidgetP
   const hi = rollup(lines, 'max')
   const contract = contractRange(lines)
   const margins = marginRange(lines, actualSpend)
-  const invoiced = invoicedAtCollected(lines)
+  /* WHAT THE CLIENT OWES, not what we collected. This was invoicedAtCollected —
+     Σ(rate × raw n_collected), uncapped — which broke both of David's rules
+     (2026-09-10): bill the CLEANED n_actual, and never bill above target. On the
+     twenty projects whose rate was recovered from email it overstated revenue by
+     $44,326, 36% high. */
+  const invoiced = invoicedBillable(lines)
+  const over = overage(lines)
 
   // Totals across ALL lines (priced or not) — this is the N the client is being
   // quoted, which is not the same as the N that has a price on it.
@@ -284,7 +295,14 @@ export function PricingWidget({ projectId, budget, actualSpend }: PricingWidgetP
 
   // N actually collected across the priced lines — the divisor behind "billable
   // now", and what decides whether there is any profit to state at all.
-  const nCollectedTotal = lines.reduce((t, l) => t + Number(l.nCollected ?? 0), 0)
+  // Delivered = has anything landed at all (gates "nothing collected yet").
+  // Billable = what that delivery can actually be invoiced for.
+  const nDeliveredTotal = lines.reduce((t, l) => t + Number(l.nActual ?? l.nCollected ?? 0), 0)
+  const nBillableTotal = lines.reduce((t, l) => {
+    const d = Number(l.nActual ?? l.nCollected ?? 0)
+    const cap = l.nMax ?? l.nMin
+    return t + (cap == null ? d : Math.min(d, cap))
+  }, 0)
   // Once delivered, "so far" is misleading — the number is final, not partial.
   const isDelivered = project?.board_column === 'Delivery' || project?.delivered_at != null
   const costKnown = hasRecordedCost(actualSpend) && unknownBlasts === 0 && unknownSend === 0
@@ -429,13 +447,13 @@ export function PricingWidget({ projectId, budget, actualSpend }: PricingWidgetP
             decisions. */}
         <div className="flex items-center justify-between">
           <span className="flex items-center text-xs text-muted-foreground">
-            Profit{nCollectedTotal > 0 && !isDelivered ? ' so far' : ''}
+            Profit{nDeliveredTotal > 0 && !isDelivered ? ' so far' : ''}
             {!costKnown && invoiced != null ? ' (indicative)' : ''}
             <InfoTooltip
               text={
                 invoiced == null
                   ? TIP.profitUnpriced
-                  : nCollectedTotal === 0
+                  : nDeliveredTotal === 0
                     ? TIP.profitNoN
                     : costKnown
                       ? TIP.profit
@@ -444,11 +462,11 @@ export function PricingWidget({ projectId, budget, actualSpend }: PricingWidgetP
                         : TIP.profitNoCost
               }
             />
-            <CalcMark from="(rate × N collected) − Actual $" />
+            <CalcMark from="(rate × billable N) − Actual $" />
           </span>
           {invoiced == null ? (
             <span className="text-sm text-muted-foreground">—</span>
-          ) : nCollectedTotal === 0 ? (
+          ) : nDeliveredTotal === 0 ? (
             // Nothing collected yet, so there is nothing earned yet. Showing
             // -Actual$ in red would be true but useless before fielding starts;
             // say what is actually the case.
@@ -484,12 +502,29 @@ export function PricingWidget({ projectId, budget, actualSpend }: PricingWidgetP
         {invoiced != null && (
           <div className="flex items-center justify-between pl-3">
             <span className="flex items-center text-[11px] text-muted-foreground">
-              Billable at N {fmtNum(nCollectedTotal)}
+              Billable at N {fmtNum(nBillableTotal)}
               <InfoTooltip text={TIP.invoiced} />
-              <CalcMark from="Σ(rate × N collected)" />
+              <CalcMark from="Σ(rate × min(N actual, target))" />
             </span>
             <span className="text-xs tabular-nums text-muted-foreground">
               {money(invoiced)} − {hasRecordedCost(actualSpend) ? money(actualSpend) : '$0.00'} spent
+            </span>
+          </div>
+        )}
+
+        {/* OVER-DELIVERY. Only rendered when there is some — an absent row is the
+            good case and does not need a line saying "none". Amber, not red: it
+            is not an error, it is work given away, and the fix is upstream in how
+            hard we field rather than anything on this page. */}
+        {over.n > 0 && (
+          <div className="flex items-center justify-between pl-3">
+            <span className="flex items-center text-[11px] text-muted-foreground">
+              Over target by {fmtNum(over.n)} N — not billable
+              <InfoTooltip text={TIP.overage} />
+              <CalcMark from="Σ max(0, N actual − target)" />
+            </span>
+            <span className="text-xs font-medium tabular-nums text-amber-600 dark:text-amber-400">
+              {over.dollars > 0 ? `${money(over.dollars)} given away` : 'unpriced'}
             </span>
           </div>
         )}

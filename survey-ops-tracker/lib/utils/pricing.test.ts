@@ -6,6 +6,8 @@ import {
   blendedRate,
   contractRange,
   invoicedAtCollected,
+  invoicedBillable,
+  overage,
   hasRecordedCost,
   margin,
   marginPct,
@@ -204,5 +206,70 @@ describe('ceilingOvershoot', () => {
     // A $6k ceiling is under the $10.5k best case but over the $3.5k commitment.
     expect(ceilingOvershoot(6000, c.low)).toBe(2500)
     expect(ceilingOvershoot(6000, c.high)).toBeNull()
+  })
+})
+
+/* BILLABLE N — the two rules David stated on 2026-09-10, each of which the
+   shipped code broke:
+     1. bill min(delivered, target); over-delivery is not chargeable
+     2. bill the CLEANED n_actual, not the raw n_collected
+   Measured cost of getting these wrong across the twenty projects whose rate was
+   recovered from email: $44,326 of revenue shown that no client would ever pay. */
+describe('invoicedBillable / overage', () => {
+  it("caps at target — his own example: 50 target, 48 delivered, $100/N", () => {
+    const l = [{ rate: 100, nMin: 50, nMax: 50, nCollected: 48, nActual: 48 }]
+    expect(invoicedBillable(l)).toBe(4800)
+    expect(overage(l)).toEqual({ n: 0, dollars: 0 })
+  })
+
+  it('does NOT bill delivery above target, and reports it as overage', () => {
+    const l = [{ rate: 100, nMin: 50, nMax: 50, nCollected: 60, nActual: 57 }]
+    expect(invoicedBillable(l)).toBe(5000)      // 50 x $100, not 57
+    expect(invoicedAtCollected(l)).toBe(6000)   // what the page used to show
+    expect(overage(l)).toEqual({ n: 7, dollars: 700 })
+  })
+
+  it('bills the CLEANED n_actual, not the raw n_collected (PR00371 shape)', () => {
+    // 1,114 collected, 533 survived cleaning, 500 target, $12/N.
+    const l = [{ rate: 12, nMin: 500, nMax: 500, nCollected: 1114, nActual: 533 }]
+    expect(invoicedBillable(l)).toBe(6000)
+    expect(invoicedAtCollected(l)).toBe(13368)  // the old figure: 2.2x too high
+    expect(overage(l)).toEqual({ n: 33, dollars: 396 })
+  })
+
+  it('falls back to n_collected while a study is still in the field', () => {
+    // No cleaned figure yet; under target, so nothing is capped away.
+    expect(invoicedBillable([{ rate: 50, nMin: 100, nMax: 100, nCollected: 40, nActual: null }])).toBe(2000)
+  })
+
+  it('caps at the TOP of a target range, so delivery inside the range still bills', () => {
+    const inside = [{ rate: 100, nMin: 50, nMax: 70, nCollected: 65, nActual: 65 }]
+    expect(invoicedBillable(inside)).toBe(6500)
+    expect(overage(inside)).toEqual({ n: 0, dollars: 0 })
+    const above = [{ rate: 100, nMin: 50, nMax: 70, nCollected: 80, nActual: 80 }]
+    expect(invoicedBillable(above)).toBe(7000)
+    expect(overage(above)).toEqual({ n: 10, dollars: 1000 })
+  })
+
+  it('caps each SEGMENT separately — one segment over cannot subsidise one under', () => {
+    const l = [
+      { rate: 100, nMin: 50, nMax: 50, nCollected: 60, nActual: 60 },  // 10 over
+      { rate: 100, nMin: 50, nMax: 50, nCollected: 30, nActual: 30 },  // 20 under
+    ]
+    // NOT 90 x $100: the surplus on one segment is not billable against the shortfall on the other.
+    expect(invoicedBillable(l)).toBe(8000)
+    expect(overage(l)).toEqual({ n: 10, dollars: 1000 })
+  })
+
+  it('an unpriced line contributes overage N but no overage dollars', () => {
+    const l = [{ rate: null, nMin: 50, nMax: 50, nCollected: 70, nActual: 70 }]
+    expect(invoicedBillable(l)).toBeNull()
+    expect(overage(l)).toEqual({ n: 20, dollars: 0 })
+  })
+
+  it('a line with no target at all is uncapped — there is nothing to cap against', () => {
+    const l = [{ rate: 10, nMin: null, nMax: null, nCollected: 500, nActual: 480 }]
+    expect(invoicedBillable(l)).toBe(4800)
+    expect(overage(l)).toEqual({ n: 0, dollars: 0 })
   })
 })

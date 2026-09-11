@@ -13,7 +13,7 @@
 
 /** Which end of the N range to roll up at. `collected` is the actual N banked so
  *  far, used for the invoice-at-what-we-delivered view. */
-export type RangeEnd = 'min' | 'max' | 'collected'
+export type RangeEnd = 'min' | 'max' | 'collected' | 'billable'
 
 export interface PriceLine {
   /** Effective $ per completed response — the segment's own rate, or the project
@@ -23,8 +23,12 @@ export interface PriceLine {
   nMin: number | null
   /** N at the high end (n_target_max). */
   nMax: number | null
-  /** N banked so far, for the invoiced-at-N-collected figure. */
+  /** N banked so far — the RAW count, before cleaning. */
   nCollected?: number | null
+  /** The CLEANED final N. This, not nCollected, is what the client is billed on
+   *  (David 2026-09-10). Falls back to nCollected while a study is still in the
+   *  field and no cleaned figure exists yet. */
+  nActual?: number | null
 }
 
 /**
@@ -52,7 +56,37 @@ export function isInherited(segmentRate: number | null | undefined): boolean {
  *  that backfill. */
 function nAt(line: PriceLine, end: RangeEnd): number {
   if (end === 'collected') return line.nCollected ?? 0
+  if (end === 'billable') return billableNOf(line)
   return (end === 'max' ? (line.nMax ?? line.nMin) : line.nMin) ?? 0
+}
+
+/**
+ * The N this line can actually be INVOICED for.
+ *
+ *   billable = min(cleaned N delivered, the target the client asked for)
+ *
+ * TWO RULES, BOTH FROM DAVID 2026-09-10, AND THE CODE HONOURED NEITHER:
+ *
+ *   1. CAP AT TARGET. "any N delivered above the target is not charged to the
+ *      client." Over-delivery is work we paid for and cannot bill.
+ *   2. BILL THE CLEANED N. "The N actual is then what we bill the client."
+ *      n_collected is the raw count; n_actual is what survives cleaning.
+ *
+ * Measured on the twenty projects whose rate was recovered from email, invoicing
+ * at raw uncapped n_collected overstated revenue by $44,326 against these rules —
+ * 36% high. PR00371 is the extreme: 1,114 collected, 533 actual, 500 target, so
+ * the old figure billed 1,114 N and the true billable is 500.
+ *
+ * The cap is the TOP of the target range (nMax), not the bottom: a range means
+ * the client asked for up to that many, so delivering inside the range is
+ * billable and only delivery ABOVE the range is the give-away. Only 12 of 395
+ * live projects carry a range at all, so this choice moves little today — but it
+ * is the reading of "the target is what the client asked for".
+ */
+function billableNOf(line: PriceLine): number {
+  const delivered = line.nActual ?? line.nCollected ?? 0
+  const cap = line.nMax ?? line.nMin
+  return cap == null ? delivered : Math.min(delivered, cap)
 }
 
 export interface RateRollup {
@@ -113,10 +147,41 @@ export function contractRange(lines: PriceLine[]): { low: number; high: number }
 }
 
 /** Revenue if we invoiced at N collected instead of at target. null until
- *  something priced has actually been collected. */
+ *  something priced has actually been collected.
+ *  NOT what the client owes — see invoicedBillable. Kept because the raw
+ *  collected figure is still worth showing beside the billable one. */
 export function invoicedAtCollected(lines: PriceLine[]): number | null {
   const r = rollup(lines, 'collected')
   return r.pricedN > 0 ? r.revenue : null
+}
+
+/** What the client is ACTUALLY invoiced: Σ(rate × min(n_actual, target)).
+ *  null until something priced has been delivered. */
+export function invoicedBillable(lines: PriceLine[]): number | null {
+  const r = rollup(lines, 'billable')
+  return r.pricedN > 0 ? r.revenue : null
+}
+
+/**
+ * N delivered above the target, and what it would have been worth.
+ *
+ * This is the margin leak nothing in SOCC showed before: work we paid to collect
+ * and cannot invoice. Returns zeroes rather than null when there is no overage,
+ * because "none" is a real and reassuring answer that deserves rendering.
+ */
+export function overage(lines: PriceLine[]): { n: number; dollars: number } {
+  let n = 0
+  let dollars = 0
+  for (const line of lines) {
+    const delivered = line.nActual ?? line.nCollected ?? 0
+    const cap = line.nMax ?? line.nMin
+    if (cap == null) continue
+    const extra = Math.max(0, delivered - cap)
+    if (extra === 0) continue
+    n += extra
+    if (line.rate != null) dollars += line.rate * extra
+  }
+  return { n, dollars }
 }
 
 /**
