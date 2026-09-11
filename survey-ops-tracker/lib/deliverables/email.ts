@@ -1,4 +1,5 @@
 // lib/deliverables/email.ts
+import addressparser from 'nodemailer/lib/addressparser'
 import { sha256 } from './dedup'
 
 export const ALPHAROC_DOMAIN = 'alpharoc.ai'
@@ -20,12 +21,48 @@ export type FileItem = { filename: string; mimeType: string; bytes: Buffer; hash
 
 const EMAIL_RE = /[^\s<>,;"]+@[^\s<>,;"]+/g
 
-/** Lowercased domain after the @, or '' if there is no address. */
+/**
+ * Lowercased domain of the ONE mailbox in an address header, or '' when the
+ * header does not unambiguously name exactly one.
+ *
+ * DO NOT HAND-ROLL THIS. It gates the deliverables ingest — isInternalSender()
+ * is the only check that a forward came from inside the company — and it was
+ * got wrong twice in a row by regex:
+ *
+ *   1. "take the first @"      — the comment said "a display name never
+ *      contains '@'". RFC 5322 permits a quoted display name to contain
+ *      anything, so  "david@alpharoc.ai" <attacker@evil.com>  read as ours.
+ *   2. "take the first <…>"    — same mistake one character over: qtext
+ *      includes '<' and '>', so  "<david@alpharoc.ai>" <attacker@evil.com>
+ *      read as ours too. And a quoted LOCAL-PART may contain '@', so
+ *      "david@alpharoc.ai"@evil.com  did as well.
+ *
+ * In every one of those the attacker spoofs nothing: their own SPF and DKIM
+ * pass, because our address is only ever a display name.
+ *
+ * So this defers to nodemailer's RFC 5322 parser — deliberately THE SAME parser
+ * that lib/email/send.ts hands the reply to. That is the point: whatever this
+ * function calls internal is, by construction, the address the receipt is
+ * actually delivered to. The gate and the delivery cannot disagree.
+ *
+ * FAILS CLOSED. Zero mailboxes, several mailboxes, or a display name posing as
+ * an address all return '' — read as external, so the mail is ignored. A header
+ * we cannot read one way is not a header we should trust.
+ */
 export function emailDomain(addr: string): string {
-  // A display name never contains '@', so the first EMAIL_RE match is always the real address.
-  const m = addr.match(EMAIL_RE)
-  const email = m?.[0]?.toLowerCase() ?? ''
-  return email.split('@')[1] ?? ''
+  const parsed = addressparser(String(addr ?? ''), { flatten: true })
+  if (parsed.length !== 1) return ''
+  const { address, name } = parsed[0]
+  if (!address) return ''
+  // `<a@ours> <b@theirs>` (no comma) parses as ONE mailbox whose display name
+  // is the second address. nodemailer would deliver to a@ours, so this is not a
+  // disclosure — but it is a header with two addresses in it, and we decline to
+  // rule on those rather than let one file into the depository.
+  if (name && name.includes('@')) return ''
+  const email = address.toLowerCase()
+  // lastIndexOf, not split: a quoted local-part may itself contain '@'.
+  const at = email.lastIndexOf('@')
+  return at === -1 ? '' : email.slice(at + 1)
 }
 
 export function isInternalSender(from: string): boolean {

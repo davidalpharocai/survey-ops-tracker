@@ -11,6 +11,67 @@ describe('emailDomain / isInternalSender', () => {
     expect(isInternalSender('Person <person@coatue.com>')).toBe(false)
     expect(isInternalSender('')).toBe(false)
   })
+
+  /* IMPERSONATION. isInternalSender is the only check that a forward came from
+     inside the company: pass it and the attachments are filed to the shared
+     Drive and a receipt naming the matched client and project code is mailed
+     back to the From header.
+
+     Every header below is genuinely sent BY evil.com and spoofs nothing — SPF,
+     DKIM and DMARC all align on evil.com, because our address appears only as a
+     display name or a quoted local-part. Two successive regex parses read them
+     as ours: "first @ wins" fell to the first case, "first <…> wins" fell to the
+     second and third. Each stays here as a named regression. */
+  it('does not let a display name impersonate the domain', () => {
+    expect(isInternalSender('"david@alpharoc.ai" <attacker@evil.com>')).toBe(false)
+    expect(isInternalSender('"ops@alpharoc.ai"<attacker@evil.com>')).toBe(false)
+    // '' rather than 'evil.com': a display name posing as an address is a
+    // header we decline to rule on at all, which is the stronger answer.
+    expect(emailDomain('"david@alpharoc.ai" <attacker@evil.com>')).toBe('')
+    // Unquoted, too — a bare display name is not required to be an address.
+    expect(isInternalSender('alpharoc.ai admin <attacker@evil.com>')).toBe(false)
+    // A display name with no '@' resolves normally, to the real sender.
+    expect(emailDomain('Definitely Alpharoc <attacker@evil.com>')).toBe('evil.com')
+  })
+
+  it('does not let ANGLE BRACKETS inside a quoted display name impersonate it', () => {
+    // RFC 5322 qtext includes '<' and '>' exactly as it includes '@', so taking
+    // the first bracket pair was the same bug one character over.
+    expect(isInternalSender('"<david@alpharoc.ai>" <attacker@evil.com>')).toBe(false)
+    expect(emailDomain('"<david@alpharoc.ai>" <attacker@evil.com>')).toBe('')
+    expect(isInternalSender('"AlphaROC Deliverables <deliverables@alpharoc.ai>" <ops@evil.com>')).toBe(false)
+  })
+
+  it('does not let a QUOTED LOCAL-PART impersonate it', () => {
+    // "david@alpharoc.ai"@evil.com is ONE legal mailbox at evil.com. Splitting
+    // on the first '@' read the local part as the whole address.
+    expect(isInternalSender('"david@alpharoc.ai"@evil.com')).toBe(false)
+    expect(emailDomain('"david@alpharoc.ai"@evil.com')).toBe('evil.com')
+  })
+
+  it('fails closed on a header naming more than one mailbox', () => {
+    // Two mailboxes means we cannot say who sent it, so we do not guess.
+    expect(isInternalSender('<david@alpharoc.ai> <attacker@evil.com>')).toBe(false)
+    expect(isInternalSender('<david@alpharoc.ai>, <attacker@evil.com>')).toBe(false)
+    expect(isInternalSender('Team: david@alpharoc.ai, attacker@evil.com;')).toBe(false)
+    expect(emailDomain('nonsense with no address at all')).toBe('')
+  })
+
+  it('still reads the ordinary shapes Gmail actually produces', () => {
+    expect(isInternalSender('david@alpharoc.ai')).toBe(true)
+    expect(isInternalSender('David Schwartzman <david@alpharoc.ai>')).toBe(true)
+    expect(isInternalSender('  DAVID@ALPHAROC.AI  ')).toBe(true)
+    // Every distinct From header on the 82 deliverables filed to date is one of
+    // these two shapes; these are the real ones.
+    expect(isInternalSender('Sreerag Cheeroth <sreerag@alpharoc.ai>')).toBe(true)
+    expect(isInternalSender('Julia Tibbetts <julia@alpharoc.ai>')).toBe(true)
+    // A display name containing brackets is legitimate and must still work —
+    // the previous fix broke this one, dropping the deliverable silently.
+    expect(isInternalSender('"AlphaROC <Deliverables>" <deliverables@alpharoc.ai>')).toBe(true)
+    // Lookalikes stay out.
+    expect(isInternalSender('x@alpharoc.ai.evil.com')).toBe(false)
+    expect(isInternalSender('x@notalpharoc.ai')).toBe(false)
+  })
 })
 
 describe('parseAddressList', () => {
