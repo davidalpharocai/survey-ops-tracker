@@ -1,4 +1,5 @@
 import { bucketOf, type BucketInput } from './buckets'
+import { isRerunProject } from '@/lib/reruns/isRerun'
 
 /**
  * What a salesperson sees when they open SOCC.
@@ -37,7 +38,33 @@ export interface HomeRow extends BucketInput {
   n_collected: number | null
   n_actual: number | null
   requested_by_name?: string | null
+  /* The three fields isRerunProject() needs. All already on the sales_projects
+     allowlist, so hiding reruns cost no migration and exposed nothing new —
+     notably NOT the captain, which the view does not carry and should not. */
+  series_id?: string | null
+  rerun_number?: number | null
+  project_type?: string | null
 }
+
+/**
+ * Reruns are hidden from Home (David, 2026-09-14).
+ *
+ * WHY THE RULE IS "ALL RERUNS" AND NOT "RERUNS SREE CAPTAINS", which is what was
+ * actually asked: sales_projects does not expose captain_id, and adding it would
+ * be a disclosure decision taken for one filter. Measured first — of the 13 live
+ * reruns in the book, 12 are Sree's; the 13th is PR00442 "Holocene Weekly Tracker
+ * - 16th Rerun" under Anne Wei, which is the same standing-tracker shape. So the
+ * two rules differ by ONE survey, and the simpler one neither names a person in
+ * SQL nor breaks the day Sree hands a tracker over.
+ *
+ * Uses the app's own isRerunProject rather than a local test. The local test I
+ * first wrote keyed on `rerun_number != null` — and rerun_number DEFAULTS TO 1 on
+ * every row, so it called all 401 projects reruns. isRerunProject gets it right
+ * with `(rerun_number ?? 1) > 1`.
+ */
+export const isHiddenRerun = (r: HomeRow) => isRerunProject({
+  series_id: r.series_id, rerun_number: r.rerun_number, project_type: r.project_type,
+})
 
 /** Worst first. Used for both the badge and the sort, so they cannot disagree. */
 export type Kind = 'late' | 'due' | 'over' | 'ok'
@@ -171,6 +198,11 @@ export function salesHome(rows: HomeRow[], today: string): SalesHome {
   let scoping = 0
 
   for (const r of rows) {
+    // Hidden from every LIST, and from the counts that describe those lists.
+    // Deliberately NOT hidden from quietAccounts below: an account with a rerun
+    // in flight is not a quiet account, and saying it is would invent a lapsed
+    // relationship out of work that is actively running.
+    if (isHiddenRerun(r)) continue
     const bucket = bucketOf(r)
     if (bucket === 'active') {
       inField.push(judgeLive(r, today))

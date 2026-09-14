@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  salesHome, judgeLive, commitmentDate, pctOfTarget, quietAccounts, type HomeRow,
+  salesHome, judgeLive, commitmentDate, pctOfTarget, quietAccounts, isHiddenRerun, type HomeRow,
 } from './home'
 
 /**
@@ -226,5 +226,50 @@ describe('quietAccounts', () => {
       row({ id: '2', client: 'Ancient', board_column: 'Delivery', deliver_date: '2026-01-01' }),
     ], TODAY)
     expect(q.map(x => x.client)).toEqual(['Ancient', 'Recent'])
+  })
+})
+
+describe('reruns are hidden from Home', () => {
+  const rerun = (o: Partial<HomeRow> = {}) =>
+    row({ id: 'rr', project_name: 'Weekly Tracker - 16th Rerun', rerun_number: 16, ...o })
+
+  it('recognises a rerun by wave number, series, or legacy type', () => {
+    expect(isHiddenRerun(row({ rerun_number: 2 }))).toBe(true)
+    expect(isHiddenRerun(row({ series_id: 'abc' }))).toBe(true)
+    expect(isHiddenRerun(row({ project_type: 'Rerun' }))).toBe(true)
+  })
+
+  it('does NOT call a first wave a rerun', () => {
+    // rerun_number DEFAULTS TO 1 on all 401 rows, so a `!= null` test calls the
+    // entire book a rerun. That bug produced a wrong reconciliation count before
+    // it was caught; this test exists so it cannot come back.
+    expect(isHiddenRerun(row({ rerun_number: 1 }))).toBe(false)
+    expect(isHiddenRerun(row({ rerun_number: null }))).toBe(false)
+    expect(isHiddenRerun(row())).toBe(false)
+  })
+
+  it('keeps reruns out of every list and every count', () => {
+    const h = salesHome([
+      row({ id: 'live', deliver_date: '2026-09-20' }),
+      rerun({ id: 'r-live', deliver_date: '2026-09-20' }),
+      rerun({ id: 'r-shipped', board_column: 'Delivery', deliver_date: '2026-09-11' }),
+      rerun({ id: 'r-stalled', phase: 'Scoping', board_column: 'Submitted', submitted_date: '2026-07-01' }),
+    ], TODAY)
+    expect(h.inField.map(j => j.row.id)).toEqual(['live'])
+    expect(h.shipped).toEqual([])
+    expect(h.stalled).toEqual([])
+    expect(h.counts).toMatchObject({ inField: 1, scoping: 0, delivered: 0 })
+  })
+
+  it('still counts a live rerun as work in flight, so the account is not called quiet', () => {
+    // The one place a rerun must NOT be invisible. An account whose only live
+    // work is a tracker is an ACTIVE account; listing it under "gone quiet"
+    // would invent a lapsed relationship out of work that is running weekly.
+    const rows: HomeRow[] = [
+      row({ id: 'old', client: 'Holocene', board_column: 'Delivery', deliver_date: '2026-03-01' }),
+      rerun({ id: 'r', client: 'Holocene', board_column: 'Fielding' }),
+    ]
+    expect(quietAccounts(rows, TODAY)).toEqual([])
+    expect(salesHome(rows, TODAY).quiet).toEqual([])
   })
 })
