@@ -241,9 +241,20 @@ export function buildChecks(p: Row, sup: SupRow[], blasts: BlastRow[], costs: Co
     // AND a blast (OverviewFieldGrid renders both widgets for Rerun and untyped
     // projects), and there the N could have arrived entirely through the
     // suppliers while the blast genuinely returned nothing — a correctly-recorded
-    // project that this would otherwise hard-fail. Every project with blasts in
-    // production today is blast-only, so the gate changes nothing now; it stops
-    // the first mixed-source project being accused.
+    // project that this would otherwise hard-fail.
+    //
+    // WHEN WRITTEN, the note here said every project with blasts in production
+    // was blast-only, so the gate changed nothing yet. That is no longer true:
+    // measured 2026-09-14, 69 projects have blasts, 53 have supplier rows, and
+    // FIVE have both (PR00036, PR00197, PR00230, PR00321, PR00034). The gate is
+    // load-bearing now, not a precaution.
+    //
+    // STILL BLIND, and worth naming: this fires only when blast completes sum to
+    // EXACTLY 0. PR00425 has 10 completes against an n_collected of 1,019 — the
+    // other 1,009 came through PureSpectrum and are recorded nowhere — and no
+    // branch here says a word about it. Catching that needs a reconciliation
+    // check on n_collected vs the sum of ALL sources, which is a separate piece
+    // of work; 35 projects were in that state on the same date.
     const blastIsOnlySource = sup.length === 0
     if (nCollected > 0 && blastCompletes === 0 && blastIsOnlySource) {
       checks.push({
