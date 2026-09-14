@@ -1,9 +1,13 @@
 'use client'
 
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 import { getDueUrgency, urgencyTextClass, urgencySuffix } from '@/lib/utils/date'
 import { useUpdateProject, type SurveyProject } from '@/lib/hooks/useProjects'
+import { useProjectBlasts } from '@/lib/hooks/useProjectBlasts'
+import { useProjectSuppliers } from '@/lib/hooks/useProjectSuppliers'
+import { useProjectLaunches } from '@/lib/hooks/useProjectLaunches'
+import { moneySources } from './moneySources'
 import type { Database } from '@/lib/supabase/types'
 import { FieldSection, TextCell, DateCell, SelectCell } from './fields'
 import { NSegmentsEditor } from './NSegmentsEditor'
@@ -30,13 +34,14 @@ const TIP = {
     'Client-facing deadline — when the client needs the project in hand. Often the same day as the internal due date.',
   rerun:
     'Date the next wave auto-spawns (arms the rerun cron); changing it re-arms it.',
-  type: 'PS (PureSpectrum sample) or B2B (blast outreach). Drives which Money widget shows below. Rerun is shown as a separate ↻ chip, not a type.',
+  type: 'PS (PureSpectrum sample) or B2B (blast outreach) — what the survey mainly is. It no longer decides what Money shows: a survey fielded through both records both, and either section appears as soon as it has rows. Rerun is shown as a separate ↻ chip, not a type.',
   surveyIds:
     "IDs of this project's surveys, comma separated. Auto-filled from the attached Google Sheet by the scheduled sync; manual edits stick unless the sheet changes.",
   longitudinal: 'Whether this is a longitudinal study tracked across multiple waves.',
   rowLevel: 'Whether individual respondent-level data is included in the deliverable.',
   occam: 'Whether this project uses Occam (our internal survey tool).',
 }
+
 
 /**
  * The main-column field-grid body of the project Overview: Details,
@@ -48,6 +53,24 @@ const TIP = {
 export function OverviewFieldGrid({ project }: { project: SurveyProject }) {
   const updateProject = useUpdateProject()
   const save = (updates: ProjectUpdate) => updateProject.mutate({ id: project.id, updates })
+
+  /* Both widgets already run these exact queries, and react-query dedupes by
+     key — so asking here costs no extra request, it just lets the parent decide
+     what to render instead of guessing from the type. */
+  const { data: blastRows } = useProjectBlasts(project.id)
+  const { data: supplierRows } = useProjectSuppliers(project.id)
+  const { data: launchRows } = useProjectLaunches(project.id)
+  const [alsoPS, setAlsoPS] = useState(false)
+  const [alsoBlasts, setAlsoBlasts] = useState(false)
+  const money = moneySources({
+    projectType: project.project_type,
+    hasBlasts: (blastRows?.length ?? 0) > 0,
+    // A launch with no supplier rows yet still counts: it is a PureSpectrum wave
+    // someone has started, and hiding it would lose the work in progress.
+    hasPS: (supplierRows?.length ?? 0) > 0 || (launchRows?.length ?? 0) > 0,
+    alsoPS,
+    alsoBlasts,
+  })
 
   // Delivered projects (board_column 'Delivery') drop the proximity treatment —
   // the work is done, so due/delivery dates no longer warn. Both the internal
@@ -150,11 +173,9 @@ export function OverviewFieldGrid({ project }: { project: SurveyProject }) {
               this panel you type in.
             </span>
           </p>
-          {/* Rerun is a dimension, not a type — a rerun wave still carries its
-              base type (PS/B2B) on project_type, so it maps to one widget
-              below like any other project. PS -> Suppliers (PureSpectrum),
-              B2B -> blast blocks. Untyped shows both (doesn't map cleanly). */}
-          {project.project_type === 'PS' && (
+          {/* WHICH MONEY WIDGETS SHOW — see moneySources() above for the rule.
+              Driven by what the project HAS, not only by what it is called. */}
+          {money.showSuppliers && (
             <SuppliersWidget
               projectId={project.id}
               nTarget={project.n_target}
@@ -162,20 +183,36 @@ export function OverviewFieldGrid({ project }: { project: SurveyProject }) {
               nActual={project.n_actual}
             />
           )}
-          {project.project_type === 'B2B' && <BlastBlocks project={project} />}
-          {/* Legacy 'Rerun' rows predate the type/dimension split and were
-              never re-typed to PS/B2B — keep showing both widgets for them
-              (same as untyped) rather than dropping Money entirely. */}
-          {(project.project_type === 'Rerun' || project.project_type == null) && (
-            <>
-              <SuppliersWidget
-                projectId={project.id}
-                nTarget={project.n_target}
-                nInternalTarget={project.n_internal_target}
-                nActual={project.n_actual}
-              />
-              <BlastBlocks project={project} />
-            </>
+          {money.showBlasts && <BlastBlocks project={project} />}
+
+          {/* Starting a mixed project. Without this, a survey typed B2B whose
+              second wave went to PureSpectrum has nowhere to record it, which
+              is how PR00425 ended up with 5 blasts covering 10 completes
+              against an n_collected of 1,019 — the other 1,009 had no home. */}
+          {(!money.showSuppliers || !money.showBlasts) && (
+            <div className="mt-2 flex items-center gap-2 border-t border-border pt-3">
+              <span className="text-xs text-muted-foreground">Also fielded through</span>
+              {!money.showSuppliers && (
+                <button
+                  type="button"
+                  onClick={() => setAlsoPS(true)}
+                  className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground transition-colors hover:border-primary hover:text-foreground"
+                  title="Record PureSpectrum launches on this project as well as its blasts. Both count toward actual spend."
+                >
+                  + PureSpectrum
+                </button>
+              )}
+              {!money.showBlasts && (
+                <button
+                  type="button"
+                  onClick={() => setAlsoBlasts(true)}
+                  className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground transition-colors hover:border-primary hover:text-foreground"
+                  title="Record B2B blasts on this project as well as its PureSpectrum launches. Both count toward actual spend."
+                >
+                  + B2B blasts
+                </button>
+              )}
+            </div>
           )}
           {/* Budget summary sits under the supplier/blast config — reuses
               BudgetWidget wholesale (it already renders budget editing, the
