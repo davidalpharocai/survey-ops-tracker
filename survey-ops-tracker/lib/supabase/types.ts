@@ -1133,6 +1133,7 @@ export type Database = {
       }
       project_blasts: {
         Row: {
+          channel: string | null
           id: string
           project_id: string
           delivered: number
@@ -1151,6 +1152,7 @@ export type Database = {
           created_at: string
         }
         Insert: {
+          channel?: string | null
           id?: string
           project_id: string
           delivered?: number
@@ -1169,6 +1171,7 @@ export type Database = {
           created_at?: string
         }
         Update: {
+          channel?: string | null
           id?: string
           project_id?: string
           delivered?: number

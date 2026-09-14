@@ -5,7 +5,7 @@ import { Caret } from '@/components/shared/Caret'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
-import { FieldCell, DateCell, NumberCell, RateCell, TextCell } from './fields'
+import { FieldCell, DateCell, NumberCell, RateCell, TextCell, SelectCell } from './fields'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
 import {
   useProjectBlasts,
@@ -18,6 +18,7 @@ import {
   blastCost,
   unknownCostBlasts,
   sendCost,
+  isEmailBlast,
   blastAllInCost,
   totalBidDollars,
   totalSendDollars,
@@ -25,7 +26,15 @@ import {
 } from '@/lib/utils/blast'
 import type { SurveyProject } from '@/lib/hooks/useProjects'
 
+const CHANNEL_OPTIONS = [
+  { value: '', label: '— not recorded —' },
+  { value: 'email', label: 'Email' },
+  { value: 'sms', label: 'SMS' },
+]
+
 const TIP = {
+  channel:
+    'How this blast went out. EMAIL is not metered per message, so it costs only the incentive ($/bid × completes) and the $/send field disappears. SMS is charged per message on top. Leaving this blank keeps charging the send cost — blank means "not recorded", not "free".',
   header:
     'Log each B2B blast. It costs TWO things and both count toward the project’s spend: the reward ($/bid × completes — paid only for people who finished) and the send ($/send × # people — paid for every message that went out, answered or not). Leave a figure blank until you actually know it: blank means “not recorded”, which is not the same as 0.',
   sent: 'When the blast actually went out — pick the date and time (AM/PM).',
@@ -286,6 +295,7 @@ function BlastBlock({
   // The two halves separately as well as together: each can be known while the
   // other is not, and the breakdown line says so per half.
   const reward = blastCost(blast)
+  const isEmail = isEmailBlast(blast as { channel?: string | null })
   const send = sendCost(blast)
   const allIn = blastAllInCost(blast)
 
@@ -357,12 +367,44 @@ function BlastBlock({
             whole send cost. On PR00309 that is $1,915.76 destroyed by a stray
             click. CostLines and PricingWidget both hit this and both wrote it
             down; RateCell exists so the fourth caller does not repeat it. */}
-        <RateCell
-          label="$ / send"
-          tooltip={TIP.costPerSend}
-          value={blast.cost_per_send}
-          onSave={v => save({ cost_per_send: v })}
+        {/* CHANNEL, and the reason $ / send can disappear below it. Migration
+            112: an email blast is not metered per message, so the incentive is
+            its whole cost. SMS is metered. A blank channel keeps paying, because
+            "nobody recorded how this went out" is not evidence it was free. */}
+        <SelectCell
+          label="Channel"
+          tooltip={TIP.channel}
+          value={(blast as { channel?: string | null }).channel ?? ''}
+          options={CHANNEL_OPTIONS}
+          onSave={v => save({ channel: (v || null) as never })}
         />
+        {/* RateCell, NOT NumberCell. NumberCell commits through commitNumber,
+            which Math.rounds, so $0.02 would save as 0 -- and because it seeds
+            from the stored value and commits on blur, merely opening this cell
+            and clicking away would zero the rate. 0 is a LEGAL rate after 095
+            (an owned list), so nothing downstream would flag it: the row would
+            read "send $0.00" as a fact and the project would quietly lose the
+            whole send cost. On PR00309 that is $1,915.76 destroyed by a stray
+            click. CostLines and PricingWidget both hit this and both wrote it
+            down; RateCell exists so the fourth caller does not repeat it. */}
+        {isEmail ? (
+          /* Not a $0 rate cell — a statement. Showing "$ / send  $0.00" invites
+             someone to type 0.02 back in, and leaves the reader unsure whether
+             the zero is a fact or an empty field. */
+          <FieldCell
+            label="$ / send"
+            tooltip="Email blasts are not charged per message, so there is no send cost — the incentive is the whole cost of this blast."
+          >
+            <span className="text-muted-foreground">n/a for email</span>
+          </FieldCell>
+        ) : (
+          <RateCell
+            label="$ / send"
+            tooltip={TIP.costPerSend}
+            value={blast.cost_per_send}
+            onSave={v => save({ cost_per_send: v })}
+          />
+        )}
         {/* The DISPLAY functions, not the SQL-mirroring ones: blastTotal and
             sendTotal return 0 for an unrecorded blast, and "$0" on screen is read
             as a result — a send that cost us nothing. An unknown cost has to say

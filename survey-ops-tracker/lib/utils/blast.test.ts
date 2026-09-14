@@ -1,9 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import {
-  blastTotal, blastCost, isBlastCostUnknown, unknownCostBlasts,
-  totalBidDollars, totalPeople, totalCompletes, blendedBid, costPerN,
-  sendCost, sendTotal, isSendCostUnknown, totalSendDollars, unknownSendBlasts, blastAllInCost,
-} from './blast'
+import { blastTotal, blastCost, isBlastCostUnknown, unknownCostBlasts, totalBidDollars, totalPeople, totalCompletes, blendedBid, costPerN, sendCost, sendTotal, isSendCostUnknown, totalSendDollars, unknownSendBlasts, blastAllInCost } from './blast'
 import type { Blast } from './blast'
 
 const b = (bid: number | null, people: number | null, completes: number | null): Blast =>
@@ -177,5 +173,46 @@ describe('blastAllInCost', () => {
 
   it('is null when the send half is unknown but the reward is known', () => {
     expect(blastAllInCost({ bid: 25, completes: 10, people: null, cost_per_send: 0.02 })).toBeNull()
+  })
+})
+
+describe('email blasts have no send cost (migration 112)', () => {
+  const email = { people: 10_000, cost_per_send: 0.02, channel: 'email' }
+  const sms = { people: 10_000, cost_per_send: 0.02, channel: 'sms' }
+  const unrecorded = { people: 10_000, cost_per_send: 0.02, channel: null }
+
+  it('charges nothing to send an email blast', () => {
+    // David, 2026-09-14: the incentive is the whole cost of an email blast.
+    expect(sendCost(email)).toBe(0)
+    expect(sendTotal(email)).toBe(0)
+  })
+
+  it('still charges SMS, which IS metered per message', () => {
+    expect(sendCost(sms)).toBe(200)
+    expect(sendTotal(sms)).toBe(200)
+  })
+
+  it('STILL CHARGES a blast whose channel was never recorded', () => {
+    // The load-bearing one. "Nobody wrote down how this went out" is not
+    // evidence that it was free — 21 blasts are in that state carrying
+    // $1,526.80 between them, and forgiving that on a guess invents a discount.
+    // recompute_project_spend uses `is distinct from 'email'` for the same reason.
+    expect(sendCost(unrecorded)).toBe(200)
+    expect(sendCost({ people: 10_000, cost_per_send: 0.02 })).toBe(200)
+  })
+
+  it('calls an email blast KNOWN-zero, not unknown', () => {
+    // Zero and unknown render differently and mean opposite things: "$0.00" is a
+    // fact, "not recorded" is an absence. An email blast's send cost is a fact.
+    expect(isSendCostUnknown(email)).toBe(false)
+    expect(isSendCostUnknown({ channel: 'email' })).toBe(false)
+    expect(isSendCostUnknown({ people: null, cost_per_send: 0.02 })).toBe(true)
+  })
+
+  it('leaves the all-in cost as the incentive alone for email', () => {
+    expect(blastAllInCost({ bid: 25, completes: 10, people: 10_000, cost_per_send: 0.02, channel: 'email' }))
+      .toBe(250)
+    expect(blastAllInCost({ bid: 25, completes: 10, people: 10_000, cost_per_send: 0.02, channel: 'sms' }))
+      .toBe(250 + 200)
   })
 })

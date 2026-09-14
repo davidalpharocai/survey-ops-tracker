@@ -10,7 +10,9 @@ type BlastFigures = { bid?: number | null; completes?: number | null }
  *  questions and are unknown independently — a blast can have a known send cost
  *  and an unknown reward — PR00309's shape: every send recorded, no completes
  *  ever entered. */
-type SendFigures = { people?: number | null; cost_per_send?: number | null }
+type SendFigures = { people?: number | null; cost_per_send?: number | null;
+  /** 'email' | 'sms' | null. Migration 112 — email blasts have NO send cost. */
+  channel?: string | null }
 
 /**
  * NULL vs 0 on a blast (migration 091). `bid`, `people` and `completes` are
@@ -119,10 +121,34 @@ export function unknownCostBlasts(blasts: BlastFigures[]): number {
 // to them is this. They stack.
 // ---------------------------------------------------------------------------
 
+/**
+ * AN EMAIL BLAST HAS NO SEND COST (migration 112).
+ *
+ * David, 2026-09-14: "if the blast was an email blast, the only cost associated
+ * with the blast is the incentive cost. there's no '$ / Send'." Email is not
+ * metered per message; SMS is. 095 charged both, because until 112 there was no
+ * channel on a blast to tell them apart.
+ *
+ * Gated HERE rather than at each call site so the app cannot disagree with the
+ * database: every display, total and estimate below flows through these two
+ * helpers, and recompute_project_spend applies the identical rule in SQL.
+ *
+ * NULL channel still pays. "We never recorded how this went out" is not
+ * evidence that it was free — 21 blasts are in that state, carrying $1,526.80
+ * of send cost between them, and forgiving it on a guess would be inventing a
+ * discount. `is distinct from` in the SQL does the same thing.
+ */
+export function isEmailBlast(b: SendFigures): boolean {
+  return b.channel === 'email'
+}
+
 /** True when a blast's SEND cost is unknown rather than zero — the sent count or
  *  the rate has never been recorded. Distinct from the reward being unknown:
- *  PR00309 has a fully known send cost and no recorded completes at all. */
+ *  PR00309 has a fully known send cost and no recorded completes at all.
+ *
+ *  An email blast is never "unknown": its send cost is a known, genuine zero. */
 export function isSendCostUnknown(b: SendFigures): boolean {
+  if (isEmailBlast(b)) return false
   return b.people == null || b.cost_per_send == null
 }
 
@@ -132,6 +158,7 @@ export function isSendCostUnknown(b: SendFigures): boolean {
  *  deliberately not quoted here: the figure written yesterday was wrong by the
  *  next morning. data_health checks 7c/7d report the current ones.) */
 export function sendCost(b: SendFigures): number | null {
+  if (isEmailBlast(b)) return 0
   return isSendCostUnknown(b) ? null : (b.people as number) * (b.cost_per_send as number)
 }
 
@@ -139,6 +166,7 @@ export function sendCost(b: SendFigures): number | null {
  *  095's `coalesce(people,0) * coalesce(cost_per_send,0)`. Use for reconciling
  *  against survey_projects.actual_spend; never for display. */
 export function sendTotal(b: SendFigures): number {
+  if (isEmailBlast(b)) return 0
   return (b.people ?? 0) * (b.cost_per_send ?? 0)
 }
 
