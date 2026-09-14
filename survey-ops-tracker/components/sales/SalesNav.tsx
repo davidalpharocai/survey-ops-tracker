@@ -17,18 +17,19 @@ import { SalesSearch } from './SalesSearch'
  * page load, to render badges for surfaces they cannot open. Forking the
  * component would mean carrying that.
  *
- * Four destinations, which is few enough for a horizontal ribbon and is exactly
- * what David named. Order is deliberate: Surveys first because it is the reason
- * they open the tool, Accounts and Contacts as the two ways of slicing the same
+ * Five destinations, few enough for a horizontal ribbon. Order is deliberate:
+ * Home first because it is the reason to open the tool, Surveys behind it for
+ * the full table, Accounts and Contacts as the two ways of slicing the same
  * book, and What's new last because it is read once a week, not once an hour.
- *
- * No Home/dashboard tab. A digest page is the right idea eventually, but a fifth
- * tab that duplicates the first is worse than none — and until credits are
- * populated there is nothing for a digest to say that the Surveys list does not
- * already show.
  */
 
 const TABS = [
+  // Home leads now. The comment below used to argue against a Home tab on the
+  // grounds that "a fifth tab that duplicates the first is worse than none" —
+  // true of a digest that restated the surveys list, which is why /sales/home is
+  // not one. It shows the LIVE book judged and ordered: 144 of Alex's 187
+  // surveys are delivered, so the surveys table opens onto history every morning.
+  { href: '/sales/home', label: 'Home' },
   { href: '/sales/surveys', label: 'Surveys' },
   { href: '/sales/accounts', label: 'Accounts' },
   { href: '/sales/contacts', label: 'Contacts' },
@@ -41,7 +42,7 @@ export function SalesNav({ name }: { name: string | null }) {
   return (
     <nav className="border-b border-border bg-card">
       <div className="mx-auto flex max-w-6xl items-center gap-1 px-6 py-2">
-        <Link href="/sales/surveys" className="mr-3 shrink-0 text-sm font-bold hover:opacity-80">
+        <Link href="/sales/home" className="mr-3 shrink-0 text-sm font-bold hover:opacity-80">
           AlphaROC
         </Link>
 
@@ -74,6 +75,17 @@ export function SalesNav({ name }: { name: string | null }) {
           {name && (
             <span className="hidden shrink-0 pl-1 text-xs text-muted-foreground sm:inline">{name}</span>
           )}
+          {/* Not optional furniture. This shell has four tabs and no other way
+              out: before this link a sales user could not end their session at
+              all, and an admin whose "view as" cookie expired was stranded in
+              here with a read-only session and nothing to click. Always shown,
+              never behind a menu — an exit you have to find is not an exit. */}
+          <Link
+            href="/signout"
+            className="shrink-0 rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+          >
+            Sign out
+          </Link>
         </div>
       </div>
     </nav>

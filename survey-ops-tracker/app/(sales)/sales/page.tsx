@@ -9,5 +9,5 @@ import { redirect } from 'next/navigation'
  * 404 for the tier's own root would be a self-inflicted support ticket.
  */
 export default function SalesRoot() {
-  redirect('/sales/surveys')
+  redirect('/sales/home')
 }
