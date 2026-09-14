@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { PortalThemeToggle } from '@/components/portal/PortalThemeToggle'
 import { ImpersonationBanner } from '@/components/shared/ImpersonationBanner'
 
@@ -17,6 +18,14 @@ export default function PortalShell({ children }: { children: React.ReactNode })
         <span className="text-slate-400 dark:text-slate-600 text-sm">/</span>
         <span className="text-slate-500 dark:text-slate-400 text-sm">Compliance Portal</span>
         <PortalThemeToggle />
+        {/* Same gap as the other two shells had: an external reviewer on a
+            shared machine could not end their own session. */}
+        <Link
+          href="/signout"
+          className="ml-auto text-xs text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
+        >
+          Sign out
+        </Link>
       </nav>
       <main className="p-6 max-w-4xl mx-auto">{children}</main>
     </div>

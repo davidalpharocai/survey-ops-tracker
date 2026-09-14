@@ -379,6 +379,13 @@ export function TopNav() {
                   <span>↺</span> Reset ribbon order
                 </button>
               )}
+              <div className="border-t border-border my-1.5" />
+              {/* The app went its whole life without one of these. The only code
+                  that ended a session was the login page's two error branches,
+                  so signing out meant provoking an error or clearing cookies. */}
+              <Link href="/signout" className={menuItemClass} title="Sign out — ends your session, and clears the 'viewing as' cookie if one is set">
+                <span>🚪</span> Sign out
+              </Link>
             </div>
           )}
         </div>

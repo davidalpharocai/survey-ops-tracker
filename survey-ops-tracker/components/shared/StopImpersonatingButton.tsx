@@ -24,17 +24,21 @@ export function StopImpersonatingButton({ className = '' }: { className?: string
       const res = await fetch('/api/admin/impersonate/stop', { method: 'POST' })
       const body = (await res.json()) as { ok?: boolean; error?: string; next?: string }
       if (!res.ok || body.error) {
-        toast(body.error ?? 'Could not stop — sign out and back in.')
-        // Still leave, if the server told us where. A failed restore that also
-        // signed us out must not strand the tab on a page it can no longer read.
-        if (body.next) window.location.assign(body.next)
-        setBusy(false)
+        toast(body.error ?? 'Could not stop — signing you out instead.')
+        // A failed restore must not strand the tab on a page it can no longer
+        // read. Where the server names a destination, take it; otherwise fall
+        // back to /signout, which works from inside any shell and can clear the
+        // cookies this request could not.
+        window.location.assign(body.next ?? '/signout')
         return
       }
       window.location.assign(body.next ?? '/')
     } catch {
-      toast('Could not reach the server. Sign out and back in to return to your own account.')
-      setBusy(false)
+      // Previously this said "sign out and back in" and left the user with
+      // nothing to click — there was no sign-out in the app to follow that
+      // advice with. Now there is, so send them to it rather than describing it.
+      toast('Could not reach the server — taking you to sign out.')
+      window.location.assign('/signout')
     }
   }
 

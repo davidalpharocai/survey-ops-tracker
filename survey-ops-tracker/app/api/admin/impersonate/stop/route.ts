@@ -53,8 +53,14 @@ export async function POST() {
     type: 'magiclink', email: imp.adminEmail,
   })
   if (linkError || !link?.properties?.hashed_token) {
+    // `next` on every failure branch, matching the 403 above. The client carries
+    // its own fallback, but a server that knows the restore failed and does not
+    // say where to go is leaving the recovery to be guessed — and the old copy
+    // ("Sign out and back in") described an action the app could not perform,
+    // because until now it had no sign-out at all.
     return NextResponse.json({
-      error: `Could not restore ${imp.adminEmail}'s session: ${linkError?.message ?? 'no token'}. Sign out and back in.`,
+      error: `Could not restore ${imp.adminEmail}'s session: ${linkError?.message ?? 'no token'}. Taking you to sign out.`,
+      next: '/signout',
     }, { status: 500 })
   }
 
@@ -68,7 +74,8 @@ export async function POST() {
   })
   if (otpError || !session?.session) {
     return NextResponse.json({
-      error: `Could not restore ${imp.adminEmail}'s session: ${otpError?.message ?? 'no session'}. Sign out and back in.`,
+      error: `Could not restore ${imp.adminEmail}'s session: ${otpError?.message ?? 'no session'}. Taking you to sign out.`,
+      next: '/signout',
     }, { status: 500 })
   }
 

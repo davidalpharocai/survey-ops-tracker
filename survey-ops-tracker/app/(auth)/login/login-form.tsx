@@ -58,6 +58,13 @@ export default function LoginForm() {
       supabase.auth.signOut()
       setError("Your account doesn't have access to this view yet. Ask David to finish setting it up.")
     }
+    // /api/auth/signout could not be reached, so SignOutButton sent us here to
+    // finish the job from the browser. Not an error the user did anything to
+    // cause — it clears what it can and says nothing, because arriving at a
+    // signed-out login page is the outcome they asked for.
+    if (searchParams.get('signout-failed')) {
+      supabase.auth.signOut()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
