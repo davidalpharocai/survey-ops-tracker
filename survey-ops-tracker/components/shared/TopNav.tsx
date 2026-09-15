@@ -346,6 +346,11 @@ export function TopNav() {
               <Link href="/insights" className={menuItemClass} title="Insights — pipeline rollup, deadlines, on-time delivery, workload, budget">
                 <span>📊</span> Insights
               </Link>
+              {/* Cost, not P&L — SOCC has a client rate on 4 of 322 delivered
+                  surveys, so margin is not computable and the page says so. */}
+              <Link href="/finance" className={menuItemClass} title="Finance — what our fielding actually costs: per complete by route, where the money goes, N we cannot bill, blast efficiency, spend by account">
+                <span>💵</span> Finance
+              </Link>
               <Link href="/internal" className={menuItemClass} title="Internal Projects — AlphaROC's own work on a sprint-based board">
                 <span>🧰</span> Internal Projects
               </Link>
