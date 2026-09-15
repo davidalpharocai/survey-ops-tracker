@@ -13,6 +13,7 @@ import { WaveHistory } from '@/components/project/WaveHistory'
 import { CloneProjectModal } from '@/components/project/CloneProjectModal'
 import { PutIntoRerunServiceModal } from '@/components/project/PutIntoRerunServiceModal'
 import { OverviewFieldGrid } from '@/components/project/OverviewFieldGrid'
+import { FieldingGuidance } from '@/components/project/FieldingGuidance'
 import { ActivityLog } from '@/components/project/ActivityLog'
 import { DataChangeLog } from '@/components/project/DataChangeLog'
 import { ProjectAuditLog } from '@/components/project/ProjectAuditLog'
@@ -662,6 +663,13 @@ export default function ProjectDetailPage() {
                 </div>
               </div>
             )}
+
+            {/* ABOVE the field grid, not below it. The guidance is about
+                decisions still open — which route, whether to send another
+                blast, whether the buy has already overshot — and those are
+                decided before anyone edits a field, not after scrolling past
+                every one. Renders nothing on delivered, held or closed work. */}
+            <FieldingGuidance project={project} />
 
             <OverviewFieldGrid project={project} />
           </div>
