@@ -23,7 +23,12 @@ import { InfoTooltip } from '@/components/shared/InfoTooltip'
  * then it is not there on the day it matters. Delivered, held, closed and
  * scoping work gets no panel at all.
  */
-export function FieldingGuidance({ project }: { project: SurveyProject }) {
+export function FieldingGuidance({
+  project,
+  /** Tab mode. Inline the panel simply disappears when it has nothing to say;
+   *  as a TAB it must explain the blank, or clicking it looks broken. */
+  showEmpty = false,
+}: { project: SurveyProject; showEmpty?: boolean }) {
   const { data: blasts } = useProjectBlasts(project.id)
   const { data: suppliers } = useProjectSuppliers(project.id)
   const [open, setOpen] = useState<string | null>(null)
@@ -39,7 +44,21 @@ export function FieldingGuidance({ project }: { project: SurveyProject }) {
     suppliers: suppliers ?? [],
   })
 
-  if (items.length === 0) return null
+  if (items.length === 0) {
+    if (!showEmpty) return null
+    const finished = project.board_column === 'Delivery'
+      || project.status === 'Hold' || project.status === 'Closed' || project.status === 'Cancelled'
+    return (
+      <section className="rounded-xl border border-border bg-card p-8 text-center shadow-sm">
+        <p className="text-sm font-medium">No guidance for this survey</p>
+        <p className="mx-auto mt-1.5 max-w-md text-[13px] leading-relaxed text-muted-foreground">
+          {finished
+            ? 'The fielding decisions on this one are already made. Guidance only appears while a survey is open and still has choices left in it.'
+            : 'Nothing here yet — guidance needs a target N, or blasts and launches on file, before it has anything to price or compare. It appears as soon as either exists.'}
+        </p>
+      </section>
+    )
+  }
 
   return (
     <section className="mb-4 overflow-hidden rounded-xl border border-border bg-card shadow-sm">

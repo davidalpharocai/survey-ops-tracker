@@ -39,20 +39,22 @@ import { ProjectSummaryStrip } from '@/components/project/summary/ProjectSummary
 import { isRerunProject } from '@/lib/reruns/isRerun'
 import { RerunChip } from '@/components/reruns/RerunChip'
 
-type ActiveTab = 'overview' | 'insights' | 'context' | 'activity' | 'compliance' | 'deliverables' | 'links' | 'logs'
+type ActiveTab = 'overview' | 'insights' | 'fielding' | 'context' | 'deliverables' | 'activity' | 'logs'
 
 // Tab bar config — order here is the on-screen order. Context sits next to
-// Insights (both are "read about this project" tabs); Compliance sits between
-// Activity and Deliverables; "Other" (Slack + notifications) sits last.
+// Tab order, set by David 2026-09-15: Overview, Insights, Fielding Guidance,
+// Context, Deliverables, Activity, Logs. "Other" (Slack + a static notifications
+// blurb) and "Compliance" were removed in the same pass — the compliance panel
+// was always a duplicate of the one in the Overview rail, and SlackChannel moved
+// to that rail rather than disappearing with its tab.
 const PROJECT_TABS: { id: ActiveTab; label: string; title: string }[] = [
   { id: 'overview', label: 'Overview', title: 'The full project view — stats, pipeline, next steps, documents, and details' },
-  { id: 'insights', label: 'Insights (Beta)', title: 'Performance stats — completion/fill rates, cost per complete, pace, supplier mix' },
+  { id: 'insights', label: 'Insights', title: 'Performance stats — completion/fill rates, cost per complete, pace, supplier mix' },
+  { id: 'fielding', label: 'Fielding Guidance', title: 'What the measured history says to do about this survey — route cost, when to stop blasting, channel, and how much raw N to buy. Every item shows its sample size.' },
   { id: 'context', label: 'Context', title: 'Background on this project from the open web — what appears to have sparked the study, what moved during the field window, and the links behind both. Internal reading, refreshed daily; never a client deliverable.' },
-  { id: 'activity', label: 'Activity', title: 'Logged emails and events for this project' },
-  { id: 'compliance', label: 'Compliance', title: 'Compliance review — submit the question list for the client to approve before launch, and log the after-fielding results review' },
   { id: 'deliverables', label: 'Deliverables', title: 'Files delivered to the client for this project' },
+  { id: 'activity', label: 'Activity', title: 'Logged emails and events for this project' },
   { id: 'logs', label: 'Logs', title: 'Manual data-change log and the automatic field-change audit trail' },
-  { id: 'links', label: 'Other', title: 'Slack channel link and notification settings' },
 ]
 
 const TOOLTIPS: Record<string, string> = {
@@ -591,9 +593,14 @@ export default function ProjectDetailPage() {
 
       {/* Compliance review — reuses the same CompliancePanel shown in the rail
           glance, rendered full-width as its own tab. */}
-      {activeTab === 'compliance' && (
+      {/* Fielding guidance. Its own tab as of 2026-09-15 (David) rather than
+          inline above the field grid, where it competed with the thing people
+          open Overview to edit. Renders its own empty state — on a delivered,
+          held or closed survey there is no guidance to give, and it says so
+          rather than showing a blank tab. */}
+      {activeTab === 'fielding' && (
         <div className="max-w-3xl">
-          <CompliancePanel projectId={project.id} project={project} />
+          <FieldingGuidance project={project} showEmpty />
         </div>
       )}
 
@@ -607,19 +614,6 @@ export default function ProjectDetailPage() {
         <div className="max-w-3xl flex flex-col gap-4">
           <DataChangeLog projectId={project.id} />
           <ProjectAuditLog projectId={project.id} />
-        </div>
-      )}
-
-      {activeTab === 'links' && (
-        <div className="max-w-3xl flex flex-col gap-4">
-          <SlackChannel projectId={project.id} url={project.slack_channel_url ?? null} />
-
-          <div className="bg-card border border-border shadow-sm rounded-xl p-4 text-sm text-muted-foreground leading-relaxed">
-            <p className="font-medium text-muted-foreground mb-1 text-xs uppercase tracking-widest">
-              Notifications
-            </p>
-            Slack alerts sent to #survey-ops when: stage advances, due date is tomorrow, N target is hit.
-          </div>
         </div>
       )}
 
@@ -663,13 +657,6 @@ export default function ProjectDetailPage() {
                 </div>
               </div>
             )}
-
-            {/* ABOVE the field grid, not below it. The guidance is about
-                decisions still open — which route, whether to send another
-                blast, whether the buy has already overshot — and those are
-                decided before anyone edits a field, not after scrolling past
-                every one. Renders nothing on delivered, held or closed work. */}
-            <FieldingGuidance project={project} />
 
             <OverviewFieldGrid project={project} />
           </div>
@@ -740,6 +727,13 @@ export default function ProjectDetailPage() {
             {showCompliance && (
               <CompliancePanel projectId={project.id} project={project} collapsible defaultCollapsed />
             )}
+
+            {/* Moved here when the "Other" tab was removed (David, 2026-09-15).
+                That tab was the only place to set a project's Slack channel
+                URL, so deleting it wholesale would have removed the ability,
+                not just the tab. The notifications blurb that sat beside it was
+                static text describing #survey-ops alerts and is not reproduced. */}
+            <SlackChannel projectId={project.id} url={project.slack_channel_url ?? null} />
 
             <SidebarCard title="Rerun history" dense collapsible defaultCollapsed>
               <WaveHistory project={project} />
