@@ -714,6 +714,7 @@ export type Database = {
       }
       clients: {
         Row: {
+          is_demo: boolean
           id: string
           name: string
           code: string | null
@@ -730,6 +731,7 @@ export type Database = {
           deleted_at: string | null
         }
         Insert: {
+          is_demo?: boolean
           id?: string
           name: string
           code?: string | null
@@ -743,6 +745,7 @@ export type Database = {
           deleted_at?: string | null
         }
         Update: {
+          is_demo?: boolean
           id?: string
           name?: string
           code?: string | null

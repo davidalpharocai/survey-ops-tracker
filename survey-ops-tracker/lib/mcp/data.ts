@@ -10,6 +10,7 @@ import { beforeFieldingRequired, afterFieldingRequired, beforeFieldingMet, after
 import { VIEW_FINANCIALS } from '@/lib/auth/capabilityNames'
 import { isRestrictedAuditField } from '@/lib/utils/auditFormat'
 import type { Database } from '@/lib/supabase/types'
+import { demoClientIds, withoutDemo } from '@/lib/metrics/demo'
 
 /** Tool args are user-controlled: strip PostgREST-reserved chars, escape LIKE wildcards, cap length. */
 export function sanitizeQuery(q: string): string {
@@ -640,14 +641,15 @@ function addDays(isoDate: string, n: number): string {
 export async function pipelineSummary(args: { mine?: boolean; userId?: string } = {}) {
   const supabase = createAdminClient()
   const { data, error } = await supabase.from('survey_projects')
-    .select('project_code, project_name, client, board_column, due_date, n_target, n_target_max, n_collected, status, phase, captain:team_members(name, initials)')
+    .select('client_id, project_code, project_name, client, board_column, due_date, n_target, n_target_max, n_collected, status, phase, captain:team_members(name, initials)')
     .eq('status', 'Open')
     .eq('phase', 'Active')
     .is('deleted_at', null)
     .or('project_type.is.null,project_type.neq.Internal')
   if (error) throw error
 
-  let rows = (data ?? []) as unknown as Row[]
+  // Demo and test accounts never count toward a metric (mig 113).
+  let rows = withoutDemo((data ?? []) as unknown as Row[], await demoClientIds(supabase))
   // SQL already restricts to Open+Active, but a delivered project can sit in the
   // 'Delivery' (Delivered) column with status still Open — drop those so the
   // overdue / due-soon buckets never flag finished work as due.
@@ -770,11 +772,13 @@ export async function whatsAtRisk(args: { mine?: boolean; userId?: string; userE
   const canViewFinancials = await callerCanViewFinancials(args)
   const supabase = createAdminClient()
   const { data, error } = await supabase.from('survey_projects')
-    .select('project_code, project_name, client, board_column, due_date, launch_date, n_target, n_target_max, n_collected, budget, actual_spend, status, phase, captain:team_members(name, initials)')
+    .select('client_id, project_code, project_name, client, board_column, due_date, launch_date, n_target, n_target_max, n_collected, budget, actual_spend, status, phase, captain:team_members(name, initials)')
     .eq('status', 'Open').eq('phase', 'Active').is('deleted_at', null)
     .or('project_type.is.null,project_type.neq.Internal')
   if (error) throw error
-  let rows = ((data ?? []) as unknown as Row[]).filter(isActiveOperational)
+  // Demo and test accounts never count toward a metric (mig 113).
+  let rows = withoutDemo((data ?? []) as unknown as Row[], await demoClientIds(supabase))
+    .filter(isActiveOperational)
 
   if (args.mine && args.userId) {
     const me = await getMe(args.userId)

@@ -1,5 +1,6 @@
 import 'server-only'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { demoClientIds, withoutDemo } from '@/lib/metrics/demo'
 
 // Reporting/analytics helpers shared by the connector tools (survey_stats /
 // survey_report) and the .xlsx export route. Deliberately flexible on the time
@@ -124,7 +125,8 @@ export function resolvePeriod(a: {
 }
 
 const BASE_SELECT =
-  'project_code, project_name, client, project_type, phase, status, board_column, salesperson, ' +
+  // client_id rides along solely so demo accounts can be dropped below (mig 113).
+  'client_id, project_code, project_name, client, project_type, phase, status, board_column, salesperson, ' +
   'submitted_date, launch_date, due_date, deliver_date, n_target, n_collected, n_actual, ' +
   'audience_size, audience_used, ' +
   'budget, actual_spend, longitudinal, survey_tool_id, slack_channel_url, latest_next_steps, ' +
@@ -152,7 +154,11 @@ export async function surveyRows(opts: { event: SurveyEvent; from: string; to: s
   if (opts.type) q = q.eq('project_type', opts.type)
   const { data, error } = await q
   if (error) throw new Error(error.message)
-  return (data ?? []) as unknown as Row[]
+  // Demo and test accounts never count (mig 113). Filtered HERE because
+  // surveyRows is the single funnel for both survey_report and ops_metrics —
+  // one place to drop them rather than two that can drift apart.
+  const rows = withoutDemo((data ?? []) as unknown as Row[], await demoClientIds(supabase))
+  return rows
 }
 
 /** How many placeholder rerun waves (is_placeholder=true) fall in the SAME

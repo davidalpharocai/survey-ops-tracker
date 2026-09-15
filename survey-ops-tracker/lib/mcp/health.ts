@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { resolveProject, isActiveOperational, getMe } from './data'
 import { stageDurations } from '@/lib/utils/stageTiming'
 import { isKnownSalesperson, ALL_SALESPERSON_VALUES } from '@/lib/utils/salespeople'
+import { demoClientIds, withoutDemo } from '@/lib/metrics/demo'
 
 // Data-integrity + pipeline-throughput reads for the connector. All read-only.
 //   - reconcileProject: cross-field consistency for one project
@@ -528,11 +529,12 @@ export async function dataHealth(args: { active_only?: boolean; limit?: number }
     // buildChecks reads does not error — `p.salesperson` is simply undefined and the
     // check silently never fires, which is the quietest way for an integrity checker
     // to stop checking something.
-    .select('id, project_code, project_name, status, phase, board_column, n_target, n_collected, n_actual, actual_spend, survey_id_discrepancy, launch_date, deliver_date, salesperson, audience_size, audience_used')
+    .select('client_id, id, project_code, project_name, status, phase, board_column, n_target, n_collected, n_actual, actual_spend, survey_id_discrepancy, launch_date, deliver_date, salesperson, audience_size, audience_used')
     .is('deleted_at', null)
     .or('project_type.is.null,project_type.neq.Internal')
   if (error) throw error
-  let projects = (projData ?? []) as unknown as Row[]
+  // Demo and test accounts never count toward a metric (mig 113).
+  let projects = withoutDemo((projData ?? []) as unknown as Row[], await demoClientIds(supabase))
   const activeOnly = args.active_only ?? true
   if (activeOnly) projects = projects.filter(isActiveOperational)
   const ids = projects.map(p => p.id as string)
@@ -627,11 +629,13 @@ const REPORT_STAGES = ['Submitted', 'Doc Programming', 'Survey Programming', 'Ed
 export async function pipelineThroughput(args: { mine?: boolean; userId?: string; stuck_days?: number } = {}) {
   const supabase = createAdminClient()
   const { data: projData, error } = await supabase.from('survey_projects')
-    .select('id, project_code, project_name, board_column, status, phase, captain:team_members(name, initials)')
+    .select('client_id, id, project_code, project_name, board_column, status, phase, captain:team_members(name, initials)')
     .eq('status', 'Open').eq('phase', 'Active').is('deleted_at', null)
     .or('project_type.is.null,project_type.neq.Internal')
   if (error) throw error
-  let projects = ((projData ?? []) as unknown as Row[]).filter(isActiveOperational)
+  // Demo and test accounts never count toward a metric (mig 113).
+  let projects = withoutDemo((projData ?? []) as unknown as Row[], await demoClientIds(supabase))
+    .filter(isActiveOperational)
 
   if (args.mine && args.userId) {
     const me = await getMe(args.userId)
