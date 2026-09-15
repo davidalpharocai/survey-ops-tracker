@@ -131,6 +131,42 @@ describe('TOOLS registry shape', () => {
       expect('confirm' in t!.schema, `${name} must accept confirm`).toBe(true)
     }
   })
+
+  it('every tool that writes a blast can set its channel', () => {
+    // 112 made `channel` decide whether send cost is charged: 'email' means the
+    // incentive is the whole cost, 'sms' is metered, and NULL is charged. 114
+    // fills it from the "EMAIL · " / "SMS · " prefix the CM import writes — a
+    // MACHINE-written prefix. A person saying "log the email blast that went to
+    // 12,000 people" produces prose, the trigger correctly declines to guess,
+    // and without this parameter the blast lands NULL and is billed $240 of send
+    // cost it never incurred. So the gap closed in 115 is not cosmetic: dropping
+    // either of these silently re-opens a money bug, not a missing field.
+    for (const name of ['log_blast', 'update_blast']) {
+      const shape = TOOLS.find(x => x.name === name)!.schema as Record<string, z.ZodTypeAny>
+      expect('channel' in shape, `${name} must accept channel`).toBe(true)
+      // Exactly the two values 112's CHECK constraint allows. A third would be
+      // accepted by zod and rejected by Postgres — a database error, not a tool.
+      const c = shape.channel as unknown as { _def: { innerType?: unknown } }
+      // .nullable().optional() wraps twice; unwrap to the enum underneath.
+      let inner: unknown = c
+      while ((inner as { _def?: { innerType?: unknown } })?._def?.innerType) {
+        inner = (inner as { _def: { innerType: unknown } })._def.innerType
+      }
+      expect(new Set((inner as { options: string[] }).options), `${name} channel enum`)
+        .toEqual(new Set(['email', 'sms']))
+    }
+  })
+
+  it('both segment tools can set a segment note', () => {
+    // 084 added project_segments.note and taught only mcp_update_segment to
+    // write it, so the connector could give a segment a note only by adding it
+    // and then patching it — two calls, and a failure between them left a
+    // noteless segment and no error anyone saw. 115 gave mcp_add_segment the
+    // parameter. David has asked for segment notes twice; this keeps them.
+    for (const name of ['add_segment', 'update_segment']) {
+      expect('note' in TOOLS.find(x => x.name === name)!.schema, `${name} must accept note`).toBe(true)
+    }
+  })
 })
 
 describe('MCP route ⇄ registry parity', () => {

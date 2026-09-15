@@ -80,6 +80,20 @@ export function changelogFor(audience: ChangeAudience): ChangelogEntry[] {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    date: '2026-09-15',
+    changes: [
+      {
+        kind: 'FIXED',
+        // Not 'all': it is about what we spend.
+        text: 'Ask Claude to log an email blast and it can now say so. Before this it had no way to record that a blast went out by email, so the blast was charged for its sends like an SMS — on a 12,000-person email that is $240 of spend that never happened. You can also correct a blast that was logged that way.',
+      },
+      {
+        kind: 'NEW',
+        text: 'Claude can put a note on an N segment when it creates one — the quota it came from, the sub-audience, whatever would otherwise end up buried in the project comments — and edit that note later.',
+      },
+    ],
+  },
+  {
     date: '2026-09-09',
     changes: [
       {

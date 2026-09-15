@@ -1475,7 +1475,7 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'add_segment',
     description:
-      "Add an N segment to a project — e.g. split N into Buyers / Sellers, each with its own target. Adding the first segment converts the project to a segmented N (its total N becomes the sum of the segments). A segment's target is a RANGE: `target` is the minimum and `target_max` the maximum — pass both when the segment was sold as a range, or just `target` for a single agreed number. If the label or target isn't given, ask before adding. Preview first; confirm to apply.",
+      "Add an N segment to a project — e.g. split N into Buyers / Sellers, each with its own target. Adding the first segment converts the project to a segmented N (its total N becomes the sum of the segments). A segment's target is a RANGE: `target` is the minimum and `target_max` the maximum — pass both when the segment was sold as a range, or just `target` for a single agreed number. `note` is free text about this segment specifically — the quota it came from, the sub-audience, anything that would otherwise be lost in the project-level comments. If the label or target isn't given, ask before adding. Preview first; confirm to apply.",
     kind: 'write',
     schema: {
       project: z.string(),
@@ -1484,12 +1484,15 @@ export const TOOLS: AssistantTool[] = [
       target_max: z.number().int().nullable().optional(),
       collected: z.number().int().nullable().optional(),
       actual: z.number().int().nullable().optional(),
+      // 115. Before it, the note column (084) was reachable only by adding the
+      // segment and then patching it.
+      note: z.string().max(2000).nullable().optional(),
       confirm: z.boolean().optional(),
     },
     handler: async (rawArgs, ctx, meta) => {
       const args = rawArgs as {
         project: string; label: string; target?: number | null; target_max?: number | null
-        collected?: number | null; actual?: number | null; confirm?: boolean
+        collected?: number | null; actual?: number | null; note?: string | null; confirm?: boolean
       }
       const { userEmail } = ctx
       const p = await resolveProjectWritable(args.project)
@@ -1518,6 +1521,7 @@ export const TOOLS: AssistantTool[] = [
         async () => ({
           summary:
             `Add segment "${args.label}" (target ${formatNRange(args.target, args.target_max)}, collected ${fmtNum(args.collected ?? 0)}) to ${p.project_code}` +
+            (args.note ? ` — note: "${args.note}"` : '') +
             (existing === 0
               ? ' — this splits its single N into segments; the total N becomes the sum of the segments'
               : ` (segment ${existing + 1})`),
@@ -1530,10 +1534,11 @@ export const TOOLS: AssistantTool[] = [
             targetMax: args.target_max ?? null,
             collected: args.collected ?? null,
             actual: args.actual ?? null,
+            note: args.note ?? null,
             actor: `${userEmail} via Claude`,
           })
           meta.detail = { created_segment: { id: row.id, label: row.label } }
-          return { ok: true, segment: { id: row.id, label: row.label, n_target: row.n_target, n_target_max: row.n_target_max, n_collected: row.n_collected, n_actual: row.n_actual } }
+          return { ok: true, segment: { id: row.id, label: row.label, n_target: row.n_target, n_target_max: row.n_target_max, n_collected: row.n_collected, n_actual: row.n_actual, note: row.note } }
         }
       )
     },
@@ -1541,7 +1546,7 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'update_segment',
     description:
-      "Edit an N segment's label, numbers or audience (the target RANGE — target is the minimum, target_max the maximum — plus collected / actual; audience is free text, audience_size is the total available contacts for THIS segment and audience_used how many have been drawn on). Identify the segment by its name or id. Moving one end of the range past the other pulls the other end along to match (shown in the preview). If it's unclear which segment, ask. Preview first; confirm to apply.",
+      "Edit an N segment's label, numbers, audience or note (the target RANGE — target is the minimum, target_max the maximum — plus collected / actual; audience is free text, audience_size is the total available contacts for THIS segment and audience_used how many have been drawn on; note is free text about this segment specifically, e.g. the quota it came from). Identify the segment by its name or id. Moving one end of the range past the other pulls the other end along to match (shown in the preview). If it's unclear which segment, ask. Preview first; confirm to apply.",
     kind: 'write',
     schema: {
       project: z.string(),
@@ -1554,6 +1559,8 @@ export const TOOLS: AssistantTool[] = [
       audience: z.string().max(500).nullable().optional(),
       audience_size: z.number().int().nullable().optional(),
       audience_used: z.number().int().nullable().optional(),
+      // The RPC has had this arm since 084; the tool never exposed it (115).
+      note: z.string().max(2000).nullable().optional(),
       confirm: z.boolean().optional(),
     },
     handler: async (rawArgs, ctx, meta) => {
@@ -1561,6 +1568,7 @@ export const TOOLS: AssistantTool[] = [
         project: string; segment_ref: string; label?: string; target?: number | null; target_max?: number | null
         collected?: number | null; actual?: number | null
         audience?: string | null; audience_size?: number | null; audience_used?: number | null
+        note?: string | null
         confirm?: boolean
       }
       const { userEmail } = ctx
@@ -1585,11 +1593,12 @@ export const TOOLS: AssistantTool[] = [
       if (args.audience !== undefined) patch.audience = args.audience
       if (args.audience_size !== undefined) patch.audience_size = args.audience_size
       if (args.audience_used !== undefined) patch.audience_used = args.audience_used
+      if (args.note !== undefined) patch.note = args.note
       if (Object.keys(patch).length === 0) {
         return {
           needs: 'a change',
           message:
-            'Specify at least one of: label, target, target_max, collected, actual, audience, audience_size, audience_used.',
+            'Specify at least one of: label, target, target_max, collected, actual, audience, audience_size, audience_used, note.',
         }
       }
       // Only a pair the caller sent WHOLE can be transposed; one end on its own
@@ -1609,6 +1618,7 @@ export const TOOLS: AssistantTool[] = [
         args.audience !== undefined ? `audience → ${args.audience ? `"${args.audience}"` : '—'}` : null,
         args.audience_size !== undefined ? `total available audience → ${fmtNum(args.audience_size)}` : null,
         args.audience_used !== undefined ? `audience used → ${fmtNum(args.audience_used)}` : null,
+        args.note !== undefined ? `note → ${args.note ? `"${args.note}"` : '—'}` : null,
       ].filter(Boolean).join(', ')
       return confirmable(
         args,
@@ -1616,7 +1626,7 @@ export const TOOLS: AssistantTool[] = [
         async () => {
           const row = await runUpdateSegment(seg.id as string, aligned, `${userEmail} via Claude`)
           meta.detail = { segment_id: row.id, updated: aligned }
-          return { ok: true, segment: { id: row.id, label: row.label, n_target: row.n_target, n_target_max: row.n_target_max, n_collected: row.n_collected, n_actual: row.n_actual, audience: row.audience, audience_size: row.audience_size, audience_used: row.audience_used } }
+          return { ok: true, segment: { id: row.id, label: row.label, n_target: row.n_target, n_target_max: row.n_target_max, n_collected: row.n_collected, n_actual: row.n_actual, audience: row.audience, audience_size: row.audience_size, audience_used: row.audience_used, note: row.note } }
         }
       )
     },
@@ -1697,7 +1707,7 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'log_blast',
     description:
-      "Log (or update) a B2B blast against ANY project, whatever its project_type — a survey typed PS that also ran blasts takes both, and both roll into the same actual_spend — its $/bid (the per-completion reward), the # of people it went to, the # of those who COMPLETED the survey, when it ran (optional), and an optional description of the audience. It costs TWO things, both counting toward the project's spend: the REWARD, $/bid × completes (we only pay people who completed), and the SEND, $/send × people (paid for every message, answered or not). $/send defaults to the configured rate — currently $0.02 — so OMIT cost_per_send unless you have been told this blast was charged differently (e.g. SMS). It is charged PER SEND, not per unique person: re-sending to the same list costs again each time. UNRECORDED IS NOT ZERO: OMIT a figure you don't know and it is stored as \"not recorded\" (the app shows an em dash and reports the cost as unknown); pass 0 ONLY when you know the real answer is zero — a blast that genuinely produced nothing, or an unpaid send. Never substitute 0 for a number you haven't been told, because 0 is read as a result and it silently drags the project's spend and response rate down. Completes usually aren't known at send time — omit them, then fill them in later by re-calling with the SAME idem_key (it upserts, like log_launch; omitting a figure on the re-call LEAVES the recorded one alone rather than wiping it), or via update_blast. You can also ingest a blast-platform campaign screenshot: per blast, map Reward→bid, that blast's Sent→people, Rewards Count→completes (so spend matches the platform's Total Issued; NOT the higher \"Completed\" count), its Scheduled date/time→blast_at, and channel/audience/template→description; if the screenshot is the Overview tab and shows no Rewards Count, omit completes rather than sending 0. Resolve the project by campaign name or Survey ID, and set idem_key to \"<SurveyID>#<BlastLabel>\" so re-importing the same screenshot updates that same blast instead of double-logging. Preview first (shows create vs update); confirm to apply.",
+      "Log (or update) a B2B blast against ANY project, whatever its project_type — a survey typed PS that also ran blasts takes both, and both roll into the same actual_spend — its $/bid (the per-completion reward), the # of people it went to, the # of those who COMPLETED the survey, when it ran (optional), and an optional description of the audience. It costs TWO things, both counting toward the project's spend: the REWARD, $/bid × completes (we only pay people who completed), and the SEND, $/send × people (paid for every message, answered or not). $/send defaults to the configured rate — currently $0.02 — so OMIT cost_per_send unless you have been told this blast was charged differently. It is charged PER SEND, not per unique person: re-sending to the same list costs again each time. ALWAYS SET `channel` WHEN YOU KNOW IT: 'email' means there is NO send cost at all — the incentive is the whole cost — while 'sms' is metered per message. Leaving it out records \"channel unknown\", and an unknown channel IS charged for its sends, so omitting it on an email blast invents spend that never happened (12,000 people × $0.02 = $240 on the project's budget and margin). Nothing infers it from your description; say it. UNRECORDED IS NOT ZERO: OMIT a figure you don't know and it is stored as \"not recorded\" (the app shows an em dash and reports the cost as unknown); pass 0 ONLY when you know the real answer is zero — a blast that genuinely produced nothing, or an unpaid send. Never substitute 0 for a number you haven't been told, because 0 is read as a result and it silently drags the project's spend and response rate down. Completes usually aren't known at send time — omit them, then fill them in later by re-calling with the SAME idem_key (it upserts, like log_launch; omitting a figure on the re-call LEAVES the recorded one alone rather than wiping it), or via update_blast. You can also ingest a blast-platform campaign screenshot: per blast, map Reward→bid, that blast's Sent→people, Rewards Count→completes (so spend matches the platform's Total Issued; NOT the higher \"Completed\" count), its Scheduled date/time→blast_at, and channel/audience/template→description; if the screenshot is the Overview tab and shows no Rewards Count, omit completes rather than sending 0. Resolve the project by campaign name or Survey ID, and set idem_key to \"<SurveyID>#<BlastLabel>\" so re-importing the same screenshot updates that same blast instead of double-logging. Preview first (shows create vs update); confirm to apply.",
     kind: 'write',
     schema: {
       project: z.string(),
@@ -1711,6 +1721,8 @@ export const TOOLS: AssistantTool[] = [
       // Omit unless told otherwise: the column default supplies the configured
       // rate at insert time, which is both correct and self-maintaining.
       cost_per_send: z.number().min(0).nullable().optional(),
+      // 115. Not a label — it decides whether send cost is charged at all.
+      channel: z.enum(['email', 'sms']).nullable().optional(),
       blast_at: z.string().optional(),
       description: z.string().max(1000).optional(),
       confirm: z.boolean().optional(),
@@ -1719,7 +1731,7 @@ export const TOOLS: AssistantTool[] = [
     handler: async (rawArgs, ctx, meta) => {
       const args = rawArgs as {
         project: string; bid?: number | null; people?: number | null; completes?: number | null
-        cost_per_send?: number | null
+        cost_per_send?: number | null; channel?: 'email' | 'sms' | null
         blast_at?: string; description?: string; confirm?: boolean; idem_key?: string
       }
       const { userEmail } = ctx
@@ -1764,17 +1776,26 @@ export const TOOLS: AssistantTool[] = [
       // on an idem_key update the RPC keeps whatever is already stored.
       const finalRate =
         args.cost_per_send ?? existing?.cost_per_send ?? configuredSendRate
+      /* The channel the row will END UP with, and it has to reach every figure
+         below. An email blast is charged NO send cost (112), so a projection that
+         left channel out quoted people x rate of spend the write would not
+         produce — $240 on a 12,000-person email blast — which is precisely the
+         defect 095 was faulted for and this preview exists to prevent. Same
+         coalesce as the RPC's upsert: a re-import that carries no channel keeps
+         the stored one rather than silently re-charging the sends. */
+      const finalChannel = args.channel ?? existing?.channel ?? null
       const thisBlastTotal =
         blastTotal({ bid: finalBid, completes: finalCompletes }) +
-        sendTotal({ people: finalPeople, cost_per_send: finalRate })
+        sendTotal({ people: finalPeople, cost_per_send: finalRate, channel: finalChannel })
       const priorContribution = existing
         ? blastTotal({ bid: existing.bid, completes: existing.completes }) +
-          sendTotal({ people: existing.people, cost_per_send: existing.cost_per_send })
+          sendTotal({ people: existing.people, cost_per_send: existing.cost_per_send, channel: existing.channel })
         : 0
       const projectedSpend = currentSpend - priorContribution + thisBlastTotal
       // Either half unknown leaves the project's spend understating this blast.
       const rewardUnknown = isBlastCostUnknown({ bid: finalBid, completes: finalCompletes })
-      const sendUnknown = isSendCostUnknown({ people: finalPeople, cost_per_send: finalRate })
+      // An email blast's send cost is not unknown — it is a known, genuine zero.
+      const sendUnknown = isSendCostUnknown({ people: finalPeople, cost_per_send: finalRate, channel: finalChannel })
       const costUnknown = rewardUnknown || sendUnknown
       const fig = (v: number | null) => (v == null ? 'not recorded' : String(v))
 
@@ -1797,7 +1818,12 @@ export const TOOLS: AssistantTool[] = [
         args,
         async () => ({
           summary:
-            `${existing ? 'Update' : 'Log'} blast on ${p.project_code}: ${fig(finalCompletes)} completes / ${fig(finalPeople)} people @ ${finalBid == null ? 'not recorded' : '$' + finalBid}/bid + ${finalRate == null ? 'not recorded' : '$' + finalRate}/send = ` +
+            `${existing ? 'Update' : 'Log'} blast on ${p.project_code}: ${fig(finalCompletes)} completes / ${fig(finalPeople)} people @ ${finalBid == null ? 'not recorded' : '$' + finalBid}/bid + ` +
+            // Quoting a $/send rate on an email blast invites the reader to
+            // check arithmetic that isn't being done. Say why it is free.
+            (finalChannel === 'email'
+              ? 'no send cost (email) = '
+              : `${finalRate == null ? 'not recorded' : '$' + finalRate}/send${finalChannel == null ? ' (channel not recorded — sends are charged)' : ''} = `) +
             (costUnknown
               ? `${rewardUnknown && sendUnknown ? 'cost UNKNOWN' : rewardUnknown ? 'reward UNKNOWN' : 'send cost UNKNOWN'} (the missing half adds $0 to spend until it is recorded) → projected spend ${money(projectedSpend)}`
               : `${money(thisBlastTotal)} → projected spend ${money(projectedSpend)}`) +
@@ -1808,7 +1834,7 @@ export const TOOLS: AssistantTool[] = [
           over_target: overTarget.over ? { excess_n: overTarget.excess, projected_n: overTarget.projected, target: overTarget.target } : null,
           mode: existing ? 'update' : 'create',
           people: finalPeople, completes: finalCompletes, bid: finalBid,
-          cost_per_send: finalRate,
+          cost_per_send: finalRate, channel: finalChannel,
           cost_unknown: costUnknown, reward_unknown: rewardUnknown, send_unknown: sendUnknown,
           blast_at: args.blast_at ?? null,
           projected_actual_spend: projectedSpend,
@@ -1823,6 +1849,11 @@ export const TOOLS: AssistantTool[] = [
             // the floor here: the RPC fell through to the default and the tool
             // still answered ok. Null keeps that fallback deliberate.
             costPerSend: args.cost_per_send ?? null,
+            // args.channel, NOT finalChannel: the RPC coalesces against the
+            // stored value itself, and sending the resolved one would turn an
+            // omission into an assertion — harmless today, but it would overwrite
+            // a hand-set channel the moment the read and the write disagree.
+            channel: args.channel ?? null,
           })
           const after = await listBlastsForProject(p.id as string)
           // blast_spend_total mirrors the SQL, so an unrecorded blast adds $0 to it.
@@ -2062,7 +2093,7 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'update_blast',
     description:
-      "Update a B2B blast on a project — any of its $/bid, # of people, # of completes, $/send, when it ran (blast_at), or description. Identify it by `blast_ref` = its idem_key (e.g. \"<SurveyID>#<BlastLabel>\") or its id. Only the fields you pass change (idempotent). Cost = ($/bid × completes) + ($/send × people), and it recomputes into the project's spend — so changing the # of people now changes the money, not just the response rate. This is the tool for filling in completes once they come in on a blast that was logged before they were known. THREE DISTINCT ACTIONS, don't confuse them: OMIT a field to leave it exactly as it is; pass a number to record it; pass null to UN-RECORD it (back to \"not recorded\", for a figure entered by mistake). Passing 0 asserts the real answer is zero — a blast that genuinely produced nothing — and it is NOT the way to say \"unknown\": 0 counts as a result, drags the response rate down, and makes the cost look settled at $0. Preview first; confirm to apply.",
+      "Update a B2B blast on a project — any of its $/bid, # of people, # of completes, $/send, channel ('email' or 'sms'), when it ran (blast_at), or description. Setting channel to 'email' says the blast had NO send cost (the incentive is the whole cost) and drops that cost out of the project's spend; 'sms' is metered per message and keeps it. This is the tool for correcting a blast that was logged without a channel and is therefore being charged for sends it never incurred. Identify it by `blast_ref` = its idem_key (e.g. \"<SurveyID>#<BlastLabel>\") or its id. Only the fields you pass change (idempotent). Cost = ($/bid × completes) + ($/send × people), and it recomputes into the project's spend — so changing the # of people now changes the money, not just the response rate. This is the tool for filling in completes once they come in on a blast that was logged before they were known. THREE DISTINCT ACTIONS, don't confuse them: OMIT a field to leave it exactly as it is; pass a number to record it; pass null to UN-RECORD it (back to \"not recorded\", for a figure entered by mistake). Passing 0 asserts the real answer is zero — a blast that genuinely produced nothing — and it is NOT the way to say \"unknown\": 0 counts as a result, drags the response rate down, and makes the cost look settled at $0. Preview first; confirm to apply.",
     kind: 'write',
     schema: {
       project: z.string(),
@@ -2073,6 +2104,9 @@ export const TOOLS: AssistantTool[] = [
       people: z.number().int().min(0).nullable().optional(),
       completes: z.number().int().min(0).nullable().optional(),
       cost_per_send: z.number().min(0).nullable().optional(),
+      // 115. null un-records it, which re-arms 114's trigger to re-derive from a
+      // structured note prefix if there is one.
+      channel: z.enum(['email', 'sms']).nullable().optional(),
       blast_at: z.string().nullable().optional(),
       description: z.string().max(1000).nullable().optional(),
       confirm: z.boolean().optional(),
@@ -2081,6 +2115,7 @@ export const TOOLS: AssistantTool[] = [
       const args = rawArgs as {
         project: string; blast_ref: string; bid?: number | null; people?: number | null
         completes?: number | null; cost_per_send?: number | null
+        channel?: 'email' | 'sms' | null
         blast_at?: string | null; description?: string | null; confirm?: boolean
       }
       const { userEmail } = ctx
@@ -2098,12 +2133,13 @@ export const TOOLS: AssistantTool[] = [
       if (args.people !== undefined) patch.people = args.people
       if (args.completes !== undefined) patch.completes = args.completes
       if (args.cost_per_send !== undefined) patch.cost_per_send = args.cost_per_send
+      if (args.channel !== undefined) patch.channel = args.channel
       if (args.blast_at !== undefined) patch.blast_at = args.blast_at
       if (args.description !== undefined) patch.note = args.description
       if (Object.keys(patch).length === 0) {
         return {
           needs: 'a change',
-          message: 'Specify at least one of: bid, people, completes, cost_per_send, blast_at, description.',
+          message: 'Specify at least one of: bid, people, completes, cost_per_send, channel, blast_at, description.',
         }
       }
       // "not recorded", spelled out — a preview that rendered a null as an empty
@@ -2113,6 +2149,11 @@ export const TOOLS: AssistantTool[] = [
         args.people !== undefined ? `people → ${args.people ?? 'not recorded'}` : null,
         args.completes !== undefined ? `completes → ${args.completes ?? 'not recorded'}` : null,
         args.cost_per_send !== undefined ? `$/send → ${args.cost_per_send == null ? 'not recorded' : '$' + args.cost_per_send}` : null,
+        // Spell out the money consequence: this field reads like a label and is
+        // not one. Switching a blast to email drops its send cost to zero.
+        args.channel !== undefined
+          ? `channel → ${args.channel == null ? 'not recorded (sends charged again)' : args.channel === 'email' ? 'email (no send cost)' : 'sms (sends charged)'}`
+          : null,
         args.blast_at !== undefined ? `blast_at → ${args.blast_at ?? '—'}` : null,
         args.description !== undefined ? `description → "${args.description ?? ''}"` : null,
       ].filter(Boolean).join(', ')
@@ -2124,8 +2165,11 @@ export const TOOLS: AssistantTool[] = [
       const afterCompletes = args.completes !== undefined ? args.completes : blast.completes
       const afterPeople = args.people !== undefined ? args.people : blast.people
       const afterRate = args.cost_per_send !== undefined ? args.cost_per_send : blast.cost_per_send
+      const afterChannel = args.channel !== undefined ? args.channel : blast.channel
       const rewardUnknown = isBlastCostUnknown({ bid: afterBid, completes: afterCompletes })
-      const sendUnknown = isSendCostUnknown({ people: afterPeople, cost_per_send: afterRate })
+      // Channel-aware, or this reports an email blast's send cost as UNKNOWN when
+      // it is a known zero — and tells the reader spend is missing when it isn't.
+      const sendUnknown = isSendCostUnknown({ people: afterPeople, cost_per_send: afterRate, channel: afterChannel })
       // Either half missing leaves the project's spend understating this blast, so
       // both have to reach the warning. Reporting only the reward would call a
       // blast settled while its send cost is still unrecorded — and on PR00309 the

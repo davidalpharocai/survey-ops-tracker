@@ -28,6 +28,10 @@ export type Database = {
           audience: string | null
           audience_size: number | null
           audience_used: number | null
+          // Migration 084 added the column and taught mcp_update_segment to patch
+          // it; this file was never updated to match, so the field was invisible
+          // to every TypeScript caller. 115.
+          note: string | null
           sort_order: number
           created_at: string
         }
@@ -43,6 +47,7 @@ export type Database = {
           audience?: string | null
           audience_size?: number | null
           audience_used?: number | null
+          note?: string | null
           sort_order?: number
           created_at?: string
         }
@@ -58,6 +63,7 @@ export type Database = {
           audience?: string | null
           audience_size?: number | null
           audience_used?: number | null
+          note?: string | null
           sort_order?: number
           created_at?: string
         }

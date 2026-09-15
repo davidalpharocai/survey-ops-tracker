@@ -445,6 +445,13 @@ export async function runLogBlast(opts: {
    *  default, i.e. the currently configured rate — so a caller that knows nothing
    *  about this parameter still produces a correctly priced blast. */
   costPerSend?: number | null
+  /** 'email' | 'sms' (115). Decides whether send cost is charged at all: an
+   *  email blast costs only the incentive (112). Null means "not recorded", which
+   *  IS charged — so omitting this on an email blast overstates the project's
+   *  spend by people x rate. 114's trigger fills it from a machine-written
+   *  "EMAIL · " / "SMS · " note prefix; this is for the caller who simply knows,
+   *  and an explicit value always outranks the trigger's inference. */
+  channel?: 'email' | 'sms' | null
 }): Promise<ProjectBlastRow> {
   const supabase = createAdminClient()
   const { data, error } = await supabase.rpc('mcp_log_blast', {
@@ -458,7 +465,12 @@ export async function runLogBlast(opts: {
     p_idem: opts.idemKey,
     p_actor: opts.actor,
     p_cost_per_send: opts.costPerSend ?? null,
-  })
+    p_channel: opts.channel ?? null,
+    // 115 is applied by hand and lib/supabase/types.ts is maintained separately,
+    // so p_channel isn't in the generated Args yet. Asserting only the one added
+    // arg keeps the rest of the call type-checked; drop the cast when the
+    // regenerated types land. Same pattern as runAddSegment's p_target_max.
+  } as Database['public']['Functions']['mcp_log_blast']['Args'] & { p_channel: string | null })
   if (error) rethrowBlastWriteError(error)
   return data as ProjectBlastRow
 }
@@ -630,6 +642,11 @@ export async function runAddSegment(
   opts: {
     projectId: string; label: string; target: number | null; targetMax: number | null
     collected: number | null; actual: number | null; actor: string
+    /** Free-text comment on the segment (115). 084 added the column and taught
+     *  only mcp_update_segment to write it, so a segment could be given a note
+     *  only by adding it and then patching it — two calls, and a failure between
+     *  them left a noteless segment and no error anyone saw. */
+    note?: string | null
   }
 ): Promise<ProjectSegmentRow> {
   const supabase = createAdminClient()
@@ -641,11 +658,14 @@ export async function runAddSegment(
     p_target_max: opts.targetMax,
     p_collected: opts.collected,
     p_actual: opts.actual,
-    // Migration 078 is applied in prod but lib/supabase/types.ts is regenerated
-    // separately, so p_target_max isn't in the generated Args yet. Asserting the
-    // one added arg keeps the rest of the call type-checked; drop the cast when
-    // the regenerated types land.
-  } as Database['public']['Functions']['mcp_add_segment']['Args'] & { p_target_max: number | null })
+    p_note: opts.note ?? null,
+    // Migrations 078 and 115 are applied in prod but lib/supabase/types.ts is
+    // regenerated separately, so p_target_max / p_note aren't in the generated
+    // Args yet. Asserting only the added args keeps the rest of the call
+    // type-checked; drop the cast when the regenerated types land.
+  } as Database['public']['Functions']['mcp_add_segment']['Args'] & {
+    p_target_max: number | null; p_note: string | null
+  })
   if (error) throw new Error(error.message)
   return data as ProjectSegmentRow
 }
