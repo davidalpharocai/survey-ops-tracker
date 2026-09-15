@@ -70,11 +70,18 @@ do $drop$
 declare f record;
 begin
   for f in
-    select p.oid::regprocedure::text as sig
+    -- pg_get_function_identity_arguments gives exactly the type list DROP wants, and
+    -- %I.%I forces the schema on, so this cannot depend on whatever search_path the SQL
+    -- editor happens to have. Building the name from the catalogue is the whole point:
+    -- a hand-typed type list that is one type off is a silent no-op under `if exists`,
+    -- and that silent no-op is what leaves two overloads behind.
+    select format('%I.%I(%s)', n.nspname, p.proname,
+                  pg_get_function_identity_arguments(p.oid)) as sig
       from pg_proc p
       join pg_namespace n on n.oid = p.pronamespace
      where n.nspname = 'public' and p.proname = 'mcp_log_blast'
   loop
+    raise notice 'dropping %', f.sig;
     execute 'drop function ' || f.sig;
   end loop;
 end $drop$;
@@ -164,11 +171,13 @@ do $drop$
 declare f record;
 begin
   for f in
-    select p.oid::regprocedure::text as sig
+    select format('%I.%I(%s)', n.nspname, p.proname,
+                  pg_get_function_identity_arguments(p.oid)) as sig
       from pg_proc p
       join pg_namespace n on n.oid = p.pronamespace
      where n.nspname = 'public' and p.proname = 'mcp_add_segment'
   loop
+    raise notice 'dropping %', f.sig;
     execute 'drop function ' || f.sig;
   end loop;
 end $drop$;
@@ -259,6 +268,12 @@ begin
 end $verify$;
 
 commit;
+
+-- PostgREST caches the schema, and these functions changed SHAPE rather than body. Supabase
+-- reloads the cache on DDL by itself, but it costs nothing to ask and it removes the one
+-- way this lands correctly in the database and still answers
+-- "Could not find the function public.mcp_log_blast(...)" to the next connector call.
+notify pgrst, 'reload schema';
 
 -- VERIFY, after applying. The migration already asserted all of this and would
 -- have rolled back if it failed, so these are for reading, not for trusting:
