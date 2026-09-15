@@ -40,6 +40,9 @@ export function FieldingGuidance({
     board_column: project.board_column,
     status: project.status,
     phase: project.phase,
+    // What the survey IS — drives which route is recommended. The MEASURED
+    // route (from the rows below) drives the pricing. Different questions.
+    project_type: project.project_type,
     blasts: blasts ?? [],
     suppliers: suppliers ?? [],
   })

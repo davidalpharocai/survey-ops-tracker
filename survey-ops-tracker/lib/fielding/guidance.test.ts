@@ -62,23 +62,66 @@ describe('measuredRoute: the rows, never the label', () => {
   })
 })
 
-describe('route cost', () => {
-  it('prices the target both ways so the 57x gap is visible before committing', () => {
-    const g = fieldingGuidance({ ...base, n_target: 1000 })[0]
-    expect(g.code).toBe('route-cost')
-    // 1000 x 1.13 = 1130 raw; panel ~$994, blast ~$56,150.
-    expect(g.headline).toContain('$994')
-    expect(g.headline).toContain('$56,150')
+describe('route fit: the routes are not substitutes', () => {
+  it('names the route that fits the audience and prices only that one', () => {
+    // David, 2026-09-15: a B2B survey uses blasts, a PS survey uses PureSpectrum.
+    // An earlier version priced BOTH and invited the reader to choose, which is
+    // how a B2B study ends up sourced from a consumer panel.
+    const b2b = fieldingGuidance({ ...base, project_type: 'B2B', n_target: 100 })[0]
+    expect(b2b.code).toBe('route-fit')
+    expect(b2b.headline).toContain('B2B blasts')
+    expect(b2b.headline).not.toContain('PureSpectrum')
+
+    const ps = fieldingGuidance({ ...base, project_type: 'PS', n_target: 1000 })[0]
+    expect(ps.headline).toContain('PureSpectrum')
+    expect(ps.headline).not.toContain('blast')
   })
 
-  it('shows the sample size behind the rate, not just the rate', () => {
-    const g = fieldingGuidance({ ...base, n_target: 100 })[0]
-    expect(g.evidence).toContain('n=40')
-    expect(g.evidence).toContain('n=34')
+  it('explains the gap as reach, not as a saving on offer', () => {
+    const g = fieldingGuidance({ ...base, project_type: 'B2B', n_target: 100 })[0]
+    expect(g.detail).toMatch(/does not reach this audience/)
+  })
+
+  it('says nothing when the type does not name an audience', () => {
+    // Legacy 'Rerun' and untyped rows do not imply a route, and guessing one
+    // would be the same mistake in the other direction.
+    expect(codes({ ...base, project_type: 'Rerun', n_target: 500 })).not.toContain('route-fit')
+    expect(codes({ ...base, project_type: null, n_target: 500 })).not.toContain('route-fit')
   })
 
   it('does not price a survey with no target', () => {
-    expect(codes({ ...base, blasts: [{}] })).not.toContain('route-cost')
+    expect(codes({ ...base, project_type: 'B2B', blasts: [{}] })).not.toContain('route-fit')
+  })
+})
+
+describe('crossing routes needs screeners', () => {
+  it('flags a B2B study being filled from the panel', () => {
+    const g = fieldingGuidance({
+      ...base, project_type: 'B2B', n_target: 1180,
+      suppliers: [{ cpi: 1, n_collected: 1865 }],
+    }).find(x => x.code === 'route-mismatch')
+    expect(g?.level).toBe('act')
+    expect(g?.detail).toContain('screeners')
+    expect(g?.headline).toContain('1,865')
+  })
+
+  it('flags it on a mixed-route B2B study too', () => {
+    expect(codes({
+      ...base, project_type: 'B2B', n_target: 250,
+      blasts: [{ completes: 25 }], suppliers: [{ cpi: 1, n_collected: 995 }],
+    })).toContain('route-mismatch')
+  })
+
+  it('says nothing about a B2B study fielded the normal way', () => {
+    expect(codes({
+      ...base, project_type: 'B2B', n_target: 50, blasts: [{ completes: 40 }],
+    })).not.toContain('route-mismatch')
+  })
+
+  it('does not flag a PS study on the panel — that IS the fit', () => {
+    expect(codes({
+      ...base, project_type: 'PS', n_target: 1000, suppliers: [{ cpi: 1, n_collected: 1000 }],
+    })).not.toContain('route-mismatch')
   })
 })
 
@@ -131,8 +174,10 @@ describe('the buy multiple', () => {
 
 describe('every rule can be audited', () => {
   it('attaches evidence with a sample size to every item it emits', () => {
+    // project_type supplied because route-fit is keyed on the audience the
+    // survey is FOR — without it the rule correctly stays silent.
     const all = fieldingGuidance({
-      ...base, n_target: 100, n_collected: 500,
+      ...base, project_type: 'B2B', n_target: 100, n_collected: 500,
       blasts: [{ channel: 'email' }, { channel: 'sms' }, { channel: 'sms' }, { channel: 'sms' }],
     })
     expect(all.length).toBeGreaterThan(3)

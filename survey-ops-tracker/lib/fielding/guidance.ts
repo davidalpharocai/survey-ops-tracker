@@ -22,6 +22,29 @@
  * measurable response gain, and the apparent negative relationship is bid
  * REACTING to a failing blast rather than causing one — so the honest guidance
  * is "the bid is not your dial", which is the absence of a lever, not a lever.
+ *
+ * ── THE ROUTES ARE NOT SUBSTITUTES (David, 2026-09-15) ──────────────────────
+ * An earlier version of this file priced a target both ways and invited the
+ * reader to "choose on reach, then price the consequence". That is wrong, and
+ * David corrected it: a B2B survey uses blasts, a PS survey uses PureSpectrum.
+ * You cannot buy enterprise decision-makers off a consumer panel because they
+ * are cheaper there — they are not there.
+ *
+ * The measured book already works this way: 108 of the 123 surveys holding any
+ * field rows follow it (B2B->blast 60, PS->panel 48). So the 57x price gap is
+ * mostly an INCIDENCE gap, not an efficiency gap, and presenting it as a menu
+ * invited exactly the mistake the exception rule below exists to catch.
+ *
+ * Crossing routes is allowed with a substantiated reason, and then it carries a
+ * condition: screeners tight enough to keep the data clean. Five B2B-typed
+ * surveys have been fielded through panel — PR00230 collected 1,865 panel
+ * completes against a 1,180 B2B target — and that is the shape of the risk.
+ *
+ * WHICH SIGNAL FOR WHICH JOB. project_type says what the survey IS (the
+ * audience), and drives the recommendation. The MEASURED route says what we
+ * actually did, and drives the pricing. They are different questions and this
+ * file keeps them apart; when they disagree, that disagreement is itself the
+ * finding.
  */
 
 export const EVIDENCE_DATE = '2026-09-15'
@@ -76,11 +99,15 @@ export interface GuidanceInput {
   board_column?: string | null
   status?: string | null
   phase?: string | null
+  /** What the survey IS — the audience. Drives WHICH ROUTE is recommended.
+   *  Never used to decide what a survey COST: that is measuredRoute(), read off
+   *  the rows, because the label disagrees with the rows on 15 of 123. */
+  project_type?: string | null
   blasts?: BlastLike[]
   suppliers?: SupplierLike[]
 }
 
-export type GuidanceCode = 'route-cost' | 'wave-stop' | 'channel' | 'buy-multiple'
+export type GuidanceCode = 'route-fit' | 'route-mismatch' | 'wave-stop' | 'channel' | 'buy-multiple'
 export type GuidanceLevel = 'info' | 'watch' | 'act'
 
 export interface GuidanceItem {
@@ -160,23 +187,52 @@ export function fieldingGuidance(i: GuidanceInput): GuidanceItem[] {
   const target = i.n_target ?? null
   const collected = Number(i.n_collected ?? 0)
 
-  // 1) What this N costs by route — the 57x gap is the single most consequential
-  //    number in the system, and it is invisible at scoping time today.
-  if (target && target > 0 && (route === 'none' || route === 'blast' || route === 'panel')) {
+  /* 1) THE ROUTE THAT FITS THIS AUDIENCE, and what it costs.
+        Not a price comparison. A B2B audience is reached by blasts and a
+        consumer audience by panel; the 57x gap between them is mostly
+        incidence, and offering it as a choice is how a B2B study ends up
+        sourced from a consumer panel. */
+  const intended: 'blast' | 'panel' | null =
+    i.project_type === 'B2B' ? 'blast' : i.project_type === 'PS' ? 'panel' : null
+
+  if (target && target > 0 && intended) {
     const raw = Math.ceil(target * BUY_MULTIPLE)
-    const b = ROUTE_COST.blast, p = ROUTE_COST.panel
+    const r = intended === 'blast' ? ROUTE_COST.blast : ROUTE_COST.panel
+    const label = intended === 'blast' ? 'B2B blasts' : 'PureSpectrum'
     out.push({
-      code: 'route-cost',
+      code: 'route-fit',
       level: 'info',
-      headline: `${num(target)} clean N costs about ${money(raw * p.median)} on panel or ${money(raw * b.median)} on blasts`,
+      headline: `${num(target)} clean N through ${label} runs about ${money(raw * r.median)}`,
       detail:
-        `Buying ${num(raw)} raw completes (${BUY_MULTIPLE}× target) costs ` +
-        `${money(raw * p.p25)}–${money(raw * p.p75)} through PureSpectrum suppliers, or ` +
-        `${money(raw * b.p25)}–${money(raw * b.p75)} through B2B blasts. ` +
-        `The routes are not substitutes — pick on reach, then price the consequence.`,
+        `Buying ${num(raw)} raw completes (${BUY_MULTIPLE}× target) to land ${num(target)} clean, at ` +
+        `${money(r.p25)}–${money(r.p75)} per complete. This is a ${i.project_type} study, so ${label} ` +
+        `is the route — the other route is cheaper per complete but does not reach this audience, ` +
+        `which is most of why the two look so far apart.`,
       evidence:
-        `Median ${money(b.median)}/complete on blasts (n=${b.n}) vs $${p.median.toFixed(2)} on panel ` +
-        `(n=${p.n}), measured ${EVIDENCE_DATE} on surveys whose recorded completes cover their N.`,
+        `${money(r.median)}/complete median on the ${intended} route (p25 ${money(r.p25)}, p75 ` +
+        `${money(r.p75)}, n=${r.n}), ${EVIDENCE_DATE}, measured only on surveys whose recorded ` +
+        `completes cover their N. 108 of the 123 surveys with field rows use the route matching their type.`,
+    })
+  }
+
+  /* 1b) CROSSING ROUTES. Allowed with a reason, never silently — and a B2B
+         audience sourced from a consumer panel needs screeners or the data is
+         not worth having. */
+  if (i.project_type === 'B2B' && (route === 'panel' || route === 'both')) {
+    const panelN = (i.suppliers ?? []).reduce((t, s) => t + (s.n_collected ?? 0), 0)
+    out.push({
+      code: 'route-mismatch',
+      level: 'act',
+      headline: `B2B study being filled from PureSpectrum — ${num(panelN)} panel completes so far`,
+      detail:
+        `A B2B audience sourced off a consumer panel needs screeners tight enough to prove the ` +
+        `respondent is who the client asked for. Without them this delivers volume and not data. ` +
+        `If the blast route could not reach the audience, that reason belongs on the record — and ` +
+        `the screeners belong in the questionnaire before the next launch.`,
+      evidence:
+        `Five B2B-typed surveys have been fielded through panel (${EVIDENCE_DATE}). PR00230 collected ` +
+        `1,865 panel completes against a 1,180 B2B target. Panel completes cost ${money(ROUTE_COST.panel.median)} ` +
+        `against ${money(ROUTE_COST.blast.median)} on blasts, so the saving is real and so is the risk.`,
     })
   }
 
