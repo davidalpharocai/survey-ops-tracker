@@ -175,9 +175,9 @@ describe('coverage: the caveat travels with the numbers', () => {
 
 describe('filters', () => {
   const rows = [
-    P({ id: 'a', deliver_date: '2026-06-15', project_type: 'PS', client: 'BAM' }),
-    P({ id: 'b', deliver_date: '2026-09-01', project_type: 'B2B', client: 'Coatue' }),
-    P({ id: 'c', deliver_date: null, launch_date: '2026-07-01', project_type: 'PS', client: 'BAM' }),
+    P({ id: 'a', deliver_date: '2026-06-15', project_type: 'PS', client: 'BAM', client_id: 'bam' }),
+    P({ id: 'b', deliver_date: '2026-09-01', project_type: 'B2B', client: 'Coatue', client_id: 'coa' }),
+    P({ id: 'c', deliver_date: null, launch_date: '2026-07-01', project_type: 'PS', client: 'BAM - James Cook', client_id: 'bam' }),
   ]
   const route = () => 'panel' as const
 
@@ -185,10 +185,12 @@ describe('filters', () => {
     expect(finDate(rows[2])).toBe('2026-07-01')
   })
 
-  it('filters by range, type and client', () => {
+  it('filters by range, type and account', () => {
     expect(applyFilters(rows, { from: '2026-07-01' }, route).map(r => r.id)).toEqual(['b', 'c'])
     expect(applyFilters(rows, { type: 'PS' }, route).map(r => r.id)).toEqual(['a', 'c'])
-    expect(applyFilters(rows, { client: 'Coatue' }, route).map(r => r.id)).toEqual(['b'])
+    expect(applyFilters(rows, { accountId: 'coa' }, route).map(r => r.id)).toEqual(['b'])
+    // Through the KEY, so row c joins BAM despite wearing a different label.
+    expect(applyFilters(rows, { accountId: 'bam' }, route).map(r => r.id)).toEqual(['a', 'c'])
   })
 
   it('drops an undated survey from a dated range rather than guessing it in', () => {

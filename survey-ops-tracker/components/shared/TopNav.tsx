@@ -346,9 +346,11 @@ export function TopNav() {
               <Link href="/insights" className={menuItemClass} title="Insights — pipeline rollup, deadlines, on-time delivery, workload, budget">
                 <span>📊</span> Insights
               </Link>
-              {/* Cost, not P&L — SOCC has a client rate on 4 of 322 delivered
-                  surveys, so margin is not computable and the page says so. */}
-              <Link href="/finance" className={menuItemClass} title="Finance — what our fielding actually costs: per complete by route, where the money goes, N we cannot bill, blast efficiency, spend by account">
+              {/* Open to analysts, because the cost half of this page is what
+                  the fielding team needs. The revenue, margin and rate bands are
+                  gated inside the page on VIEW_FINANCIALS, and project_financials
+                  is restricted at the database layer besides (migration 086). */}
+              <Link href="/finance" className={menuItemClass} title="Finance — what our fielding costs and, for finance, what it earns: margin on the priced book, money lost vs revenue foregone, cost per complete by route, spend by account">
                 <span>💵</span> Finance
               </Link>
               <Link href="/internal" className={menuItemClass} title="Internal Projects — AlphaROC's own work on a sprint-based board">

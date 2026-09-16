@@ -2,11 +2,12 @@
  * The finance hub's arithmetic.
  *
  * ── WHAT THIS CAN AND CANNOT ANSWER ─────────────────────────────────────────
- * It answers "what did our work COST, and where did the money go". It does not
- * answer "are we profitable", because SOCC cannot: 4 of 322 delivered surveys
- * carry a client rate, and there is no contracts, invoices or rate_cards table
- * in the database at all. A margin number here would be a number about four
- * surveys wearing the clothes of a number about the business.
+ * It answers "what did our work COST, where did the money go, and — on the part
+ * of the book that carries a client rate — what did it earn". Revenue is real
+ * but PARTIAL: project_financials.price_per_n exists on 57 of 403 surveys, so
+ * every margin figure is a statement about the priced subset and has to name
+ * that subset beside itself. It is no longer true that margin is incomputable;
+ * it is true that margin is computable on about an eighth of the delivered book.
  *
  * ── EVERY FIGURE CARRIES ITS COVERAGE ───────────────────────────────────────
  * Only about a third of delivered surveys have any recorded cost. A total drawn
@@ -20,6 +21,14 @@
  * PR00425 is typed B2B and holds 294 PureSpectrum supplier rows. Route here is
  * always derived from the rows a survey actually has. Pricing a panel survey at
  * blast rates overstated one figure 24x earlier this week.
+ *
+ * ── THE ACCOUNT IS clients.name, NEVER survey_projects.client ───────────────
+ * `survey_projects.client` is a stale denormalised string that still carries a
+ * contact suffix: the 82 BAM surveys wear NINE different labels there ("BAM",
+ * "BAM - James Cook", "BAM - Grey Jones", …), and grouping by it splits one
+ * account into nine — reporting 11% of BAM's spend as BAM's. The `clients`
+ * table is ALREADY consolidated and every live project carries a client_id, so
+ * the account is resolved through the key and the label is used for nothing.
  */
 
 export type Route = 'blast' | 'panel' | 'both' | 'none'
@@ -40,6 +49,35 @@ export interface FinProject {
   n_target: number | null
   n_collected: number | null
   n_actual: number | null
+  /** Who at the account asked for this. The only trustworthy contact link —
+   *  the suffix in `client` agrees with it on all 58 surveys that carry both
+   *  and contradicts it on none, so the suffix adds nothing the key lacks. */
+  requested_by_contact_id?: string | null
+}
+
+/** One row of `clients`. `name` is the consolidated account. */
+export interface FinAccount {
+  id: string
+  name: string | null
+}
+
+/** One row of `client_contacts`. */
+export interface FinContact {
+  id: string
+  client_id: string | null
+  first_name: string | null
+  last_name: string | null
+  email: string | null
+  archived?: boolean | null
+}
+
+/** What the client pays per completed interview, from project_financials.
+ *  Migration 086 restricts that table at the database layer, so for a reader
+ *  without VIEW_FINANCIALS this array simply arrives EMPTY — which reads as
+ *  "nothing is priced" and degrades to the cost report, rather than erroring. */
+export interface FinRate {
+  project_id: string
+  price_per_n: number | null
 }
 export interface FinBlast {
   project_id: string
@@ -66,9 +104,18 @@ export interface Filters {
   /** project_type as a LABEL filter — this is the one place the label is the
    *  right thing to filter on, because the user picked it from a list of labels. */
   type?: string | null
-  client?: string | null
+  /** The consolidated account, as a clients.id — NOT the stale `client` string. */
+  accountId?: string | null
+  /** Narrows to one person's surveys within the selected account. The sentinel
+   *  `NONE` means "the surveys at this account with no contact recorded", which
+   *  is 31 of BAM's 82 and must stay reachable rather than being unfilterable. */
+  contactId?: string | null
   route?: Route | null
 }
+
+/** Sentinel for "no contact recorded". A real contact id is a uuid, so this
+ *  cannot collide with one. */
+export const NO_CONTACT = 'NONE'
 
 /** The date a survey belongs to. Same precedence the sales Home uses: the
  *  delivery commitment first, because it is the better-populated field. */
@@ -129,10 +176,72 @@ export function applyFilters(rows: FinProject[], f: Filters, routeFor: (p: FinPr
     if (f.from && (!d || d < f.from)) return false
     if (f.to && (!d || d > f.to)) return false
     if (f.type && p.project_type !== f.type) return false
-    if (f.client && p.client !== f.client) return false
+    if (f.accountId && p.client_id !== f.accountId) return false
+    if (f.contactId) {
+      const c = p.requested_by_contact_id ?? null
+      if (f.contactId === NO_CONTACT ? c !== null : c !== f.contactId) return false
+    }
     if (f.route && routeFor(p) !== f.route) return false
     return true
   })
+}
+
+/** Account name for one survey, resolved through the key. Falls back to the
+ *  stale label only when there is no client_id at all — which is true of no
+ *  live project today, but the column is nullable and a wrong name beats a
+ *  silently dropped row. */
+export function accountOf(p: FinProject, accounts: Map<string, string>): string {
+  if (p.client_id) return accounts.get(p.client_id) ?? p.client ?? '(no account)'
+  return p.client ?? '(no account)'
+}
+
+export const contactName = (c: FinContact): string =>
+  [c.first_name, c.last_name].filter(Boolean).join(' ').trim() || c.email || '(unnamed)'
+
+export interface AccountOption { id: string; name: string; surveys: number }
+
+/** The account dropdown: every account with at least one survey in the working
+ *  set, by survey count then name. Accounts with no surveys are not offered —
+ *  picking one would empty the page with no way to tell why. */
+export function accountOptions(rows: FinProject[], accounts: FinAccount[]): AccountOption[] {
+  const name = new Map(accounts.map(a => [a.id, a.name ?? '(unnamed)']))
+  const n = new Map<string, number>()
+  for (const p of rows) if (p.client_id) n.set(p.client_id, (n.get(p.client_id) ?? 0) + 1)
+  return [...n.entries()]
+    .map(([id, surveys]) => ({ id, name: name.get(id) ?? '(unknown account)', surveys }))
+    .sort((a, b) => b.surveys - a.surveys || a.name.localeCompare(b.name))
+}
+
+export interface ContactOption { id: string; name: string; surveys: number }
+
+/**
+ * The contact dropdown, scoped to one account: every contact who is `requested_by`
+ * on at least one survey there.
+ *
+ * Deliberately built from the SURVEYS, not from the contact roster. BAM has 16
+ * contacts on file and 10 who have ever asked for a survey; offering all 16
+ * would put six dead ends in the list. The "no contact recorded" entry is
+ * included when such surveys exist, because 31 of BAM's 82 are in that state and
+ * a dropdown that cannot reach them hides a third of the account.
+ */
+export function contactOptions(
+  rows: FinProject[], contacts: FinContact[], accountId: string | null,
+): ContactOption[] {
+  if (!accountId) return []
+  const mine = rows.filter(p => p.client_id === accountId)
+  const by = new Map(contacts.map(c => [c.id, c]))
+  const n = new Map<string, number>()
+  let none = 0
+  for (const p of mine) {
+    const id = p.requested_by_contact_id
+    if (id && by.has(id)) n.set(id, (n.get(id) ?? 0) + 1)
+    else none++
+  }
+  const out = [...n.entries()]
+    .map(([id, surveys]) => ({ id, name: contactName(by.get(id)!), surveys }))
+    .sort((a, b) => b.surveys - a.surveys || a.name.localeCompare(b.name))
+  if (none > 0) out.push({ id: NO_CONTACT, name: 'No contact recorded', surveys: none })
+  return out
 }
 
 const pct = (a: number, b: number) => (b > 0 ? Math.round((a / b) * 100) : 0)
@@ -188,13 +297,22 @@ export interface ClientSpend {
   share: number
 }
 
+/**
+ * Recorded spend per ACCOUNT.
+ *
+ * Grouped through client_id, never the `client` string. Grouping by the string
+ * split BAM across nine labels and reported $39,390 / 11% where the account had
+ * actually absorbed $99,634 / 29% — an error that made the largest account look
+ * like the fifth largest.
+ */
 export function spendByClient(
   rows: FinProject[], blasts: FinBlast[], suppliers: FinSupplier[], costs: FinCost[],
+  accounts: Map<string, string> = new Map(),
 ): { clients: ClientSpend[]; total: number; coverage: { costed: number; of: number } } {
   const by = new Map<string, { total: number; surveys: number; costed: number }>()
   let total = 0, costed = 0
   for (const p of rows) {
-    const key = p.client ?? '(no account)'
+    const key = accountOf(p, accounts)
     const sp = spendOf(p, blasts, suppliers, costs)
     const e = by.get(key) ?? { total: 0, surveys: 0, costed: 0 }
     e.total += sp.total
@@ -309,4 +427,207 @@ export function coverage(
     unreconciled,
     unattributedCompletes: unattributed,
   }
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * REVENUE
+ *
+ * The billing rule is  revenue = rate x min(n_actual, n_target).  Two halves of
+ * that deserve to be said out loud because both are counter-intuitive:
+ *
+ *   · Delivering ABOVE target earns nothing. The cap is min(), not max().
+ *   · QA scrub does not reduce the bill at all unless it drags n_actual BELOW
+ *     target. A survey that buys 1,300, scrubs 200 and still hands over 1,100
+ *     against a 1,000 target bills the full 1,000. The scrub cost real money
+ *     and cost zero revenue — which is why scrub is priced at COST below, and
+ *     never at the client rate.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+/** rate x min(n_actual, n_target), or null when either input is missing.
+ *  NEVER 0 for "unknown" — an unpriced survey has unknown revenue, and folding
+ *  it in as zero would drag every margin percentage toward a number about
+ *  bookkeeping rather than about the business. */
+export function revenueOf(p: FinProject, rate: number | null | undefined): number | null {
+  if (rate == null || !(rate > 0)) return null
+  const t = p.n_target, a = p.n_actual
+  if (t == null || a == null) return null
+  return rate * Math.min(Number(a), Number(t))
+}
+
+export interface Margin {
+  revenue: number
+  cost: number
+  margin: number
+  /** As a fraction of revenue. */
+  pct: number
+  /** Surveys contributing to ALL THREE figures above. */
+  surveys: number
+  /** Delivered + priced but carrying no recorded cost. Their revenue is
+   *  EXCLUDED above, because counting revenue whose cost was never logged
+   *  reports a margin of 100% on that survey and lifts the whole ratio. */
+  pricedNoCost: number
+  pricedNoCostRevenue: number
+  /** Delivered surveys with no rate at all — the part of the book this cannot
+   *  see. The single most important denominator on the page. */
+  unpriced: number
+  delivered: number
+}
+
+/**
+ * Margin on the part of the book that carries BOTH a rate and a recorded cost.
+ *
+ * The exclusion in `pricedNoCost` is the whole point of this function. Including
+ * those surveys takes the measured margin from 46% to 58%, not because the work
+ * got more profitable but because five surveys contributed revenue and no cost.
+ * That higher number is what this function exists to stop anyone printing.
+ */
+export function marginOf(
+  rows: FinProject[], rates: Map<string, number>,
+  blasts: FinBlast[], suppliers: FinSupplier[], costs: FinCost[],
+): Margin {
+  let revenue = 0, cost = 0, surveys = 0
+  let pricedNoCost = 0, pricedNoCostRevenue = 0, unpriced = 0, delivered = 0
+  for (const p of rows) {
+    if (!isDelivered(p)) continue
+    delivered++
+    const rev = revenueOf(p, rates.get(p.id))
+    if (rev == null) { unpriced++; continue }
+    const sp = spendOf(p, blasts, suppliers, costs)
+    if (sp.total <= 0) { pricedNoCost++; pricedNoCostRevenue += rev; continue }
+    revenue += rev; cost += sp.total; surveys++
+  }
+  return {
+    revenue, cost, margin: revenue - cost,
+    pct: revenue > 0 ? (revenue - cost) / revenue : 0,
+    surveys, pricedNoCost, pricedNoCostRevenue, unpriced, delivered,
+  }
+}
+
+export interface Foregone {
+  /** Delivered surveys that finished short of the N they promised. */
+  surveys: number
+  n: number
+  /** n x the CLIENT rate — revenue we could have billed and did not. */
+  dollars: number
+  /** Short of target but carrying no rate, so unpriceable. Reported because
+   *  19x as much short N sits here as in the priced figure (8,298 against 443),
+   *  and a reader who does not see it will read the priced number as the whole. */
+  unpricedSurveys: number
+  unpricedN: number
+}
+
+/**
+ * REVENUE FOREGONE — David, 2026-09-14: "N we can't bill (N we didn't deliver
+ * x $/ N)".
+ *
+ * This is the half measured against the CLIENT rate, because the thing lost is
+ * revenue. It is NOT cash that left the building, and it must never be added to
+ * `moneyLost` below: one is an invoice that was never raised and the other is an
+ * invoice we paid. Adding them produces a "total waste" figure that double-counts
+ * nothing but means nothing either.
+ */
+export function foregone(rows: FinProject[], rates: Map<string, number>): Foregone {
+  const f: Foregone = { surveys: 0, n: 0, dollars: 0, unpricedSurveys: 0, unpricedN: 0 }
+  for (const p of rows) {
+    if (!isDelivered(p)) continue
+    const t = p.n_target, a = p.n_actual
+    if (t == null || a == null || !(Number(t) > 0)) continue
+    const short = Math.max(0, Number(t) - Number(a))
+    if (short <= 0) continue
+    const r = rates.get(p.id)
+    if (r != null && r > 0) { f.surveys++; f.n += short; f.dollars += short * r }
+    else { f.unpricedSurveys++; f.unpricedN += short }
+  }
+  return f
+}
+
+export interface LostBucket { surveys: number; n: number; dollars: number }
+export interface MoneyLost {
+  /** Completes bought past the promised N. The cap is min(), so these bill zero. */
+  overTarget: LostBucket
+  /** Completes bought that never survived QA into the deliverable. */
+  scrub: LostBucket
+  /** Surveys in one of those states whose cost was never recorded, so the
+   *  dollars could not be computed. The N is still real. */
+  uncostedSurveys: number
+  uncostedN: number
+  /** Of the scrubbed surveys, how many still cleared their target — i.e. how
+   *  much of the scrub cost us cash and cost us NO revenue. */
+  scrubStillHitTarget: number
+}
+
+/**
+ * MONEY LOST — David, 2026-09-14: "money lost (cost to field that N)".
+ *
+ * Cash that left for interviews we cannot bill, priced at each survey's OWN
+ * measured cost per complete. Never at a route default (that mispriced one
+ * survey 24x) and never at the client rate, which would answer a different and
+ * far larger question — the same scrub comes to $52,612 at cost across 14,148 N,
+ * and $146,076 at the client rate across the 2,345 N that carry one.
+ */
+export function moneyLost(
+  rows: FinProject[], blasts: FinBlast[], suppliers: FinSupplier[], costs: FinCost[],
+): MoneyLost {
+  const z = (): LostBucket => ({ surveys: 0, n: 0, dollars: 0 })
+  const m: MoneyLost = {
+    overTarget: z(), scrub: z(), uncostedSurveys: 0, uncostedN: 0, scrubStillHitTarget: 0,
+  }
+  for (const p of rows) {
+    if (!isDelivered(p)) continue
+    const t = Number(p.n_target ?? 0), g = Number(p.n_collected ?? 0), a = p.n_actual
+    if (a == null || !(g > 0)) continue
+    const A = Number(a)
+    const over = t > 0 ? Math.max(0, Math.min(A, g) - t) : 0
+    const scrub = Math.max(0, g - A)
+    if (over === 0 && scrub === 0) continue
+    const sp = spendOf(p, blasts, suppliers, costs)
+    if (sp.total <= 0 || sp.paidCompletes <= 0) {
+      m.uncostedSurveys++; m.uncostedN += over + scrub; continue
+    }
+    const rate = sp.total / sp.paidCompletes
+    if (over > 0) { m.overTarget.surveys++; m.overTarget.n += over; m.overTarget.dollars += over * rate }
+    if (scrub > 0) {
+      m.scrub.surveys++; m.scrub.n += scrub; m.scrub.dollars += scrub * rate
+      if (t > 0 && A >= t) m.scrubStillHitTarget++
+    }
+  }
+  return m
+}
+
+export interface RateBand { rate: number; surveys: number; accounts: string[] }
+
+/**
+ * The rate card as it actually stands, so the page can show its own provenance.
+ *
+ * A backfill can put one number on a third of the book in a single sitting, and
+ * on a dashboard that is indistinguishable from a third of the book having
+ * negotiated the same price. It happened here: 53 surveys were written at
+ * $200.00/N, which implied $3.1M of contract value until David caught that the
+ * rate belongs to B2B expert work and not to PureSpectrum panel studies, where
+ * he has "never seen it be more than $7-15". 36 were cleared; 16 remain, all
+ * B2B. This function exists so the UI can show that concentration rather than
+ * hide it, because the same mistake will be made again.
+ */
+export function rateBands(
+  rows: FinProject[], rates: Map<string, number>, accounts: Map<string, string>,
+): RateBand[] {
+  const by = new Map<number, Set<string>>()
+  const n = new Map<number, number>()
+  for (const p of rows) {
+    const r = rates.get(p.id)
+    if (r == null) continue
+    n.set(r, (n.get(r) ?? 0) + 1)
+    if (!by.has(r)) by.set(r, new Set())
+    by.get(r)!.add(accountOf(p, accounts))
+  }
+  return [...n.entries()]
+    .map(([rate, surveys]) => ({ rate, surveys, accounts: [...(by.get(rate) ?? [])].sort() }))
+    .sort((a, b) => b.surveys - a.surveys || b.rate - a.rate)
+}
+
+/** Rates recorded as exactly 0. Almost certainly "nobody entered one" rather
+ *  than "we did this for free" — and a 0 rate silently prices a survey's whole
+ *  delivery at nothing, so it is surfaced rather than averaged in. */
+export function zeroRates(rows: FinProject[], rates: Map<string, number>): FinProject[] {
+  return rows.filter(p => rates.get(p.id) === 0)
 }
