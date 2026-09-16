@@ -255,7 +255,7 @@ export default function FinancePage() {
         <span className="font-semibold">Everything here is a floor.</span>{' '}
         {fmtNum(cover.deliveredCosted)} of {fmtNum(cover.delivered)} delivered surveys
         ({cover.deliveredPct}%) carry any recorded cost
-        {showMoney && <>, and {fmtNum(margin.delivered - margin.unpriced)} carry a client rate</>}.
+        {showMoney && <>, and {fmtNum(margin.rated)} carry a client rate</>}.
         The rest contribute $0 because nothing was logged, not because nothing was spent
         {showMoney && <>, so margin below describes {fmtNum(margin.surveys)} surveys — not the business</>}.
       </p>

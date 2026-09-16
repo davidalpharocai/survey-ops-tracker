@@ -81,6 +81,20 @@ describe('marginOf: the flattering number that must never print', () => {
     expect(m).toMatchObject({ delivered: 3, unpriced: 2, surveys: 1 })
   })
 
+  it('separates "carries a rate" from "yields a revenue figure"', () => {
+    // b has a rate and no N; c has a rate of 0. Both are RATED and neither is
+    // priceable. Against production 44 delivered surveys carry a rate and only
+    // 38 produce revenue, and the banner used to quote the 38 as the rate card.
+    const rows = [
+      P({ id: 'a', n_target: 10, n_actual: 10 }),
+      P({ id: 'b', n_target: null, n_actual: null }),
+      P({ id: 'c', n_target: 10, n_actual: 10 }),
+      P({ id: 'd' }),
+    ]
+    const m = marginOf(rows, new Map([['a', 5], ['b', 5], ['c', 0]]), [blast('a', 1, 10)], [], [])
+    expect(m).toMatchObject({ delivered: 4, rated: 3, unpriced: 3, surveys: 1 })
+  })
+
   it('ignores work that is not delivered', () => {
     const rows = [P({ id: 'a', board_column: 'Fielding', n_target: 10, n_actual: 10 })]
     expect(marginOf(rows, new Map([['a', 5]]), [blast('a', 1, 10)], [], []).delivered).toBe(0)

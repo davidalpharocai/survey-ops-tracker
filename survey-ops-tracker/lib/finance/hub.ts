@@ -478,9 +478,16 @@ export interface Margin {
    *  reports a margin of 100% on that survey and lifts the whole ratio. */
   pricedNoCost: number
   pricedNoCostRevenue: number
-  /** Delivered surveys with no rate at all — the part of the book this cannot
-   *  see. The single most important denominator on the page. */
+  /** Delivered surveys this card cannot turn into revenue — no rate, OR a rate
+   *  of 0, OR a missing n_target/n_actual. NOT the same as "has no rate": 44
+   *  delivered surveys carry a rate and only 38 of them yield a revenue figure,
+   *  and a banner that called this "no client rate" was undercounting the rate
+   *  card by six. Kept separate from `rated` below for exactly that reason. */
   unpriced: number
+  /** Delivered surveys carrying ANY rate row, including the ones above that
+   *  cannot be turned into revenue. This is what "how much of the book is
+   *  priced" means, and it is the number the banner quotes. */
+  rated: number
   delivered: number
 }
 
@@ -497,10 +504,11 @@ export function marginOf(
   blasts: FinBlast[], suppliers: FinSupplier[], costs: FinCost[],
 ): Margin {
   let revenue = 0, cost = 0, surveys = 0
-  let pricedNoCost = 0, pricedNoCostRevenue = 0, unpriced = 0, delivered = 0
+  let pricedNoCost = 0, pricedNoCostRevenue = 0, unpriced = 0, rated = 0, delivered = 0
   for (const p of rows) {
     if (!isDelivered(p)) continue
     delivered++
+    if (rates.has(p.id)) rated++
     const rev = revenueOf(p, rates.get(p.id))
     if (rev == null) { unpriced++; continue }
     const sp = spendOf(p, blasts, suppliers, costs)
@@ -510,7 +518,7 @@ export function marginOf(
   return {
     revenue, cost, margin: revenue - cost,
     pct: revenue > 0 ? (revenue - cost) / revenue : 0,
-    surveys, pricedNoCost, pricedNoCostRevenue, unpriced, delivered,
+    surveys, pricedNoCost, pricedNoCostRevenue, unpriced, rated, delivered,
   }
 }
 
