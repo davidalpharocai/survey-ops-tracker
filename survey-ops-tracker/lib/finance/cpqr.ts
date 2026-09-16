@@ -46,7 +46,7 @@
  * authority; the claim has been removed rather than softened.
  */
 
-import { isDelivered, spendOf, routeOf, type FinBlast, type FinCost, type FinProject, type FinSupplier, type Route } from './hub'
+import { buildIndex, isDelivered, spendOf, routeOf, type FinBlast, type FinCost, type FinProject, type FinSupplier, type Route } from './hub'
 
 export interface Cpqr {
   route: 'blast' | 'panel'
@@ -93,6 +93,7 @@ export function cpqrByRoute(
 ): Cpqr[] {
   // `skipped` is PER ROUTE. A single shared counter would report panel's
   // exclusions on blast's card and vice versa.
+  const ix = buildIndex(blasts, suppliers, costs)
   const acc: Record<'blast' | 'panel', {
     spend: number; qualified: number; paid: number; per: number[]; skipped: number
   }> = {
@@ -101,12 +102,12 @@ export function cpqrByRoute(
   }
   for (const p of rows) {
     if (!isDelivered(p)) continue
-    const route: Route = routeOf(p, blasts, suppliers)
+    const route: Route = routeOf(p, blasts, suppliers, ix)
     if (route !== 'blast' && route !== 'panel') continue
     if (p.n_actual == null) continue
     const qualified = Number(p.n_actual)
     if (!(qualified > 0)) continue
-    const sp = spendOf(p, blasts, suppliers, costs)
+    const sp = spendOf(p, blasts, suppliers, costs, ix)
     if (sp.total <= 0) continue
     // THE GUARD. Without it this reported blast CPQR at $37.31 against its own
     // $71.78 median and a 116.5% QA yield. Both impossible, both rendered.
@@ -159,11 +160,11 @@ export function cpqrByRoute(
 export function blastIncidence(
   rows: FinProject[], blasts: FinBlast[], suppliers: FinSupplier[],
 ): { reach: number; completes: number; rate: number } | null {
+  const ix = buildIndex(blasts, suppliers, [])
   let reach = 0, completes = 0
   for (const p of rows) {
-    if (routeOf(p, blasts, suppliers) !== 'blast') continue
-    for (const b of blasts) {
-      if (b.project_id !== p.id) continue
+    if (routeOf(p, blasts, suppliers, ix) !== 'blast') continue
+    for (const b of ix.blasts.get(p.id) ?? []) {
       reach += Number(b.people ?? 0)
       completes += Number(b.completes ?? 0)
     }

@@ -53,6 +53,11 @@ export interface FinProject {
    *  cancelled surveys today and a future path that sets only one must not
    *  drop out of the money. */
   cancelled_at?: string | null
+  /** The COST CEILING — the most we intend to spend (David, 2026-08-24). NOT
+   *  client revenue, and never to be reconciled against contract value as if
+   *  the two should agree. 33 surveys carry one; 24 of those also carry a cost
+   *  and are the only ones variance can speak about. */
+  budget?: number | null
   /** Who at the account asked for this. The only trustworthy contact link —
    *  the suffix in `client` agrees with it on all 58 surveys that carry both
    *  and contradicts it on none, so the suffix adds nothing the key lacks. */
@@ -170,15 +175,51 @@ export interface Spend {
   paidCompletes: number
 }
 
+/**
+ * Child rows bucketed by project_id.
+ *
+ * Without this, spendOf scans all 906 blasts and 1,592 supplier rows for every
+ * one of 403 projects, and the page calls it about seven times per row across
+ * its cards: 246 ms of synchronous work inside render, on every filter change,
+ * rising to 657 ms at twice the data. Indexed, the same work is 6 ms — 41x —
+ * and it is the floor everything else on this page is built on.
+ */
+export interface FinIndex {
+  blasts: Map<string, FinBlast[]>
+  suppliers: Map<string, FinSupplier[]>
+  costs: Map<string, FinCost[]>
+}
+
+const bucket = <T extends { project_id: string }>(rows: T[]): Map<string, T[]> => {
+  const m = new Map<string, T[]>()
+  for (const r of rows) {
+    const a = m.get(r.project_id)
+    if (a) a.push(r); else m.set(r.project_id, [r])
+  }
+  return m
+}
+
+export const buildIndex = (
+  blasts: FinBlast[], suppliers: FinSupplier[], costs: FinCost[],
+): FinIndex => ({
+  blasts: bucket(blasts), suppliers: bucket(suppliers), costs: bucket(costs),
+})
+
 /** One survey's money, recomputed from its own rows rather than read from the
  *  stored column — so this file cannot silently disagree with the trigger, and
- *  a disagreement is visible instead of assumed away. */
+ *  a disagreement is visible instead of assumed away.
+ *
+ *  `ix` is optional so every existing call site and test keeps working; when it
+ *  is supplied the row lookup is a Map hit instead of three array scans. Every
+ *  looping function in this file builds one index up front and threads it
+ *  through, which is where the 41x comes from. */
 export function spendOf(
   p: FinProject, blasts: FinBlast[], suppliers: FinSupplier[], costs: FinCost[],
+  ix?: FinIndex,
 ): Spend {
-  const b = blasts.filter(x => x.project_id === p.id)
-  const s = suppliers.filter(x => x.project_id === p.id)
-  const c = costs.filter(x => x.project_id === p.id)
+  const b = ix ? (ix.blasts.get(p.id) ?? []) : blasts.filter(x => x.project_id === p.id)
+  const s = ix ? (ix.suppliers.get(p.id) ?? []) : suppliers.filter(x => x.project_id === p.id)
+  const c = ix ? (ix.costs.get(p.id) ?? []) : costs.filter(x => x.project_id === p.id)
   const reward = b.reduce((t, x) => t + (x.bid ?? 0) * (x.completes ?? 0), 0)
   // Email sends are free — 112. `!== 'email'` rather than `=== 'sms'` so an
   // unrecorded channel keeps paying, which is what the SQL does too.
@@ -194,9 +235,11 @@ export function spendOf(
   }
 }
 
-export function routeOf(p: FinProject, blasts: FinBlast[], suppliers: FinSupplier[]): Route {
-  const b = blasts.some(x => x.project_id === p.id)
-  const s = suppliers.some(x => x.project_id === p.id)
+export function routeOf(
+  p: FinProject, blasts: FinBlast[], suppliers: FinSupplier[], ix?: FinIndex,
+): Route {
+  const b = ix ? (ix.blasts.get(p.id)?.length ?? 0) > 0 : blasts.some(x => x.project_id === p.id)
+  const s = ix ? (ix.suppliers.get(p.id)?.length ?? 0) > 0 : suppliers.some(x => x.project_id === p.id)
   return b && s ? 'both' : b ? 'blast' : s ? 'panel' : 'none'
 }
 
@@ -310,11 +353,12 @@ export interface RouteCost {
 export function routeCosts(
   rows: FinProject[], blasts: FinBlast[], suppliers: FinSupplier[], costs: FinCost[],
 ): RouteCost[] {
+  const ix = buildIndex(blasts, suppliers, costs)
   const buckets: Record<'blast' | 'panel', number[]> = { blast: [], panel: [] }
   for (const p of rows) {
-    const route = routeOf(p, blasts, suppliers)
+    const route = routeOf(p, blasts, suppliers, ix)
     if (route !== 'blast' && route !== 'panel') continue
-    const sp = spendOf(p, blasts, suppliers, costs)
+    const sp = spendOf(p, blasts, suppliers, costs, ix)
     const got = Number(p.n_collected ?? 0)
     if (sp.total <= 0 || sp.paidCompletes <= 0) continue
     if (!(got > 0 && sp.paidCompletes >= got)) continue
@@ -350,11 +394,12 @@ export function spendByClient(
   rows: FinProject[], blasts: FinBlast[], suppliers: FinSupplier[], costs: FinCost[],
   accounts: Map<string, string> = new Map(),
 ): { clients: ClientSpend[]; total: number; coverage: { costed: number; of: number } } {
+  const ix = buildIndex(blasts, suppliers, costs)
   const by = new Map<string, { total: number; surveys: number; costed: number }>()
   let total = 0, costed = 0
   for (const p of rows) {
     const key = accountOf(p, accounts)
-    const sp = spendOf(p, blasts, suppliers, costs)
+    const sp = spendOf(p, blasts, suppliers, costs, ix)
     const e = by.get(key) ?? { total: 0, surveys: 0, costed: 0 }
     e.total += sp.total
     e.surveys++
@@ -385,6 +430,7 @@ export interface Unbillable {
 export function unbillable(
   rows: FinProject[], blasts: FinBlast[], suppliers: FinSupplier[], costs: FinCost[],
 ): Unbillable {
+  const ix = buildIndex(blasts, suppliers, costs)
   const u: Unbillable = { overTarget: 0, scrub: 0, overTargetCost: 0, scrubCost: 0, surveys: 0 }
   for (const p of rows) {
     if (!isDelivered(p)) continue
@@ -392,7 +438,7 @@ export function unbillable(
     const got = p.n_collected ?? 0
     const actual = p.n_actual
     if (!(target > 0 && got > 0 && actual != null)) continue
-    const sp = spendOf(p, blasts, suppliers, costs)
+    const sp = spendOf(p, blasts, suppliers, costs, ix)
     if (sp.total <= 0 || sp.paidCompletes <= 0) continue
     const rate = sp.total / sp.paidCompletes
     const over = Math.max(0, Math.min(actual, got) - target)
@@ -453,10 +499,11 @@ export interface Coverage {
 export function coverage(
   rows: FinProject[], blasts: FinBlast[], suppliers: FinSupplier[], costs: FinCost[],
 ): Coverage {
+  const ix = buildIndex(blasts, suppliers, costs)
   const delivered = rows.filter(isDelivered)
   let deliveredCosted = 0, unreconciled = 0, unattributed = 0
   for (const p of rows) {
-    const sp = spendOf(p, blasts, suppliers, costs)
+    const sp = spendOf(p, blasts, suppliers, costs, ix)
     if (isDelivered(p) && sp.total > 0) deliveredCosted++
     const got = Number(p.n_collected ?? 0)
     if (got > 0 && sp.paidCompletes < got) { unreconciled++; unattributed += got - sp.paidCompletes }
@@ -543,6 +590,7 @@ export function marginOf(
   rows: FinProject[], rates: Map<string, number>,
   blasts: FinBlast[], suppliers: FinSupplier[], costs: FinCost[],
 ): Margin {
+  const ix = buildIndex(blasts, suppliers, costs)
   let revenue = 0, cost = 0, surveys = 0
   let pricedNoCost = 0, pricedNoCostRevenue = 0, unpriced = 0, rated = 0, delivered = 0
   let cancelledCost = 0, cancelledSurveys = 0
@@ -552,7 +600,7 @@ export function marginOf(
     // `cost` would make the delivered book look worse than it performed while
     // hiding the reason. The page shows margin both ways.
     if (isCancelled(p)) {
-      const sp = spendOf(p, blasts, suppliers, costs)
+      const sp = spendOf(p, blasts, suppliers, costs, ix)
       if (sp.total > 0) { cancelledCost += sp.total; cancelledSurveys++ }
       continue
     }
@@ -561,7 +609,7 @@ export function marginOf(
     if (rates.has(p.id)) rated++
     const rev = revenueOf(p, rates.get(p.id))
     if (rev == null) { unpriced++; continue }
-    const sp = spendOf(p, blasts, suppliers, costs)
+    const sp = spendOf(p, blasts, suppliers, costs, ix)
     if (sp.total <= 0) { pricedNoCost++; pricedNoCostRevenue += rev; continue }
     revenue += rev; cost += sp.total; surveys++
   }
@@ -648,6 +696,7 @@ export interface MoneyLost {
 export function moneyLost(
   rows: FinProject[], blasts: FinBlast[], suppliers: FinSupplier[], costs: FinCost[],
 ): MoneyLost {
+  const ix = buildIndex(blasts, suppliers, costs)
   const z = (): LostBucket => ({ surveys: 0, n: 0, dollars: 0 })
   const m: MoneyLost = {
     overTarget: z(), scrub: z(), uncostedSurveys: 0, uncostedN: 0, scrubStillHitTarget: 0,
@@ -659,7 +708,7 @@ export function moneyLost(
     // it lost all of it. Both were invisible while this function looked only at
     // `isDelivered`, which is what David caught on 2026-09-15.
     if (isCancelled(p) || isInFlight(p)) {
-      const sp = spendOf(p, blasts, suppliers, costs)
+      const sp = spendOf(p, blasts, suppliers, costs, ix)
       if (sp.total > 0) {
         const b = isCancelled(p) ? m.cancelled : m.inFlight
         b.surveys++
@@ -675,7 +724,7 @@ export function moneyLost(
     const over = t > 0 ? Math.max(0, Math.min(A, g) - t) : 0
     const scrub = Math.max(0, g - A)
     if (over === 0 && scrub === 0) continue
-    const sp = spendOf(p, blasts, suppliers, costs)
+    const sp = spendOf(p, blasts, suppliers, costs, ix)
     if (sp.total <= 0 || sp.paidCompletes <= 0) {
       m.uncostedSurveys++; m.uncostedN += over + scrub; continue
     }
