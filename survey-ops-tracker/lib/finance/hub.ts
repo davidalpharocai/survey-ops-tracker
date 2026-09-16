@@ -201,15 +201,21 @@ export const contactName = (c: FinContact): string =>
 export interface AccountOption { id: string; name: string; surveys: number }
 
 /** The account dropdown: every account with at least one survey in the working
- *  set, by survey count then name. Accounts with no surveys are not offered —
- *  picking one would empty the page with no way to tell why. */
+ *  set. Accounts with no surveys are not offered — picking one would empty the
+ *  page with no way to tell why.
+ *
+ *  ALPHABETICAL, not by size. This is a picker, and a picker's job is to let
+ *  you find the one you already have in mind; the "Spend by account" card is
+ *  where accounts get ranked. Scanning 70 entries for "Wellington" in size
+ *  order is a worse job than scanning them in name order, and the survey count
+ *  rides along on each row so nothing is lost by not sorting on it. */
 export function accountOptions(rows: FinProject[], accounts: FinAccount[]): AccountOption[] {
   const name = new Map(accounts.map(a => [a.id, a.name ?? '(unnamed)']))
   const n = new Map<string, number>()
   for (const p of rows) if (p.client_id) n.set(p.client_id, (n.get(p.client_id) ?? 0) + 1)
   return [...n.entries()]
     .map(([id, surveys]) => ({ id, name: name.get(id) ?? '(unknown account)', surveys }))
-    .sort((a, b) => b.surveys - a.surveys || a.name.localeCompare(b.name))
+    .sort((a, b) => a.name.localeCompare(b.name))
 }
 
 export interface ContactOption { id: string; name: string; surveys: number }
@@ -223,6 +229,11 @@ export interface ContactOption { id: string; name: string; surveys: number }
  * would put six dead ends in the list. The "no contact recorded" entry is
  * included when such surveys exist, because 31 of BAM's 82 are in that state and
  * a dropdown that cannot reach them hides a third of the account.
+ *
+ * Alphabetical by name, per David 2026-09-15 — the same order he asked for on
+ * the client page and in the Requested-by picker, so a name is looked up the
+ * same way wherever it appears. "No contact recorded" sorts last regardless: it
+ * is a bucket, not a person, and alphabetising it among the names would bury it.
  */
 export function contactOptions(
   rows: FinProject[], contacts: FinContact[], accountId: string | null,
@@ -239,7 +250,7 @@ export function contactOptions(
   }
   const out = [...n.entries()]
     .map(([id, surveys]) => ({ id, name: contactName(by.get(id)!), surveys }))
-    .sort((a, b) => b.surveys - a.surveys || a.name.localeCompare(b.name))
+    .sort((a, b) => a.name.localeCompare(b.name))
   if (none > 0) out.push({ id: NO_CONTACT, name: 'No contact recorded', surveys: none })
   return out
 }

@@ -64,10 +64,17 @@ function useFinanceData() {
     queryFn: async () => {
       // Paged: PostgREST caps at 1000 and truncates SILENTLY, which on a money
       // page would mean quietly reporting a subset as the whole.
-      const page = async <T,>(table: string, cols: string): Promise<T[]> => {
+      const page = async <T,>(
+        table: string, cols: string, live = false,
+      ): Promise<T[]> => {
         const out: T[] = []
         for (let from = 0; ; from += 1000) {
-          const { data, error } = await supabase.from(table as never).select(cols).range(from, from + 999)
+          const q = supabase.from(table as never).select(cols).range(from, from + 999)
+          // Soft-deleted projects are still rows. Every other reader in the app
+          // filters them (useProjects does it four times); this page did not,
+          // and so counted 32 deleted surveys — including one deleted tonight —
+          // into every total it printed.
+          const { data, error } = await (live ? q.is('deleted_at', null) : q)
           if (error) throw error
           out.push(...((data ?? []) as unknown as T[]))
           if (!data || data.length < 1000) break
@@ -81,7 +88,7 @@ function useFinanceData() {
       const rates = await page<FinRate>('project_financials', 'project_id, price_per_n')
         .catch(() => [] as FinRate[])
       const [projects, blasts, suppliers, costs, clients, contacts] = await Promise.all([
-        page<FinProject>('survey_projects', COLS),
+        page<FinProject>('survey_projects', COLS, true),
         page<FinBlast>('project_blasts', 'project_id, bid, people, completes, cost_per_send, channel'),
         page<FinSupplier>('project_suppliers', 'project_id, cpi, n_collected'),
         page<FinCost>('project_costs', 'project_id, amount'),
@@ -322,15 +329,30 @@ export default function FinancePage() {
                 tone={margin.pct >= 0 ? 'pos' : 'neg'}
               />
             </div>
+            {/* Only when something actually WAS left out. With the account filter
+                on, pricedNoCost is often 0, and the sentence then explained an
+                exclusion that never happened and quoted the same rate twice. */}
             <div className="border-t border-border/60 bg-muted/30 px-4 py-2.5 text-[13px] leading-relaxed text-muted-foreground">
-              <span className="font-medium text-foreground">Deliberately left out.</span>{' '}
-              {fmtNum(margin.pricedNoCost)} delivered surveys carry a rate but no recorded cost
-              ({money(margin.pricedNoCostRevenue)} of revenue). Folding them in would take this
-              rate to {pctOf(
-                margin.revenue + margin.pricedNoCostRevenue - margin.cost,
-                margin.revenue + margin.pricedNoCostRevenue,
-              )}% — higher because their cost is missing, not because the work was better.
-              A further {fmtNum(margin.unpriced)} delivered surveys have no rate at all.
+              {margin.pricedNoCost > 0 ? (
+                <>
+                  <span className="font-medium text-foreground">Deliberately left out.</span>{' '}
+                  {fmtNum(margin.pricedNoCost)} delivered survey{margin.pricedNoCost === 1 ? '' : 's'} carry a
+                  rate but no recorded cost ({money(margin.pricedNoCostRevenue)} of revenue). Folding
+                  them in would take this rate to {pctOf(
+                    margin.revenue + margin.pricedNoCostRevenue - margin.cost,
+                    margin.revenue + margin.pricedNoCostRevenue,
+                  )}% — higher because their cost is missing, not because the work was better.{' '}
+                </>
+              ) : (
+                <>
+                  <span className="font-medium text-foreground">Every priced survey here carries a cost</span>,
+                  so nothing was excluded from the rate above.{' '}
+                </>
+              )}
+              {margin.unpriced > 0 && (
+                <>{fmtNum(margin.unpriced)} delivered survey{margin.unpriced === 1 ? '' : 's'} have no rate at all
+                  and are invisible to this card.</>
+              )}
             </div>
           </Card>
 

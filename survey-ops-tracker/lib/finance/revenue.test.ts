@@ -233,6 +233,19 @@ describe('the account is the key, never the label', () => {
     expect(opts.map(o => o.name)).toEqual(['BAM', 'Coatue'])
     expect(opts[0].surveys).toBe(2)
   })
+
+  it('sorts accounts alphabetically, not by size', () => {
+    // A picker is for finding a name you already have in mind. Ranking lives on
+    // the spend card. Zulu has three surveys and still sorts last.
+    const rows = [
+      P({ id: 'a', client_id: 'z' }), P({ id: 'b', client_id: 'z' }), P({ id: 'c', client_id: 'z' }),
+      P({ id: 'd', client_id: 'm' }), P({ id: 'e', client_id: 'a' }),
+    ]
+    const opts = accountOptions(rows, [
+      { id: 'z', name: 'Zulu' }, { id: 'm', name: 'Mike' }, { id: 'a', name: 'Alpha' },
+    ])
+    expect(opts.map(o => o.name)).toEqual(['Alpha', 'Mike', 'Zulu'])
+  })
 })
 
 describe('the contact dropdown', () => {
@@ -254,8 +267,17 @@ describe('the contact dropdown', () => {
     // BAM has 16 contacts on file and 10 who ever asked for a survey. The other
     // six would be dead ends in the list.
     const o = contactOptions(rows, contacts, 'acc1')
-    expect(o.map(x => x.name)).toEqual(['James Cook', 'Grey Jones', 'No contact recorded'])
-    expect(o[0].surveys).toBe(2)
+    expect(o.map(x => x.name)).toEqual(['Grey Jones', 'James Cook', 'No contact recorded'])
+    expect(o.find(x => x.name === 'James Cook')!.surveys).toBe(2)
+  })
+
+  it('sorts contacts alphabetically but keeps the no-contact bucket last', () => {
+    // David, 2026-09-15: alphabetical wherever a contact is picked. The bucket
+    // is not a person, and alphabetising it among the names would bury it.
+    const o = contactOptions(rows, contacts, 'acc1')
+    expect(o.at(-1)!.id).toBe(NO_CONTACT)
+    const people = o.filter(x => x.id !== NO_CONTACT).map(x => x.name)
+    expect(people).toEqual([...people].sort((a, b) => a.localeCompare(b)))
   })
 
   it('keeps the no-contact surveys reachable', () => {
