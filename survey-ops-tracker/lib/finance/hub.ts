@@ -532,9 +532,12 @@ export interface Margin {
  * Margin on the part of the book that carries BOTH a rate and a recorded cost.
  *
  * The exclusion in `pricedNoCost` is the whole point of this function. Including
- * those surveys takes the measured margin from 46% to 58%, not because the work
- * got more profitable but because five surveys contributed revenue and no cost.
- * That higher number is what this function exists to stop anyone printing.
+ * those surveys takes the measured margin from 39.8% to 47.8%, not because the
+ * work got more profitable but because five surveys contributed revenue and no
+ * cost. That higher number is what this function exists to stop anyone printing.
+ * (These figures move whenever a rate is corrected — they were 46%/58% before
+ * seven DE Shaw rates were restored on 2026-09-15. The RATIO between them is
+ * the durable point, not either number.)
  */
 export function marginOf(
   rows: FinProject[], rates: Map<string, number>,

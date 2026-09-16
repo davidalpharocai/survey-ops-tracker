@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { fmtNum } from '@/lib/utils/number'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
 import { useCanViewFinancials } from '@/lib/hooks/useCapabilities'
+import { blastIncidence, cpqrByRoute } from '@/lib/finance/cpqr'
 import {
   accountOptions, applyFilters, blastEfficiency, contactOptions, coverage, finDate,
   foregone, marginOf, moneyLost, rateBands, routeCosts, routeOf, spendByClient, spendOf,
@@ -201,6 +202,8 @@ export default function FinancePage() {
       gone: foregone(rows, rates),
       margin: marginOf(rows, rates, blasts, suppliers, costs),
       bands: rateBands(rows, rates, nameById),
+      cpqr: cpqrByRoute(rows, blasts, suppliers, costs),
+      incidence: blastIncidence(rows, blasts, suppliers),
       zeros: zeroRates(rows, rates),
       blast: blastEfficiency(rows, blasts),
       cover: coverage(rows, blasts, suppliers, costs),
@@ -578,10 +581,65 @@ export default function FinancePage() {
                   <span className="font-semibold text-foreground">
                     {Math.round(blastRate.median / panelRate.median)}×
                   </span>{' '}
-                  a panel complete. They are not substitutes — most of that gap is incidence, not
-                  inefficiency. Choose the route the audience is actually on, then price the consequence.
+                  a panel complete — and see CPQR below, where the gap is <em>wider</em> still, because
+                  both routes scrub and this card counts completes we bought rather than completes the
+                  client received. The routes are not substitutes: choose the one the audience is
+                  actually on, then price the consequence.
                 </p>
               )}
+            </div>
+          )}
+        </Card>
+
+        {/* CPQR — David asked for this by name. It is NOT a restatement of the
+            card above: that divides by completes we PAID for, this divides by
+            completes that survived QA into the deliverable. Panel loses 41% of
+            what it buys; blast loses none. The two cards disagree on purpose. */}
+        <Card
+          title="CPQR — cost per qualified respondent"
+          tip="Recorded spend ÷ n_actual, the post-QA count the client actually received. Cost per complete (above) divides by what we PAID for instead. The difference between the two cards is the scrub, and it is much larger on panel than on blast. Delivered surveys only — n_actual is not final until a study ships."
+        >
+          {view.cpqr.length === 0 ? (
+            <p className="px-4 py-8 text-center text-sm text-muted-foreground">
+              No delivered survey in this view has both a recorded cost and a post-QA count.
+            </p>
+          ) : (
+            <div className="divide-y divide-border/60">
+              {view.cpqr.map(c => (
+                <div key={c.route} className="px-4 py-3">
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-sm font-medium">
+                      {c.route === 'panel' ? 'PureSpectrum panel' : 'B2B blasts'}
+                    </span>
+                    <span className="tabular-nums text-sm">
+                      {money2(c.blended)}<span className="text-muted-foreground"> / qualified N</span>
+                    </span>
+                  </div>
+                  <div className="mt-0.5 text-xs text-muted-foreground tabular-nums">
+                    typical survey {money2(c.median)} · {money2(c.p25)} – {money2(c.p75)} · n={c.n}
+                  </div>
+                  <div className="mt-0.5 text-xs text-muted-foreground">
+                    {fmtNum(c.paid)} bought → {fmtNum(c.qualified)} delivered ·{' '}
+                    <span className="font-medium text-red-600 dark:text-red-400">
+                      {Math.round(c.scrubRate * 100)}% scrubbed
+                    </span>
+                    {c.excluded > 0 && (
+                      <> · {fmtNum(c.excluded)} costed survey{c.excluded === 1 ? '' : 's'} excluded, their
+                        recorded completes do not cover the N they collected</>
+                    )}
+                  </div>
+                </div>
+              ))}
+              <p className="bg-muted/30 px-4 py-2.5 text-[13px] leading-relaxed text-muted-foreground">
+                {view.incidence && (
+                  <>
+                    <span className="font-medium text-foreground">Blast incidence is {(view.incidence.rate * 100).toFixed(4)}%</span>
+                    {' '}— {fmtNum(view.incidence.completes)} completes from {fmtNum(view.incidence.reach)} people reached.
+                    There is no panel equivalent: PureSpectrum reach is never recorded, so the claim that the
+                    cost gap is &ldquo;mostly incidence&rdquo; cannot be tested and is not made here.
+                  </>
+                )}
+              </p>
             </div>
           )}
         </Card>

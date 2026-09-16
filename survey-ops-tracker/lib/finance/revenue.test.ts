@@ -63,7 +63,8 @@ describe('marginOf: the flattering number that must never print', () => {
   it('EXCLUDES priced surveys with no recorded cost, and says how many', () => {
     // This is the entire point. Survey B has revenue and no cost; counting it
     // reports 100% margin on B and lifts the blended figure. Measured against
-    // production the difference is 46% (honest) vs 58% (bookkeeping artefact).
+    // production the difference is 39.8% (honest) vs 47.8% (bookkeeping
+    // artefact) — the gap is the durable point; both move when a rate changes.
     const rows = [
       P({ id: 'a', n_target: 100, n_actual: 100 }),
       P({ id: 'b', n_target: 100, n_actual: 100 }),
