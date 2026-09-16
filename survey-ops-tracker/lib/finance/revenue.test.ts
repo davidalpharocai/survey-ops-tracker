@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   revenueOf, marginOf, foregone, moneyLost, rateBands, zeroRates,
-  accountOf, accountOptions, contactOptions, applyFilters, spendByClient,
+  accountOf, accountOptions, contactOptions, applyFilters, spendByClient, isCancelled,
   NO_CONTACT,
   type FinProject, type FinBlast, type FinSupplier, type FinContact,
 } from './hub'
@@ -320,5 +320,57 @@ describe('the contact dropdown', () => {
       P({ id: 'c', client: 'Coatue', client_id: 'acc2' }),
     ]
     expect(applyFilters(mixed, { accountId: 'acc1' }, () => 'none').map(r => r.id)).toEqual(['a', 'b'])
+  })
+})
+
+describe('cancelled work counts — David, 2026-09-15', () => {
+  const CANC = (o: Partial<FinProject> = {}) =>
+    P({ board_column: 'Submitted', status: 'Cancelled', cancelled_at: '2026-09-01', ...o })
+
+  it('books the WHOLE spend of a cancelled survey as lost, not a slice', () => {
+    // A cancelled survey did not lose part of its money. PR00243 spent $746 and
+    // delivered nothing; there is no target, actual or scrub to take a slice of.
+    const rows = [CANC({ id: 'x', n_collected: 4 })]
+    const m = moneyLost(rows, [blast('x', 100, 7)], [], [])
+    expect(m.cancelled).toMatchObject({ surveys: 1, n: 4, dollars: 700 })
+    expect(m.scrub.dollars).toBe(0)
+    expect(m.overTarget.dollars).toBe(0)
+  })
+
+  it('recognises a cancellation recorded on EITHER field', () => {
+    expect(isCancelled(P({ status: 'Cancelled', cancelled_at: null }))).toBe(true)
+    expect(isCancelled(P({ status: 'Closed', cancelled_at: '2026-01-01' }))).toBe(true)
+    expect(isCancelled(P({ status: 'Closed', cancelled_at: null }))).toBe(false)
+  })
+
+  it('carries in-flight spend separately, and never as a loss', () => {
+    // $30,620 of running work was invisible while this looked only at delivered.
+    // It is shown, but it is work in progress and must not join the loss total.
+    const rows = [P({ id: 'y', board_column: 'Fielding', status: 'Open', n_collected: 50 })]
+    const m = moneyLost(rows, [blast('y', 10, 30)], [], [])
+    expect(m.inFlight).toMatchObject({ surveys: 1, n: 50, dollars: 300 })
+    expect(m.cancelled.dollars).toBe(0)
+    expect(m.scrub.dollars + m.overTarget.dollars).toBe(0)
+  })
+
+  it('never double-counts a cancelled survey as delivered', () => {
+    const rows = [CANC({ id: 'x', board_column: 'Delivery', n_target: 10, n_collected: 30, n_actual: 20 })]
+    const m = moneyLost(rows, [blast('x', 1, 30)], [], [])
+    expect(m.cancelled.surveys).toBe(1)
+    expect(m.scrub.surveys).toBe(0)
+  })
+
+  it('charges cancelled cost against margin, but reports it apart', () => {
+    // Burying it inside `cost` would make the delivered book look worse than it
+    // performed while hiding the reason, so both figures are returned.
+    const rows = [
+      P({ id: 'a', n_target: 100, n_actual: 100 }),
+      CANC({ id: 'c' }),
+    ]
+    const m = marginOf(rows, new Map([['a', 50]]), [blast('a', 10, 100), blast('c', 10, 20)], [], [])
+    expect(m).toMatchObject({ revenue: 5000, cost: 1000, cancelledCost: 200, cancelledSurveys: 1 })
+    expect(m.margin).toBe(4000)
+    expect(m.marginAfterCancelled).toBe(3800)
+    expect(m.pctAfterCancelled).toBeCloseTo(0.76)
   })
 })

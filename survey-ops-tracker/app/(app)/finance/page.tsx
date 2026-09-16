@@ -20,8 +20,8 @@ import {
  * ── WHAT CHANGED, AND WHY THE OLD BANNER WAS A LIE ──────────────────────────
  * This page used to state, in fixed text, that "client rates are recorded on 4
  * of 322 delivered surveys" and that margin was therefore not computable. That
- * was true in July. It is not true now — 94 surveys carry a rate and 75 of them
- * are delivered — and a hardcoded caveat that has outlived its data is worse
+ * was true in July. It is not true now — 44 delivered surveys carry a rate —
+ * and a hardcoded caveat that has outlived its data is worse
  * than no caveat, because it tells the reader to stop looking. Every number in
  * the banner is now computed from the same rows as the cards beneath it, so it
  * cannot drift out of agreement with them again.
@@ -55,7 +55,7 @@ const PRESETS = [
 
 const COLS =
   'id, project_code, project_name, client, client_id, project_type, board_column, status, phase, ' +
-  'deliver_date, launch_date, submitted_date, n_target, n_collected, n_actual, requested_by_contact_id'
+  'deliver_date, launch_date, submitted_date, n_target, n_collected, n_actual, requested_by_contact_id, cancelled_at'
 
 function useFinanceData() {
   const supabase = createClient()
@@ -325,7 +325,9 @@ export default function FinancePage() {
               />
               <Figure
                 value={Math.round(margin.pct * 100) + '%'} label="margin rate"
-                sub={`across ${fmtNum(margin.surveys)} delivered surveys that carry both a rate and a cost`}
+                sub={margin.cancelledSurveys > 0
+                  ? `${fmtNum(margin.surveys)} delivered surveys with a rate and a cost. After ${money(margin.cancelledCost)} of cancelled work: ${Math.round(margin.pctAfterCancelled * 100)}%`
+                  : `across ${fmtNum(margin.surveys)} delivered surveys that carry both a rate and a cost`}
                 tone={margin.pct >= 0 ? 'pos' : 'neg'}
               />
             </div>
@@ -426,6 +428,36 @@ export default function FinancePage() {
               </div>
               <Bar value={lost.overTarget.dollars} max={Math.max(lost.scrub.dollars, lost.overTarget.dollars)} tone="neg" />
             </div>
+            {/* David, 2026-09-15: cancelled surveys count. A cancelled survey
+                did not lose part of its money — it lost all of it, so the bucket
+                is the whole spend. In-flight sits beside it because the same
+                `isDelivered` gate was hiding $30,620 of running work. */}
+            {lost.cancelled.dollars > 0 && (
+              <div className="px-4 py-3">
+                <div className="flex items-baseline justify-between text-sm">
+                  <span>Cancelled before delivery</span>
+                  <span className="tabular-nums">{money(lost.cancelled.dollars)}</span>
+                </div>
+                <div className="mt-0.5 text-xs text-muted-foreground">
+                  {fmtNum(lost.cancelled.surveys)} survey{lost.cancelled.surveys === 1 ? '' : 's'} called off after
+                  spending began — every dollar bought something that can never be billed
+                </div>
+                <Bar value={lost.cancelled.dollars}
+                  max={Math.max(lost.scrub.dollars, lost.overTarget.dollars, lost.cancelled.dollars)} tone="neg" />
+              </div>
+            )}
+            {lost.inFlight.dollars > 0 && (
+              <div className="px-4 py-3">
+                <div className="flex items-baseline justify-between text-sm">
+                  <span className="text-muted-foreground">Still running <span className="text-xs">(not a loss)</span></span>
+                  <span className="tabular-nums text-muted-foreground">{money(lost.inFlight.dollars)}</span>
+                </div>
+                <div className="mt-0.5 text-xs text-muted-foreground">
+                  spent so far on {fmtNum(lost.inFlight.surveys)} surveys still in flight. Work in progress,
+                  shown because the delivered-only view used to hide it entirely.
+                </div>
+              </div>
+            )}
             <p className="bg-muted/30 px-4 py-2.5 text-[13px] leading-relaxed text-muted-foreground">
               {lost.scrub.surveys > 0 && (
                 <>

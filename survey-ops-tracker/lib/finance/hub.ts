@@ -49,6 +49,10 @@ export interface FinProject {
   n_target: number | null
   n_collected: number | null
   n_actual: number | null
+  /** Cancellation. Read alongside `status`, because the two agree on all nine
+   *  cancelled surveys today and a future path that sets only one must not
+   *  drop out of the money. */
+  cancelled_at?: string | null
   /** Who at the account asked for this. The only trustworthy contact link —
    *  the suffix in `client` agrees with it on all 58 surveys that carry both
    *  and contradicts it on none, so the suffix adds nothing the key lacks. */
@@ -123,6 +127,32 @@ export const finDate = (p: FinProject): string | null =>
   p.deliver_date || p.launch_date || p.submitted_date || null
 
 export const isDelivered = (p: FinProject) => p.board_column === 'Delivery'
+
+/**
+ * Cancelled work.
+ *
+ * David, 2026-09-15: "cancelled surveys should be included in the financials
+ * (unless a manual adjustment is instructed)."
+ *
+ * A cancelled survey is the purest form of money lost — every dollar it spent
+ * bought nothing that can ever be billed. Nine surveys are cancelled today and
+ * they carry $746, so this is small; the principle is not. The gate that hid
+ * them, `isDelivered`, also hides $30,620 of spend on 78 in-flight surveys —
+ * 8.9% of everything recorded — which is the bigger version of the same fault.
+ *
+ * `status` and `cancelled_at` agree on all nine, so either would do; both are
+ * checked because a future cancellation path that sets only one should not
+ * silently fall out of the numbers.
+ *
+ * There is no "manual adjustment" mechanism yet. Default is to include.
+ */
+export const isCancelled = (p: FinProject) =>
+  p.status === 'Cancelled' || p.cancelled_at != null
+
+/** Work that is neither finished nor cancelled: it is still running, and the
+ *  money it has already spent is real. Kept distinct from both so a reader can
+ *  see committed-but-unfinished cost instead of it vanishing. */
+export const isInFlight = (p: FinProject) => !isDelivered(p) && !isCancelled(p)
 
 export interface Spend {
   /** bid x completes — the respondent reward. */
@@ -489,6 +519,13 @@ export interface Margin {
    *  priced" means, and it is the number the banner quotes. */
   rated: number
   delivered: number
+  /** Cost of work that was called off. David, 2026-09-15: cancelled surveys
+   *  count. Held apart from `cost` so the delivered book's own performance
+   *  stays readable, and folded into the two figures below. */
+  cancelledCost: number
+  cancelledSurveys: number
+  marginAfterCancelled: number
+  pctAfterCancelled: number
 }
 
 /**
@@ -505,7 +542,17 @@ export function marginOf(
 ): Margin {
   let revenue = 0, cost = 0, surveys = 0
   let pricedNoCost = 0, pricedNoCostRevenue = 0, unpriced = 0, rated = 0, delivered = 0
+  let cancelledCost = 0, cancelledSurveys = 0
   for (const p of rows) {
+    // Cancelled work is cost with no revenue, and it belongs in the margin a
+    // finance reader sees — but reported separately, because burying it inside
+    // `cost` would make the delivered book look worse than it performed while
+    // hiding the reason. The page shows margin both ways.
+    if (isCancelled(p)) {
+      const sp = spendOf(p, blasts, suppliers, costs)
+      if (sp.total > 0) { cancelledCost += sp.total; cancelledSurveys++ }
+      continue
+    }
     if (!isDelivered(p)) continue
     delivered++
     if (rates.has(p.id)) rated++
@@ -519,6 +566,9 @@ export function marginOf(
     revenue, cost, margin: revenue - cost,
     pct: revenue > 0 ? (revenue - cost) / revenue : 0,
     surveys, pricedNoCost, pricedNoCostRevenue, unpriced, rated, delivered,
+    cancelledCost, cancelledSurveys,
+    marginAfterCancelled: revenue - cost - cancelledCost,
+    pctAfterCancelled: revenue > 0 ? (revenue - cost - cancelledCost) / revenue : 0,
   }
 }
 
@@ -573,6 +623,14 @@ export interface MoneyLost {
   /** Of the scrubbed surveys, how many still cleared their target — i.e. how
    *  much of the scrub cost us cash and cost us NO revenue. */
   scrubStillHitTarget: number
+  /** Cancelled work: every dollar spent on a survey that was called off. Not a
+   *  partial loss like scrub or over-delivery — the whole spend bought nothing
+   *  billable, so the bucket is the survey's total cost, not a slice of it. */
+  cancelled: LostBucket
+  /** Spend on surveys still running. NOT a loss — it is work in progress, and
+   *  it is carried here only so that it stops being invisible. Never add it to
+   *  the loss total. */
+  inFlight: LostBucket
 }
 
 /**
@@ -590,8 +648,23 @@ export function moneyLost(
   const z = (): LostBucket => ({ surveys: 0, n: 0, dollars: 0 })
   const m: MoneyLost = {
     overTarget: z(), scrub: z(), uncostedSurveys: 0, uncostedN: 0, scrubStillHitTarget: 0,
+    cancelled: z(), inFlight: z(),
   }
   for (const p of rows) {
+    // Cancelled and in-flight work is measured FIRST, and on its whole spend
+    // rather than a slice — a cancelled survey did not lose part of its money,
+    // it lost all of it. Both were invisible while this function looked only at
+    // `isDelivered`, which is what David caught on 2026-09-15.
+    if (isCancelled(p) || isInFlight(p)) {
+      const sp = spendOf(p, blasts, suppliers, costs)
+      if (sp.total > 0) {
+        const b = isCancelled(p) ? m.cancelled : m.inFlight
+        b.surveys++
+        b.n += Number(p.n_collected ?? 0)
+        b.dollars += sp.total
+      }
+      continue
+    }
     if (!isDelivered(p)) continue
     const t = Number(p.n_target ?? 0), g = Number(p.n_collected ?? 0), a = p.n_actual
     if (a == null || !(g > 0)) continue
