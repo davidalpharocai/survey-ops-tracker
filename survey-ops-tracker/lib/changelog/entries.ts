@@ -80,6 +80,20 @@ export function changelogFor(audience: ChangeAudience): ChangelogEntry[] {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    date: '2026-09-17',
+    changes: [
+      {
+        kind: 'NEW',
+        // Not 'all': it is about spend we failed to record.
+        text: 'A survey’s N is now checked against the blasts and PureSpectrum launches that produced it. People only reach us those two ways, so if a survey says it collected 1,000 and its launches and blasts only account for 400, something was never logged — and whatever it cost is missing from the survey’s spend. Ask Claude to “reconcile PR00123”, or “what’s our data health” for the whole book.',
+      },
+      {
+        kind: 'NEW',
+        text: 'Related: asking for data health across all surveys (not just active ones) now gives you the backfill list — every survey carrying an N with nothing on record to say how it was fielded. There are 150 of them, all reporting no fielding spend at all.',
+      },
+    ],
+  },
+  {
     date: '2026-09-15',
     changes: [
       {

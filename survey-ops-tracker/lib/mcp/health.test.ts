@@ -149,3 +149,82 @@ describe('the three checks are independent', () => {
     }
   })
 })
+
+describe('check 11 — n_collected vs every source that could have produced it', () => {
+  /** Full control of both halves: suppliers AND blasts, with spend reconciled so
+   *  check 1 stays quiet and cannot be mistaken for the check under test. */
+  const withSources = (
+    sup: SupRow[], blasts: BlastRow[], over: Record<string, unknown> = {},
+  ) => buildChecks(
+    project({ actual_spend: spendOf(blasts, [], sup), ...over }), sup, blasts, [], [])
+
+  it('THE REGRESSION CASE — PR00425: blast completes recorded, PureSpectrum ones not', () => {
+    // 1,019 collected, 10 of them through blasts, the other 1,009 through
+    // PureSpectrum rows that were never created. Every other check in this file
+    // passed this project while a five-figure sum went unrecorded: check 1 sees
+    // stored and computed spend agree, and 7b cannot fire because blast completes
+    // are non-zero. This is the whole reason check 11 exists.
+    const cs = withSources([], [blast({ completes: 10, bid: 25, people: 0, cost_per_send: 0 })],
+                           { n_collected: 1019 })
+    const c = cs.find(x => x.check === 'n_vs_sources')
+    expect(c, 'check 11 did not fire').toBeDefined()
+    expect(c!.advisory, 'missing money must not be advisory').toBe(false)
+    expect(c!.expected).toBe(10)
+    expect(c!.actual).toBe(1019)
+    // and NOT via 7b, which is blind here because completes are non-zero
+    expect(names(cs)).not.toContain('blast_completes_missing')
+  })
+
+  it('stays silent when the two halves add up to the project N', () => {
+    // 60 from suppliers + 40 from blasts = the project's 100.
+    const cs = withSources([{ cpi: 1, n_collected: 60 }], [blast({ completes: 40, people: 0, cost_per_send: 0 })])
+    expect(names(cs)).not.toContain('n_vs_sources')
+    expect(names(cs)).not.toContain('n_has_no_source')
+  })
+
+  it('SHORT of N is a real issue — a launch or blast was never logged', () => {
+    const c = withSources([{ cpi: 1, n_collected: 10 }], [], { n_collected: 500 })
+      .find(x => x.check === 'n_vs_sources')
+    expect(c?.advisory).toBe(false)
+    expect(c?.detail).toMatch(/missing from actual_spend/)
+  })
+
+  it('ABOVE N is advisory — richer detail than headline means a stale n_collected', () => {
+    const c = withSources([{ cpi: 1, n_collected: 500 }], [], { n_collected: 100 })
+      .find(x => x.check === 'n_vs_sources')
+    expect(c?.advisory).toBe(true)
+    expect(c?.detail).toMatch(/stale/)
+  })
+
+  it('tolerates a gap of 1% or one complete — completes trickle in for days', () => {
+    // 2,229 against 2,230 is the shape three real projects were in on 2026-09-17.
+    expect(names(withSources([{ cpi: 1, n_collected: 2229 }], [], { n_collected: 2230 })))
+      .not.toContain('n_vs_sources')
+    // but 2% of a small N still speaks
+    expect(names(withSources([{ cpi: 1, n_collected: 80 }], [], { n_collected: 100 })))
+      .toContain('n_vs_sources')
+  })
+
+  it('no sources at all is ADVISORY — 150 legacy projects are in that state', () => {
+    const c = withSources([], [], { n_collected: 500, actual_spend: 0 })
+      .find(x => x.check === 'n_has_no_source')
+    expect(c, 'did not fire').toBeDefined()
+    expect(c!.advisory, 'a backfill queue is not an accusation').toBe(true)
+  })
+
+  it('says nothing about a project that has collected nothing yet', () => {
+    const cs = names(withSources([], [], { n_collected: 0 }))
+    expect(cs).not.toContain('n_vs_sources')
+    expect(cs).not.toContain('n_has_no_source')
+  })
+
+  it('names the unrecorded blasts that explain part of a shortfall', () => {
+    // A blast with NULL completes drags `sourced` down; 7a already reports it, so
+    // 11 should point at it rather than read as a second, separate defect.
+    const c = withSources(
+      [], [blast({ completes: null, blast_at: '2020-01-01T00:00:00Z', people: 0, cost_per_send: 0 })],
+      { n_collected: 500 },
+    ).find(x => x.check === 'n_vs_sources')
+    expect(c?.detail).toMatch(/blast_completes_unrecorded/)
+  })
+})

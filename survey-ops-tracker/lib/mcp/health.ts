@@ -424,6 +424,68 @@ export function buildChecks(p: Row, sup: SupRow[], blasts: BlastRow[], costs: Co
     })
   }
 
+  // 11) THE PROJECT'S N AGAINST EVERY SOURCE THAT COULD HAVE PRODUCED IT.
+  //
+  //     This is the check the comment on 7b named and left open. Respondents reach
+  //     us two ways and two only — a blast complete, or a PureSpectrum supplier
+  //     complete — so n_collected should equal their sum. Nothing else in this file
+  //     asks that question of BOTH halves at once:
+  //       · check 1 compares stored spend to computed spend, and both can be $0.
+  //       · check 3 compares SUPPLIERS to the delivered N, advisory, blind to blasts.
+  //       · check 7b fires only when blast completes are EXACTLY 0 and blasts are
+  //         the only source — so PR00425, which collected 1,019 with 10 blast
+  //         completes and 1,009 PureSpectrum completes that were never recorded,
+  //         passed every check in this file while a five-figure sum went unrecorded.
+  //
+  //     WHY THE DIRECTION SETS THE SEVERITY. The two ways to miss are not equally
+  //     bad, so they are not reported equally:
+  //       · sources SHORT of N — we have more respondents than we can account for,
+  //         so a launch or a blast was never logged and its cost is missing from
+  //         actual_spend. Money is wrong. A real issue.
+  //       · sources ABOVE N — the detail is richer than the headline, which usually
+  //         means n_collected is simply stale. Nothing is missing. Advisory.
+  //
+  //     CALIBRATED, not guessed (2026-09-17). On the active projects data_health
+  //     scans by default: 15 carry an N, 13 reconcile inside tolerance, 1 has no
+  //     source rows, 1 is short. Across ALL live projects it is 60 / 150 / 26 / 41 —
+  //     the 150 being work that predates the supplier and blast model, which is why
+  //     `n_has_no_source` is advisory: it is a backfill queue, not an accusation.
+  //     Run data_health with active_only:false to see that queue.
+  const nColl = num(p.n_collected)
+  if (nColl > 0) {
+    const fromSuppliers = sup.reduce((s, r) => s + num(r.n_collected), 0)
+    const fromBlasts = blasts.reduce((s, b) => s + num(b.completes), 0)
+    const sourced = fromSuppliers + fromBlasts
+    if (!sup.length && !blasts.length) {
+      checks.push({
+        check: 'n_has_no_source', ok: false, advisory: true,
+        expected: nColl, actual: 0,
+        detail: `project collected ${nColl.toLocaleString('en-US')} N but holds no blast and no PureSpectrum supplier rows, so nothing records how it was fielded — any fielding cost it incurred is absent from actual_spend`,
+      })
+    } else {
+      // Completes trickle in for days and QA attrition is real, so a small gap is
+      // noise rather than signal. 1% of N, or one complete, whichever is larger.
+      const tolerance = Math.max(1, Math.round(nColl * 0.01))
+      const delta = nColl - sourced
+      if (Math.abs(delta) > tolerance) {
+        const short = delta > 0
+        // A blast whose completes are still unrecorded understates `sourced` and is
+        // already reported by 7a — say so, so this doesn't read as a second defect.
+        const pending = blasts.filter(b => b.completes == null).length
+        const because = pending
+          ? ` ${pending} blast(s) still have completes unrecorded, which accounts for some of the gap (see blast_completes_unrecorded).`
+          : ''
+        checks.push({
+          check: 'n_vs_sources', ok: false, advisory: !short,
+          expected: sourced, actual: nColl,
+          detail: short
+            ? `project collected ${nColl.toLocaleString('en-US')} N but its sources account for only ${sourced.toLocaleString('en-US')} (${fromBlasts.toLocaleString('en-US')} blast completes + ${fromSuppliers.toLocaleString('en-US')} supplier completes) — ${delta.toLocaleString('en-US')} unaccounted for, so a launch or blast was probably never logged and its cost is missing from actual_spend.${because}`
+            : `sources account for ${sourced.toLocaleString('en-US')} completes (${fromBlasts.toLocaleString('en-US')} blast + ${fromSuppliers.toLocaleString('en-US')} supplier) against a project N of ${nColl.toLocaleString('en-US')} — ${Math.abs(delta).toLocaleString('en-US')} more than the headline, which usually means n_collected is stale rather than anything being missing (advisory)`,
+        })
+      }
+    }
+  }
+
   return checks
 }
 

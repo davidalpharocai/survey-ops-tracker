@@ -923,7 +923,7 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'reconcile_project',
     description:
-      "Cross-field consistency check for ONE project: does actual_spend match Σ(cpi×collected)+Σ(bid×completes)+Σ(people×$/send)+Σ(cost amount); do segment N totals sum to the project N; is a survey-ID discrepancy flagged; are the dates in a sane order — plus advisory notes (supplier N collected vs the delivered N, which legitimately differ via QA attrition; sheet copy behind the app (RETIRED - the sheet write-back was deleted, so this advisory can no longer fire)). Returns the failing `issues`, `advisories`, and the full `checks`. Use for “does <project>'s money/N add up”, “is anything off on <project>”, or to explain a spend/N number that looks wrong.",
+      "Cross-field consistency check for ONE project: does actual_spend match Σ(cpi×collected)+Σ(bid×completes)+Σ(people×$/send)+Σ(cost amount); do segment N totals sum to the project N; DOES THE PROJECT'S N MATCH WHAT ITS BLASTS AND PURESPECTRUM LAUNCHES ACTUALLY COLLECTED (respondents arrive only those two ways, so a shortfall means a launch or blast was never logged and its cost is missing from spend — that is an issue; an excess usually just means n_collected is stale — that is advisory); is a survey-ID discrepancy flagged; are the dates in a sane order — plus advisory notes (a project carrying N with no blast or supplier row at all; supplier N collected vs the delivered N, which legitimately differ via QA attrition). Returns the failing `issues`, `advisories`, and the full `checks`. Use for “does <project>'s money/N add up”, “is anything off on <project>”, “where did this survey's N come from”, or to explain a spend/N number that looks wrong.",
     kind: 'read',
     schema: { project: z.string() },
     handler: async (rawArgs) => {
@@ -934,7 +934,7 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'data_health',
     description:
-      "Portfolio-wide anomaly scan — runs the reconcile_project checks over every project and returns the ones with real integrity issues (spend mismatch, segment totals off, survey-ID discrepancy, impossible date order), with counts_by_check and separate advisory_counts. Defaults to the active operational set; pass active_only:false to scan all non-deleted projects. Use for “is our data healthy / anything drifting”, a spend audit, or a pre-report sanity pass.",
+      "Portfolio-wide anomaly scan — runs the reconcile_project checks over every project and returns the ones with real integrity issues (spend mismatch, segment totals off, survey-ID discrepancy, impossible date order, and N that its blasts and PureSpectrum launches cannot account for), with counts_by_check and separate advisory_counts. Defaults to the active operational set; pass active_only:false to scan all non-deleted projects — which is also how to pull the BACKFILL QUEUE, the projects carrying an N with no blast or supplier row at all to say how it was fielded (150 of them on 2026-09-17, all reporting $0 fielding spend). Use for “is our data healthy / anything drifting”, a spend audit, “which surveys have N we can't account for”, or a pre-report sanity pass.",
     kind: 'read',
     schema: { active_only: z.boolean().optional(), limit: z.number().int().min(1).max(200).optional() },
     handler: async (rawArgs) => {
