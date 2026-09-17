@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { requireSalesUser, mySalespersonName } from '@/lib/sales-auth'
 import { fmtNum } from '@/lib/utils/number'
+import { deliveredN, type DeliveryInput } from '@/lib/sales/deliveredN'
 import { salesHome, daysBetween, type HomeRow, type Judged, type Kind } from '@/lib/sales/home'
 
 export const dynamic = 'force-dynamic'
@@ -63,16 +64,45 @@ function Empty({ title, body }: { title: string; body: string }) {
 /** Collected over promised, with the percentage beneath — David, 2026-09-11.
  *  No target means NO percentage: a blank denominator rendered as 0% reads as
  *  failure, and "not set" and "none collected" are opposite problems. */
-function NCell({ got, target }: { got: number | null; target: number | null }) {
-  const pct = target ? Math.round(((got ?? 0) / target) * 100) : null
+/**
+ * Delivered N against target.
+ *
+ * Shows n_actual where it is recorded, and a PROJECTION where it is not —
+ * David, 2026-09-17: "the N vs target should be the N actual if its filled in.
+ * otherwise it should be an estimated number … if the PS survey target is 1000
+ * and we collected 2000, it shouldnt be 2000/1000".
+ *
+ * The old cell showed raw collection, so an over-collected study read as 200%
+ * of target and a salesperson would tell a client they were getting 2,000
+ * interviews. They are not: a study that over-collects delivers roughly what it
+ * sold. An estimate is marked with ~ and carries its reasoning in the title.
+ */
+function NCell({ row }: { row: DeliveryInput }) {
+  const d = deliveredN(row)
+  const target = row.n_target
+  if (!d) {
+    return (
+      <div className="shrink-0 text-right leading-tight">
+        <div className="text-sm tabular-nums text-muted-foreground">—</div>
+        <div className="text-[11px] text-muted-foreground">nothing collected yet</div>
+      </div>
+    )
+  }
+  const pct = target ? Math.round((d.value / target) * 100) : null
   return (
-    <div className="shrink-0 text-right leading-tight">
+    <div className="shrink-0 text-right leading-tight" title={d.note || undefined}>
       <div className="text-sm tabular-nums">
-        {fmtNum(got ?? 0)}
+        {d.estimated && <span className="text-muted-foreground">~</span>}
+        {fmtNum(d.value)}
         {target != null && <span className="text-muted-foreground">/{fmtNum(target)}</span>}
       </div>
-      <div className={`text-[11px] tabular-nums ${pct != null && pct >= 100 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>
+      <div className={`text-[11px] tabular-nums ${
+        !d.estimated && pct != null && pct >= 100
+          ? 'text-emerald-600 dark:text-emerald-400'
+          : 'text-muted-foreground'
+      }`}>
         {pct == null ? 'no target set' : `${pct}%`}
+        {d.estimated && <span className="ml-1 italic">est.</span>}
       </div>
     </div>
   )
@@ -194,7 +224,7 @@ export default async function SalesHomePage() {
                     </span>
                   )}
                 </span>
-                <NCell got={j.row.n_collected} target={j.row.n_target} />
+                <NCell row={j.row} />
               </Row>
             )
           })
@@ -213,7 +243,7 @@ export default async function SalesHomePage() {
                     <span className="block truncate text-sm font-medium">{r.project_name}</span>
                     <span className="block truncate text-xs text-muted-foreground">{r.client} · {r.deliver_date}</span>
                   </span>
-                  <NCell got={r.n_actual ?? r.n_collected} target={r.n_target} />
+                  <NCell row={r} />
                 </Row>
               ))
             )}
