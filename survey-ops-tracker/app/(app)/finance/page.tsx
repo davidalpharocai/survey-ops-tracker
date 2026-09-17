@@ -11,6 +11,7 @@ import { UnitTab } from '@/components/finance/UnitTab'
 import { BookTab } from '@/components/finance/BookTab'
 import { money } from '@/components/finance/shared'
 import { blastIncidence, cpqrByRoute } from '@/lib/finance/cpqr'
+import { exportFinanceCsv } from '@/lib/finance/exportFinance'
 import {
   accountPnl, backlog, bidLadder, budgetVariance, exceptions, inLifecycle,
   lifecycleCounts, liveExposure, monthly, surveyPnl, unpricedSpend,
@@ -355,6 +356,27 @@ function FinanceInner() {
             Clear
           </button>
         )}
+        {/* Exports EXACTLY the rows in view, with the filter state going into
+            the audit log beside the row count — so a pull can be read back as
+            "these 82 surveys under these filters", not just "someone exported
+            82 rows". Restricted columns are absent for a non-holder, not blank. */}
+        <button
+          onClick={() => exportFinanceCsv(view.pnl, view.rows, {
+            canViewFinancials: canFinance,
+            route: `finance-${tab}`,
+            label: tab,
+            filters: {
+              tab, lifecycle, preset, route, type,
+              from: view.resolved.from, to: view.resolved.to,
+              account: account || null, contact: contact || null,
+            },
+          })}
+          disabled={view.rows.length === 0}
+          title={`Download the ${view.rows.length} surveys in view as CSV`}
+          className="ml-auto rounded-md border border-border px-2 py-1 text-[13px] text-muted-foreground transition-colors hover:text-foreground disabled:opacity-40"
+        >
+          ⭳ Export {fmtNum(view.rows.length)}
+        </button>
       </div>
 
       {data?.ratesBroken && (

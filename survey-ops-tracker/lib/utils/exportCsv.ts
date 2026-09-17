@@ -104,7 +104,9 @@ export interface ExportCsvOptions {
  * already happened by the time this runs, and a lost log row must not surface as
  * a broken button.
  */
-async function logExport(entry: {
+/** Exported so the finance exporter can share the one audit path rather than
+ *  writing a second one that could drift out of step with it. */
+export async function logExport(entry: {
   route: string
   rowCount: number
   filters?: Record<string, unknown>
