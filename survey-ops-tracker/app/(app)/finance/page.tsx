@@ -12,6 +12,12 @@ import { BookTab } from '@/components/finance/BookTab'
 import { money } from '@/components/finance/shared'
 import { blastIncidence, cpqrByRoute } from '@/lib/finance/cpqr'
 import { exportFinanceCsv } from '@/lib/finance/exportFinance'
+import { DrillPanel, type DrillColumn, type DrillSpec } from '@/components/finance/DrillPanel'
+import {
+  breachRows, cpqrRows, exposureRows, foregoneRows, marginRows, overTargetRows,
+  scrubRows, unpricedRows,
+} from '@/lib/finance/drills'
+import { money as fmtMoney, money2 as fmtMoney2 } from '@/components/finance/shared'
 import {
   accountPnl, backlog, bidLadder, budgetVariance, exceptions, inLifecycle,
   lifecycleCounts, liveExposure, monthly, surveyPnl, unpricedSpend,
@@ -150,6 +156,7 @@ function FinanceInner() {
   const contact = get('contact')
   const route = get('route')
   const lifecycle = (get('lifecycle', 'delivered') || 'delivered') as Lifecycle
+  const drill = get('drill')
 
   const set = (patch: Record<string, string>) => {
     const next = new URLSearchParams(params.toString())
@@ -245,6 +252,133 @@ function FinanceInner() {
       </p>
     )
   }
+
+  // -- DRILL-DOWN -----------------------------------------------------------
+  // Resolved from the URL so browser Back closes the panel and a view is
+  // shareable. Every spec is built from `view.pnl`, the same object the cards
+  // render, so the panel cannot end up describing a different population than
+  // the figure that opened it -- and the panel re-checks that sum on open.
+  const N = (v: unknown) => (v == null ? '--' : fmtNum(Math.round(Number(v))))
+  const M = (v: unknown) => (v == null ? '--' : fmtMoney(Number(v)))
+  const M2 = (v: unknown) => (v == null ? '--' : fmtMoney2(Number(v)))
+  const COL: Record<string, DrillColumn> = {
+    account: { header: 'Account', value: r => String(r.account ?? '') },
+    route: { header: 'Route', value: r => String(r.route ?? '') },
+    target: { header: 'Target', num: true, value: r => N(r.target) },
+    collected: { header: 'Collected', num: true, value: r => N(r.collected) },
+    actual: { header: 'Delivered', num: true, value: r => N(r.actual) },
+    cost: { header: 'Cost', num: true, value: r => M(r.cost) },
+    cpc: { header: '$/complete', num: true, value: r => M2(r.cpc) },
+    cpqr: { header: 'CPQR', num: true, value: r => M2(r.cpqr) },
+    stage: { header: 'Stage', value: r => String(r.board ?? '') },
+  }
+
+  const spec: DrillSpec | null = !drill || !view ? null : (() => {
+    const pop = (n: number, of: number, what: string) =>
+      lifecycle + ' | ' + (route || 'all routes') + ' | ' + fmtNum(n) + ' of ' + fmtNum(of) + ' surveys ' + what
+    if (drill === 'scrub') {
+      const rows = scrubRows(view.pnl)
+      return {
+        key: drill, title: 'Lost in QA - completes bought and never delivered',
+        population: pop(rows.length, view.rows.length, 'with scrub and a recorded cost'),
+        rows, total: { label: 'Scrub at cost', value: view.lost.scrub.dollars }, format: 'money' as const,
+        columns: [COL.account, COL.route, COL.collected, COL.actual,
+          { header: 'Scrub N', num: true, value: r => N(r.scrubN) },
+          COL.cpc,
+          { header: 'Scrub $', num: true, value: r => M(r.contribution) },
+          { header: 'Hit target?', value: r => (r.stillHitTarget ? 'yes - cost no revenue' : 'no') }],
+      }
+    }
+    if (drill === 'over') {
+      const rows = overTargetRows(view.pnl)
+      return {
+        key: drill, title: 'Delivered above target - billed at nothing',
+        population: pop(rows.length, view.rows.length, 'that over-delivered'),
+        rows, total: { label: 'Over-delivery at cost', value: view.lost.overTarget.dollars }, format: 'money' as const,
+        columns: [COL.account, COL.route, COL.target, COL.collected, COL.actual,
+          { header: 'Over N', num: true, value: r => N(r.overN) },
+          { header: 'Over $', num: true, value: r => M(r.contribution) }],
+      }
+    }
+    if (drill === 'foregone') {
+      const rows = foregoneRows(view.pnl)
+      return {
+        key: drill, title: 'Revenue foregone - short of target, at the client rate',
+        population: pop(rows.length, view.rows.length, 'short of target AND priced'),
+        rows, total: { label: 'Never billed', value: view.gone.dollars }, format: 'money' as const,
+        columns: [COL.account, COL.target, COL.actual,
+          { header: 'Short N', num: true, value: r => N(r.shortN) },
+          { header: '$/N', num: true, value: r => M2(r.rate) },
+          { header: 'Foregone', num: true, value: r => M(r.contribution) }],
+      }
+    }
+    if (drill === 'margin') {
+      const rows = marginRows(view.pnl)
+      return {
+        key: drill, title: 'Margin - every survey with both a rate and a cost',
+        population: pop(rows.length, view.margin.delivered, 'carrying both'),
+        rows, total: { label: 'Gross margin', value: view.margin.margin }, format: 'money' as const,
+        columns: [COL.account, COL.route,
+          { header: '$/N', num: true, value: r => M2(r.rate) },
+          { header: 'Revenue', num: true, value: r => M(r.revenue) },
+          COL.cost,
+          { header: 'Margin', num: true, value: r => M(r.contribution) },
+          { header: '%', num: true, value: r => (r.marginPct == null ? '--' : Math.round(Number(r.marginPct) * 100) + '%') }],
+      }
+    }
+    if (drill === 'cpqr-blast' || drill === 'cpqr-panel') {
+      const rt = drill === 'cpqr-blast' ? 'blast' : 'panel'
+      const rows = cpqrRows(view.pnl, rt)
+      const c = view.cpqr.find(x => x.route === rt)
+      return {
+        key: drill, title: 'CPQR - ' + (rt === 'blast' ? 'B2B blasts' : 'PureSpectrum panel'),
+        population: fmtNum(rows.length) + ' delivered ' + rt + ' surveys whose records reconcile',
+        rows, total: { label: 'Spend behind the rate', value: c ? c.spend : 0 }, format: 'money' as const,
+        columns: [COL.account, COL.collected, COL.actual,
+          { header: 'Paid', num: true, value: r => N(r.paidCompletes) },
+          COL.cpc, COL.cpqr,
+          { header: 'Cost', num: true, value: r => M(r.contribution) }],
+      }
+    }
+    if (drill === 'breach') {
+      const rows = breachRows(view.variance.breaches)
+      return {
+        key: drill, title: 'Past the cost ceiling',
+        population: fmtNum(rows.length) + ' of ' + fmtNum(view.variance.measurable) + ' surveys carrying both a ceiling and a cost',
+        rows, total: { label: 'Gross overrun', value: view.variance.overrun }, format: 'money' as const,
+        columns: [COL.account, COL.route,
+          { header: 'Ceiling', num: true, value: r => M(r.budget) },
+          { header: 'Spend', num: true, value: r => M(r.spend) },
+          { header: '%', num: true, value: r => Math.round(Number(r.pct) * 100) + '%' },
+          { header: 'Over by', num: true, value: r => M(r.contribution) },
+          COL.stage],
+      }
+    }
+    if (drill === 'exposure') {
+      const rows = exposureRows(view.exposure)
+      return {
+        key: drill, title: 'Live exposure - money still moving',
+        population: fmtNum(rows.length) + ' in-flight surveys past a ceiling or past target',
+        rows, total: { label: 'Spent so far', value: rows.reduce((t, r) => t + r.contribution, 0) }, format: 'money' as const,
+        columns: [COL.account, COL.stage,
+          { header: 'Ceiling', num: true, value: r => M(r.budget) },
+          { header: 'Spend', num: true, value: r => M(r.contribution) },
+          COL.target, COL.collected,
+          { header: 'Why', value: r => String(r.reasons ?? '') }],
+      }
+    }
+    if (drill === 'unpriced') {
+      const rows = unpricedRows(view.pnl)
+      return {
+        key: drill, title: 'Recorded spend with no client rate',
+        population: fmtNum(rows.length) + ' costed surveys carrying no price - this money can never reach a margin',
+        rows, total: { label: 'Unpriced spend', value: view.unpriced.total }, format: 'money' as const,
+        columns: [COL.account, COL.route, COL.collected, COL.actual,
+          { header: 'Cost', num: true, value: r => M(r.contribution) }],
+      }
+    }
+    return null
+  })()
 
   const sel = 'rounded-md border border-border bg-card px-2 py-1 text-[13px]'
   const showMoney = canFinance && view.pricedInView > 0
@@ -400,17 +534,20 @@ function FinanceInner() {
 
       {tab === 'now' && (
         <NowTab exposure={view.exposure} variance={view.variance} queue={view.queue}
-          back={view.back} canFinance={canFinance} />
+          back={view.back} canFinance={canFinance} onDrill={k => set({ drill: k })} />
       )}
       {tab === 'unit' && (
         <UnitTab cpqr={view.cpqr} rates={view.rates} accounts={view.accountsPnl}
-          ladder={view.ladder} incidence={view.incidence} canFinance={canFinance} />
+          ladder={view.ladder} incidence={view.incidence} canFinance={canFinance}
+          onDrill={k => set({ drill: k })} />
       )}
       {tab === 'book' && (
         <BookTab periods={view.periods} split={view.split} byAccount={view.byAccount}
           lost={view.lost} gone={view.gone} cover={view.cover} unpriced={view.unpriced}
-          canFinance={canFinance} />
+          canFinance={canFinance} onDrill={k => set({ drill: k })} />
       )}
+
+      <DrillPanel spec={spec} onClose={() => set({ drill: '' })} />
     </div>
   )
 }

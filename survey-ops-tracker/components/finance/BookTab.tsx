@@ -14,11 +14,12 @@
 
 import { fmtNum } from '@/lib/utils/number'
 import { Bar, Card, Empty, Figure, Note, Row, money, money2, pct } from './shared'
+import { Drillable } from './DrillPanel'
 import type { Period, UnpricedAccount } from '@/lib/finance/analysis'
 import type { ClientSpend, Coverage, MoneyLost, Foregone } from '@/lib/finance/hub'
 
 export function BookTab({
-  periods, split, byAccount, lost, gone, cover, unpriced, canFinance,
+  periods, split, byAccount, lost, gone, cover, unpriced, canFinance, onDrill,
 }: {
   periods: Period[]
   split: { reward: number; send: number; panel: number; other: number }
@@ -28,6 +29,7 @@ export function BookTab({
   cover: Coverage
   unpriced: { total: number; share: number; accounts: UnpricedAccount[] }
   canFinance: boolean
+  onDrill: (key: string) => void
 }) {
   const maxSpend = periods.length ? Math.max(...periods.map(p => p.spend)) : 0
   const maxClient = byAccount.clients[0]?.total ?? 0
@@ -128,17 +130,26 @@ export function BookTab({
         tip="Three different things that all cost money, deliberately not summed. Scrub and over-delivery are cash that left, priced at each survey's own cost per complete. Revenue foregone is an invoice never raised, priced at the client rate."
       >
         <div className="divide-y divide-border/60">
-          <Row k={<>Lost in QA <span className="text-muted-foreground">(scrub)</span></>}
+          <Row
+            k={<Drillable onOpen={() => onDrill('scrub')} title={`Show the ${lost.scrub.surveys} scrubbed surveys`}>
+              Lost in QA <span className="text-muted-foreground">(scrub)</span>
+            </Drillable>}
             v={money(lost.scrub.dollars)} tone="neg"
             sub={`${fmtNum(lost.scrub.n)} completes bought and never delivered, across ${fmtNum(lost.scrub.surveys)} surveys`} />
-          <Row k="Delivered above target" v={money(lost.overTarget.dollars)} tone="neg"
+          <Row
+            k={<Drillable onOpen={() => onDrill('over')} title={`Show the ${lost.overTarget.surveys} over-delivered surveys`}>
+              Delivered above target
+            </Drillable>}
+            v={money(lost.overTarget.dollars)} tone="neg"
             sub={`${fmtNum(lost.overTarget.n)} completes past the promised N`} />
           {lost.cancelled.dollars > 0 && (
             <Row k="Cancelled before delivery" v={money(lost.cancelled.dollars)} tone="neg"
               sub={`${fmtNum(lost.cancelled.surveys)} survey${lost.cancelled.surveys === 1 ? '' : 's'} called off after spending began`} />
           )}
           {canFinance && (
-            <Row k={<>Revenue foregone <span className="text-xs text-muted-foreground">(different currency)</span></>}
+            <Row k={<Drillable onOpen={() => onDrill('foregone')} title="Show the surveys that came up short">
+              Revenue foregone <span className="text-xs text-muted-foreground">(different currency)</span>
+            </Drillable>}
               v={money(gone.dollars)} tone="neg"
               sub={`${fmtNum(gone.n)} N short of target on ${fmtNum(gone.surveys)} priced surveys${gone.unpricedN > 0 ? ` · ${fmtNum(gone.unpricedN)} more N short on ${fmtNum(gone.unpricedSurveys)} unpriced surveys` : ''}`} />
           )}
@@ -190,9 +201,11 @@ export function BookTab({
           tip="Recorded cost on surveys with no client rate. Nothing here can ever appear in a margin figure, so this is a data-entry worklist ranked by how much it is worth fixing."
         >
           <div className="px-4 py-3">
-            <div className="tabular-nums text-2xl font-semibold text-red-600 dark:text-red-400">
-              {money(unpriced.total)}
-            </div>
+            <Drillable onOpen={() => onDrill('unpriced')} title="Show every costed survey with no rate">
+              <div className="tabular-nums text-2xl font-semibold text-red-600 dark:text-red-400">
+                {money(unpriced.total)}
+              </div>
+            </Drillable>
             <div className="mt-0.5 text-sm">
               {Math.round(unpriced.share * 100)}% of every dollar recorded, on work with no price attached
             </div>

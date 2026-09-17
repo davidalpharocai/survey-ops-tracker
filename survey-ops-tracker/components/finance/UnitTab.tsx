@@ -12,17 +12,19 @@
 
 import { fmtNum } from '@/lib/utils/number'
 import { Bar, Card, Empty, Note, Row, money, money2, moneyAuto, pct1 } from './shared'
+import { Drillable } from './DrillPanel'
 import type { AccountPnl, BidLadder } from '@/lib/finance/analysis'
 import type { Cpqr } from '@/lib/finance/cpqr'
 import type { RouteCost } from '@/lib/finance/hub'
 
-export function UnitTab({ cpqr, rates, accounts, ladder, incidence, canFinance }: {
+export function UnitTab({ cpqr, rates, accounts, ladder, incidence, canFinance, onDrill }: {
   cpqr: Cpqr[]
   rates: RouteCost[]
   accounts: AccountPnl[]
   ladder: BidLadder | null
   incidence: { reach: number; completes: number; rate: number } | null
   canFinance: boolean
+  onDrill: (key: string) => void
 }) {
   const panel = cpqr.find(c => c.route === 'panel')
   const blast = cpqr.find(c => c.route === 'blast')
@@ -42,9 +44,12 @@ export function UnitTab({ cpqr, rates, accounts, ladder, incidence, canFinance }
             {cpqr.map(c => (
               <div key={c.route} className="px-4 py-3">
                 <div className="flex items-baseline justify-between">
-                  <span className="text-sm font-medium">
-                    {c.route === 'panel' ? 'PureSpectrum panel' : 'B2B blasts'}
-                  </span>
+                  <Drillable onOpen={() => onDrill('cpqr-' + c.route)}
+                    title={`Show the ${c.n} surveys behind this rate`}>
+                    <span className="text-sm font-medium">
+                      {c.route === 'panel' ? 'PureSpectrum panel' : 'B2B blasts'}
+                    </span>
+                  </Drillable>
                   <span className="tabular-nums text-sm">
                     {money2(c.blended)}<span className="text-muted-foreground"> / qualified N</span>
                   </span>

@@ -14,14 +14,18 @@
 
 import { fmtNum } from '@/lib/utils/number'
 import { Bar, Card, Empty, Figure, Note, ProjectLink, Row, money, pct } from './shared'
+import { Drillable } from './DrillPanel'
 import type { Backlog, BudgetVariance, Exception, Exposure } from '@/lib/finance/analysis'
 
-export function NowTab({ exposure, variance, queue, back, canFinance }: {
+export function NowTab({ exposure, variance, queue, back, canFinance, onDrill }: {
   exposure: Exposure[]
   variance: BudgetVariance
   queue: Exception[]
   back: Backlog
   canFinance: boolean
+  /** Opens the rows behind a figure. Every headline here is a population, and
+   *  a population you cannot open is a dead end. */
+  onDrill: (key: string) => void
 }) {
   const worstPct = exposure[0] ? Math.max(...exposure.map(e =>
     e.budget && e.budget > 0 ? e.spend / e.budget : 0)) : 0
@@ -65,8 +69,10 @@ export function NowTab({ exposure, variance, queue, back, canFinance }: {
               ))}
             </div>
             <Note tone="neg">
-              {fmtNum(exposure.length)} survey{exposure.length === 1 ? '' : 's'} in flight
-              {exposure.length > 8 && <> ({fmtNum(exposure.length - 8)} more not shown)</>}.
+              <Drillable onOpen={() => onDrill('exposure')}>
+                {fmtNum(exposure.length)} survey{exposure.length === 1 ? '' : 's'} in flight
+              </Drillable>{' '}
+              {exposure.length > 8 && <> — {fmtNum(exposure.length - 8)} more behind this figure</>}.
               Every dollar here is being spent now, against a limit somebody already set.
             </Note>
           </>
@@ -78,11 +84,13 @@ export function NowTab({ exposure, variance, queue, back, canFinance }: {
         tip="survey_projects.budget is a COST CEILING — the most we intend to spend — not client revenue. Overrun and headroom are shown side by side and never netted: headroom on one survey cannot pay for an overrun on another, and subtracting them reports roughly zero and hides both."
       >
         <div className="grid grid-cols-2 divide-x divide-border/60">
-          <Figure
-            value={money(variance.overrun)} label="spent past a ceiling"
-            sub={`${fmtNum(variance.breaches.length)} of ${fmtNum(variance.measurable)} surveys that carry both a ceiling and a cost`}
-            tone="neg"
-          />
+          <Drillable onOpen={() => onDrill('breach')} title="Show the surveys that blew their ceiling">
+            <Figure
+              value={money(variance.overrun)} label="spent past a ceiling"
+              sub={`${fmtNum(variance.breaches.length)} of ${fmtNum(variance.measurable)} surveys that carry both a ceiling and a cost`}
+              tone="neg"
+            />
+          </Drillable>
           <Figure
             value={money(variance.headroom)} label="unused headroom"
             sub={`${fmtNum(variance.underSurveys)} surveys came in under. NOT an offset — it is on different surveys.`}
