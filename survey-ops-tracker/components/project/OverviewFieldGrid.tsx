@@ -226,6 +226,8 @@ export function OverviewFieldGrid({ project }: { project: SurveyProject }) {
               clientId={project.client_id ?? null}
               credits={project.credits ?? null}
               termId={project.term_id ?? null}
+              nTarget={project.n_target ?? null}
+              nActual={project.n_actual ?? null}
             />
           </div>
         </div>

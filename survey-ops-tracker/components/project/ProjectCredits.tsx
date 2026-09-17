@@ -7,7 +7,9 @@ import { FieldCell, useSavedFlash } from './fields'
 import { cn } from '@/lib/utils'
 import { fmtNum } from '@/lib/utils/number'
 import { useUpdateProject } from '@/lib/hooks/useProjects'
-import { useClientTerms } from '@/lib/hooks/useClientTerms'
+import { useClientTerms, useTermDollars } from '@/lib/hooks/useClientTerms'
+import { useCanViewFinancials } from '@/lib/hooks/useCapabilities'
+import { creditValues, valueCredits } from '@/lib/finance/credits'
 
 const TIP = {
   header:
@@ -16,6 +18,8 @@ const TIP = {
     'Credits for this survey. Entered when the scope is confirmed — i.e. when it moves to an active stage. BLANK IS NOT ZERO: blank means not priced yet, and the client-facing consumption totals count it as unknown rather than free. Enter 0 only for work genuinely done at no charge.',
   term:
     'Which contract this survey draws down. Until it is attached, its credits count toward nothing — the client’s remaining balance will not move. Contracts are created on the client page.',
+  implied:
+    'What these credits work out to per completed interview: (credits × the contract’s dollars per credit) ÷ N. FINANCE ONLY, because it is contract value in dollars — the credit count above is public, this is not. Divided by BILLABLE N once the survey has delivered, because that is what a rate-priced survey bills on and the two have to be comparable; before delivery it divides by target, which is the figure the work was quoted against, and says so.',
 }
 
 /**
@@ -33,15 +37,23 @@ const TIP = {
  * sales account page have been counting an empty set until now.
  */
 export function ProjectCredits({
-  projectId, clientId, credits, termId,
+  projectId, clientId, credits, termId, nTarget, nActual,
 }: {
   projectId: string
   clientId: string | null
   credits: number | null
   termId: string | null
+  /** For the implied $ / N. Optional so existing call sites keep compiling; the
+   *  implied figure simply does not render without them. */
+  nTarget?: number | null
+  nActual?: number | null
 }) {
   const updateProject = useUpdateProject()
+  const canFinance = useCanViewFinancials()
   const { data: terms = [] } = useClientTerms(clientId ?? '')
+  // RLS-gated (100): a non-holder gets an empty object, indistinguishable from
+  // "not set" on purpose, so the implied row simply does not appear.
+  const { data: dollars = {} } = useTermDollars(terms.map(t => t.id))
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
   const [saved, flash] = useSavedFlash()
@@ -122,6 +134,42 @@ export function ProjectCredits({
             </select>
           )}
         </FieldCell>
+
+        {/* The $ / N David asked for on a credit-priced survey (2026-09-17):
+            "a record may have credits associated with it, but id ideally still
+            want to see the $ / N so i can better understand costs".
+
+            Finance-only, because it is contract value in dollars — the credit
+            count above is deliberately public and this is deliberately not.
+            Derived from the contract's own dollars ÷ credits rather than a
+            stored rate: a third number could disagree with the two it came
+            from. */}
+        {canFinance && (() => {
+          const values = creditValues(
+            terms.map(t => ({ id: t.id, client_id: t.client_id, name: t.name, credits_total: t.credits_total })),
+            new Map(Object.entries(dollars)))
+          const v = valueCredits(
+            { id: projectId, project_code: null, project_name: null, client: null,
+              client_id: clientId, project_type: null, board_column: null, status: null,
+              phase: null, deliver_date: null, launch_date: null, submitted_date: null,
+              n_target: nTarget ?? null, n_collected: null, n_actual: nActual ?? null,
+              credits, term_id: termId },
+            values)
+          if (!v || v.contracted == null) return null
+          return (
+            <FieldCell label="Implied $ / N" tooltip={TIP.implied}>
+              <span className="tabular-nums">
+                {v.impliedRatePerN != null
+                  ? '$' + v.impliedRatePerN.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                  : <span className="text-muted-foreground/50">— no N recorded</span>}
+                <span className="ml-2 text-xs text-muted-foreground">
+                  {'$' + Math.round(v.contracted).toLocaleString('en-US')} contracted
+                  {v.impliedBasis === 'target' && ' · against target, not yet delivered'}
+                </span>
+              </span>
+            </FieldCell>
+          )
+        })()}
 
         {/* The two failure modes worth naming, because each makes a client-facing
             total silently wrong rather than visibly missing. */}

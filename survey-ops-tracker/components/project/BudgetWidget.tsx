@@ -21,6 +21,9 @@ interface BudgetWidgetProps {
   clientId: string | null
   credits: number | null
   termId: string | null
+  /** For the implied $ / N on a credit-priced survey. */
+  nTarget?: number | null
+  nActual?: number | null
 }
 
 function money(value: number | null): string {
@@ -90,7 +93,7 @@ function EditableAmount({
  * restricted to holders of `view_financials`. The gate is soft: it hides, it does
  * not secure.
  */
-export function BudgetWidget({ projectId, budget, nCollected, actualSpend, clientId, credits, termId }: BudgetWidgetProps) {
+export function BudgetWidget({ projectId, budget, nCollected, actualSpend, clientId, credits, termId, nTarget, nActual }: BudgetWidgetProps) {
   const updateProject = useUpdateProject()
   // False until the capability check settles true, so a restricted figure can
   // never flash on screen while the answer is still in flight.
@@ -120,7 +123,8 @@ export function BudgetWidget({ projectId, budget, nCollected, actualSpend, clien
       {/* Credits sit between cost-to-run and the finance-gated budget block:
           they are the client's side of the ledger and are PUBLIC, so they must
           not end up inside the capability gate below. */}
-      <ProjectCredits projectId={projectId} clientId={clientId} credits={credits} termId={termId} />
+      <ProjectCredits projectId={projectId} clientId={clientId} credits={credits} termId={termId}
+        nTarget={nTarget} nActual={nActual} />
 
       <div className="border-t border-border pt-3">
         <p className="text-xs text-muted-foreground uppercase tracking-widest mb-3 font-medium flex items-center">
