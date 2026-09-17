@@ -65,10 +65,28 @@ export interface Cpqr {
   /** Completes we paid for, so a caller can show CPQR beside cost-per-complete
    *  and let the scrub between them be visible rather than asserted. */
   paid: number
-  /** 1 − qualified/paid: the share of what we bought that QA removed. The guard
-   *  makes this well-defined — before it, blast reported a negative scrub rate,
-   *  which is not a finding about quality but about record-keeping. */
+  /**
+   * POOLED scrub: 1 − Σqualified/Σpaid. The share of every complete we bought
+   * that never reached a client — the right number for costing the portfolio.
+   *
+   * It is NOT what happens on a typical survey, and the difference is large:
+   * pooled panel scrub is 24.8% and the MEDIAN panel survey scrubs 13.2%,
+   * because PR00231 alone (5,342 collected, 342 delivered, 6% keep) pulls the
+   * pooled figure down from 82.8% to 75.2%. A card that prints the pooled
+   * ratio beside a median CPQR invites a reader planning their next study to
+   * take a portfolio ratio as the typical case, so both now ship together.
+   */
   scrubRate: number
+  /** MEDIAN per-survey scrub — what to expect on the NEXT survey. Blast and
+   *  panel are near-identical here (12.5% and 13.2%); they differ only in the
+   *  tail, which is what the pooled figure is measuring. */
+  scrubRateMedian: number
+  /** p25/p75 of per-survey KEEP (qualified ÷ paid). The spread is the finding:
+   *  0.74–0.97 on panel. Anyone planning a buy-multiple needs this, not a
+   *  point estimate — a rule calibrated on the median under-buys on roughly
+   *  half of all surveys. */
+  keepP25: number
+  keepP75: number
   /** Costed delivered surveys on this route that the guard excluded, so the UI
    *  can print the coverage rather than implying the rate covers everything. */
   excluded: number
@@ -95,10 +113,10 @@ export function cpqrByRoute(
   // exclusions on blast's card and vice versa.
   const ix = buildIndex(blasts, suppliers, costs)
   const acc: Record<'blast' | 'panel', {
-    spend: number; qualified: number; paid: number; per: number[]; skipped: number
+    spend: number; qualified: number; paid: number; per: number[]; keep: number[]; skipped: number
   }> = {
-    blast: { spend: 0, qualified: 0, paid: 0, per: [], skipped: 0 },
-    panel: { spend: 0, qualified: 0, paid: 0, per: [], skipped: 0 },
+    blast: { spend: 0, qualified: 0, paid: 0, per: [], keep: [], skipped: 0 },
+    panel: { spend: 0, qualified: 0, paid: 0, per: [], keep: [], skipped: 0 },
   }
   for (const p of rows) {
     if (!isDelivered(p)) continue
@@ -126,6 +144,7 @@ export function cpqrByRoute(
     a.qualified += qualified
     a.paid += sp.paidCompletes
     a.per.push(sp.total / qualified)
+    if (sp.paidCompletes > 0) a.keep.push(qualified / sp.paidCompletes)
   }
   const out: Cpqr[] = []
   for (const route of ['panel', 'blast'] as const) {
@@ -142,6 +161,9 @@ export function cpqrByRoute(
       qualified: a.qualified,
       paid: a.paid,
       scrubRate: a.paid > 0 ? 1 - a.qualified / a.paid : 0,
+      scrubRateMedian: a.keep.length ? 1 - quantile(a.keep, 0.5) : 0,
+      keepP25: a.keep.length ? quantile(a.keep, 0.25) : 0,
+      keepP75: a.keep.length ? quantile(a.keep, 0.75) : 0,
       excluded: a.skipped,
     })
   }

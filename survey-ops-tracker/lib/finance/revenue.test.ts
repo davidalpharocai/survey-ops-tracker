@@ -46,11 +46,13 @@ describe('revenueOf: the cap is min(), not max()', () => {
     expect(revenueOf(P({ n_target: 100, n_actual: 100 }), undefined)).toBeNull()
   })
 
-  it('treats a recorded rate of exactly 0 as unpriced, not as free work', () => {
-    // PR00435 (UBS) carries rate 0 against 1,000 delivered N. Honouring that
-    // would book $0 of revenue against $1,834 of real cost and drag the
-    // portfolio margin with a number nobody entered.
-    expect(revenueOf(P({ n_target: 1000, n_actual: 1000 }), 0)).toBeNull()
+  it('treats a recorded rate of exactly 0 as a REAL price of zero', () => {
+    // David confirmed all three $0 surveys on file (2026-09-17): PR00440 is
+    // internal and PR00435/PR00431 are free trials. Zero is the price, so the
+    // survey books $0 of revenue against its real cost — which is the honest
+    // shape of a free trial. NULL still means "nobody recorded one".
+    expect(revenueOf(P({ n_target: 1000, n_actual: 1000 }), 0)).toBe(0)
+    expect(revenueOf(P({ n_target: 1000, n_actual: 1000 }), null)).toBeNull()
   })
 
   it('returns null when the survey has no N recorded', () => {
@@ -83,17 +85,23 @@ describe('marginOf: the flattering number that must never print', () => {
   })
 
   it('separates "carries a rate" from "yields a revenue figure"', () => {
-    // b has a rate and no N; c has a rate of 0. Both are RATED and neither is
-    // priceable. Against production 44 delivered surveys carry a rate and only
-    // 38 produce revenue, and the banner used to quote the 38 as the rate card.
+    // b has a rate but no N, so it cannot produce revenue even though it is
+    // rated. c is priced at a real $0 and DOES yield a figure — it simply
+    // yields zero. Against production 44 delivered surveys carry a rate and
+    // fewer produce revenue; the banner used to quote the smaller number as
+    // the size of the rate card.
     const rows = [
       P({ id: 'a', n_target: 10, n_actual: 10 }),
       P({ id: 'b', n_target: null, n_actual: null }),
       P({ id: 'c', n_target: 10, n_actual: 10 }),
       P({ id: 'd' }),
     ]
-    const m = marginOf(rows, new Map([['a', 5], ['b', 5], ['c', 0]]), [blast('a', 1, 10)], [], [])
-    expect(m).toMatchObject({ delivered: 4, rated: 3, unpriced: 3, surveys: 1 })
+    const m = marginOf(rows, new Map([['a', 5], ['b', 5], ['c', 0]]),
+      [blast('a', 1, 10), blast('c', 1, 10)], [], [])
+    expect(m).toMatchObject({ delivered: 4, rated: 3, unpriced: 2, surveys: 2 })
+    // The free survey contributes its cost and no revenue, which is the point.
+    expect(m.revenue).toBe(50)
+    expect(m.cost).toBe(20)
   })
 
   it('ignores work that is not delivered', () => {

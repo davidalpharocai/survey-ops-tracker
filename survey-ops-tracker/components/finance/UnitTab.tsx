@@ -60,12 +60,26 @@ export function UnitTab({ cpqr, rates, accounts, ladder, incidence, canFinance, 
                 <div className="mt-0.5 text-xs text-muted-foreground">
                   {fmtNum(c.paid)} bought → {fmtNum(c.qualified)} delivered ·{' '}
                   <span className="font-medium text-red-600 dark:text-red-400">
-                    {Math.round(c.scrubRate * 100)}% scrubbed
+                    {Math.round(c.scrubRate * 100)}% scrubbed across the book
                   </span>
+                  {', '}<span className="font-medium">{Math.round(c.scrubRateMedian * 100)}% on the typical survey</span>
                   {c.excluded > 0 && <> · {fmtNum(c.excluded)} excluded, records do not reconcile</>}
                 </div>
               </div>
             ))}
+            {(panel || blast) && (
+              <Note>
+                <span className="font-medium text-foreground">Use the right one of those two.</span>{' '}
+                The book figure is what every bought complete cost you across the portfolio; the
+                typical-survey figure is what to expect on the next one, and they differ because a
+                handful of studies scrub catastrophically rather than because the routes behave
+                differently. Per-survey keep runs{' '}
+                {panel && <>{Math.round(panel.keepP25 * 100)}–{Math.round(panel.keepP75 * 100)}% on panel</>}
+                {panel && blast && ' and '}
+                {blast && <>{Math.round(blast.keepP25 * 100)}–{Math.round(blast.keepP75 * 100)}% on blast</>}
+                {' '}— wide enough that any single buy-multiple under-buys about half the time.
+              </Note>
+            )}
             {panel && blast && (
               <Note>
                 A qualified B2B respondent costs{' '}

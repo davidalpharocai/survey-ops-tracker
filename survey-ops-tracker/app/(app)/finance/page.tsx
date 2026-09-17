@@ -9,9 +9,11 @@ import { useCanViewFinancials } from '@/lib/hooks/useCapabilities'
 import { NowTab } from '@/components/finance/NowTab'
 import { UnitTab } from '@/components/finance/UnitTab'
 import { BookTab } from '@/components/finance/BookTab'
+import { SaveTab } from '@/components/finance/SaveTab'
 import { money } from '@/components/finance/shared'
 import { blastIncidence, cpqrByRoute } from '@/lib/finance/cpqr'
 import { exportFinanceCsv } from '@/lib/finance/exportFinance'
+import { savings } from '@/lib/finance/savings'
 import { DrillPanel, type DrillColumn, type DrillSpec } from '@/components/finance/DrillPanel'
 import {
   breachRows, cpqrRows, exposureRows, foregoneRows, marginRows, overTargetRows,
@@ -65,6 +67,7 @@ const TABS = [
   { id: 'now', label: 'Now', hint: 'What needs a phone call today' },
   { id: 'unit', label: 'Unit economics', hint: 'What one respondent costs and what we charge' },
   { id: 'book', label: 'The book', hint: 'What happened, and how much of it we can see' },
+  { id: 'save', label: 'Save', hint: 'Where the money could come out, and what pulling it costs' },
 ] as const
 
 const LIFECYCLES: { id: Lifecycle; label: string }[] = [
@@ -114,11 +117,12 @@ function useFinanceData() {
       let ratesBroken = false
       const rates = await page<FinRate>('project_financials', 'project_id, price_per_n', 'project_id')
         .catch(() => { ratesBroken = true; return [] as FinRate[] })
-      const [projects, blasts, suppliers, costs, clients, contacts] = await Promise.all([
+      const [projects, blasts, suppliers, costs, launches, clients, contacts] = await Promise.all([
         page<FinProject>('survey_projects', COLS, 'id', true),
-        page<FinBlast>('project_blasts', 'project_id, bid, people, completes, cost_per_send, channel', 'id'),
-        page<FinSupplier>('project_suppliers', 'project_id, cpi, n_collected', 'id'),
+        page<FinBlast>('project_blasts', 'project_id, bid, people, completes, cost_per_send, channel, blast_at, scheduled_at, created_at', 'id'),
+        page<FinSupplier & { supplier_id: string | null; launch_id: string | null }>('project_suppliers', 'project_id, cpi, n_collected, supplier_id, launch_id', 'id'),
         page<FinCost>('project_costs', 'project_id, amount', 'id'),
+        page<{ id: string; project_id: string; target: number | null }>('project_launches', 'id, project_id, target', 'id'),
         page<FinAccount & { is_demo: boolean | null }>('clients', 'id, name, is_demo', 'id'),
         page<FinContact>('client_contacts', 'id, client_id, first_name, last_name, email, archived', 'id'),
       ])
@@ -129,7 +133,7 @@ function useFinanceData() {
       return {
         ratesBroken,
         projects: projects.filter(p => !(p.client_id && demo.has(p.client_id))),
-        blasts, suppliers, costs, contacts,
+        blasts, suppliers, costs, contacts, launches,
         accounts: clients.filter(c => !demo.has(c.id)) as FinAccount[],
         rates: new Map(
           rates.filter(r => r.price_per_n != null).map(r => [r.project_id, Number(r.price_per_n)]),
@@ -168,7 +172,7 @@ function FinanceInner() {
 
   const view = useMemo(() => {
     if (!data) return null
-    const { projects, blasts, suppliers, costs, accounts, contacts, rates } = data
+    const { projects, blasts, suppliers, costs, accounts, contacts, rates, launches } = data
     // One index for the whole render. Without it this memo spends ~250ms of
     // synchronous work per filter change rescanning every child row per project.
     const ix = buildIndex(blasts, suppliers, costs)
@@ -230,6 +234,10 @@ function FinanceInner() {
       accountsPnl: accountPnl(pnl),
       unpriced: unpricedSpend(pnl),
       queue: exceptions(pnl, variance, medians),
+      // Levers describe the WHOLE book, like exposure and backlog: a
+      // negotiable send rate does not stop being negotiable because the
+      // reader is filtered to one account.
+      save: savings(projects, blasts, suppliers, costs, launches),
       periods: monthly(rows, rates, blasts, suppliers, costs),
       split: rows.reduce((acc, x) => {
         const s = spendOf(x, blasts, suppliers, costs, ix)
@@ -365,6 +373,27 @@ function FinanceInner() {
           { header: 'Spend', num: true, value: r => M(r.contribution) },
           COL.target, COL.collected,
           { header: 'Why', value: r => String(r.reasons ?? '') }],
+      }
+    }
+    if (drill.startsWith('lever-')) {
+      const lever = view.save.levers.find(l => 'lever-' + l.key === drill)
+      if (!lever) return null
+      const ids = new Set(lever.ids)
+      const rows = view.pnl.filter(r => ids.has(r.id))
+        .map(r => ({ id: r.id, code: r.code, account: r.account, route: r.route,
+          collected: r.collected, actual: r.actual, cost: r.cost, cpc: r.cpc,
+          contribution: r.cost }))
+        .sort((a, b) => b.contribution - a.contribution)
+      return {
+        key: drill, title: lever.title,
+        // The strip reconciles against the surveys' TOTAL spend, not the
+        // saving: a lever's dollars are a slice of these rows and cannot be
+        // attributed row-by-row without inventing an allocation.
+        population: lever.population + ' - rows below are their full recorded cost, not the saving',
+        rows, total: { label: 'Recorded cost on these surveys', value: rows.reduce((t, r) => t + r.contribution, 0) },
+        format: 'money' as const,
+        columns: [COL.account, COL.route, COL.collected, COL.actual,
+          { header: 'Cost', num: true, value: r => M(r.contribution) }],
       }
     }
     if (drill === 'unpriced') {
@@ -545,6 +574,10 @@ function FinanceInner() {
         <BookTab periods={view.periods} split={view.split} byAccount={view.byAccount}
           lost={view.lost} gone={view.gone} cover={view.cover} unpriced={view.unpriced}
           canFinance={canFinance} onDrill={k => set({ drill: k })} />
+      )}
+
+      {tab === 'save' && (
+        <SaveTab view={view.save} onDrill={k => set({ drill: k })} />
       )}
 
       <DrillPanel spec={spec} onClose={() => set({ drill: '' })} />

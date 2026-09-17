@@ -76,9 +76,29 @@ export const WAVE_LIMIT = 3
  *  test 7-0-1, p=0.016. Ordering was checked: email is not merely the mop-up. */
 export const SMS_ADVANTAGE = { ratio: 4.74, ciLow: 2.49, ciHigh: 9.04, segments: 8 }
 
-/** How much raw N you actually need to land n_target CLEAN completes. The
- *  measured requirement is 1.13x; anything beyond it is scrub nobody bills. */
+/**
+ * How much raw N you need to land n_target CLEAN completes.
+ *
+ * 1.13x is the MEDIAN requirement, and it was shipped without its spread, which
+ * made it read as a rule when it is a coin flip. Replayed against 188 delivered
+ * surveys with all three N figures recorded, 1.13x would have been enough on
+ * 101 and **too little on 87 — 46%**. The required multiple runs p25 1.00x,
+ * median 1.12x, p75 1.29x, p90 1.60x.
+ *
+ * The spread is the finding, not the point estimate. Per-survey keep runs 0.74
+ * to 0.97 on panel and 0.78 to 0.95 on blast, and it is NOT predictable before
+ * fielding: it is written at delivery, after the money is spent, and an
+ * account's own history does not forecast it (BofA's p25 keep is 0.444 against
+ * a 0.801 median). That is why this is quoted as a RANGE and never used as a
+ * stop gate — replaying a 1.13x cap wave-by-wave would have saved $13,625 and
+ * broken twelve deliveries worth $28,714.
+ */
 export const BUY_MULTIPLE = 1.13
+/** p75 and p90 of the same measurement. Quoted beside the median so a planner
+ *  sees "usually 1.13x, but budget 1.29x and be ready for 1.60x" rather than a
+ *  single number that is wrong half the time. */
+export const BUY_MULTIPLE_P75 = 1.29
+export const BUY_MULTIPLE_P90 = 1.60
 
 export interface BlastLike {
   completes?: number | null
@@ -205,9 +225,12 @@ export function fieldingGuidance(i: GuidanceInput): GuidanceItem[] {
       headline: `${num(target)} clean N through ${label} runs about ${money(raw * r.median)}`,
       detail:
         `Buying ${num(raw)} raw completes (${BUY_MULTIPLE}× target) to land ${num(target)} clean, at ` +
-        `${money(r.p25)}–${money(r.p75)} per complete. This is a ${i.project_type} study, so ${label} ` +
-        `is the route — the other route is cheaper per complete but does not reach this audience, ` +
-        `which is most of why the two look so far apart.`,
+        `${money(r.p25)}–${money(r.p75)} per complete. That multiple is the MEDIAN and it is too ` +
+        `little on 46% of past surveys — a quarter of them needed ${BUY_MULTIPLE_P75}× ` +
+        `(${num(Math.ceil(target * BUY_MULTIPLE_P75))} raw) and one in ten needed ${BUY_MULTIPLE_P90}×. ` +
+        `QA loss is not knowable before fielding, so treat this as a budget range, not a cap. ` +
+        `This is a ${i.project_type} study, so ${label} is the route — the other route is cheaper ` +
+        `per complete but does not reach this audience, which is most of why the two look so far apart.`,
       evidence:
         `${money(r.median)}/complete median on the ${intended} route (p25 ${money(r.p25)}, p75 ` +
         `${money(r.p75)}, n=${r.n}), ${EVIDENCE_DATE}, measured only on surveys whose recorded ` +

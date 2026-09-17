@@ -531,12 +531,26 @@ export function coverage(
  *     never at the client rate.
  * ──────────────────────────────────────────────────────────────────────────── */
 
-/** rate x min(n_actual, n_target), or null when either input is missing.
- *  NEVER 0 for "unknown" — an unpriced survey has unknown revenue, and folding
- *  it in as zero would drag every margin percentage toward a number about
- *  bookkeeping rather than about the business. */
+/**
+ * rate x min(n_actual, n_target), or null when the rate or the N is missing.
+ *
+ * NULL rate and ZERO rate are different facts and are treated differently:
+ *
+ *   NULL  = nobody recorded a price. Revenue is UNKNOWN, so this returns null
+ *           and the survey stays out of every margin figure. Folding it in as
+ *           zero would drag margin toward a statement about bookkeeping.
+ *   0     = the price IS zero, and David confirmed the three cases on file
+ *           (2026-09-17): PR00440 is internal work and PR00435/PR00431 are free
+ *           trials. That is a real price, so it returns 0 and the survey enters
+ *           margin carrying its real cost against no revenue — which is the
+ *           honest shape of a free trial. Excluding it would flatter the book
+ *           by hiding work we chose to give away.
+ *
+ * An earlier version treated 0 as "unpriced" on the assumption it was an empty
+ * field. It was not.
+ */
 export function revenueOf(p: FinProject, rate: number | null | undefined): number | null {
-  if (rate == null || !(rate > 0)) return null
+  if (rate == null || rate < 0) return null
   const t = p.n_target, a = p.n_actual
   if (t == null || a == null) return null
   return rate * Math.min(Number(a), Number(t))
@@ -769,9 +783,11 @@ export function rateBands(
     .sort((a, b) => b.surveys - a.surveys || b.rate - a.rate)
 }
 
-/** Rates recorded as exactly 0. Almost certainly "nobody entered one" rather
- *  than "we did this for free" — and a 0 rate silently prices a survey's whole
- *  delivery at nothing, so it is surfaced rather than averaged in. */
+/** Surveys priced at exactly $0 — work given away on purpose. All three on file
+ *  are legitimate (one internal, two free trials), so these are surfaced as
+ *  context rather than flagged as an error: they carry real cost against no
+ *  revenue, and a reader looking at margin should know which surveys those are
+ *  rather than wondering why the ratio moved. */
 export function zeroRates(rows: FinProject[], rates: Map<string, number>): FinProject[] {
   return rows.filter(p => rates.get(p.id) === 0)
 }
