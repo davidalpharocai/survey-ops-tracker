@@ -18,6 +18,7 @@ import {
   emptyDraft,
   type ContactDraft,
 } from '@/components/client/ContactForm'
+import { contactMatches } from '@/lib/utils/contact'
 
 export function ClientContacts({ clientId }: { clientId: string }) {
   const { data: contacts = [], isLoading } = useClientContacts(clientId)
@@ -29,9 +30,12 @@ export function ClientContacts({ clientId }: { clientId: string }) {
   const [adding, setAdding] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [showArchived, setShowArchived] = useState(false)
+  const [query, setQuery] = useState('')
 
   const active = contacts.filter(c => !c.archived)
   const archived = contacts.filter(c => c.archived)
+  // Already alphabetical by the displayed name — useClientContacts sorts on it.
+  const shown = active.filter(c => contactMatches(c, query))
 
   function handleCreate(d: ContactDraft) {
     create.mutate(draftToFields(d), { onSuccess: () => setAdding(false) })
@@ -64,6 +68,17 @@ export function ClientContacts({ clientId }: { clientId: string }) {
         )}
       </div>
 
+      {/* Only once the list is long enough that scanning it is work. BAM has 16
+          contacts; most accounts have one or two, where a search box is noise. */}
+      {active.length > 5 && (
+        <input
+          value={query}
+          onChange={e => setQuery(e.target.value)}
+          placeholder={`Search ${active.length} contacts by name, title or email…`}
+          className="w-full rounded border border-border bg-background px-2 py-1 text-sm"
+        />
+      )}
+
       {adding && (
         <ContactForm
           initial={emptyDraft()}
@@ -78,9 +93,13 @@ export function ClientContacts({ clientId }: { clientId: string }) {
         <p className="text-xs text-muted-foreground/60">Loading…</p>
       ) : active.length === 0 && !adding ? (
         <p className="text-xs text-muted-foreground/60">No contacts yet — add the person who requests this client&apos;s surveys.</p>
+      ) : shown.length === 0 ? (
+        <p className="text-xs text-muted-foreground/60">
+          None of this client&apos;s {active.length} contacts match &ldquo;{query}&rdquo;.
+        </p>
       ) : (
         <div className="flex flex-col divide-y divide-border">
-          {active.map(c =>
+          {shown.map(c =>
             editingId === c.id ? (
               <div key={c.id} className="py-2">
                 <ContactForm

@@ -89,7 +89,16 @@ export function BlastBlocks({ project }: { project: SurveyProject }) {
   })
   const userName = user?.email?.split('@')[0] ?? 'Unknown'
 
-  const [expanded, setExpanded] = useState(true)
+  // Collapsed by default, per David 2026-09-17: "default on surveys should be
+  // that blasts, launches and segments are collapsed. otherwise it's a lot of
+  // scrolling." A blast-heavy project carries a dozen lines and pushed the rest
+  // of the page below the fold. Segments and launches already defaulted closed;
+  // this was the one section that did not, so the three now agree.
+  //
+  // The header still carries the count, so collapsed is informative rather than
+  // merely hidden: "Blasts · 11" says everything a reader needs to decide
+  // whether to open it.
+  const [expanded, setExpanded] = useState(false)
   // Session-level Undo: the last-removed blast's payload. Cleared when re-added
   // or replaced by a newer removal.
   const [undo, setUndo] = useState<Blast | null>(null)

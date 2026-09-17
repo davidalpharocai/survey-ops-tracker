@@ -2,13 +2,20 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from '@/lib/utils/toast'
 import type { Database } from '@/lib/supabase/types'
+import { sortByDisplayName } from '@/lib/utils/contact'
 
 export type ClientContact = Database['public']['Tables']['client_contacts']['Row']
 type ContactInsert = Database['public']['Tables']['client_contacts']['Insert']
 type ContactUpdate = Database['public']['Tables']['client_contacts']['Update']
 
-/** All contacts for a client (archived included), ordered by name. The picker
- *  filters to active; a project row can still resolve an archived contact. */
+/** All contacts for a client (archived included), ordered by the name the screen
+ *  actually SHOWS. The picker filters to active; a project row can still resolve
+ *  an archived contact.
+ *
+ *  Sorted in JS rather than by the database because the display name is
+ *  "first last" with an email fallback, and Postgres ordering by last_name puts
+ *  "Elliot Birman, James Cook, Grey Jones" on screen — correct by surname and
+ *  visibly unsorted to the reader. */
 export function useClientContacts(clientId: string | null | undefined) {
   const supabase = createClient()
   return useQuery({
@@ -21,7 +28,7 @@ export function useClientContacts(clientId: string | null | undefined) {
         .order('last_name')
         .order('first_name')
       if (error) throw error
-      return data as ClientContact[]
+      return sortByDisplayName(data as ClientContact[])
     },
     enabled: !!clientId,
   })
@@ -47,7 +54,8 @@ export function useAllContacts() {
         .select('id, first_name, last_name, title, client_id, archived, clients(name)')
         .eq('archived', false)
       if (error) throw error
-      return (data ?? []) as unknown as AllContact[]
+      // Same display-name order as every other contact list in the app.
+      return sortByDisplayName((data ?? []) as unknown as AllContact[])
     },
     staleTime: 60_000,
   })

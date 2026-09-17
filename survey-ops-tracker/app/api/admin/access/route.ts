@@ -72,8 +72,19 @@ export async function GET() {
     directByProfile.set(c.profile_id, [...(directByProfile.get(c.profile_id) ?? []), c.capability])
   }
 
+  // Compliance-tier accounts are CLIENT-SIDE reviewers — Holocene's compliance
+  // desk, not AlphaROC staff. They reached this panel only because they share
+  // the `profiles` table, and David asked for them out (2026-09-17): an
+  // internal access screen listing four external email addresses invites
+  // someone to grant one of them an internal role.
+  //
+  // Filtered SERVER-SIDE so the addresses do not travel to the browser at all.
+  // Their access is administered by the compliance portal, not here, and
+  // nothing in this panel could usefully be granted to them.
+  const isStaff = (p: { role: string | null }) => p.role !== 'compliance'
+
   return NextResponse.json({
-    people: (profiles.data ?? []).map((p) => ({
+    people: (profiles.data ?? []).filter(isStaff).map((p) => ({
       id: p.id,
       email: p.email,
       name: p.full_name,

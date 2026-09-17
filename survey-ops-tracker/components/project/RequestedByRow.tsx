@@ -9,7 +9,7 @@ import {
   type ClientContact,
 } from '@/lib/hooks/useClientContacts'
 import { useProjectsByContact } from '@/lib/hooks/useProjectsByContact'
-import { contactName, contactSubtitle } from '@/lib/utils/contact'
+import { contactMatches, contactName, contactSubtitle } from '@/lib/utils/contact'
 import {
   ContactForm,
   contactToDraft,
@@ -30,6 +30,9 @@ type Mode = 'closed' | 'details' | 'pick' | 'new' | 'edit'
 
 export function RequestedByRow({ clientId, contactId, snapshotName, tooltip, onChange }: Props) {
   const [mode, setMode] = useState<Mode>('closed')
+  // Scoped to THIS client's contacts by construction — useClientContacts is
+  // already keyed on clientId, so the search can never reach another account.
+  const [query, setQuery] = useState('')
   const { data: contacts = [] } = useClientContacts(clientId)
   const create = useCreateClientContact(clientId)
   const update = useUpdateClientContact(clientId)
@@ -37,8 +40,14 @@ export function RequestedByRow({ clientId, contactId, snapshotName, tooltip, onC
   const current = contactId ? contacts.find(c => c.id === contactId) ?? null : null
   const { data: contactProjects = [] } = useProjectsByContact(current ? current.id : null)
   const active = contacts.filter(c => !c.archived)
+  // Already alphabetical by the displayed name — useClientContacts sorts on it.
+  const shown = active.filter(c => contactMatches(c, query))
   // Show the live contact's name if it still exists, else the saved snapshot.
   const label = current ? contactName(current) : snapshotName
+
+  /** Opening the picker always starts from the full list — a query left over
+   *  from last time reads as "this client has one contact". */
+  function openPicker() { setQuery(''); setMode('pick') }
 
   function select(c: ClientContact) {
     onChange({ requested_by_contact_id: c.id, requested_by_name: contactName(c) })
@@ -152,7 +161,7 @@ export function RequestedByRow({ clientId, contactId, snapshotName, tooltip, onC
                   <button onClick={() => setMode('edit')} className="text-blue-600 dark:text-blue-400 hover:underline">
                     Edit
                   </button>
-                  <button onClick={() => setMode('pick')} className="text-blue-600 dark:text-blue-400 hover:underline">
+                  <button onClick={() => openPicker()} className="text-blue-600 dark:text-blue-400 hover:underline">
                     Change
                   </button>
                   <button onClick={clear} className="text-muted-foreground hover:text-red-600 dark:hover:text-red-400 ml-auto">
@@ -165,11 +174,27 @@ export function RequestedByRow({ clientId, contactId, snapshotName, tooltip, onC
             {mode === 'pick' && (
               <div className="flex flex-col">
                 <p className="text-[12px] text-muted-foreground px-1 pb-1">Pick a contact</p>
+                {/* Only worth the row when the list is long enough to scan.
+                    Below that the search box IS the scrolling. */}
+                {active.length > 5 && (
+                  <input
+                    autoFocus
+                    value={query}
+                    onChange={e => setQuery(e.target.value)}
+                    placeholder={`Search ${active.length} contacts…`}
+                    className="mb-1 w-full rounded border border-border bg-background px-2 py-1 text-sm"
+                  />
+                )}
                 <div className="max-h-[12rem] overflow-y-auto">
                   {active.length === 0 && (
                     <p className="text-xs text-muted-foreground/60 px-1 py-2">No contacts yet.</p>
                   )}
-                  {active.map(c => (
+                  {active.length > 0 && shown.length === 0 && (
+                    <p className="text-xs text-muted-foreground/60 px-1 py-2">
+                      No contact here matches &ldquo;{query}&rdquo;.
+                    </p>
+                  )}
+                  {shown.map(c => (
                     <button
                       key={c.id}
                       onClick={() => select(c)}
