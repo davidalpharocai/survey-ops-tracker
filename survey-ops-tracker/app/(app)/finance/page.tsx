@@ -11,7 +11,7 @@ import { UnitTab } from '@/components/finance/UnitTab'
 import { BookTab } from '@/components/finance/BookTab'
 import { SaveTab } from '@/components/finance/SaveTab'
 import { money } from '@/components/finance/shared'
-import { blastIncidence, cpqrByRoute } from '@/lib/finance/cpqr'
+import { blastIncidence, cpqrWithCoverage } from '@/lib/finance/cpqr'
 import { exportFinanceCsv } from '@/lib/finance/exportFinance'
 import { savings } from '@/lib/finance/savings'
 import { DrillPanel, type DrillColumn, type DrillSpec } from '@/components/finance/DrillPanel'
@@ -218,11 +218,11 @@ function FinanceInner() {
 
     const pnl = surveyPnl(rows, rates, blasts, suppliers, costs, nameById)
     const variance = budgetVariance(rows, blasts, suppliers, costs, nameById)
-    const cpqr = cpqrByRoute(rows, blasts, suppliers, costs)
+    const { rates: cpqr, mixed: cpqrMixed } = cpqrWithCoverage(rows, blasts, suppliers, costs)
     const medians = new Map<Route, number>(cpqr.map(c => [c.route as Route, c.median]))
 
     return {
-      rows, pnl, variance, cpqr,
+      rows, pnl, variance, cpqr, cpqrMixed,
       resolved: { from: f, to: t },
       rates: routeCosts(rows, blasts, suppliers, costs),
       byAccount: spendByClient(rows, blasts, suppliers, costs, nameById),
@@ -588,7 +588,7 @@ function FinanceInner() {
           back={view.back} canFinance={canFinance} onDrill={k => set({ drill: k })} />
       )}
       {tab === 'unit' && (
-        <UnitTab cpqr={view.cpqr} rates={view.rates} accounts={view.accountsPnl}
+        <UnitTab cpqr={view.cpqr} mixed={view.cpqrMixed} rates={view.rates} accounts={view.accountsPnl}
           ladder={view.ladder} incidence={view.incidence} canFinance={canFinance}
           onDrill={k => set({ drill: k })} />
       )}

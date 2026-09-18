@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { cpqrByRoute, blastIncidence } from './cpqr'
+import { cpqrByRoute, cpqrWithCoverage, blastIncidence } from './cpqr'
 import type { FinBlast, FinProject, FinSupplier } from './hub'
 
 /**
@@ -108,5 +108,125 @@ describe('blastIncidence', () => {
     // Panel has no reach column at all. A rate of 0 would read as "nobody
     // answered" instead of "nobody wrote it down".
     expect(blastIncidence([P({ id: 'x' })], [B('x', 1, 10, 0)], [])).toBeNull()
+  })
+})
+
+/**
+ * 117: mixed-route surveys reaching CPQR at all.
+ *
+ * Seven delivered surveys use both routes and carry $32,878.54 of spend and
+ * 2,554 delivered respondents. Every one of them was dropped by the opening
+ * `if (route !== 'blast' && route !== 'panel') continue` — about 13% of costed
+ * delivered spend, absent from the only per-respondent cost figure published.
+ *
+ * PR00425 is the worked example throughout: 995 PureSpectrum collected for
+ * $2,085.70 and 236 delivered; 24 blast completes for $2,730.10 and 16
+ * delivered; and an $8,697.85 ZoomInfo list that bought exactly the 124,255
+ * sends those blasts used.
+ */
+describe('cpqrByRoute: mixed-route surveys', () => {
+  const MIX = (o: Partial<FinProject> = {}) => P({
+    id: 'm', project_type: 'B2B', n_collected: 1019, n_actual: 252,
+    n_actual_panel: 236, n_actual_blast: 16, n_actual_split_method: 'measured', ...o,
+  })
+  const MB = [{ project_id: 'm', bid: 245 / 24, completes: 24, people: 124255, cost_per_send: 0.02, channel: 'sms' }]
+  const MS = [S('m', 2085.70 / 995, 995)]
+  const ZOOM = (route: string | null) => [{ project_id: 'm', amount: 8697.85, route }]
+
+  it('prices each route on its own money and its own delivered N', () => {
+    const r = cpqrByRoute([MIX()], MB, MS, ZOOM('blast'))
+    const panel = r.find(x => x.route === 'panel')!
+    const blast = r.find(x => x.route === 'blast')!
+    // $8.84 against $714.25 — an 81x spread that the blended $53.63 hides
+    // completely, which is the entire reason this exists.
+    expect(panel.blended).toBeCloseTo(8.84, 2)
+    expect(blast.blended).toBeCloseTo(714.25, 2)
+    expect(panel.qualified).toBe(236)
+    expect(blast.qualified).toBe(16)
+    expect(panel.mixed).toBe(1)
+    expect(blast.mixed).toBe(1)
+  })
+
+  it('never lets the same dollar reach both cards', () => {
+    const r = cpqrByRoute([MIX()], MB, MS, ZOOM('blast'))
+    const total = r.reduce((t, x) => t + x.spend, 0)
+    expect(total).toBeCloseTo(13513.65, 2)
+    expect(r.reduce((t, x) => t + x.qualified, 0)).toBe(252)
+  })
+
+  it('refuses the survey outright while its flat cost names no route', () => {
+    // The failure this guard exists for: admitted with the list unplaced, the
+    // blast leg prices at $170.63 — a quarter of the truth — and pools into a
+    // median beside single-route surveys that DO carry their flat costs.
+    const { rates, mixed } = cpqrWithCoverage([MIX()], MB, MS, ZOOM(null))
+    expect(rates).toEqual([])
+    expect(mixed).toMatchObject({ surveys: 1, priced: 0 })
+    expect(mixed.reasons['unrouted-cost']).toBe(1)
+    expect(mixed.unroutedSpend).toBeCloseTo(8697.85, 2)
+    expect(mixed.blockedSpend).toBeCloseTo(13513.65, 2)
+    expect(mixed.blockedN).toBe(252)
+  })
+
+  it('refuses a split that no longer sums to n_actual', () => {
+    const { rates, mixed } = cpqrWithCoverage([MIX({ n_actual: 300 })], MB, MS, ZOOM('blast'))
+    expect(rates).toEqual([])
+    expect(mixed.reasons['split-mismatch']).toBe(1)
+  })
+
+  it('refuses an ESTIMATED split, and says so rather than dropping it silently', () => {
+    const { rates, mixed } = cpqrWithCoverage(
+      [MIX({ n_actual_split_method: 'estimated' })], MB, MS, ZOOM('blast'))
+    expect(rates).toEqual([])
+    expect(mixed.reasons['estimated']).toBe(1)
+  })
+
+  it('reports a mixed survey nobody has split yet as no-split, not as absent', () => {
+    const { rates, mixed } = cpqrWithCoverage(
+      [MIX({ n_actual_panel: null, n_actual_blast: null, n_actual_split_method: null })],
+      MB, MS, ZOOM('blast'))
+    expect(rates).toEqual([])
+    expect(mixed).toMatchObject({ surveys: 1, priced: 0, blockedN: 252 })
+    expect(mixed.reasons['no-split']).toBe(1)
+  })
+
+  it('counts a mixed survey with no n_actual at all, rather than losing it', () => {
+    // PR00321 and PR00034 are exactly this. They are not "fine", they are
+    // unmeasurable, and the coverage line is where that becomes visible.
+    const { mixed } = cpqrWithCoverage([MIX({ n_actual: null })], MB, MS, ZOOM('blast'))
+    expect(mixed.reasons['no-n-actual']).toBe(1)
+    expect(mixed.blockedSpend).toBeCloseTo(13513.65, 2)
+  })
+
+  it('keeps the spend of a route that delivered nothing', () => {
+    // Money spent on a route that produced no usable interview is a real
+    // outcome. Dropping the leg would understate what a respondent costs.
+    const r = cpqrByRoute([MIX({ n_actual_panel: 252, n_actual_blast: 0 })], MB, MS, ZOOM('blast'))
+    const blast = r.find(x => x.route === 'blast')
+    // No finite per-survey rate, so no median row…
+    expect(blast).toBeUndefined()
+    // …but the panel side is untouched and still prices its own 252.
+    expect(r.find(x => x.route === 'panel')).toMatchObject({ qualified: 252 })
+  })
+
+  it('leaves single-route surveys exactly where they were', () => {
+    // The no-op guarantee. A mixed survey in the set must not move a rate built
+    // from single-route surveys by a cent.
+    const solo = [P({ id: 'a', project_type: 'PS', n_collected: 100, n_actual: 50 })]
+    const before = cpqrByRoute(solo, [], [S('a', 1, 100)], [])
+    expect(before[0]).toMatchObject({ route: 'panel', n: 1, blended: 2, qualified: 50, spend: 100 })
+
+    // Add a mixed survey whose flat cost is NOT routed: it must contribute
+    // nothing, so every figure on the panel card has to come back identical.
+    const blocked = cpqrByRoute([...solo, MIX()], MB, [...MS, S('a', 1, 100)], ZOOM(null))
+    expect(blocked).toEqual(before)
+
+    // Route the cost and it joins — as a SECOND observation, not by disturbing
+    // the first. The solo survey's own $2.00 is still in there beside the mixed
+    // leg's $8.84.
+    const after = cpqrByRoute([...solo, MIX()], MB, [...MS, S('a', 1, 100)], ZOOM('blast'))
+    const panelAfter = after.find(x => x.route === 'panel')!
+    expect(panelAfter.n).toBe(2)
+    expect(panelAfter.spend).toBeCloseTo(100 + 2085.70, 2)
+    expect(panelAfter.qualified).toBe(50 + 236)
   })
 })

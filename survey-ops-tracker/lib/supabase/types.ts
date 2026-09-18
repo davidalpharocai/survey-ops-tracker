@@ -244,6 +244,15 @@ export type Database = {
           voter_survey_qa: boolean | null
           citation_language_needed: boolean | null
           n_actual: number | null
+          /** 117: of n_actual, how many delivered respondents came from
+           *  PureSpectrum launches / from B2B blasts. NULL = not established.
+           *  lib/finance only prices the split when both are present, they sum
+           *  to n_actual, and the method is not 'estimated'. */
+          n_actual_panel: number | null
+          n_actual_blast: number | null
+          /** 117: 'measured' | 'derived' | 'estimated'. 'estimated' is stored so
+           *  the knowledge is not lost and is refused by every published rate. */
+          n_actual_split_method: string | null
           slack_channel_url: string | null
           survey_ids_from_sheet: string | null
           survey_ids_synced_at: string | null
@@ -327,6 +336,9 @@ export type Database = {
           voter_survey_qa?: boolean | null
           citation_language_needed?: boolean | null
           n_actual?: number | null
+          n_actual_panel?: number | null
+          n_actual_blast?: number | null
+          n_actual_split_method?: string | null
           slack_channel_url?: string | null
           survey_ids_from_sheet?: string | null
           survey_ids_synced_at?: string | null
@@ -410,6 +422,9 @@ export type Database = {
           voter_survey_qa?: boolean | null
           citation_language_needed?: boolean | null
           n_actual?: number | null
+          n_actual_panel?: number | null
+          n_actual_blast?: number | null
+          n_actual_split_method?: string | null
           slack_channel_url?: string | null
           survey_ids_from_sheet?: string | null
           survey_ids_synced_at?: string | null
@@ -469,6 +484,10 @@ export type Database = {
           quantity: number | null
           /** 101: optional idempotency key for connector writes. */
           idem_key: string | null
+          /** 117: which fielding route this cost bought — 'blast' | 'panel'.
+           *  NULL = unattributed, and lib/finance keeps an unattributed line out
+           *  of BOTH per-route rates rather than spreading it pro rata. */
+          route: string | null
           description: string | null
           incurred_on: string | null
           created_by: string | null
@@ -481,6 +500,7 @@ export type Database = {
           amount?: number
           quantity?: number | null
           idem_key?: string | null
+          route?: string | null
           description?: string | null
           incurred_on?: string | null
           created_by?: string | null
@@ -493,6 +513,7 @@ export type Database = {
           amount?: number
           quantity?: number | null
           idem_key?: string | null
+          route?: string | null
           description?: string | null
           incurred_on?: string | null
           created_by?: string | null

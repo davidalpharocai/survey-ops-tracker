@@ -80,6 +80,28 @@ export function changelogFor(audience: ChangeAudience): ChangelogEntry[] {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    date: '2026-09-18',
+    changes: [
+      {
+        kind: 'NEW',
+        // Not 'all': cost per respondent, and what a route costs us.
+        text: 'A survey fielded both by blast and by PureSpectrum can now say how many of its delivered respondents came from each. Ask Claude to record it, and the finance page starts pricing the two routes separately instead of leaving the survey out. The Amex study is the case in point: 236 of its 252 respondents came from PureSpectrum and 16 from the blasts, which works out at $8.84 a delivered respondent on one side and $714.25 on the other — a blended figure of $53.62 describes neither.',
+      },
+      {
+        kind: 'NEW',
+        text: 'A flat cost line can say which route it bought for. It matters on a survey that used both: the Amex study’s $8,697.85 contact list was bought purely to blast — the 124,255 contacts are exactly the 124,255 messages sent — so charging any of it to the panel side would understate what a blast respondent costs by four times.',
+      },
+      {
+        kind: 'FIXED',
+        text: 'Surveys fielded both ways were missing from cost per respondent and cost per complete altogether — seven of them, carrying $32,879 of spend and 2,554 delivered respondents, about an eighth of all recorded delivered spend. They now appear as one entry per route. Where a survey still can’t be split, the page says so and says what is missing, rather than quietly leaving it out.',
+      },
+      {
+        kind: 'IMPROVED',
+        text: 'Asking Claude to reconcile a survey now checks the route split adds up to the delivered N, and flags a cost line on a both-ways survey that doesn’t say which route it bought.',
+      },
+    ],
+  },
+  {
     date: '2026-09-17',
     changes: [
       {

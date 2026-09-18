@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import {
-  spendOf, routeOf, routeCosts, spendByClient, unbillable, blastEfficiency,
+  spendOf, routeOf, routeCosts, legsOf, spendByClient, unbillable, blastEfficiency,
   coverage, applyFilters, finDate,
-  type FinProject, type FinBlast, type FinSupplier,
+  type FinProject, type FinBlast, type FinCost, type FinSupplier,
 } from './hub'
 
 /**
@@ -79,11 +79,45 @@ describe('routeCosts', () => {
     expect(routeCosts(rows, b, [], []).find(r => r.route === 'blast')).toMatchObject({ n: 1, median: 50 })
   })
 
-  it('never pools a mixed-route survey into either rate', () => {
+  // 117 CHANGED THIS DELIBERATELY. It used to assert `toEqual([])` — a mixed
+  // survey contributed to neither rate, on the grounds that "a blended survey
+  // cannot attribute its own dollars to one side". That was true of CPQR, which
+  // divides by a post-QA figure no row records per route. It was never true
+  // here: this rate divides spend by completes we PAID FOR, and a blast row
+  // carries its own bid and completes while a supplier row carries its own CPI
+  // and collected. The money was always attributable; it was being discarded.
+  it('partitions a mixed-route survey into one leg per route', () => {
     const rows = [P({ id: 'm', n_collected: 2 })]
     const b: FinBlast[] = [{ project_id: 'm', bid: 50, completes: 1, people: 0, cost_per_send: 0, channel: 'sms' }]
     const s: FinSupplier[] = [{ project_id: 'm', cpi: 1, n_collected: 1 }]
-    expect(routeCosts(rows, b, s, [])).toEqual([])
+    const out = routeCosts(rows, b, s, [])
+    expect(out.find(r => r.route === 'blast')).toMatchObject({ n: 1, median: 50 })
+    expect(out.find(r => r.route === 'panel')).toMatchObject({ n: 1, median: 1 })
+  })
+
+  // …but ONLY when every dollar can be placed. A flat cost line naming no route
+  // is the one thing a mixed survey cannot split, and on PR00425 that line is
+  // 64% of the bill — so it blocks both legs rather than being smeared across
+  // them.
+  it('drops a mixed survey whose flat cost names no route', () => {
+    const rows = [P({ id: 'm', n_collected: 2 })]
+    const b: FinBlast[] = [{ project_id: 'm', bid: 50, completes: 1, people: 0, cost_per_send: 0, channel: 'sms' }]
+    const s: FinSupplier[] = [{ project_id: 'm', cpi: 1, n_collected: 1 }]
+    const c: FinCost[] = [{ project_id: 'm', amount: 900, route: null }]
+    expect(routeCosts(rows, b, s, c)).toEqual([])
+  })
+
+  it('prices a mixed survey once its flat cost is routed', () => {
+    const rows = [P({ id: 'm', n_collected: 2 })]
+    const b: FinBlast[] = [{ project_id: 'm', bid: 50, completes: 1, people: 0, cost_per_send: 0, channel: 'sms' }]
+    const s: FinSupplier[] = [{ project_id: 'm', cpi: 1, n_collected: 1 }]
+    const c: FinCost[] = [{ project_id: 'm', amount: 900, route: 'blast' }]
+    const out = routeCosts(rows, b, s, c)
+    // The list purchase lands wholly on the side that bought it: $950 for the
+    // one blast complete, $1 for the one panel complete. Pro rata would have put
+    // $450 on a panel leg that bought none of it.
+    expect(out.find(r => r.route === 'blast')).toMatchObject({ n: 1, median: 950 })
+    expect(out.find(r => r.route === 'panel')).toMatchObject({ n: 1, median: 1 })
   })
 
   it('reports the spread, not just a median', () => {
@@ -196,5 +230,108 @@ describe('filters', () => {
   it('drops an undated survey from a dated range rather than guessing it in', () => {
     const undated = [P({ id: 'z', deliver_date: null, launch_date: null, submitted_date: null })]
     expect(applyFilters(undated, { from: '2026-01-01' }, route)).toEqual([])
+  })
+})
+
+/**
+ * 117: the partition.
+ *
+ * legsOf is the only place a survey's money is split by route, and everything
+ * downstream adds up legs rather than reaching for spendOf().total. These guard
+ * the invariant that makes that safe — if a leg can be produced whose parts do
+ * not add back to the whole, the same dollar can be counted on both cards.
+ */
+describe('legsOf', () => {
+  const MIX = (o: Partial<FinProject> = {}) => P({
+    id: 'm', n_collected: 1019, n_actual: 252,
+    n_actual_panel: 236, n_actual_blast: 16, n_actual_split_method: 'measured', ...o,
+  })
+  // PR00425, to scale: 11 SMS blasts (24 completes, $245 reward + $2,485.10
+  // send), PureSpectrum (995 collected, $2,085.70) and an $8,697.85 ZoomInfo
+  // list that bought exactly the 124,255 sends the blasts used.
+  const B: FinBlast[] = [{ project_id: 'm', bid: 245 / 24, completes: 24, people: 124255, cost_per_send: 0.02, channel: 'sms' }]
+  const S: FinSupplier[] = [{ project_id: 'm', cpi: 2085.70 / 995, n_collected: 995 }]
+  const ZOOM = (route: string | null): FinCost[] => [{ project_id: 'm', amount: 8697.85, route }]
+
+  it('gives a single-route survey ONE leg carrying its entire bill', () => {
+    // The no-op guarantee: everything downstream that used spendOf().total on a
+    // single-route survey must get the identical number from one leg, flat cost
+    // lines included, routed or not. 126 of 133 costed surveys take this path.
+    const p = P({ id: 'p1', n_collected: 10, n_actual: 8 })
+    const b: FinBlast[] = [{ project_id: 'p1', bid: 25, completes: 10, people: 100, cost_per_send: 0.02, channel: 'sms' }]
+    const c: FinCost[] = [{ project_id: 'p1', amount: 500, route: null }]
+    const { legs, unrouted, reason } = legsOf(p, b, [], c)
+    expect(reason).toBe('ok')
+    expect(unrouted).toBe(0)
+    expect(legs).toHaveLength(1)
+    expect(legs[0]).toMatchObject({ route: 'blast', paid: 10, delivered: 8, collected: 10 })
+    expect(legs[0].spend).toBeCloseTo(spendOf(p, b, [], c).total, 6)
+  })
+
+  it('splits a mixed survey so the parts add back to the whole', () => {
+    const p = MIX()
+    const c = ZOOM('blast')
+    const { legs, unrouted } = legsOf(p, B, S, c)
+    const sp = spendOf(p, B, S, c)
+    expect(legs).toHaveLength(2)
+    // THE INVARIANT. Without it the same dollar reaches both cards.
+    expect(legs.reduce((t, l) => t + l.spend, 0) + unrouted).toBeCloseTo(sp.total, 6)
+    expect(legs.reduce((t, l) => t + l.paid, 0)).toBe(sp.paidCompletes)
+    expect(legs.reduce((t, l) => t + (l.delivered ?? 0), 0)).toBe(252)
+
+    const panel = legs.find(l => l.route === 'panel')!
+    const blast = legs.find(l => l.route === 'blast')!
+    expect(panel.spend).toBeCloseTo(2085.70, 2)
+    expect(panel.delivered).toBe(236)
+    // The list purchase lands wholly on the blasts that used it: $2,730.10 of
+    // field cost plus $8,697.85 of contacts. Pro rata by delivered N would have
+    // charged the panel side $8,145 of a list it never touched.
+    expect(blast.spend).toBeCloseTo(11427.95, 2)
+    expect(blast.delivered).toBe(16)
+  })
+
+  it('refuses to split at all while a flat cost names no route', () => {
+    // 64% of PR00425's bill. Admitting the survey without placing it prices the
+    // blast leg at $170.63 against a truth of $714.25 — four times too cheap,
+    // pooled beside single-route surveys that DO carry their flat costs.
+    const { legs, unrouted, reason } = legsOf(MIX(), B, S, ZOOM(null))
+    expect(legs).toEqual([])
+    expect(reason).toBe('unrouted-cost')
+    expect(unrouted).toBeCloseTo(8697.85, 2)
+  })
+
+  it('still partitions the MONEY when the delivered split is unknown', () => {
+    // Cost per complete needs no delivered figure, so a mixed survey nobody has
+    // joined the deliverable for still prices per complete. Only CPQR refuses.
+    const { legs, splitReason } = legsOf(
+      MIX({ n_actual_panel: null, n_actual_blast: null, n_actual_split_method: null }), B, S, ZOOM('blast'))
+    expect(legs).toHaveLength(2)
+    expect(legs.every(l => l.delivered == null)).toBe(true)
+    expect(splitReason).toBe('no-split')
+    expect(legs.reduce((t, l) => t + l.spend, 0)).toBeCloseTo(13513.65, 2)
+  })
+
+  it('treats a split that no longer sums to n_actual as absent', () => {
+    // n_actual moves on its own. A split that stops agreeing is stale, and stale
+    // is worse than missing because it looks answered.
+    const { legs, splitReason } = legsOf(MIX({ n_actual: 300 }), B, S, ZOOM('blast'))
+    expect(legs.every(l => l.delivered == null)).toBe(true)
+    expect(splitReason).toBe('split-mismatch')
+  })
+
+  it('stores an estimated split but refuses to price it', () => {
+    const { legs, splitReason } = legsOf(
+      MIX({ n_actual_split_method: 'estimated' }), B, S, ZOOM('blast'))
+    expect(legs.every(l => l.delivered == null)).toBe(true)
+    expect(splitReason).toBe('estimated')
+  })
+
+  it('allows a leg that delivered nothing', () => {
+    // A route we spent on that produced no usable interview is a real outcome,
+    // not a data error. Its spend still has to land somewhere.
+    const { legs } = legsOf(
+      MIX({ n_actual_panel: 252, n_actual_blast: 0 }), B, S, ZOOM('blast'))
+    expect(legs.find(l => l.route === 'blast')).toMatchObject({ delivered: 0 })
+    expect(legs.find(l => l.route === 'panel')).toMatchObject({ delivered: 252 })
   })
 })

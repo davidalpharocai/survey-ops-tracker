@@ -79,16 +79,35 @@ export function marginRows(pnl: SurveyPnl[]): DrillRow[] {
     .sort((a, b) => (a.contribution as number) - (b.contribution as number))
 }
 
-/** CPQR contributors for one route. `contribution` is SPEND, not the rate: a
- *  blended rate is a ratio of two sums and cannot be reconciled row-by-row, so
- *  the strip checks the numerator it was actually built from. */
+/**
+ * CPQR contributors for one route. `contribution` is SPEND, not the rate: a
+ * blended rate is a ratio of two sums and cannot be reconciled row-by-row, so
+ * the strip checks the numerator it was actually built from.
+ *
+ * READS `cpqrLegs`, WHICH THE CARD ALSO READS. This used to re-state the card's
+ * admission test as its own filter, which was survivable while a survey was
+ * wholly on one route. It stopped being survivable in 117: a MIXED survey now
+ * contributes a PART of its cost to each route, so `r.cost` — the whole bill —
+ * is the wrong contribution on both sides. On PR00425 it would report $13,514
+ * against a panel headline built from $2,086.
+ */
 export function cpqrRows(pnl: SurveyPnl[], route: 'blast' | 'panel'): DrillRow[] {
   return pnl
-    .filter(r =>
-      r.lifecycle === 'delivered' && r.route === route && r.cost > 0 &&
-      r.actual != null && r.actual > 0 && r.collected != null && r.collected > 0 &&
-      r.paidCompletes >= Math.max(r.collected, r.actual))
-    .map(r => ({ ...base(r), paidCompletes: r.paidCompletes, contribution: r.cost }))
+    .flatMap(r => {
+      const leg = r.cpqrLegs.find(l => l.route === route)
+      if (!leg) return []
+      return [{
+        ...base(r),
+        paidCompletes: leg.paid,
+        // The leg's own figures, so a mixed survey's row reads as the part of it
+        // this card is about rather than as the whole survey.
+        cost: leg.spend,
+        actual: leg.delivered,
+        cpqr: leg.delivered && leg.delivered > 0 ? leg.spend / leg.delivered : null,
+        cpc: leg.paid > 0 ? leg.spend / leg.paid : null,
+        contribution: leg.spend,
+      }]
+    })
     .sort((a, b) => (b.cpqr as number ?? 0) - (a.cpqr as number ?? 0))
 }
 

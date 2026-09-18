@@ -2437,6 +2437,7 @@ export const TOOLS: AssistantTool[] = [
       "KIND is a closed set, enforced by the database: 'contacts_export' = what it cost to ACQUIRE contacts. 'sms_email_blast' = a FIXED platform charge that does NOT scale with messages sent — the per-message cost is $/send on the blast itself and is already in spend, so putting it here charges it twice. 'other' = anything else — translation, a panel fee, an incentive paid outside a blast — and it REQUIRES a description saying what it was. Reach for 'other' rather than filing a cost under whichever of the first two is closer: kind is what the double-count check reads, and a mislabelled row is a false positive there forever. " +
       "MONEY, one of two ways: `amount` for a flat invoice, or `unit_cost` + `quantity` when it is per-unit (0.07 × 22,121 → $1,548.47) — the product is computed here, shown in the preview, and stored, and `quantity` is kept so cost-per-unit stays derivable. Passing both is fine only if they agree. " +
       "IDEMPOTENCY: without an idem_key a second call ADDS A SECOND LINE and spend counts both, so pass one whenever a retry is possible. With one, a re-send updates that same line, and any field you OMIT keeps its recorded value rather than being blanked — use update_cost to un-record something deliberately. The key must be one you chose; an id put there matches nothing and inserts a duplicate. " +
+      "ROUTE (optional) says which fielding route the money bought: 'blast' or 'panel'. It only matters on a survey fielded BOTH ways, and there it matters a great deal — a contacts export is bought in order to blast it, so on PR00425 leaving its $8,697.85 ZoomInfo line unrouted priced the blast side at $170.63 a respondent against a true $714.25. An unrouted line is not spread pro rata; it holds the whole survey out of the per-route rates until someone says where it belongs. On a single-route survey there is only one place it can go, so leave it off. " +
       "Preview says create vs update and warns if the project already carries a line of the same kind and amount; confirm to apply.",
     kind: 'write',
     schema: {
@@ -2447,6 +2448,7 @@ export const TOOLS: AssistantTool[] = [
       quantity: z.number().int().positive().optional(),
       description: z.string().max(1000).optional(),
       incurred_on: z.string().optional(),
+      route: z.enum(['blast', 'panel']).optional(),
       idem_key: z.string().optional(),
       confirm: z.boolean().optional(),
     },
@@ -2454,7 +2456,8 @@ export const TOOLS: AssistantTool[] = [
       const args = rawArgs as {
         project: string; kind: 'contacts_export' | 'sms_email_blast' | 'other'
         amount?: number; unit_cost?: number; quantity?: number
-        description?: string; incurred_on?: string; idem_key?: string; confirm?: boolean
+        description?: string; incurred_on?: string; route?: 'blast' | 'panel'
+        idem_key?: string; confirm?: boolean
       }
       const { userEmail } = ctx
       const p = await resolveProjectWritable(args.project)
@@ -2572,6 +2575,10 @@ export const TOOLS: AssistantTool[] = [
             createdBy: userEmail.split('@')[0],
             idemKey,
             actor: `${userEmail} via Claude`,
+            // `?? null` not a coalesce onto anything existing: on an idem_key
+            // re-send the RPC keeps the recorded route when this arrives null,
+            // so an omission stays an omission rather than clearing it.
+            route: args.route ?? null,
           })
           const after = await listCostsForProject(p.id as string)
           meta.detail = { [existing ? 'updated' : 'created']: { id: row.id, kind: row.kind, amount: row.amount } }
@@ -2588,7 +2595,9 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'update_cost',
     description:
-      "Change a cost line on a project — its kind, amount, quantity, description or date. Identify it by `cost_ref` = its idem_key or its id. Only the fields you pass change. Pass `unit_cost` with `quantity` to recompute the amount from the pair. The project's actual spend recomputes. Preview first; confirm to apply.",
+      "Change a cost line on a project — its kind, amount, quantity, description, date or route. Identify it by `cost_ref` = its idem_key or its id. Only the fields you pass change. Pass `unit_cost` with `quantity` to recompute the amount from the pair. " +
+      "ROUTE is which fielding route the money bought, 'blast' or 'panel', and it is how you fix a survey fielded both ways that the per-route rates are refusing to price. Pass null to un-record it. It changes no dollar of the project's spend — only which side of the CPQR comparison those dollars count on. " +
+      "The project's actual spend recomputes. Preview first; confirm to apply.",
     kind: 'write',
     schema: {
       project: z.string(),
@@ -2599,6 +2608,7 @@ export const TOOLS: AssistantTool[] = [
       quantity: z.number().int().positive().nullable().optional(),
       description: z.string().max(1000).nullable().optional(),
       incurred_on: z.string().nullable().optional(),
+      route: z.enum(['blast', 'panel']).nullable().optional(),
       confirm: z.boolean().optional(),
     },
     handler: async (rawArgs, ctx, meta) => {
@@ -2606,7 +2616,8 @@ export const TOOLS: AssistantTool[] = [
         project: string; cost_ref: string
         kind?: 'contacts_export' | 'sms_email_blast' | 'other'
         amount?: number; unit_cost?: number; quantity?: number | null
-        description?: string | null; incurred_on?: string | null; confirm?: boolean
+        description?: string | null; incurred_on?: string | null
+        route?: 'blast' | 'panel' | null; confirm?: boolean
       }
       const { userEmail } = ctx
       const p = await resolveProjectWritable(args.project)
@@ -2621,6 +2632,9 @@ export const TOOLS: AssistantTool[] = [
       if (args.kind !== undefined) patch.kind = args.kind
       if (args.description !== undefined) patch.description = args.description
       if (args.incurred_on !== undefined) patch.incurred_on = args.incurred_on
+      // Three distinct actions, as everywhere else: omit to leave alone, a value
+      // to record, null to un-record.
+      if (args.route !== undefined) patch.route = args.route
 
       // unit_cost x quantity recomputes the amount, using the stored quantity
       // when only the unit price moved — repricing a known number of contacts is

@@ -44,7 +44,16 @@ export type BlastRow = {
 /** `kind` is here for check 9 (the send-cost double count) and must stay named in
  *  fetchCosts' select below — an omitted column does not error, it just leaves
  *  the value undefined and the check silently never fires. */
-export type CostRow = { amount: number | null; kind: string | null }
+export type CostRow = {
+  amount: number | null; kind: string | null
+  /** 117: which fielding route this cost bought. OPTIONAL on the type, because
+   *  this file must keep working in the window between deploy and David applying
+   *  the migration by hand — before it lands the column is simply absent and
+   *  check 13 reads undefined, which is `== null`, which is exactly the "not
+   *  attributed" it is looking for. It fires on mixed surveys only, of which
+   *  there are 7, so a few days of a correct advisory is the harmless outcome. */
+  route?: string | null
+}
 export type SegRow = { n_target: number | null; n_collected: number | null; n_actual: number | null }
 
 const num = (v: unknown): number => (v == null ? 0 : Number(v))
@@ -486,6 +495,81 @@ export function buildChecks(p: Row, sup: SupRow[], blasts: BlastRow[], costs: Co
     }
   }
 
+  // 12) THE DELIVERED-N ROUTE SPLIT, AGAINST THE N IT SPLITS (migration 117).
+  //
+  //     n_actual_panel + n_actual_blast must equal n_actual. This is deliberately
+  //     NOT a table constraint: n_actual moves on its own — the data team revises
+  //     it, sync_segment_totals recomputes it from segments — and a CHECK would
+  //     make an unrelated, correct edit fail with a constraint name the editor
+  //     cannot act on. So the invariant lives here, where it can be explained.
+  //
+  //     It matters because lib/finance fails CLOSED on a split that does not sum:
+  //     the survey silently drops out of both per-route rates and back into the
+  //     mixed-coverage line. Without this check, the only symptom of a stale split
+  //     is a number quietly going missing from the finance page.
+  //
+  //     AN ISSUE, not an advisory, and the asymmetry with check 11 is on purpose.
+  //     There, a disagreement between n_collected and its sources can legitimately
+  //     mean the headline is stale. Here both numbers are typed by the same person
+  //     about the same delivery, so a disagreement is an error in one of them
+  //     rather than a difference in vintage.
+  const nAct = num(p.n_actual)
+  const panelN = p.n_actual_panel == null ? null : num(p.n_actual_panel)
+  const blastN = p.n_actual_blast == null ? null : num(p.n_actual_blast)
+  if (panelN != null || blastN != null) {
+    if (panelN == null || blastN == null) {
+      const known = panelN != null ? 'PureSpectrum' : 'blast'
+      const missing = panelN != null ? 'blast' : 'PureSpectrum'
+      checks.push({
+        check: 'n_split_incomplete', ok: false, advisory: false,
+        expected: nAct, actual: (panelN ?? blastN) as number,
+        detail: `the delivered N records a ${known} side but no ${missing} side, so it cannot be checked against n_actual (${nAct.toLocaleString('en-US')}) and the per-route cost figures ignore it — set both, even if one of them is 0`,
+      })
+    } else if (panelN + blastN !== nAct) {
+      checks.push({
+        check: 'n_split_vs_n_actual', ok: false, advisory: false,
+        expected: nAct, actual: panelN + blastN,
+        detail: `the delivered split says ${panelN.toLocaleString('en-US')} from PureSpectrum + ${blastN.toLocaleString('en-US')} from blasts = ${(panelN + blastN).toLocaleString('en-US')}, but n_actual is ${nAct.toLocaleString('en-US')} — one of them moved after the other was recorded, and until they agree this survey is left out of the per-route cost per respondent`,
+      })
+    } else {
+      // A split that is a judgement is recorded and refused by the rates. Saying
+      // so here is the only place a reader learns why a correct-looking split is
+      // not on the finance page.
+      const method = p.n_actual_split_method
+      if (method === 'estimated') {
+        checks.push({
+          check: 'n_split_estimated', ok: false, advisory: true,
+          expected: nAct, actual: panelN + blastN,
+          detail: `the delivered split (${panelN.toLocaleString('en-US')} PureSpectrum / ${blastN.toLocaleString('en-US')} blast) is recorded as an ESTIMATE, so it is kept but deliberately excluded from the per-route cost per respondent — join the deliverable's transaction IDs to the QA file to make it measured`,
+        })
+      }
+    }
+  }
+
+  // 13) A FLAT COST LINE THAT NAMES NO ROUTE, ON A SURVEY FIELDED BOTH WAYS.
+  //
+  //     Only fires on a MIXED survey, because that is the only place the answer
+  //     is in doubt — a single-route survey has exactly one place a cost can
+  //     belong. There it is the difference between a right and a wrong rate: on
+  //     PR00425 the unrouted $8,697.85 contacts export is 64% of the whole bill,
+  //     and a per-route figure that cannot place it reports the blast side at
+  //     $170.63 a respondent against a true $714.25.
+  //
+  //     Advisory: nothing is WRONG, a fact is missing. Spend, N and every
+  //     project-level total are correct either way; what it blocks is the
+  //     comparison between the two routes.
+  if (sup.length > 0 && blasts.length > 0) {
+    const unrouted = costs.filter(c => c.route == null && num(c.amount) > 0)
+    if (unrouted.length) {
+      const amt = unrouted.reduce((t, c) => t + num(c.amount), 0)
+      checks.push({
+        check: 'cost_line_unrouted', ok: false, advisory: true,
+        expected: 0, actual: Math.round(amt),
+        detail: `${unrouted.length} flat cost line(s) totalling $${amt.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} say nothing about which fielding route they bought, and this survey used both — so its cost per respondent cannot be split and the survey is held out of the per-route figures. Set route to 'blast' or 'panel' on each (a bought contact list is a blast cost).`,
+      })
+    }
+  }
+
   return checks
 }
 
@@ -503,6 +587,48 @@ export function buildChecks(p: Row, sup: SupRow[], blasts: BlastRow[], costs: Co
  *     read-only report.)
  *  The table IS in the Database type now (added when 078 landed), so this reads through
  *  the normal typed client — only the failure tolerance above is still deliberate. */
+/**
+ * The delivered-N route split (117), read SEPARATELY and with the failure
+ * swallowed.
+ *
+ * Not folded into dataHealth's explicit select above, and that is the whole
+ * point. PostgREST rejects the ENTIRE select if it names a column the schema
+ * does not have — and these three do not exist until David applies 117 by hand,
+ * hours or days after this deploys. Naming them there would 500 data_health for
+ * everyone in that window; naming them here costs one extra round trip and
+ * degrades to "no splits recorded", which is true before the migration and is
+ * exactly what check 12 should see.
+ *
+ * It cannot be omitted either. buildChecks reads p.n_actual_panel, and an
+ * explicit select that leaves a column out does NOT error — the value is simply
+ * undefined and the check silently never fires, which is how check 7c came to be
+ * unreachable for every project in the database.
+ */
+async function fetchSplits(
+  supabase: ReturnType<typeof createAdminClient>,
+  projectIds: string[],
+): Promise<Map<string, Row>> {
+  const out = new Map<string, Row>()
+  try {
+    const rows = await inChunks<Row & { id: string }>(
+      projectIds,
+      c => supabase.from('survey_projects')
+        .select('id, n_actual_panel, n_actual_blast, n_actual_split_method')
+        .in('id', c),
+    )
+    for (const r of rows) {
+      out.set(r.id, {
+        n_actual_panel: r.n_actual_panel,
+        n_actual_blast: r.n_actual_blast,
+        n_actual_split_method: r.n_actual_split_method,
+      })
+    }
+  } catch (err) {
+    console.error('[health] route-split read failed — treating as no splits recorded:', err)
+  }
+  return out
+}
+
 async function fetchCosts(
   supabase: ReturnType<typeof createAdminClient>,
   projectIds: string[],
@@ -510,7 +636,16 @@ async function fetchCosts(
   try {
     return await inChunks<CostRow & { project_id: string }>(
       projectIds,
-      c => supabase.from('project_costs').select('project_id, amount, kind').in('project_id', c),
+      // SELECT * RATHER THAN A COLUMN LIST, and this is the one place in this
+      // file where that is the careful choice rather than the lazy one.
+      // PostgREST rejects the WHOLE select if it names a column the schema does
+      // not have yet, and `route` does not exist until David applies 117 by
+      // hand. Naming it would make fetchCosts throw, the catch below would
+      // swallow it to "no cost lines", and check 1 would then accuse every
+      // project carrying a cost line of a broken spend trigger — $10,246 of real
+      // cost reported as a trigger failure, for as long as the migration sat
+      // unapplied. `*` cannot fail that way, and the table has 2 rows.
+      c => supabase.from('project_costs').select('*').in('project_id', c),
     )
   } catch (err) {
     console.error('[health] project_costs read failed — treating as no cost lines:', err)
@@ -602,12 +737,20 @@ export async function dataHealth(args: { active_only?: boolean; limit?: number }
   const ids = projects.map(p => p.id as string)
   if (ids.length === 0) return { scanned: 0, with_issues: 0, counts_by_check: {}, advisory_counts: {}, projects: [], summary: 'No projects to scan.' }
 
-  const [supRows, blastRows, costRows, segRows] = await Promise.all([
+  const [supRows, blastRows, costRows, segRows, splits] = await Promise.all([
     inChunks<SupRow & { project_id: string }>(ids, c => supabase.from('project_suppliers').select('project_id, cpi, n_collected').in('project_id', c)),
     inChunks<BlastRow & { project_id: string }>(ids, c => supabase.from('project_blasts').select('project_id, bid, completes, people, cost_per_send, blast_at').in('project_id', c)),
     fetchCosts(supabase, ids),
     inChunks<SegRow & { project_id: string }>(ids, c => supabase.from('project_segments').select('project_id, n_target, n_collected, n_actual').in('project_id', c)),
+    fetchSplits(supabase, ids),
   ])
+  // Spliced onto the rows rather than added to the select above, for the reason
+  // fetchSplits explains. reconcileProject needs no equivalent: it reads through
+  // resolveProject, which is already `select('*')`.
+  for (const p of projects) {
+    const sp = splits.get(p.id as string)
+    if (sp) Object.assign(p, sp)
+  }
   const supMap = groupByProject(supRows)
   const blastMap = groupByProject(blastRows)
   const costMap = groupByProject(costRows)

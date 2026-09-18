@@ -14,11 +14,13 @@ import { fmtNum } from '@/lib/utils/number'
 import { Bar, Card, Empty, Note, Row, money, money2, moneyAuto, pct1 } from './shared'
 import { Drillable } from './DrillPanel'
 import type { AccountPnl, BidLadder } from '@/lib/finance/analysis'
-import type { Cpqr } from '@/lib/finance/cpqr'
+import type { Cpqr, MixedCoverage } from '@/lib/finance/cpqr'
 import type { RouteCost } from '@/lib/finance/hub'
 
-export function UnitTab({ cpqr, rates, accounts, ladder, incidence, canFinance, onDrill }: {
+export function UnitTab({ cpqr, mixed, rates, accounts, ladder, incidence, canFinance, onDrill }: {
   cpqr: Cpqr[]
+  /** 117: the mixed-route surveys these rates could not price, and why. */
+  mixed?: MixedCoverage
   rates: RouteCost[]
   accounts: AccountPnl[]
   ladder: BidLadder | null
@@ -35,7 +37,7 @@ export function UnitTab({ cpqr, rates, accounts, ladder, incidence, canFinance, 
     <div className="grid gap-4 lg:grid-cols-2">
       <Card
         title="CPQR — cost per qualified respondent"
-        tip="Recorded spend ÷ n_actual, the post-QA count the client actually received. Cost per complete divides by what we PAID for instead; the gap between the two is the scrub. Delivered surveys only, and only those whose recorded completes cover both the N collected and the N delivered — without that guard this card reported blast at half its true cost and an impossible 116% QA yield."
+        tip="Recorded spend ÷ n_actual, the post-QA count the client actually received. Cost per complete divides by what we PAID for instead; the gap between the two is the scrub. Delivered surveys only, and only those whose recorded completes cover both the N collected and the N delivered — without that guard this card reported blast at half its true cost and an impossible 116% QA yield. A survey fielded both ways contributes one observation to each route, built from that route's own spend and its own delivered respondents, and only once both can be established."
       >
         {cpqr.length === 0 ? (
           <Empty>No delivered survey here has both a recorded cost and a post-QA count.</Empty>
@@ -64,6 +66,10 @@ export function UnitTab({ cpqr, rates, accounts, ladder, incidence, canFinance, 
                   </span>
                   {', '}<span className="font-medium">{Math.round(c.scrubRateMedian * 100)}% on the typical survey</span>
                   {c.excluded > 0 && <> · {fmtNum(c.excluded)} excluded, records do not reconcile</>}
+                  {c.mixed > 0 && (
+                    <> · {fmtNum(c.mixed)} of these {c.mixed === 1 ? 'is' : 'are'} one side of a
+                    survey fielded both ways, counted on its own money</>
+                  )}
                 </div>
               </div>
             ))}
@@ -78,6 +84,46 @@ export function UnitTab({ cpqr, rates, accounts, ladder, incidence, canFinance, 
                 {panel && blast && ' and '}
                 {blast && <>{Math.round(blast.keepP25 * 100)}–{Math.round(blast.keepP75 * 100)}% on blast</>}
                 {' '}— wide enough that any single buy-multiple under-buys about half the time.
+              </Note>
+            )}
+            {mixed && mixed.surveys > mixed.priced && (
+              <Note>
+                <span className="font-medium text-foreground">
+                  {fmtNum(mixed.surveys - mixed.priced)} survey
+                  {mixed.surveys - mixed.priced === 1 ? '' : 's'} fielded BOTH ways{' '}
+                  {mixed.surveys - mixed.priced === 1 ? 'is' : 'are'} missing from the two rates
+                  above
+                </span>
+                {' '}— {money2(mixed.blockedSpend)} of spend and {fmtNum(mixed.blockedN)} delivered
+                respondents. A survey that used blasts and PureSpectrum together only reaches these
+                figures once every dollar and every delivered respondent can be placed on one side
+                or the other, because a rate built by splitting them down the middle would be wrong
+                on both.{' '}
+                {mixed.reasons['no-split'] ? (
+                  <>{fmtNum(mixed.reasons['no-split'])} need{mixed.reasons['no-split'] === 1 ? 's' : ''} the
+                  delivered N split by route — join the deliverable&rsquo;s transaction IDs to the QA
+                  file, then record it on the survey. </>
+                ) : null}
+                {mixed.reasons['unrouted-cost'] ? (
+                  <>{fmtNum(mixed.reasons['unrouted-cost'])} carr
+                  {mixed.reasons['unrouted-cost'] === 1 ? 'ies' : 'y'} a flat cost line
+                  ({money2(mixed.unroutedSpend)}) that does not say which route it bought — a
+                  contacts export is a blast cost. </>
+                ) : null}
+                {mixed.reasons['no-n-actual'] ? (
+                  <>{fmtNum(mixed.reasons['no-n-actual'])} ha
+                  {mixed.reasons['no-n-actual'] === 1 ? 's' : 've'} no post-QA count at all. </>
+                ) : null}
+                {mixed.reasons['under-recorded'] ? (
+                  <>{fmtNum(mixed.reasons['under-recorded'])} ha
+                  {mixed.reasons['under-recorded'] === 1 ? 's' : 've'} field rows that do not cover
+                  the N claimed. </>
+                ) : null}
+                {mixed.reasons['estimated'] ? (
+                  <>{fmtNum(mixed.reasons['estimated'])} carr
+                  {mixed.reasons['estimated'] === 1 ? 'ies' : 'y'} a split recorded as an estimate,
+                  which is kept but deliberately never priced. </>
+                ) : null}
               </Note>
             )}
             {panel && blast && (

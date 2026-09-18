@@ -62,6 +62,15 @@ export interface FinProject {
    *  the suffix in `client` agrees with it on all 58 surveys that carry both
    *  and contradicts it on none, so the suffix adds nothing the key lacks. */
   requested_by_contact_id?: string | null
+  /** 117: of n_actual, how many delivered respondents each route produced.
+   *  Only meaningful on a MIXED survey — a single-route survey's whole n_actual
+   *  belongs to its one route by construction and these stay null. */
+  n_actual_panel?: number | null
+  n_actual_blast?: number | null
+  /** 117: how the split was arrived at. 'estimated' is a judgement and is
+   *  REFUSED by every rate in this file; it is stored so the knowledge is not
+   *  lost, not so it can be divided by. */
+  n_actual_split_method?: string | null
 }
 
 /** One row of `clients`. `name` is the consolidated account. */
@@ -104,6 +113,11 @@ export interface FinSupplier {
 export interface FinCost {
   project_id: string
   amount: number | null
+  /** 117: 'blast' | 'panel', or null for an unattributed line. A flat cost on a
+   *  SINGLE-route survey needs no route — there is only one place it can belong
+   *  — so this matters only on mixed surveys, where PR00425's $8,697.85 ZoomInfo
+   *  line is 64% of the survey's whole cost. */
+  route?: string | null
 }
 
 export interface Filters {
@@ -243,6 +257,200 @@ export function routeOf(
   return b && s ? 'both' : b ? 'blast' : s ? 'panel' : 'none'
 }
 
+/** One route's share of a survey: what it cost, what it bought, what survived. */
+export interface Leg {
+  route: 'blast' | 'panel'
+  /** Spend attributable to this route — its own field rows, plus the flat cost
+   *  lines routed to it. */
+  spend: number
+  /** Completes we PAID for on this route. */
+  paid: number
+  /**
+   * Delivered (post-QA) respondents attributed to this route, or NULL when that
+   * is not established.
+   *
+   * NULLABLE on purpose, and it is the difference between the two rates this
+   * file feeds. Cost per COMPLETE needs only spend and paid, both of which a
+   * mixed survey already carries in its own rows — so routeCosts can price a
+   * mixed survey with no new data at all. CPQR divides by what survived QA into
+   * the deliverable, which no row records per route, so it refuses a null.
+   *
+   * May legitimately be 0: a route we spent on that produced nothing usable.
+   */
+  delivered: number | null
+  /** The N this route is said to have COLLECTED, for the coverage guard. On a
+   *  mixed survey that is `paid` by construction (the field rows ARE the
+   *  collection record); on a single-route survey it is the project's own
+   *  n_collected, which is what the guard has always used. */
+  collected: number
+}
+
+/** Why a survey produced no legs — the coverage line needs to say which. */
+export type LegBlock =
+  | 'ok'
+  | 'none'            // no field rows at all
+  | 'no-split'        // mixed, and nobody has recorded which route delivered what
+  | 'split-mismatch'  // a split that does not sum to n_actual — stale or half-entered
+  | 'estimated'       // a split that is a judgement, not a measurement
+  | 'unrouted-cost'   // mixed, with flat cost lines that name no route
+  | 'no-n-actual'     // nothing delivered to attribute
+  | 'under-recorded'  // the field rows do not cover the N the survey claims
+
+export interface Legs {
+  legs: Leg[]
+  /** Flat cost naming no route. Non-zero only on a MIXED survey — and because
+   *  an unattributed cost blocks the legs (see reason 'unrouted-cost'), it
+   *  travels with an EMPTY `legs` today. It is carried rather than discarded so
+   *  the finance page can name the money it is not pricing instead of quietly
+   *  dropping a survey; routing the line is what turns it into two legs. */
+  unrouted: number
+  /** Why `legs` is empty. 'ok' when it is not. */
+  reason: LegBlock
+  /** Why the legs carry a null `delivered`, when they do. Separate from `reason`
+   *  because the two failures are fixed by different people: a blocked SPEND
+   *  partition needs a cost line routed, a blocked DELIVERED split needs the
+   *  client deliverable joined to the QA file. 'ok' when delivered is set. */
+  splitReason: LegBlock
+}
+
+/**
+ * Partition one survey's money and respondents into 0, 1 or 2 route legs.
+ *
+ * ── WHY THIS EXISTS AS A FUNCTION RATHER THAN A WIDER FILTER ────────────────
+ * Every per-route rate in this codebase used to begin `if (route !== 'blast' &&
+ * route !== 'panel') continue`, which drops mixed surveys — 7 of them, $32,878
+ * and 2,554 delivered respondents. The obvious fix is to relax that test to let
+ * `'both'` through, and it is a trap: every call site then has to REMEMBER not
+ * to reach for `spendOf().total`, because on a mixed survey the whole total
+ * belongs to neither route. Get it wrong in one of the four places and the same
+ * $13,513 lands on the panel card AND the blast card.
+ *
+ * Enumerating legs makes that double-count representationally impossible. There
+ * is exactly one place a survey's money is partitioned, it carries the invariant
+ *
+ *     Σ legs.spend + unrouted === spendOf().total
+ *     Σ legs.paid              === spendOf().paidCompletes
+ *
+ * and a caller that adds up legs cannot reach past them.
+ *
+ * ── A SINGLE-ROUTE SURVEY YIELDS EXACTLY ONE LEG CARRYING EVERYTHING ────────
+ * Including its flat cost lines, routed or not: on a survey with one route
+ * there is only one place a cost can belong, so an unrouted line needs no
+ * attribution. That makes this a provable no-op on 126 of the 133 costed
+ * surveys — if anything in cpqr.test.ts goes red, this function is wrong, not
+ * the test.
+ *
+ * ── WHAT A MIXED SURVEY MUST PROVE BEFORE IT IS PRICED ──────────────────────
+ * All four, or it produces no legs and falls back to today's behaviour:
+ *
+ *   1. Both sides of the delivered split are recorded.
+ *   2. They sum to n_actual EXACTLY. A split is a statement about a number that
+ *      moves; when it stops agreeing, it is stale, and stale is worse than
+ *      absent because it looks answered.
+ *   3. The method is not 'estimated'. An estimate is stored so the knowledge
+ *      survives, and refused here so it cannot become a printed rate.
+ *   4. Every flat cost line names a route. This is the one that bites: PR00425
+ *      carries an $8,697.85 contacts export that is 64% of its entire cost, and
+ *      admitting the survey while leaving that unplaced prices its blast leg at
+ *      $170.63 against a truth of $714.25 — four times too cheap, pooled into a
+ *      median beside single-route surveys that DO carry their flat costs. An
+ *      unattributed cost is not a small cost.
+ *
+ * Deliberately NOT pro rata. Splitting PR00425's list purchase by delivered N
+ * would put 94% of it on the panel side, which bought none of it — 63% wrong on
+ * the blast leg. The remainder is shown, not smeared.
+ */
+export function legsOf(
+  p: FinProject, blasts: FinBlast[], suppliers: FinSupplier[], costs: FinCost[],
+  ix?: FinIndex,
+): Legs {
+  const route = routeOf(p, blasts, suppliers, ix)
+  if (route === 'none') return { legs: [], unrouted: 0, reason: 'none', splitReason: 'none' }
+
+  const sp = spendOf(p, blasts, suppliers, costs, ix)
+  const nActual = p.n_actual == null ? null : Number(p.n_actual)
+
+  // ── single route: one leg, everything on it ───────────────────────────────
+  //
+  // `delivered` is the project's own n_actual, null and all — a single-route
+  // survey with no delivered figure still has a real cost per complete, and
+  // routeCosts has always priced it. CPQR is the caller that refuses a null.
+  if (route === 'blast' || route === 'panel') {
+    return {
+      legs: [{
+        route,
+        spend: sp.total,
+        paid: sp.paidCompletes,
+        delivered: nActual,
+        collected: Number(p.n_collected ?? 0),
+      }],
+      unrouted: 0,
+      reason: 'ok',
+      splitReason: nActual == null ? 'no-n-actual' : 'ok',
+    }
+  }
+
+  // ── mixed ─────────────────────────────────────────────────────────────────
+  //
+  // Two independent questions, answered separately because they are blocked by
+  // different missing facts and fixed by different people.
+  const c = ix ? (ix.costs.get(p.id) ?? []) : costs.filter(x => x.project_id === p.id)
+  const b = ix ? (ix.blasts.get(p.id) ?? []) : blasts.filter(x => x.project_id === p.id)
+  const s = ix ? (ix.suppliers.get(p.id) ?? []) : suppliers.filter(x => x.project_id === p.id)
+  const blastPaid = b.reduce((t, x) => t + (x.completes ?? 0), 0)
+  const panelPaid = s.reduce((t, x) => t + (x.n_collected ?? 0), 0)
+
+  // 1. CAN THE MONEY BE PARTITIONED? Only the flat cost lines are in doubt; the
+  //    field rows carry their own route. An unattributed line blocks BOTH legs
+  //    rather than being smeared across them: on PR00425 that line is 64% of the
+  //    survey's cost, and pro-rata by delivered N would put 94% of a list
+  //    purchase on the panel side, which bought none of it.
+  const flat = (r: 'blast' | 'panel') =>
+    c.reduce((t, x) => t + (x.route === r ? Number(x.amount ?? 0) : 0), 0)
+  const unrouted = c.reduce((t, x) => t + (x.route == null ? Number(x.amount ?? 0) : 0), 0)
+  if (unrouted > 0) {
+    return { legs: [], unrouted, reason: 'unrouted-cost', splitReason: 'unrouted-cost' }
+  }
+
+  // 2. IS THE DELIVERED SPLIT TRUSTWORTHY? All three, or `delivered` stays null
+  //    and only the cost-per-complete rate can use these legs.
+  let delivered: { panel: number; blast: number } | null = null
+  let splitReason: LegBlock = 'ok'
+  const panelN = p.n_actual_panel
+  const blastN = p.n_actual_blast
+  if (nActual == null) splitReason = 'no-n-actual'
+  else if (panelN == null || blastN == null) splitReason = 'no-split'
+  // A split is a statement about a number that moves. Once it stops agreeing it
+  // is stale, and stale is worse than absent because it looks answered.
+  else if (Number(panelN) + Number(blastN) !== nActual) splitReason = 'split-mismatch'
+  // An estimate is stored so the knowledge survives, and refused here so it
+  // cannot quietly become a printed rate.
+  else if (p.n_actual_split_method === 'estimated') splitReason = 'estimated'
+  else delivered = { panel: Number(panelN), blast: Number(blastN) }
+
+  return {
+    legs: [
+      {
+        route: 'panel',
+        spend: sp.panel + flat('panel'),
+        paid: panelPaid,
+        delivered: delivered ? delivered.panel : null,
+        collected: panelPaid,
+      },
+      {
+        route: 'blast',
+        spend: sp.reward + sp.send + flat('blast'),
+        paid: blastPaid,
+        delivered: delivered ? delivered.blast : null,
+        collected: blastPaid,
+      },
+    ],
+    unrouted: 0,
+    reason: 'ok',
+    splitReason,
+  }
+}
+
 export function applyFilters(rows: FinProject[], f: Filters, routeFor: (p: FinProject) => Route): FinProject[] {
   return rows.filter(p => {
     const d = finDate(p)
@@ -347,8 +555,16 @@ export interface RouteCost {
  * DERIVED ONLY FROM SURVEYS WHOSE RECORDED COMPLETES COVER THEIR n_collected.
  * A rate taken from an under-recorded survey has too small a denominator and
  * runs high — it was ~40% high the first time this was computed, which is the
- * difference between "blasts cost $50 a complete" and "$80". Single-route only,
- * because a blended survey cannot attribute its own dollars to one side.
+ * difference between "blasts cost $50 a complete" and "$80".
+ *
+ * MIXED SURVEYS NOW CONTRIBUTE, and they cost nothing to admit. This rate
+ * divides spend by completes we PAID FOR, and both of those already split
+ * themselves: a blast row carries its own completes and its own bid, a supplier
+ * row its own collected and its own CPI. The only thing a mixed survey could not
+ * place was a flat cost line, and legsOf refuses to produce legs until every one
+ * of them names a route — so a mixed survey either partitions exactly or stays
+ * out, exactly as before. It needs no delivered split at all; that is CPQR's
+ * problem, not this one.
  */
 export function routeCosts(
   rows: FinProject[], blasts: FinBlast[], suppliers: FinSupplier[], costs: FinCost[],
@@ -356,13 +572,14 @@ export function routeCosts(
   const ix = buildIndex(blasts, suppliers, costs)
   const buckets: Record<'blast' | 'panel', number[]> = { blast: [], panel: [] }
   for (const p of rows) {
-    const route = routeOf(p, blasts, suppliers, ix)
-    if (route !== 'blast' && route !== 'panel') continue
     const sp = spendOf(p, blasts, suppliers, costs, ix)
-    const got = Number(p.n_collected ?? 0)
     if (sp.total <= 0 || sp.paidCompletes <= 0) continue
-    if (!(got > 0 && sp.paidCompletes >= got)) continue
-    buckets[route].push(sp.total / sp.paidCompletes)
+    const { legs } = legsOf(p, blasts, suppliers, costs, ix)
+    if (!legs.length) continue
+    // All-or-nothing, so one under-recorded leg cannot leave its partner's
+    // dollars in the rate with no completes to divide by.
+    if (!legs.every(l => l.collected > 0 && l.paid >= l.collected && l.paid > 0)) continue
+    for (const l of legs) buckets[l.route].push(l.spend / l.paid)
   }
   const out: RouteCost[] = []
   for (const route of ['blast', 'panel'] as const) {

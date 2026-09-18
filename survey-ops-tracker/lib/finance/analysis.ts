@@ -17,8 +17,11 @@
 
 import {
   buildIndex, finDate, isCancelled, isDelivered, routeOf, spendOf,
-  type FinBlast, type FinCost, type FinIndex, type FinProject, type FinSupplier, type Route,
+  type FinBlast, type FinCost, type FinIndex, type FinProject, type FinSupplier,
+  type Leg, type Route,
 } from './hub'
+// One-way: cpqr.ts imports only from hub.ts, so this cannot cycle.
+import { contributingLegs } from './cpqr'
 
 /* ── LIFECYCLE ─────────────────────────────────────────────────────────────
  * Replaces five hardcoded `isDelivered` checks with one visible selector.
@@ -237,6 +240,18 @@ export interface SurveyPnl {
    *  derived from a survey where this is false is suspect, and the drill-down
    *  shows it as a column rather than silently dropping the row. */
   reconciled: boolean
+  /**
+   * 117: the route legs this survey contributes to CPQR — empty when it
+   * contributes nothing.
+   *
+   * Carried on the row rather than recomputed in drills.ts because a mixed
+   * survey now reaches the CPQR card with only PART of its cost on each side,
+   * and `cost` is still the whole bill. A drill strip that summed `cost` for a
+   * mixed survey would over-report PR00425's panel contribution by $11,428 and
+   * trip the panel's own reconciliation check. Filled by contributingLegs, the
+   * same predicate the card uses.
+   */
+  cpqrLegs: Leg[]
 }
 
 export function surveyPnl(
@@ -268,6 +283,7 @@ export function surveyPnl(
       cpc: sp.paidCompletes > 0 && sp.total > 0 ? sp.total / sp.paidCompletes : null,
       cpqr: actual != null && actual > 0 && sp.total > 0 ? sp.total / actual : null,
       reconciled: collected != null && collected > 0 && sp.paidCompletes >= collected,
+      cpqrLegs: contributingLegs(p, blasts, suppliers, costs, ix).legs,
     }
   })
 }
