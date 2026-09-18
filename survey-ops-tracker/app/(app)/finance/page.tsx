@@ -78,15 +78,28 @@ const LIFECYCLES: { id: Lifecycle; label: string }[] = [
   { id: 'all', label: 'All' },
 ]
 
+// EVERY COLUMN lib/finance READS MUST BE NAMED HERE. An explicit select that
+// omits one does not error — the field is simply undefined, and a function that
+// reasons about it silently decides the fact is absent. That is how 117 shipped
+// its first version: the route split was written to PR00425 and correct in the
+// database, while this page went on reporting the survey as unsplittable,
+// because these three names were missing from this string.
+//
+// The mirror-image hazard is why they cannot be added speculatively: PostgREST
+// rejects the WHOLE select if it names a column the schema does not have, so
+// naming one BEFORE its migration is applied takes the entire finance page down
+// rather than degrading. 117 is applied, so these are safe; a future column is
+// not, until it is.
 const COLS =
   'id, project_code, project_name, client, client_id, project_type, board_column, status, phase, ' +
   'deliver_date, launch_date, submitted_date, n_target, n_collected, n_actual, ' +
+  'n_actual_panel, n_actual_blast, n_actual_split_method, ' +
   'requested_by_contact_id, cancelled_at, budget'
 
 function useFinanceData() {
   const supabase = createClient()
   return useQuery({
-    queryKey: ['finance-hub-v3'],
+    queryKey: ['finance-hub-v4'],
     queryFn: async () => {
       // Paged AND ordered: PostgREST caps at 1000 and truncates SILENTLY, and
       // range() with no ORDER BY has no guaranteed page boundary, so a row can
@@ -121,7 +134,11 @@ function useFinanceData() {
         page<FinProject>('survey_projects', COLS, 'id', true),
         page<FinBlast>('project_blasts', 'project_id, bid, people, completes, cost_per_send, channel, blast_at, scheduled_at, created_at', 'id'),
         page<FinSupplier & { supplier_id: string | null; launch_id: string | null }>('project_suppliers', 'project_id, cpi, n_collected, supplier_id, launch_id', 'id'),
-        page<FinCost>('project_costs', 'project_id, amount', 'id'),
+        // `route` (117): which fielding route a flat cost bought. Without it every
+        // mixed-route survey reads as having an unattributed cost and is held out
+        // of the per-route rates — the exact symptom this page showed for
+        // PR00425's ZoomInfo line after it had already been routed.
+        page<FinCost>('project_costs', 'project_id, amount, route', 'id'),
         page<{ id: string; project_id: string; target: number | null }>('project_launches', 'id, project_id, target', 'id'),
         page<FinAccount & { is_demo: boolean | null }>('clients', 'id, name, is_demo', 'id'),
         page<FinContact>('client_contacts', 'id, client_id, first_name, last_name, email, archived', 'id'),
