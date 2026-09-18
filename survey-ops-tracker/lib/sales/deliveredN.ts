@@ -23,10 +23,24 @@
  * collected against an 800 target, 342 delivered. Scaling its collection by a
  * keep rate predicts 4,637.
  *
- * The mirror case behaves differently and needs its own rule. On the 54 surveys
- * that finished at or under target, n_actual ÷ n_collected has a median of
- * 1.000 — when you have not got enough, essentially everything ships. So the
- * estimator is piecewise, because the underlying behaviour is.
+ * The mirror case behaves differently and needs its own rule — but the first
+ * version of this file got it wrong, and David caught it: "theres usually no n
+ * lost to QA when under target - thats not true".
+ *
+ * The raw median of n_actual ÷ n_collected across all 54 under-target surveys
+ * IS 1.000, and that number is an artefact. 28 of the 54 — 52% — have n_actual
+ * EXACTLY equal to n_collected, and the audit trail shows those are largely one
+ * person typing the same figure into both fields: 9 of them were set in the
+ * same MINUTE as the n_collected they match. An exact match is not evidence
+ * that QA removed nothing; it is usually evidence that nobody recorded what QA
+ * removed.
+ *
+ * On the 26 under-target surveys where a loss was actually recorded, the median
+ * keep is 0.898 — about 10% lost, and 0.741 at p25. PR00298 kept 350 of 1,350.
+ * So the estimator uses the subset where QA demonstrably ran, on David's
+ * domain knowledge that it essentially always does. Taking a median over rows
+ * where the value was never really measured is the same error as reporting a
+ * figure about one population under the label of another.
  *
  * ── WHAT THIS DELIBERATELY DOES NOT DO ──────────────────────────────────────
  * It does not pace against the delivery date. Only 19 of 48 in-flight surveys
@@ -73,8 +87,12 @@ export interface DeliveryStats {
  *  and a literal type would make the live measurement unassignable to the
  *  constant it is meant to replace. */
 export const DELIVERY_STATS: DeliveryStats = {
-  overTargetRatio: { p25: 1.000, median: 1.033, p75: 1.200, n: 134 },
-  underTargetRatio: { p25: 0.898, median: 1.000, p75: 1.000, n: 54 },
+  // Over target, excluding the 19 rows where n_actual was copied from
+  // n_collected: median 1.010 rather than the 1.033 the unfiltered set gives.
+  overTargetRatio: { p25: 1.000, median: 1.010, p75: 1.148, n: 115 },
+  // Under target, on the 26 surveys where a QA loss was actually RECORDED.
+  // The unfiltered figure is 1.000 and is an artefact — see the header.
+  underTargetRatio: { p25: 0.741, median: 0.898, p75: 0.932, n: 26 },
 }
 
 export interface DeliveredN {
@@ -159,10 +177,11 @@ export function deliveredN(
     high: Math.round(collected * r.p75),
     basis: 'short-of-target',
     note:
-      `Estimated. ${fmt(collected)} collected against a ${fmt(target)} target. A study still short ` +
-      `of target loses almost nothing in QA — across ${r.n} past surveys the delivered N was a ` +
-      `median ${r.median.toFixed(2)}x what was collected (${r.p25.toFixed(2)}–${r.p75.toFixed(2)}x) ` +
-      `— so this is a collection problem, not a QA one.` + window,
+      `Estimated. ${fmt(collected)} collected against a ${fmt(target)} target, and QA will still ` +
+      `take a share: across ${r.n} past surveys where the loss was actually recorded, the delivered ` +
+      `N came in at a median ${r.median.toFixed(2)}x what was collected ` +
+      `(${r.p25.toFixed(2)}–${r.p75.toFixed(2)}x). This survey is short on BOTH counts — it has not ` +
+      `collected enough and will lose some of what it has.` + window,
   }
 }
 
@@ -196,6 +215,10 @@ export function measureDeliveryStats(
   for (const p of rows) {
     const t = num(p.n_target), c = num(p.n_collected), a = num(p.n_actual)
     if (t == null || c == null || a == null || t <= 0 || c <= 0) continue
+    // EXCLUDE rows where n_actual was simply copied from n_collected. Those
+    // record no QA result at all, and including them pulled the shipped
+    // under-target median to a false 1.000 — half the sample were copies.
+    if (a === c) continue
     if (c >= t) over.push(a / t); else under.push(a / c)
   }
   const q = (xs: number[], pp: number) => {

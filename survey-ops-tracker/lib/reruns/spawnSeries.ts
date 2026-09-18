@@ -18,6 +18,9 @@ type Admin = ReturnType<typeof createAdminClient>
 type WaveRow = Pick<
   Database['public']['Tables']['survey_projects']['Row'],
   'id' | 'project_name' | 'rerun_number' | 'rerun_date' | 'launch_date' | 'due_date' | 'deliver_date' | 'captain_id' | 'rerun_spawned_at'
+  // Carried into the next wave rather than left blank (David, 2026-09-17).
+  | 'requested_by_contact_id' | 'requested_by_name' | 'n_target' | 'n_internal_target'
+  | 'slack_channel_url' | 'salesperson'
 >
 
 export interface SpawnWaveResult {
@@ -70,7 +73,7 @@ export async function spawnWaveForSeries(admin: Admin, seriesId: string): Promis
 
   const { data: waves, error: wavesErr } = await admin
     .from('survey_projects')
-    .select('id, project_name, rerun_number, rerun_date, launch_date, due_date, deliver_date, captain_id, rerun_spawned_at')
+    .select('id, project_name, rerun_number, rerun_date, launch_date, due_date, deliver_date, captain_id, rerun_spawned_at, requested_by_contact_id, requested_by_name, n_target, n_internal_target, slack_channel_url, salesperson')
     .eq('series_id', seriesId)
     .is('deleted_at', null)
     .order('rerun_number', { ascending: false })
@@ -94,6 +97,14 @@ export async function spawnWaveForSeries(admin: Admin, seriesId: string): Promis
     due_date: prevWave.due_date,
     deliver_date: prevWave.deliver_date,
     captain_id: prevWave.captain_id,
+    // Carried so the new wave arrives filled in rather than blank (David,
+    // 2026-09-17). Each is overridable afterwards.
+    requested_by_contact_id: prevWave.requested_by_contact_id,
+    requested_by_name: prevWave.requested_by_name,
+    n_target: prevWave.n_target,
+    n_internal_target: prevWave.n_internal_target,
+    slack_channel_url: prevWave.slack_channel_url,
+    salesperson: prevWave.salesperson,
   }
   const inherited = nextWaveInherit(series, prevWaveForInherit, todayISO)
   if (inherited.captain_id == null) {

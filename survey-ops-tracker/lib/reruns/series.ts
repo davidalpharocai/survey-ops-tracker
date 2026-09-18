@@ -129,10 +129,24 @@ export interface FutureDefaults {
   compliance_required_override?: boolean | null
 }
 
-/** The prior wave fields a new wave's dates/name are derived from. */
+/**
+ * The prior wave fields a new wave inherits.
+ *
+ * David, 2026-09-17: "when the next wave is created, the requested by, target
+ * N, internal n target, survey type, slack channel (if present), salesperson,
+ * and captain should be carried over too - worst case is that it's manually
+ * changed after the fact."
+ *
+ * Everything below the dates is carried for that reason. A wave that arrives
+ * with no requested-by and no salesperson is a wave somebody has to re-key from
+ * the one above it, and the cost of getting it wrong is a manual correction —
+ * far cheaper than the blank field it replaces.
+ */
 export type PrevWaveForInherit = Pick<
   Tables<'survey_projects'>,
   'project_name' | 'rerun_date' | 'launch_date' | 'due_date' | 'deliver_date' | 'captain_id'
+  | 'requested_by_contact_id' | 'requested_by_name' | 'n_target' | 'n_internal_target'
+  | 'slack_channel_url' | 'salesperson'
 >
 
 /** Advance a nullable date-only string by cadence months; null if either
@@ -185,14 +199,29 @@ export function nextWaveInherit(
     project_type: series.base_type, // B2B or PS — never the legacy 'Rerun' value
     series_id: series.id,
     rerun_number: series.next_wave_no,
-    // Null here means "use the default rerun captain" (e.g. Sree) — resolved
-    // by the caller (cron/route), not this pure function.
-    captain_id: fd.captain_id ?? null,
-    // Carried verbatim from the series' future_defaults, never derived from
-    // prevWave's captain — the original wave-1 captain is seeded into this
-    // list once, at promotion, so it doesn't need re-deriving per wave.
+    // Precedence throughout: the series' explicit future_defaults first (someone
+    // set them ON PURPOSE for every future wave), then the previous wave, then
+    // null. Falling through to the previous wave is what David asked for on
+    // 2026-09-17 — a new wave used to arrive with these blank and somebody
+    // re-keyed them from the wave above.
+    //
+    // captain_id null still means "use the default rerun captain", resolved by
+    // the caller; it is only reached when neither the series nor the last wave
+    // names one.
+    captain_id: fd.captain_id ?? prevWave.captain_id ?? null,
+    // From future_defaults only: the wave-1 captain is seeded into this list
+    // once, at promotion, so re-deriving it per wave would duplicate them.
     co_captain_ids: fd.co_captain_ids ?? [],
-    n_target: fd.n_target ?? null,
+    n_target: fd.n_target ?? prevWave.n_target ?? null,
+    n_internal_target: prevWave.n_internal_target ?? null,
+    // Who asked for it. Both halves: the id is the live link and the name is the
+    // snapshot that survives the contact being archived.
+    requested_by_contact_id: prevWave.requested_by_contact_id ?? null,
+    requested_by_name: prevWave.requested_by_name ?? null,
+    // "(if present)" — a series with no channel carries nothing rather than an
+    // empty string, which would render as a dead link.
+    slack_channel_url: prevWave.slack_channel_url ?? null,
+    salesperson: prevWave.salesperson ?? null,
     audience: fd.audience ?? null,
     audience_size: fd.audience_size ?? null,
     budget: fd.budget ?? null,

@@ -247,6 +247,12 @@ describe('nextWaveInherit', () => {
     due_date: '2026-01-20',
     deliver_date: '2026-01-25',
     captain_id: 'captain-original',
+    requested_by_contact_id: 'contact-7',
+    requested_by_name: 'James Cook',
+    n_target: 900,
+    n_internal_target: 1100,
+    slack_channel_url: 'https://slack.com/archives/C123',
+    salesperson: 'Alex',
     ...o,
   })
 
@@ -355,19 +361,58 @@ describe('nextWaveInherit', () => {
     expect(out1.audience_size).toBe(50000)
     expect(out1.budget).toBe(12000)
 
-    const out2 = nextWaveInherit(series({ future_defaults: {} }), prevWave(), '2026-02-01')
+    // n_target now falls back to the previous wave rather than arriving blank,
+    // so it is asserted in its own test above; audience/size/budget still come
+    // from future_defaults only.
+    const out2 = nextWaveInherit(series({ future_defaults: {} }), prevWave({ n_target: null }), '2026-02-01')
     expect(out2.n_target).toBeNull()
     expect(out2.audience).toBeNull()
     expect(out2.audience_size).toBeNull()
     expect(out2.budget).toBeNull()
   })
 
-  it('captain_id comes from future_defaults.captain_id, or null (cron resolves the default captain)', () => {
+  it('captain_id: series default first, then the PREVIOUS WAVE, then null', () => {
+    // David, 2026-09-17: the captain should carry over. future_defaults still
+    // wins — somebody set that on purpose for every future wave — and null is
+    // only reached when neither names one, which is the cron's cue to fall back
+    // to the default rerun captain.
     const withCaptain = nextWaveInherit(series({ future_defaults: { captain_id: 'sree-id' } }), prevWave(), '2026-02-01')
     expect(withCaptain.captain_id).toBe('sree-id')
 
-    const withoutCaptain = nextWaveInherit(series({ future_defaults: {} }), prevWave(), '2026-02-01')
-    expect(withoutCaptain.captain_id).toBeNull()
+    const fromPrev = nextWaveInherit(series({ future_defaults: {} }), prevWave(), '2026-02-01')
+    expect(fromPrev.captain_id).toBe('captain-original')
+
+    const neither = nextWaveInherit(series({ future_defaults: {} }), prevWave({ captain_id: null }), '2026-02-01')
+    expect(neither.captain_id).toBeNull()
+  })
+
+  it('carries requested-by, internal N, slack channel and salesperson from the last wave', () => {
+    // "worst case is that it's manually changed after the fact" — a blank field
+    // costs a re-key from the wave above; a carried one costs an edit.
+    const out = nextWaveInherit(series({ future_defaults: {} }), prevWave(), '2026-02-01')
+    expect(out.requested_by_contact_id).toBe('contact-7')
+    expect(out.requested_by_name).toBe('James Cook')
+    expect(out.n_internal_target).toBe(1100)
+    expect(out.slack_channel_url).toBe('https://slack.com/archives/C123')
+    expect(out.salesperson).toBe('Alex')
+  })
+
+  it('carries nothing where the previous wave had nothing — "(if present)"', () => {
+    // An empty string would render as a dead Slack link.
+    const out = nextWaveInherit(
+      series({ future_defaults: {} }),
+      prevWave({ slack_channel_url: null, salesperson: null, requested_by_contact_id: null }),
+      '2026-02-01')
+    expect(out.slack_channel_url).toBeNull()
+    expect(out.salesperson).toBeNull()
+    expect(out.requested_by_contact_id).toBeNull()
+  })
+
+  it('n_target falls back to the previous wave when the series has no default', () => {
+    const fromSeries = nextWaveInherit(series({ future_defaults: { n_target: 1500 } }), prevWave(), '2026-02-01')
+    expect(fromSeries.n_target).toBe(1500)
+    const fromPrev = nextWaveInherit(series({ future_defaults: {} }), prevWave(), '2026-02-01')
+    expect(fromPrev.n_target).toBe(900)
   })
 
   it('carries compliance_required_override from future_defaults, defaulting to null', () => {

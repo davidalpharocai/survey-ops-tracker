@@ -6,6 +6,7 @@ import {
   beforeFieldingMet,
   afterFieldingMet,
 } from '@/lib/utils/compliance'
+import { STAGE_ORDER, type BoardColumn } from '@/lib/utils/stage'
 import type { SurveyProject } from '@/lib/hooks/useProjects'
 
 // Amber heads-up on the project page when a required compliance review is still
@@ -18,9 +19,22 @@ export function ComplianceBanner({ project }: { project: SurveyProject }) {
   const beforeOutstanding =
     beforeFieldingRequired(cs.client, cs.override, project.rerun_number, project.compliance_required_override) &&
     !beforeFieldingMet(cs.submissions)
-  const afterOutstanding =
+  // The after-fielding review is a PRE-DELIVERY step, and this banner used to
+  // announce it from the moment the survey existed. David, 2026-09-17:
+  // "surveys under some accounts flag a compliance stage between fielding and
+  // data qa. theres no client that has that. its only after qa pre delivery."
+  //
+  // The GATE was always correct — complianceGate only blocks on the move to
+  // Delivered — but a permanently-amber banner reads as a stage of its own
+  // sitting in the pipeline, which is exactly what he saw. So the prompt now
+  // waits until the survey has reached Data QA, which is the first moment
+  // anyone could actually send questions AND results for review.
+  const stageIdx = STAGE_ORDER.indexOf(project.board_column as BoardColumn)
+  const atOrPastDataQa = stageIdx >= STAGE_ORDER.indexOf('Data QA')
+  const afterRequired =
     afterFieldingRequired(cs.client, cs.override, project.rerun_number, project.compliance_required_override) &&
     !afterFieldingMet(cs.submissions)
+  const afterOutstanding = afterRequired && atOrPastDataQa
 
   // Nothing outstanding — if that's because a rerun wave waived a review this
   // client would otherwise require, say so explicitly so the missing gate
@@ -58,7 +72,7 @@ export function ComplianceBanner({ project }: { project: SurveyProject }) {
           )}
           {afterOutstanding && (
             <li>
-              <span className="text-foreground">After fielding:</span> the questions + results must be approved before delivery.
+              <span className="text-foreground">Before delivery:</span> the questions + results must be approved before this survey can be delivered.
             </li>
           )}
         </ul>

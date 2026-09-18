@@ -28,6 +28,22 @@ import {
  * and the N they collected is real work that no cost record accounts for. */
 export type Lifecycle = 'delivered' | 'inflight' | 'cancelled' | 'abandoned' | 'all'
 
+/**
+ * Work that is still being SCOPED, not yet sold.
+ *
+ * David, 2026-09-17: "surveys that are in scoping bucket shouldnt be included
+ * in financials by default. there can be a toggle to include them but they
+ * shouldnt be included by default."
+ *
+ * 30 surveys sit in phase='Scoping'. They are a pipeline, not a book: counting
+ * them dilutes every coverage percentage with work nobody has agreed to do yet,
+ * and a survey that never gets sold would sit in the denominator for ever. Note
+ * this is `phase`, NOT `scoping_stage` — that column is populated on 373 of 416
+ * surveys (329 of them still reading "New Inquiry" long after delivery) and
+ * filtering on it would empty the page.
+ */
+export const isScoping = (p: FinProject) => p.phase === 'Scoping'
+
 export function lifecycleOf(p: FinProject): Exclude<Lifecycle, 'all'> {
   if (isCancelled(p)) return 'cancelled'
   if (isDelivered(p)) return 'delivered'

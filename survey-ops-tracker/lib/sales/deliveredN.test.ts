@@ -42,8 +42,9 @@ describe("David's example: 2,000 collected against a 1,000 target", () => {
 
   it('estimates NEAR THE TARGET, not near the collection', () => {
     // "it shouldnt be 2000/1000; rather, it should be an estimated number
-    // closer to the 1000". Measured median is 1.033x target.
-    expect(d.value).toBe(1033)
+    // closer to the 1000". Median is 1.010x target on the 115 surveys whose
+    // n_actual was not simply copied from n_collected.
+    expect(d.value).toBe(1010)
     expect(d.estimated).toBe(true)
     expect(d.basis).toBe('at-or-over-target')
   })
@@ -54,7 +55,7 @@ describe("David's example: 2,000 collected against a 1,000 target", () => {
 
   it('carries a band, so it cannot read as a measurement', () => {
     expect(d.low).toBe(1000)
-    expect(d.high).toBe(1200)
+    expect(d.high).toBe(1148)
   })
 
   it('explains itself on the line item', () => {
@@ -63,23 +64,27 @@ describe("David's example: 2,000 collected against a 1,000 target", () => {
     expect(d.note).toContain('1,000 target')
     // The reason, not just the label.
     expect(d.note).toContain('delivers roughly what it sold')
-    expect(d.note).toContain('134 past surveys')
+    expect(d.note).toContain('115 past surveys')
   })
 })
 
 describe('the mirror case behaves differently, so it has its own rule', () => {
-  it('a survey short of target keeps essentially all of what it collected', () => {
-    // n_actual ÷ n_collected has a median of 1.000 on the 54 surveys that
-    // finished under target: when you have not got enough, nothing is thrown.
+  it('still takes a QA loss off a survey that is short of target', () => {
+    // David, 2026-09-17: "theres usually no n lost to QA when under target -
+    // thats not true". The raw median IS 1.000, but 28 of those 54 surveys have
+    // n_actual copied verbatim from n_collected — 9 of them written in the same
+    // MINUTE. On the 26 where a loss was actually recorded the median keep is
+    // 0.898, and that is the figure the estimate uses.
     const d = deliveredN(P({ n_target: 1000, n_collected: 600 }))!
-    expect(d.value).toBe(600)
+    expect(d.value).toBe(539)
     expect(d.basis).toBe('short-of-target')
-    expect(d.low).toBe(539)
+    expect(d.value).toBeLessThan(600)
   })
 
-  it('names it a collection problem rather than a QA one', () => {
+  it('says the survey is short on BOTH counts', () => {
     const d = deliveredN(P({ n_target: 1000, n_collected: 600 }))!
-    expect(d.note).toContain('collection problem, not a QA one')
+    expect(d.note).toContain('QA will still')
+    expect(d.note).toContain('short on BOTH counts')
   })
 
   it('treats exactly-on-target as the at-or-over case', () => {
@@ -116,6 +121,15 @@ describe('what it refuses to do', () => {
 describe('measureDeliveryStats: the ratios sharpen from the live book', () => {
   const over = (n: number, ratio: number): DeliveryInput[] =>
     Array.from({ length: n }, () => ({ n_target: 100, n_collected: 200, n_actual: 100 * ratio }))
+
+  it('EXCLUDES rows where n_actual was copied from n_collected', () => {
+    // Half the real under-target sample is copies, and including them reported
+    // a keep rate of 1.000 that David had to correct.
+    const copies: DeliveryInput[] = Array.from({ length: 40 },
+      () => ({ n_target: 100, n_collected: 60, n_actual: 60 }))
+    const s = measureDeliveryStats(copies)
+    expect(s.underTargetRatio).toEqual(DELIVERY_STATS.underTargetRatio)
+  })
 
   it('recomputes from delivered surveys once there are enough of them', () => {
     const s = measureDeliveryStats(over(MIN_STATS_N, 1.5))

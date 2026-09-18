@@ -21,7 +21,7 @@ import {
 } from '@/lib/finance/drills'
 import { money as fmtMoney, money2 as fmtMoney2 } from '@/components/finance/shared'
 import {
-  accountPnl, backlog, bidLadder, budgetVariance, exceptions, inLifecycle,
+  accountPnl, backlog, bidLadder, budgetVariance, exceptions, inLifecycle, isScoping,
   lifecycleCounts, liveExposure, monthly, surveyPnl, unpricedSpend,
   type Lifecycle,
 } from '@/lib/finance/analysis'
@@ -161,6 +161,8 @@ function FinanceInner() {
   const route = get('route')
   const lifecycle = (get('lifecycle', 'delivered') || 'delivered') as Lifecycle
   const drill = get('drill')
+  // Scoping work is a pipeline, not a book — out by default (David 2026-09-17).
+  const withScoping = get('scoping') === '1'
 
   const set = (patch: Record<string, string>) => {
     const next = new URLSearchParams(params.toString())
@@ -201,7 +203,12 @@ function FinanceInner() {
       else { f = null; t = null }
     }
 
-    const lifeFiltered = projects.filter(p => inLifecycle(p, lifecycle))
+    // Surveys still being SCOPED are excluded before anything else is computed,
+    // so they cannot dilute a coverage percentage with work nobody has agreed
+    // to do yet. The toggle puts them back.
+    const scoped = withScoping ? projects : projects.filter(p => !isScoping(p))
+    const scopingCount = projects.filter(isScoping).length
+    const lifeFiltered = scoped.filter(p => inLifecycle(p, lifecycle))
     const rows = applyFilters(lifeFiltered, {
       from: f, to: t, type: type || null,
       accountId: account || null,
@@ -228,16 +235,16 @@ function FinanceInner() {
       // Exposure, backlog and the lifecycle counts describe the WHOLE book, not
       // the lifecycle currently selected — an in-flight overrun does not stop
       // being urgent because the reader is looking at delivered work.
-      exposure: liveExposure(projects, blasts, suppliers, costs, nameById),
-      back: backlog(projects, rates, blasts, suppliers, costs),
-      counts: lifecycleCounts(projects, blasts, suppliers, costs),
+      exposure: liveExposure(scoped, blasts, suppliers, costs, nameById),
+      back: backlog(scoped, rates, blasts, suppliers, costs),
+      counts: lifecycleCounts(scoped, blasts, suppliers, costs),
       accountsPnl: accountPnl(pnl),
       unpriced: unpricedSpend(pnl),
       queue: exceptions(pnl, variance, medians),
       // Levers describe the WHOLE book, like exposure and backlog: a
       // negotiable send rate does not stop being negotiable because the
       // reader is filtered to one account.
-      save: savings(projects, blasts, suppliers, costs, launches),
+      save: savings(scoped, blasts, suppliers, costs, launches),
       periods: monthly(rows, rates, blasts, suppliers, costs),
       split: rows.reduce((acc, x) => {
         const s = spendOf(x, blasts, suppliers, costs, ix)
@@ -249,8 +256,9 @@ function FinanceInner() {
       contactOpts: contactOptions(projects, contacts, account || null),
       undated: rows.filter(x => !finDate(x)).length,
       pricedInView: rows.filter(x => rates.has(x.id)).length,
+      scopingCount,
     }
-  }, [data, preset, from, to, type, account, contact, route, lifecycle])
+  }, [data, preset, from, to, type, account, contact, route, lifecycle, withScoping])
 
   if (isLoading) return <p className="p-6 text-sm text-muted-foreground">Loading the book…</p>
   if (isError || !view) {
@@ -510,6 +518,20 @@ function FinanceInner() {
               <option key={c.id} value={c.id}>{c.name} ({c.surveys})</option>
             ))}
           </select>
+        )}
+        {view.scopingCount > 0 && (
+          <button
+            onClick={() => set({ scoping: withScoping ? '' : '1' })}
+            title="Surveys still being scoped are not sold work. Off by default so they cannot dilute a coverage percentage."
+            className={
+              'rounded-md border px-2 py-1 text-[13px] transition-colors ' +
+              (withScoping
+                ? 'border-primary bg-primary/10 text-foreground'
+                : 'border-border text-muted-foreground hover:text-foreground')
+            }
+          >
+            {withScoping ? '✓ ' : ''}Include {fmtNum(view.scopingCount)} scoping
+          </button>
         )}
         {filtered && (
           <button
