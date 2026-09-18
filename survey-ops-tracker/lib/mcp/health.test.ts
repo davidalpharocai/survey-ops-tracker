@@ -228,3 +228,133 @@ describe('check 11 — n_collected vs every source that could have produced it',
     expect(c?.detail).toMatch(/blast_completes_unrecorded/)
   })
 })
+
+/**
+ * Checks 12 and 13 (migration 117) — the delivered-N route split and the cost
+ * line that will not say which route it bought.
+ *
+ * Both exist because lib/finance FAILS CLOSED on them: a survey whose split does
+ * not sum, or whose flat cost names no route, silently drops out of the
+ * per-route cost per respondent and back into the coverage line. Without these
+ * checks the only symptom is a number quietly going missing from a page.
+ */
+describe('check 12 — the delivered-N route split', () => {
+  // Mixed by construction: one supplier row and one blast row, so check 13's
+  // condition is also live and each test has to keep it quiet on purpose.
+  const sup: SupRow[] = [{ cpi: 2, n_collected: 995 }]
+  const blasts = [blast({ bid: 10, completes: 24, people: 0, cost_per_send: 0 })]
+  const mixed = (over: Record<string, unknown> = {}, costs: CostRow[] = []) => buildChecks(
+    project({
+      actual_spend: spendOf(blasts, costs, sup),
+      n_collected: 1019, n_actual: 252, board_column: 'Delivery', ...over,
+    }),
+    sup, blasts, costs, [],
+  )
+
+  it('says nothing when no split has been recorded', () => {
+    // Absent is not wrong. Most surveys will never carry one.
+    const cs = names(mixed())
+    expect(cs).not.toContain('n_split_vs_n_actual')
+    expect(cs).not.toContain('n_split_incomplete')
+  })
+
+  it('passes a split that sums to n_actual', () => {
+    const cs = names(mixed({ n_actual_panel: 236, n_actual_blast: 16, n_actual_split_method: 'measured' }))
+    expect(cs).not.toContain('n_split_vs_n_actual')
+    expect(cs).not.toContain('n_split_incomplete')
+    expect(cs).not.toContain('n_split_estimated')
+  })
+
+  it('fires when the split no longer sums — the stale case', () => {
+    // n_actual moves on its own, which is exactly why this is not a table
+    // constraint: an unrelated, correct edit to n_actual must not fail with a
+    // constraint name the editor cannot act on.
+    const c = mixed({ n_actual: 300, n_actual_panel: 236, n_actual_blast: 16 })
+      .find(x => x.check === 'n_split_vs_n_actual')
+    expect(c, 'did not fire').toBeDefined()
+    expect(c!.advisory, 'both numbers describe the same delivery, so this is an error not a vintage difference').toBe(false)
+    expect(c!.expected).toBe(300)
+    expect(c!.actual).toBe(252)
+  })
+
+  it('fires when only one side was recorded', () => {
+    // Half a split cannot be checked and is not used, so it has to be visible.
+    const c = mixed({ n_actual_panel: 236 }).find(x => x.check === 'n_split_incomplete')
+    expect(c, 'did not fire').toBeDefined()
+    expect(c!.detail).toMatch(/no blast side/)
+  })
+
+  it('treats a recorded ZERO as a real answer, not as a missing one', () => {
+    // 252 from panel and 0 from blast is a legitimate outcome — a route we spent
+    // on that produced nothing usable. `== null` rather than falsy is what makes
+    // that expressible.
+    const cs = names(mixed({ n_actual_panel: 252, n_actual_blast: 0 }))
+    expect(cs).not.toContain('n_split_incomplete')
+    expect(cs).not.toContain('n_split_vs_n_actual')
+  })
+
+  it('flags an ESTIMATED split as advisory — kept, but never priced', () => {
+    const c = mixed({ n_actual_panel: 236, n_actual_blast: 16, n_actual_split_method: 'estimated' })
+      .find(x => x.check === 'n_split_estimated')
+    expect(c, 'did not fire').toBeDefined()
+    expect(c!.advisory, 'an estimate recorded honestly is not a defect').toBe(true)
+  })
+
+  it('checks a SINGLE-route survey too, if someone records a split on it', () => {
+    // Nothing about check 12 depends on the survey being mixed. A split typed
+    // onto a panel-only survey should still have to add up.
+    const c = buildChecks(
+      project({ actual_spend: 1990, n_collected: 995, n_actual: 252, board_column: 'Delivery',
+        n_actual_panel: 100, n_actual_blast: 100 }),
+      sup, [], [], [],
+    ).find(x => x.check === 'n_split_vs_n_actual')
+    expect(c, 'did not fire').toBeDefined()
+  })
+})
+
+describe('check 13 — a flat cost line that names no route', () => {
+  const sup: SupRow[] = [{ cpi: 2, n_collected: 995 }]
+  const blasts = [blast({ bid: 10, completes: 24, people: 0, cost_per_send: 0 })]
+  const withCosts = (costs: CostRow[], sups = sup, bs = blasts) => buildChecks(
+    project({ actual_spend: spendOf(bs, costs, sups), n_collected: 1019, n_actual: 252, board_column: 'Delivery' }),
+    sups, bs, costs, [],
+  )
+
+  it('fires on a MIXED survey whose cost line has no route', () => {
+    // PR00425: $8,697.85, 64% of the bill. Unplaced, it prices the blast leg at
+    // $170.63 against a true $714.25.
+    const c = withCosts([{ amount: 8697.85, kind: 'contacts_export', route: null }])
+      .find(x => x.check === 'cost_line_unrouted')
+    expect(c, 'did not fire').toBeDefined()
+    expect(c!.advisory, 'a missing fact is not a wrong number').toBe(true)
+    expect(c!.actual).toBe(8698)
+  })
+
+  it('goes quiet once the line is routed', () => {
+    const cs = names(withCosts([{ amount: 8697.85, kind: 'contacts_export', route: 'blast' }]))
+    expect(cs).not.toContain('cost_line_unrouted')
+  })
+
+  it('says NOTHING on a single-route survey — there is only one place it can go', () => {
+    // The whole point of scoping this to mixed surveys. Firing on the other ~120
+    // costed surveys would be noise on a question that has no doubt in it.
+    expect(names(withCosts([{ amount: 500, kind: 'other', route: null }], sup, [])))
+      .not.toContain('cost_line_unrouted')
+    expect(names(withCosts([{ amount: 500, kind: 'other', route: null }], [], blasts)))
+      .not.toContain('cost_line_unrouted')
+  })
+
+  it('ignores a $0 line, which attributes nothing either way', () => {
+    expect(names(withCosts([{ amount: 0, kind: 'other', route: null }])))
+      .not.toContain('cost_line_unrouted')
+  })
+
+  it('survives the column not existing yet (dark-ship window)', () => {
+    // Before David applies 117 by hand, `route` is simply absent from the row.
+    // undefined is `== null`, so this reads as unattributed — correct, and the
+    // advisory it produces is harmless for the few days it is early.
+    const c = withCosts([{ amount: 8697.85, kind: 'contacts_export' } as CostRow])
+      .find(x => x.check === 'cost_line_unrouted')
+    expect(c).toBeDefined()
+  })
+})
