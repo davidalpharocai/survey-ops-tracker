@@ -39,6 +39,7 @@ type ClientProject = {
   board_column: string
   project_type: string | null
   series_id: string | null
+  rerun_series_id: string | null
   rerun_number: number | null
   submitted_date: string | null
   due_date: string | null
@@ -62,7 +63,7 @@ type ClientProject = {
 // price_per_n is deliberately absent — 082 is not, and one unknown column in an
 // explicit select fails the WHOLE request and blanks this page's project list.
 const PROJECT_COLS =
-  'id, project_code, project_name, client, status, phase, board_column, project_type, series_id, rerun_number, submitted_date, due_date, deliver_date, delivered_at, created_at, updated_at, budget, actual_spend, n_target, n_target_max, n_collected, n_actual, is_placeholder'
+  'id, project_code, project_name, client, status, phase, board_column, project_type, series_id, rerun_series_id, rerun_number, submitted_date, due_date, deliver_date, delivered_at, created_at, updated_at, budget, actual_spend, n_target, n_target_max, n_collected, n_actual, is_placeholder'
 
 function useClientPage(clientId: string) {
   const supabase = createClient()
@@ -288,19 +289,30 @@ export default function ClientPage() {
   // its top-sorted wave (so the active column sort still governs placement, and
   // standalone rows keep their exact order). A 1-wave "series" stays a normal
   // row — grouping a single project would add clutter, not remove it.
+  // The grouping key, across BOTH generations of the series model.
+  //
+  // Grouping on series_id alone left 54 surveys across 16 series rendering as
+  // unrelated singles — including the 17-wave Holocene Weekly Tracker — because
+  // those families predate the rerun_series table and only ever carried the
+  // legacy pointer. David saw this on BAM (2026-09-17).
+  //
+  // Precedence: the new key wins where a survey has one; then the legacy
+  // pointer; then the survey's OWN id, which is how a legacy ROOT joins its own
+  // children — the original wave stores nothing and its children point at it.
+  // A key that matches only itself yields a group of one, which the check below
+  // collapses back to a normal row, so this costs nothing where it does not
+  // apply.
+  const groupKeyOf = (p: ClientProject) => p.series_id ?? p.rerun_series_id ?? p.id
+
   const renderItems = useMemo<RenderItem[]>(() => {
     const items: RenderItem[] = []
     const seen = new Set<string>()
     for (const p of sortedRows) {
-      const sid = p.series_id
-      if (!sid) {
-        items.push({ kind: 'single', project: p })
-        continue
-      }
+      const sid = groupKeyOf(p)
       if (seen.has(sid)) continue
       seen.add(sid)
       const waves = sortedRows
-        .filter(w => w.series_id === sid)
+        .filter(w => groupKeyOf(w) === sid)
         .slice()
         .sort((a, b) => (a.rerun_number ?? 0) - (b.rerun_number ?? 0))
       if (waves.length <= 1) items.push({ kind: 'single', project: p })
