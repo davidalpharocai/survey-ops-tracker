@@ -5,7 +5,8 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { fmtNum } from '@/lib/utils/number'
 import { stageLabel } from '@/lib/utils/stage'
-import { BUCKETS, bucketOf, countBuckets, type BucketId } from '@/lib/sales/buckets'
+import { BUCKETS, bucketOf, countBuckets, migrateBucketId, type BucketId } from '@/lib/sales/buckets'
+import { accountOptions, inAccounts } from '@/lib/sales/accountIndex'
 
 /** Exactly the columns the page selects — no cost, no internal target. */
 export interface SalesRow {
@@ -13,6 +14,9 @@ export interface SalesRow {
   project_code: string | null
   project_name: string
   client: string | null
+  /** The consolidated account key. `client` above is a stale label that splits
+   *  14 accounts across more than one value; this is what the picker groups on. */
+  client_id: string | null
   requested_by_name: string | null
   board_column: string
   status: string
@@ -115,7 +119,10 @@ function facetValues(rows: SalesRow[], of: (r: SalesRow) => string | null): stri
 const VIEWS_KEY = 'socc-sales-views'
 interface SavedView { name: string; bucket: string; q: string; sortBy: string; asc: boolean; clients: string[]; stages: string[] }
 
-export function SalesPipeline({ rows }: { rows: SalesRow[] }) {
+export function SalesPipeline(
+  { rows, salesClients = [] }:
+  { rows: SalesRow[]; salesClients?: { id: string; name: string | null }[] },
+) {
   const router = useRouter()
   const params = useSearchParams()
 
@@ -125,7 +132,11 @@ export function SalesPipeline({ rows }: { rows: SalesRow[] }) {
      every render rather than mirroring it into useState keeps one source of
      truth; the browser Back button then works on filter changes, which is what
      people expect of a list. */
-  const bucket = (params.get('g') ?? 'active') as BucketId | 'all'
+  // Through migrateBucketId, because ?g=completed and ?g=closed are in
+  // bookmarks and pasted links from before the rename. An unrecognised id falls
+  // back to the default group rather than filtering to an empty list, which
+  // would read as "you have no surveys".
+  const bucket: BucketId | 'all' = migrateBucketId(params.get('g') ?? 'active') ?? 'active'
   const q = params.get('q') ?? ''
   const sortBy = (params.get('s') ?? 'deliver') as ColId
   const asc = params.get('d') !== 'desc'
@@ -206,7 +217,7 @@ export function SalesPipeline({ rows }: { rows: SalesRow[] }) {
   const shown = useMemo(() => {
     const needle = q.trim().toLowerCase()
     let out = bucket === 'all' ? rows : rows.filter(r => bucketOf(r) === bucket)
-    if (clients.length) out = out.filter(r => clients.includes(r.client ?? ''))
+    if (clients.length) out = out.filter(r => inAccounts(r, clients))
     if (stages.length) out = out.filter(r => stages.includes(stageLabel(r.board_column)))
     if (needle) {
       out = out.filter(r =>
@@ -235,7 +246,13 @@ export function SalesPipeline({ rows }: { rows: SalesRow[] }) {
   // Facets come from the rows in the CURRENT GROUP, not the whole book, so
   // the chips describe what is actually in front of you.
   const inBucket = useMemo(() => bucket === 'all' ? rows : rows.filter(r => bucketOf(r) === bucket), [rows, bucket])
-  const facetClients = useMemo(() => facetValues(inBucket, r => r.client ?? null), [inBucket])
+  // Accounts, keyed on client_id rather than the stale `client` label. The
+  // label splits 14 accounts across more than one value — BAM alone wears nine
+  // — so the chip row showed 106 chips for 76 accounts, which is what David
+  // meant by "client should be a drop down and no each its only bubble toggle".
+  const accountOpts = useMemo(
+    () => accountOptions(inBucket, salesClients ?? []),
+    [inBucket, salesClients])
   const facetStages = useMemo(() => facetValues(inBucket, r => stageLabel(r.board_column)), [inBucket])
   const hasFilters = clients.length > 0 || stages.length > 0 || q.trim().length > 0
 
@@ -354,16 +371,24 @@ export function SalesPipeline({ rows }: { rows: SalesRow[] }) {
 
       {/* FACETS, built from the rows actually loaded and shown only where there
           is a choice to make — a filter listing one value filters nothing. */}
-      {(facetClients.length > 0 || facetStages.length > 0) && (
+      {(accountOpts.length > 1 || facetStages.length > 0) && (
         <div className="mb-3 flex flex-wrap items-center gap-1.5">
-          {facetClients.map(c => (
-            <button key={'c' + c} type="button" onClick={() => toggleMulti('c', c)}
-              className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
-                clients.includes(c) ? 'border-primary bg-primary/10 text-foreground'
-                                    : 'border-border bg-card text-muted-foreground hover:border-ring'}`}>
-              {c}
-            </button>
-          ))}
+          {accountOpts.length > 1 && (
+            <select
+              value={clients[0] ?? ''}
+              onChange={e => setParams((sp: URLSearchParams) => {
+                sp.delete('c')
+                if (e.target.value) sp.append('c', e.target.value)
+              })}
+              title="Filter to one account. Accounts are grouped by their real record, so every BAM survey appears under BAM whatever the old label on the row says."
+              className="rounded-lg border border-border bg-card px-2.5 py-1 text-xs text-foreground focus:border-ring focus:outline-none"
+            >
+              <option value="">All accounts ({accountOpts.length})</option>
+              {accountOpts.map(a => (
+                <option key={a.id} value={a.id}>{a.name} ({a.count})</option>
+              ))}
+            </select>
+          )}
           {facetStages.map(st => (
             <button key={'s' + st} type="button" onClick={() => toggleMulti('st', st)}
               className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${

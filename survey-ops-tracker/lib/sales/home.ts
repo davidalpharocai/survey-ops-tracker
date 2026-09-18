@@ -206,7 +206,7 @@ export function salesHome(rows: HomeRow[], today: string): SalesHome {
     const bucket = bucketOf(r)
     if (bucket === 'active') {
       inField.push(judgeLive(r, today))
-    } else if (bucket === 'completed') {
+    } else if (bucket === 'delivered') {
       delivered++
       const d = r.deliver_date ? daysBetween(today, r.deliver_date) : null
       if (d !== null && d >= 0 && d <= SHIPPED_WINDOW_DAYS) shipped.push(r)
@@ -214,7 +214,7 @@ export function salesHome(rows: HomeRow[], today: string): SalesHome {
       scoping++
       if (r.submitted_date && daysBetween(today, r.submitted_date) > STALE_SCOPING_DAYS) stalled.push(r)
     }
-    // 'hold' and 'closed' are silent on purpose: paused work is paused
+    // 'hold', 'cancelled' and 'archived' are silent on purpose: paused work is paused
     // deliberately and closed work cannot be rescued. Flagging either teaches
     // people to ignore the page.
   }
@@ -268,7 +268,7 @@ export function quietAccounts(rows: HomeRow[], today: string): QuietAccount[] {
     if (stillOpen) continue
 
     const last = rs
-      .filter(r => bucketOf(r) === 'completed' && r.deliver_date)
+      .filter(r => bucketOf(r) === 'delivered' && r.deliver_date)
       .map(r => r.deliver_date as string)
       .sort()
       .pop()
@@ -276,7 +276,7 @@ export function quietAccounts(rows: HomeRow[], today: string): QuietAccount[] {
 
     const daysSince = daysBetween(today, last)
     if (daysSince <= QUIET_DAYS) continue
-    out.push({ client, delivered: rs.filter(r => bucketOf(r) === 'completed').length, last, daysSince })
+    out.push({ client, delivered: rs.filter(r => bucketOf(r) === 'delivered').length, last, daysSince })
   }
   return out.sort((a, b) => b.daysSince - a.daysSince)
 }

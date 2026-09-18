@@ -255,7 +255,7 @@ export function AccountDetail({
         {Object.keys(buckets).length > 0 && (
           <>
             {' · '}
-            {[['active', 'active'], ['scoping', 'scoping'], ['completed', 'delivered'], ['hold', 'on hold']]
+            {[['active', 'active'], ['scoping', 'scoping'], ['delivered', 'delivered'], ['hold', 'on hold']]
               .filter(([k]) => buckets[k])
               .map(([k, label]) => `${buckets[k]} ${label}`)
               .join(', ')}

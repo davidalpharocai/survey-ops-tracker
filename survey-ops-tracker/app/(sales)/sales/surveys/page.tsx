@@ -40,11 +40,21 @@ export default async function SalesPipelinePage() {
     // compile time for its types, and a `+` defeats that inference — the rows
     // come back as GenericStringError[] and the cast below stops being checked.
     .select(
-      'id, project_code, project_name, client, requested_by_name, board_column, status, phase, n_target, n_target_max, n_collected, n_actual, credits, submitted_date, deliver_date, delivered_at'
+      'id, project_code, project_name, client, client_id, requested_by_name, board_column, status, phase, n_target, n_target_max, n_collected, n_actual, credits, submitted_date, deliver_date, delivered_at'
     )
     .order('deliver_date', { ascending: true, nullsFirst: false })
 
   const rows = (data ?? []) as SalesRow[]
+
+  // Account NAMES for the picker. sales_clients is owner-scoped while
+  // sales_projects is owner-OR-named-salesperson, so the two disagree in both
+  // directions — which is exactly why the option LIST is built from the rows
+  // and this is used only to name them. A failure here costs a nicer label, not
+  // a working filter: accountOptions falls back to the shortest label it saw.
+  const { data: accountRows } = await supabase
+    .from('sales_clients')
+    .select('id, name')
+  const salesClients = (accountRows ?? []) as { id: string; name: string | null }[]
 
   return (
     <div>
@@ -74,7 +84,7 @@ export default async function SalesPipelinePage() {
         </p>
       )}
 
-      {rows.length > 0 && <SalesPipeline rows={rows} />}
+      {rows.length > 0 && <SalesPipeline rows={rows} salesClients={salesClients} />}
     </div>
   )
 }

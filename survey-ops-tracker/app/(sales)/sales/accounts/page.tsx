@@ -32,8 +32,8 @@ export default async function SalesAccountsPage() {
 
   const rows = (clients ?? []).map(c => {
     const own = (projects ?? []).filter(p => p.client_id === c.id)
-    // bucketOf returns the BucketId — 'active' | 'scoping' | 'completed' |
-    // 'hold' | 'closed' — and NOT the display label. Reading acc['Active'] here
+    // bucketOf returns the BucketId — 'active' | 'scoping' | 'delivered' |
+    // 'hold' | 'cancelled' | 'archived' — and NOT the display label. Reading acc['Active'] here
     // would quietly count zero for every account.
     const buckets = own.reduce<Record<string, number>>((acc, x) => {
       const b = bucketOf({ status: x.status, phase: x.phase, board_column: x.board_column })
