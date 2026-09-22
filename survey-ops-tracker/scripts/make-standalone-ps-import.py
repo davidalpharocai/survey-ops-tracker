@@ -3,12 +3,20 @@
 
 Generated rather than hand-copied so the two cannot drift: everything except the
 database access layer is the verified original, byte for byte.
-"""
-import re, os
 
-REPO = r"C:/Users/david/Claude Code Projects/survey-ops-tracker"
-SRC = os.path.join(REPO, 'scripts', 'ps-import.mjs')
-OUT = r"C:\Users\david\Downloads\socc-ps-import.mjs"
+Usage:
+    python scripts/make-standalone-ps-import.py [output-path]
+
+Default output is ~/Downloads/socc-ps-import.mjs, where the scheduled agent
+lives. Every splice below asserts its anchor matched EXACTLY ONCE, so an edit to
+ps-import.mjs that moves one of them fails here loudly rather than silently
+producing a half-ported file.
+"""
+import re, os, sys
+
+SRC = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ps-import.mjs')
+OUT = sys.argv[1] if len(sys.argv) > 1 else os.path.join(
+    os.path.expanduser('~'), 'Downloads', 'socc-ps-import.mjs')
 s = open(SRC, encoding='utf-8').read()
 
 

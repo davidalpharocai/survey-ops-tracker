@@ -400,8 +400,28 @@ if (plan.orphan.length) {
   report.followUp.push(`${plan.orphan.length} Survey#s map to no project (${Object.keys(byName).length} names)`)
 }
 
+/* ── the one-line summary a scheduler forwards ─────────────────────────── */
+// Built for BOTH exits. A scheduler dry-runs before it applies, and that run
+// needs a forwardable line just as much as the real one does.
+function summarise(applied) {
+  const d = report.delta
+  const work = applied
+    ? `Wrote ${report.created} launch(es), revised ${report.raised}, reconciled N on ${report.nRaised} project(s)`
+    : `WOULD write ${plan.create.length} launch(es) and revise ${plan.raise.length} — dry run, nothing written`
+  return `PureSpectrum import: ${report.completes.toLocaleString('en-US')} completes across ${report.surveys} surveys` +
+    (d ? `; ${d.newSurveys} new surveys and ${d.addedToExisting >= 0 ? '+' : ''}${d.addedToExisting} completes on existing ones since the last run` : '') +
+    `. ${work}` +
+    (report.followUp.length ? `. NEEDS ATTENTION: ${report.followUp.length} item(s).` : '. Nothing needs attention.')
+}
+
 if (!APPLY) {
+  report.summary = summarise(false)
   log(`\nDRY RUN — nothing written. Re-run with --apply.`)
+  log(`\n${report.summary}`)
+  if (report.followUp.length) {
+    warn(`\nFOLLOW-UP NEEDED:`)
+    for (const f of report.followUp) warn(`  · ${f}`)
+  }
   if (JSON_OUT) console.log(JSON.stringify({ ...report, applied: false }, null, 1))
   process.exit(report.followUp.length ? 1 : 0)
 }
@@ -541,13 +561,7 @@ try {
   warn(`could not write state (${e.message}) — the next run will report everything as new`)
 }
 
-/* ── the one-line summary a scheduler can forward ──────────────────────── */
-const d = report.delta
-report.summary =
-  `PureSpectrum import: ${report.completes.toLocaleString('en-US')} completes across ${report.surveys} surveys` +
-  (d ? `; ${d.newSurveys} new surveys and ${d.addedToExisting >= 0 ? '+' : ''}${d.addedToExisting} completes on existing ones since the last run` : '') +
-  `. Wrote ${report.created} launch(es), revised ${report.raised}, reconciled N on ${report.nRaised} project(s)` +
-  (report.followUp.length ? `. NEEDS ATTENTION: ${report.followUp.length} item(s).` : '. Nothing needs attention.')
+report.summary = summarise(true)
 log(`\n${report.summary}`)
 
 if (report.followUp.length) {
