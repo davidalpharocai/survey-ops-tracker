@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { requireSalesUser, mySalespersonName } from '@/lib/sales-auth'
 import { fmtNum } from '@/lib/utils/number'
-import { bucketOf } from '@/lib/sales/buckets'
+import { countBuckets } from '@/lib/sales/buckets'
 
 export const dynamic = 'force-dynamic'
 
@@ -32,20 +32,18 @@ export default async function SalesAccountsPage() {
 
   const rows = (clients ?? []).map(c => {
     const own = (projects ?? []).filter(p => p.client_id === c.id)
-    // bucketOf returns the BucketId — 'active' | 'scoping' | 'delivered' |
-    // 'hold' | 'cancelled' | 'archived' — and NOT the display label. Reading acc['Active'] here
-    // would quietly count zero for every account.
-    const buckets = own.reduce<Record<string, number>>((acc, x) => {
-      const b = bucketOf({ status: x.status, phase: x.phase, board_column: x.board_column })
-      acc[b] = (acc[b] ?? 0) + 1
-      return acc
-    }, {})
+    // countBuckets, NOT a local reduce into Record<string, number>. The local
+    // version type-checked against any key at all, so when the ids were renamed
+    // this read `buckets.completed` — a bucket that no longer exists — and every
+    // account's Delivered column silently read 0 for four days. Record<BucketId,
+    // number> makes that a compile error instead of a wrong number on screen.
+    const buckets = countBuckets(own)
     return {
       ...c,
       total: own.length,
-      active: buckets.active ?? 0,
-      scoping: buckets.scoping ?? 0,
-      delivered: buckets.completed ?? 0,
+      active: buckets.active,
+      scoping: buckets.scoping,
+      delivered: buckets.delivered,
       // Σ over surveys that have a credit figure. NULL credits are skipped, not
       // read as 0 — "not priced yet" is not "free", and summing them as zero
       // would understate a client's consumption and make the number a lie in
