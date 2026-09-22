@@ -2436,6 +2436,7 @@ export const TOOLS: AssistantTool[] = [
       "THIS IS NOT A BLAST, and that is the whole point: a blast carries a reward, a send count and completes, so filing a data purchase as one lands the right dollars while inflating contacts-sent and the response rate. " +
       "KIND is a closed set, enforced by the database: 'contacts_export' = what it cost to ACQUIRE contacts. 'sms_email_blast' = a FIXED platform charge that does NOT scale with messages sent — the per-message cost is $/send on the blast itself and is already in spend, so putting it here charges it twice. 'other' = anything else — translation, a panel fee, an incentive paid outside a blast — and it REQUIRES a description saying what it was. Reach for 'other' rather than filing a cost under whichever of the first two is closer: kind is what the double-count check reads, and a mislabelled row is a false positive there forever. " +
       "MONEY, one of two ways: `amount` for a flat invoice, or `unit_cost` + `quantity` when it is per-unit (0.07 × 22,121 → $1,548.47) — the product is computed here, shown in the preview, and stored, and `quantity` is kept so cost-per-unit stays derivable. Passing both is fine only if they agree. " +
+      "A NEGATIVE amount is a CREDIT, and the main real use is recovered blast incentives: a reward that goes unclaimed comes back to us, and the survey's spend should fall by what we got back rather than keep showing what we issued. It has to be a cost line — project_blasts CHECKs bid, people and completes as non-negative, so a negative blast cannot exist — and it should carry route 'blast', because a returned incentive reduces what a BLAST respondent cost. Say so in the description: a bare minus sign is unreadable a month later. " +
       "IDEMPOTENCY: without an idem_key a second call ADDS A SECOND LINE and spend counts both, so pass one whenever a retry is possible. With one, a re-send updates that same line, and any field you OMIT keeps its recorded value rather than being blanked — use update_cost to un-record something deliberately. The key must be one you chose; an id put there matches nothing and inserts a duplicate. " +
       "ROUTE (optional) says which fielding route the money bought: 'blast' or 'panel'. It only matters on a survey fielded BOTH ways, and there it matters a great deal — a contacts export is bought in order to blast it, so on PR00425 leaving its $8,697.85 ZoomInfo line unrouted priced the blast side at $170.63 a respondent against a true $714.25. An unrouted line is not spread pro rata; it holds the whole survey out of the per-route rates until someone says where it belongs. On a single-route survey there is only one place it can go, so leave it off. " +
       "Preview says create vs update and warns if the project already carries a line of the same kind and amount; confirm to apply.",
@@ -2443,7 +2444,9 @@ export const TOOLS: AssistantTool[] = [
     schema: {
       project: z.string(),
       kind: z.enum(['contacts_export', 'sms_email_blast', 'other']),
-      amount: z.number().min(0).optional(),
+      // NOT min(0): a negative amount is a credit (recovered incentives). See
+      // the description above.
+      amount: z.number().optional(),
       unit_cost: z.number().min(0).optional(),
       quantity: z.number().int().positive().optional(),
       description: z.string().max(1000).optional(),
@@ -2603,7 +2606,8 @@ export const TOOLS: AssistantTool[] = [
       project: z.string(),
       cost_ref: z.string(),
       kind: z.enum(['contacts_export', 'sms_email_blast', 'other']).optional(),
-      amount: z.number().min(0).optional(),
+      // NOT min(0) — a credit line (recovered incentives) is negative.
+      amount: z.number().optional(),
       unit_cost: z.number().min(0).optional(),
       quantity: z.number().int().positive().nullable().optional(),
       description: z.string().max(1000).nullable().optional(),

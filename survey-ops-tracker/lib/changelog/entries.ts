@@ -80,6 +80,20 @@ export function changelogFor(audience: ChangeAudience): ChangelogEntry[] {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    date: '2026-09-22',
+    changes: [
+      {
+        kind: 'NEW',
+        // Not 'all': it is what we spend on incentives.
+        text: 'Recovered incentives can be recorded. When a reward we sent goes unclaimed and the money comes back to us, it now shows on the survey as a credit against what the blasts cost — so the spend reflects what we actually paid out rather than what we issued. 41 surveys have had $27,242.70 of 2026 recoveries booked this way.',
+      },
+      {
+        kind: 'IMPROVED',
+        text: 'Ask Claude to add a cost line and it can now record a credit as well as a charge. Say what it was for in the description — a bare minus sign is unreadable a month later.',
+      },
+    ],
+  },
+  {
     date: '2026-09-18',
     changes: [
       {
