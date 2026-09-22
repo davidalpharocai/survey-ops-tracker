@@ -55,3 +55,6 @@ exports/
 # cost analysis. They are not part of the build and they made `git status`
 # unreadable, which is how a real modified file gets missed in the noise.
 scripts/_*
+
+# PureSpectrum import state (scripts/ps-import.mjs) — a local run marker, not data.
+scripts/.ps-import-state.json
