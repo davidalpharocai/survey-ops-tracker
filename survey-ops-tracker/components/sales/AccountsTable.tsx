@@ -326,11 +326,13 @@ export function AccountsTable({ rows, offBook = 0 }: { rows: AccountRow[]; offBo
         )}
       </p>
 
-      {/* The header is sticky rather than the table being scrolled in a box:
-          the page scrolls, and `sticky top-0` on the cells keeps the labels
-          against the viewport, which is what "stays frozen once you scroll down
-          past it" describes. */}
-      <div className="overflow-x-auto rounded-lg border border-border">
+      {/* WRONG BEFORE, AND THE COMMENT HERE SAID SO CONFIDENTLY: `sticky top-0`
+          on a th needs a scroll container with a BOUNDED height to stick
+          within. Inside a plain overflow-x-auto wrapper there is no scrollport,
+          so the header never moved and "stays frozen once you scroll down past
+          it" was not true of this table. Bounded height + overflow-auto is the
+          pattern ProjectTable and SalesPipeline already use. */}
+      <div className="overflow-auto thin-scroll max-h-[calc(100vh-18rem)] rounded-lg border border-border">
         <table className="w-full min-w-[52rem] text-sm">
           <thead>
             <tr className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground">

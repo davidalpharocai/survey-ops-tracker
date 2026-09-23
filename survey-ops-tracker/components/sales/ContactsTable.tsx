@@ -116,7 +116,12 @@ export function ContactsTable({ rows }: { rows: ContactRow[] }) {
           : `${fmtNum(shown.length)} of ${fmtNum(rows.length)} contacts`}
       </p>
 
-      <div className="overflow-x-auto rounded-lg border border-border">
+      {/* The header only sticks inside a scroll container that has a BOUNDED
+          height. `sticky top-0` on a th inside a plain overflow-x-auto wrapper
+          has no scrollport to stick within, so it never moved -- the claim in
+          the old comment here was simply wrong. Same bound ProjectTable and
+          SalesPipeline already use. */}
+      <div className="overflow-auto thin-scroll max-h-[calc(100vh-18rem)] rounded-lg border border-border">
         <table className="w-full min-w-[46rem] text-sm">
           <thead>
             <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
