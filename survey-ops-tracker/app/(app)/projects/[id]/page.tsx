@@ -1350,7 +1350,7 @@ function DeleteProjectModal({
         <p className="text-sm text-muted-foreground leading-relaxed">
           This removes <span className="text-foreground font-medium">{projectName}</span> from the board.
           It moves to <span className="text-foreground">Recently Deleted</span> on the Admin page, where you
-          can restore it or delete it permanently. If you just want it off the board, use Close Project instead.
+          can restore it unchanged. Nothing is destroyed. If you just want it off the board, use Close Project instead.
         </p>
         <label className="flex flex-col gap-1 text-xs text-muted-foreground">
           Type <span className="font-mono text-foreground">delete</span> to confirm

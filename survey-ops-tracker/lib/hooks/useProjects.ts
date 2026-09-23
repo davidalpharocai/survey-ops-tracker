@@ -334,19 +334,25 @@ export function useRestoreProject() {
   })
 }
 
-/** Permanently delete (real DELETE, cascades) — only from the trash view. */
-export function usePermanentlyDeleteProject() {
-  const supabase = createClient()
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from('survey_projects').delete().eq('id', id)
-      if (error) throw error
-    },
-    onError: () => toast("Couldn't permanently delete — please try again."),
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ['deleted-projects'] }),
-  })
-}
+/* REMOVED 2026-09-23: usePermanentlyDeleteProject.
+ *
+ * It read `.from('survey_projects').delete().eq('id', id)` and could never have
+ * worked. survey_projects has RLS enabled and NO DELETE policy has ever existed
+ * in any migration -- so the statement matched zero rows, PostgREST answered 200
+ * with an empty body, and supabase-js handed back error: null. `if (error)
+ * throw error` never fired and the "Couldn't permanently delete" toast never
+ * showed. A no-op that reported success.
+ *
+ * That is the failure mode to watch for on any delete written this way: a
+ * MISSING GRANT fails loudly with 42501, but a missing RLS policy fails
+ * SILENTLY as "0 rows matched". If you need a delete here, check the row is
+ * actually gone -- do not trust a null error.
+ *
+ * Do not re-add this without a DELETE policy AND a way past migration 029:
+ * project_steps and project_bids have AFTER DELETE audit triggers that insert
+ * into project_audit for the project being deleted, which violates the FK
+ * mid-cascade and rolls the whole delete back. Even the service role hits it.
+ */
 
 export function useMoveProjectToColumn() {
   const updateProject = useUpdateProject()
