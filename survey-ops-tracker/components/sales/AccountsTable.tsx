@@ -344,15 +344,23 @@ export function AccountsTable({ rows, offBook = 0 }: { rows: AccountRow[]; offBo
                   {r.code && <span className="ml-2 text-xs text-muted-foreground">{r.code}</span>}
                 </td>
                 {visible.map(c => {
-                  const v = c.value(r)
                   const isCredit = c.id.startsWith('credits')
+                  // Nothing priced at all means the answer is "not recorded",
+                  // not "nought". Rendering 0 here would have 31 of 34 accounts
+                  // assert they have drawn no credits, when in fact no survey on
+                  // them has ever been given a price. "0+?" is the worst of both
+                  // — it reads as zero and footnotes itself.
+                  const nothingPriced = isCredit && r.unpriced === r.total
+                  const v = nothingPriced ? null : c.value(r)
                   return (
                     <td key={c.id} className="px-3 py-2 text-right tabular-nums">
                       {v == null ? (
                         <span className="text-muted-foreground/40" title={
-                          c.id === 'creditsRemaining'
-                            ? 'No term allowance recorded, so there is nothing to have remaining.'
-                            : 'No term recorded for this account.'
+                          nothingPriced
+                            ? `None of this account's ${r.total} surveys is priced in credits yet — which is not the same as none being used.`
+                            : c.id === 'creditsRemaining'
+                              ? 'No term allowance recorded, so there is nothing to have remaining.'
+                              : 'No term recorded for this account.'
                         }>—</span>
                       ) : v === 0 && !isCredit ? (
                         <span className="text-muted-foreground/40">—</span>
