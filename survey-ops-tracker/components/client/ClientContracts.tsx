@@ -201,10 +201,25 @@ export function ClientContracts({ clientId }: { clientId: string }) {
       renews_on: draft.renews_on || null,
       note: draft.note.trim() || null,
     }
+    // NOTHING CLOSES UNTIL THE WRITE LANDS. This form used to clear and
+    // disappear the instant Save was pressed, before the mutation resolved, so
+    // a refused insert looked exactly like a successful one that had not
+    // appeared yet -- the typed contract was gone and nothing had been saved.
+    // That is how a database refusing every write for months reads as "the
+    // button does nothing". On failure the draft stays on screen beside the
+    // toast, so it can be retried rather than retyped.
+    const dollars = num(draft.dollars_total)
     if (editingId) {
-      update.mutate({ id: editingId, updates: fields })
-      if (canFinance) setDollars.mutate({ termId: editingId, dollars: num(draft.dollars_total) })
-      setEditingId(null)
+      const id = editingId
+      update.mutate({ id, updates: fields }, {
+        onSuccess: () => {
+          // The dollars are a second table and a second write. Sequencing them
+          // after the first keeps a refused edit from still moving the money.
+          if (canFinance) setDollars.mutate({ termId: id, dollars })
+          setEditingId(null)
+          setDraft(empty)
+        },
+      })
     } else {
       create.mutate(
         { ...fields, source: 'app', created_by: member?.name ?? null },
@@ -212,15 +227,13 @@ export function ClientContracts({ clientId }: { clientId: string }) {
           onSuccess: t => {
             // The dollars land in a second table, so they can only be written
             // once the term has an id.
-            if (canFinance && num(draft.dollars_total) != null) {
-              setDollars.mutate({ termId: t.id, dollars: num(draft.dollars_total) })
-            }
+            if (canFinance && dollars != null) setDollars.mutate({ termId: t.id, dollars })
+            setAdding(false)
+            setDraft(empty)
           },
         },
       )
-      setAdding(false)
     }
-    setDraft(empty)
   }
 
   const unattached = surveys.filter(s => s.term_id == null).length
