@@ -52,10 +52,19 @@ Nothing else is touched. No blasts, no costs, no `n_actual`, no dates, no stage.
 ### Why `cpi` is a derived average
 
 SOCC stores one CPI per supplier row, but PureSpectrum prices **per respondent**
-and the price genuinely varies inside a single survey. Storing `spend ÷ N` keeps
-`cpi × n_collected` equal to the true spend to the cent, which is what
-`recompute_project_spend` multiplies. Where a supplier's price varied, the note
-says so, so the number is never mistaken for a quoted rate.
+and the price genuinely varies inside a single survey. Storing `spend ÷ N` makes
+`cpi × n_collected` reproduce the true spend as closely as the column allows,
+which is what `recompute_project_spend` multiplies. Where a supplier's price
+varied, the note says so, so the number is never mistaken for a quoted rate.
+
+One caveat, measured rather than assumed: `project_suppliers.cpi` is
+`numeric(10,2)` (migration 054), so a derived average that needs more than two
+decimals is rounded on write. A supplier with 337 completes at a true $0.7514
+stores as $0.75 and under-states that row by $0.47. Across the April–May import
+— 50 launches, $16,015.37 — the total drift was **−$0.28, or 0.002%**, and only
+one row moved by more than 20¢. It is not worth a migration, but a reconciliation
+that demands exact equality to the export will see cents of difference and should
+tolerate them.
 
 ---
 
