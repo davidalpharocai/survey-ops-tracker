@@ -14,9 +14,9 @@ export const dynamic = 'force-dynamic'
  * should be clickable or at the very least i click anywhere in the row and it
  * takes me to the contact." There was nowhere to take them — app/(sales) had
  * exactly two dynamic routes, accounts/[id] and surveys/[id], and no contact
- * page. The global sales search already conceded the gap: it classifies a hit as
- * a Contact and then navigates to the ACCOUNT, because that was the only
- * destination available.
+ * page. The global sales search conceded the gap: it classified a hit as a
+ * Contact and then navigated to the ACCOUNT, because that was the only
+ * destination available. It points here now.
  *
  * The analyst equivalent at app/(app)/contacts/[id] is the right SHAPE and
  * cannot be reused: the (app) layout redirects a sales role before rendering,

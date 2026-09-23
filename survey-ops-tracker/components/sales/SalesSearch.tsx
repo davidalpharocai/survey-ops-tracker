@@ -90,7 +90,10 @@ export function SalesSearch() {
         id: c.id,
         title: [c.first_name, c.last_name].filter(Boolean).join(' ') || (c.email ?? 'Contact'),
         subtitle: [c.title, byClient.get(c.client_id ?? '')].filter(Boolean).join(' · ') || '—',
-        href: `/sales/accounts/${c.client_id}`,
+        // The contact's own page, not their account. This used to land on the
+        // account because /sales/contacts/[id] did not exist -- a Contact hit
+        // that opens an Account is a wrong answer dressed as a right one.
+        href: `/sales/contacts/${c.id}`,
       }))
 
     const surveys: Hit[] = data.projects
