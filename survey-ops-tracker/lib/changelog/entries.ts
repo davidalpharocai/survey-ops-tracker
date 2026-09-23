@@ -80,6 +80,95 @@ export function changelogFor(audience: ChangeAudience): ChangelogEntry[] {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    date: '2026-09-23',
+    changes: [
+      {
+        kind: 'NEW',
+        audience: 'all',
+        text: 'Search everything at once. Type in the search box and press Enter without picking anything from the list, and you land on a results page grouped by what was found — surveys, accounts, contacts, contracts, files — each with its own count, so you can narrow to the kind of thing you meant.',
+      },
+      {
+        kind: 'IMPROVED',
+        audience: 'all',
+        text: 'The search list that drops down as you type shows about twice as many results, and now says how many more it is holding back. A short list used to read as the whole answer.',
+      },
+      {
+        kind: 'FIXED',
+        audience: 'all',
+        text: 'Pressing Enter in the search box used to open whichever result happened to sort first, even though you had not chosen it. It now searches everything; use the arrow keys to pick a result instead.',
+      },
+      {
+        kind: 'FIXED',
+        audience: 'all',
+        text: 'Searching for a contact and clicking the result took you to their account rather than to them.',
+      },
+      {
+        kind: 'NEW',
+        audience: 'all',
+        text: 'The Accounts page can be searched, its header stays put as you scroll, and every number on it is a link through to the surveys behind it. Credits are broken out as used this term, remaining, and used all time, and you can add, remove and reorder the columns and save the layout you like.',
+      },
+      {
+        kind: 'NEW',
+        audience: 'all',
+        text: 'Contacts can be searched by name, email, title or account and filtered to one account, and clicking anywhere in a row opens that person — who now has a page of their own listing what they have asked for.',
+      },
+      {
+        kind: 'NEW',
+        audience: 'all',
+        text: 'The sales home page can search every survey on your book, not only the ones showing on the cards.',
+      },
+      {
+        kind: 'NEW',
+        audience: 'all',
+        text: 'A survey now names the captain who ran it, and once it has been delivered it lists the files attached to it.',
+      },
+      {
+        kind: 'IMPROVED',
+        audience: 'all',
+        text: 'Survey pages use the same words as the rest of the tracker — N Target, N Collected and N Actual — and N Collected now says when it was last updated.',
+      },
+      {
+        kind: 'IMPROVED',
+        audience: 'all',
+        text: 'The navigation bar stays frozen at the top of the sales pages as you scroll, so the tabs and the search box stay reachable on long lists.',
+      },
+      {
+        kind: 'FIXED',
+        audience: 'all',
+        text: 'Delivered surveys were labelled Closed or Archived nearly everywhere they appeared, because a delivered survey is also closed. They say Delivered now.',
+      },
+      {
+        kind: 'FIXED',
+        audience: 'all',
+        text: 'The Delivered count on the Accounts page showed a dash on most accounts instead of the real number.',
+      },
+      {
+        kind: 'FIXED',
+        // Credits are public to sales; the dollar value of one is not, and is
+        // not mentioned here.
+        audience: 'all',
+        text: 'Credits used counted every survey that had been priced, including work not yet in field, so an account could look as though it had drawn down far more than it had. It now counts only what has actually been drawn, and shows work that is committed but not yet drawn separately.',
+      },
+      {
+        kind: 'FIXED',
+        audience: 'all',
+        text: 'A credits column could read as a bare zero on an account where nothing had been priced yet. Nothing recorded and none used are different things, and it now shows a dash for the first.',
+      },
+      {
+        kind: 'NEW',
+        text: 'You can attach a file to a survey, not only paste a link to one. Use the paperclip beside the box in Linked Documents. Attached files are stored inside the tracker and stay internal to the team — they are not filed to the client and do not appear in the sales view.',
+      },
+      {
+        kind: 'FIXED',
+        text: 'Adding a contract on a client page had never once worked. The database refused every write, and the form cleared itself as though it had saved, so it looked like nothing happened. Adding, editing and removing all work now, and a save that fails keeps what you typed on screen instead of throwing it away.',
+      },
+      {
+        kind: 'FIXED',
+        text: 'Delete forever in the admin trash never deleted anything and reported success anyway. It has been removed: a deleted project stays in the trash and stays restorable, which is what was really happening all along.',
+      },
+    ],
+  },
+  {
     date: '2026-09-22',
     changes: [
       {

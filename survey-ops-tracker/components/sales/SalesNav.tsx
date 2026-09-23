@@ -40,7 +40,14 @@ export function SalesNav({ name }: { name: string | null }) {
   const pathname = usePathname()
 
   return (
-    <nav className="border-b border-border bg-card">
+    // Frozen on scroll, matching the analyst nav (components/shared/TopNav.tsx
+    // uses the same sticky top-0 z-40). David, 2026-09-23: "in sales view, when
+    // scrolling, the nav bar should be frozen which is the same in the non-sales
+    // view." The accounts and contacts tables run hundreds of rows, so the tabs
+    // and the search box were scrolling out of reach on exactly the screens that
+    // need them most. z-40 sits under the search dropdown's z-50 so the dropdown
+    // still paints over the page.
+    <nav className="sticky top-0 z-40 border-b border-border bg-card/95 backdrop-blur-sm">
       <div className="mx-auto flex max-w-6xl items-center gap-1 px-6 py-2">
         <Link href="/sales/home" className="mr-3 shrink-0 text-sm font-bold hover:opacity-80">
           AlphaROC
