@@ -1,7 +1,8 @@
-import Link from 'next/link'
+import { Suspense } from 'react'
 import { requireSalesUser, mySalespersonName } from '@/lib/sales-auth'
-import { fmtNum } from '@/lib/utils/number'
 import { countBuckets } from '@/lib/sales/buckets'
+import { creditPosition, type Term } from '@/lib/sales/credits'
+import { AccountsTable, type AccountRow } from '@/components/sales/AccountsTable'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,62 +15,88 @@ export const dynamic = 'force-dynamic'
  * A LIST, NOT A TABLE OF NAMES. An account row that says only "Citadel" makes
  * the reader click through to learn anything, and with 27 accounts that is 27
  * clicks to answer "where is the work". So each row carries the counts that
- * decide whether it is worth opening: how much is live, how much is being
- * scoped, and what has been delivered. Those three are the same breakdown David
- * asked for on the surveys list, computed from the same bucketOf() so the two
- * screens can never disagree.
+ * decide whether it is worth opening, computed from the same bucketOf() the
+ * surveys list uses so the two screens can never disagree.
+ *
+ * THE COUNTING IS countBuckets(), NOT A LOCAL REDUCE. The local version counted
+ * into a `Record<string, number>`, which type-checks against any key at all, so
+ * when the bucket ids were renamed this page kept reading `buckets.completed`
+ * and every account's Delivered column silently read 0 for four days — 61 of 79
+ * accounts, all 334 delivered surveys. `Record<BucketId, number>` makes the
+ * wrong key a compile error instead of a wrong number on screen.
  */
 export default async function SalesAccountsPage() {
   const { supabase, user } = await requireSalesUser('/sales/accounts')
   const name = await mySalespersonName(supabase, user.email)
 
-  const [{ data: clients, error: cErr }, { data: projects, error: pErr }, { data: contacts }] =
+  const [{ data: clients, error: cErr }, { data: projects, error: pErr }, { data: contacts }, terms] =
     await Promise.all([
       supabase.from('sales_clients').select('id, name, code, created_at').order('name'),
-      supabase.from('sales_projects').select('id, client_id, board_column, status, phase, delivered_at, deliver_date, credits'),
+      // board_column, n_collected and n_actual are here for hasDrawn(): a credit
+      // is consumed when the survey FIELDS (migration 100), so the stage is part
+      // of the credit arithmetic, not decoration.
+      supabase.from('sales_projects')
+        .select('id, client_id, board_column, status, phase, delivered_at, deliver_date, credits, term_id, n_collected, n_actual'),
       supabase.from('sales_contacts').select('id, client_id'),
+      // Terms are a separate, optional read: client_terms arrived in migration
+      // 100 and carries only one row in production today, so a failure here must
+      // cost the credit columns and nothing else.
+      supabase.from('sales_terms').select('id, client_id, name, credits_total, starts_on, renews_on')
+        .then(r => (r.error ? null : r.data), () => null),
     ])
 
-  const rows = (clients ?? []).map(c => {
+  // Resolved once on the server, so every account's "current term" is decided
+  // against the same date — two accounts evaluated either side of midnight would
+  // otherwise disagree about which term is running.
+  const today = new Date().toLocaleDateString('en-CA')
+
+  const rows: AccountRow[] = (clients ?? []).map(c => {
     const own = (projects ?? []).filter(p => p.client_id === c.id)
-    // countBuckets, NOT a local reduce into Record<string, number>. The local
-    // version type-checked against any key at all, so when the ids were renamed
-    // this read `buckets.completed` — a bucket that no longer exists — and every
-    // account's Delivered column silently read 0 for four days. Record<BucketId,
-    // number> makes that a compile error instead of a wrong number on screen.
-    const buckets = countBuckets(own)
+    const b = countBuckets(own)
+    const myTerms = ((terms ?? []) as (Term & { client_id: string })[]).filter(t => t.client_id === c.id)
+    const cr = creditPosition(own, myTerms, today)
     return {
-      ...c,
+      id: c.id,
+      name: c.name ?? '(unnamed)',
+      code: c.code,
       total: own.length,
-      active: buckets.active,
-      scoping: buckets.scoping,
-      delivered: buckets.delivered,
-      // Σ over surveys that have a credit figure. NULL credits are skipped, not
-      // read as 0 — "not priced yet" is not "free", and summing them as zero
-      // would understate a client's consumption and make the number a lie in
-      // the one place it is shown TO the client.
-      credits: own.reduce((t, p) => t + (p.credits ?? 0), 0),
-      creditsUnknown: own.filter(p => p.credits == null).length,
+      active: b.active,
+      scoping: b.scoping,
+      delivered: b.delivered,
+      hold: b.hold,
+      cancelled: b.cancelled,
       contacts: (contacts ?? []).filter(x => x.client_id === c.id).length,
+      creditsTerm: cr.usedThisTerm,
+      creditsRemaining: cr.remaining,
+      creditsAllTime: cr.usedAllTime,
+      creditsCommitted: cr.committed,
+      unpriced: cr.unpriced,
+      termName: cr.term?.name ?? null,
     }
   })
+
+  // sales_clients scopes on ACCOUNT ownership only (105), while sales_projects
+  // has two arms — account-owned OR named as the project's salesperson (102).
+  // So a survey can be visible to this reader while its account is not, and
+  // filtering projects into account rows drops it silently. Measured today:
+  // Alex 0, Jenna 3, Vineet 9, Shanu 1. Small, but the page's own total would
+  // otherwise disagree with the surveys list for no visible reason. Adding an
+  // account ROW for an account the reader does not own would be a scope change;
+  // saying so is not.
+  const owned = new Set((clients ?? []).map(c => c.id))
+  const offBook = (projects ?? []).filter(p => !p.client_id || !owned.has(p.client_id)).length
 
   const failed = cErr || pErr
 
   return (
     <div>
-      <div className="mb-1 flex items-baseline justify-between gap-3">
+      <div className="mb-4 flex items-baseline justify-between gap-3">
         <h1 className="text-xl font-semibold">Your accounts</h1>
         {name && <span className="text-sm text-muted-foreground">{name}</span>}
       </div>
-      <p className="mb-5 text-sm text-muted-foreground">
-        {rows.length > 0
-          ? `${rows.length} account${rows.length === 1 ? '' : 's'}, ${fmtNum(rows.reduce((t, r) => t + r.total, 0))} surveys between them.`
-          : 'Every client whose account you own.'}
-      </p>
 
       {failed && (
-        <p className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+        <p className="mb-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
           Couldn&apos;t load your accounts. Try again, or tell David if it keeps happening.
         </p>
       )}
@@ -83,49 +110,11 @@ export default async function SalesAccountsPage() {
       )}
 
       {rows.length > 0 && (
-        <div className="overflow-x-auto rounded-lg border border-border">
-          <table className="w-full min-w-[46rem] text-sm">
-            <thead>
-              <tr className="border-b border-border bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
-                <th className="px-3 py-2 font-medium">Account</th>
-                <th className="px-3 py-2 text-right font-medium">Surveys</th>
-                <th className="px-3 py-2 text-right font-medium">Active</th>
-                <th className="px-3 py-2 text-right font-medium">Scoping</th>
-                <th className="px-3 py-2 text-right font-medium">Delivered</th>
-                <th className="px-3 py-2 text-right font-medium">Credits</th>
-                <th className="px-3 py-2 text-right font-medium">Contacts</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map(r => (
-                <tr key={r.id} className="border-b border-border/60 last:border-0 hover:bg-muted/30">
-                  <td className="px-3 py-2">
-                    <Link href={`/sales/accounts/${r.id}`} className="font-medium hover:underline">
-                      {r.name}
-                    </Link>
-                    {r.code && <span className="ml-2 text-xs text-muted-foreground">{r.code}</span>}
-                  </td>
-                  <td className="px-3 py-2 text-right tabular-nums">{fmtNum(r.total)}</td>
-                  <td className="px-3 py-2 text-right tabular-nums">{r.active || <span className="text-muted-foreground/40">—</span>}</td>
-                  <td className="px-3 py-2 text-right tabular-nums">{r.scoping || <span className="text-muted-foreground/40">—</span>}</td>
-                  <td className="px-3 py-2 text-right tabular-nums">{r.delivered || <span className="text-muted-foreground/40">—</span>}</td>
-                  <td className="px-3 py-2 text-right tabular-nums">
-                    {r.credits ? fmtNum(r.credits) : <span className="text-muted-foreground/40">—</span>}
-                    {/* A total drawn from a partly-priced set is a FLOOR, and
-                        saying so is the difference between a number and a
-                        misleading number. */}
-                    {r.creditsUnknown > 0 && r.total > 0 && (
-                      <span className="ml-1 text-[10px] text-muted-foreground" title={`${r.creditsUnknown} of ${r.total} surveys have no credit figure yet, so this total is a floor.`}>
-                        +?
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-3 py-2 text-right tabular-nums">{r.contacts || <span className="text-muted-foreground/40">—</span>}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        // useSearchParams needs a Suspense boundary in an App Router page that
+        // is otherwise server-rendered.
+        <Suspense fallback={<p className="text-sm text-muted-foreground">Loading…</p>}>
+          <AccountsTable rows={rows} offBook={offBook} />
+        </Suspense>
       )}
     </div>
   )

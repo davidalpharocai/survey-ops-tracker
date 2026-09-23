@@ -4,7 +4,7 @@ import { useCallback, useMemo, useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { fmtNum } from '@/lib/utils/number'
-import { stageLabel } from '@/lib/utils/stage'
+import { stageOf, stageTone } from '@/lib/sales/stage'
 import { BUCKETS, bucketOf, countBuckets, migrateBucketId, type BucketId } from '@/lib/sales/buckets'
 import { accountOptions, inAccounts } from '@/lib/sales/accountIndex'
 
@@ -21,6 +21,8 @@ export interface SalesRow {
   board_column: string
   status: string
   phase: string | null
+  /** Read by stageOf for a Scoping survey — see AccountProject. */
+  scoping_stage?: string | null
   n_target: number | null
   n_target_max: number | null
   n_collected: number
@@ -48,7 +50,7 @@ interface Col {
 const COLS: Col[] = [
   { id: 'client', label: 'Client', title: 'The account this survey belongs to.', sort: r => r.client ?? null },
   { id: 'requested', label: 'Requested by', title: 'The client contact who asked for it.', sort: r => r.requested_by_name ?? null },
-  { id: 'stage', label: 'Stage', title: 'Where it is in the pipeline, from Submitted through Delivered.', sort: r => r.board_column },
+  { id: 'stage', label: 'Stage', title: 'Where it is: its pipeline position while it is running, or how it ended — Delivered, On hold, Cancelled, Archived.', sort: r => stageOf(r) },
   { id: 'target', label: 'Target', title: 'The agreed number of responses, as a range where one was agreed. The same N field the product team sees.', numeric: true, sort: r => r.n_target ?? null },
   { id: 'collected', label: 'Collected', title: 'Responses in so far, and how that compares with the target. Once delivered this shows the final cleaned figure.', numeric: true, sort: r => r.n_actual ?? r.n_collected },
   { id: 'credits', label: 'Credits', title: 'What this survey costs the client in credits. Blank means it has not been priced yet — not that it is free.', numeric: true, sort: r => r.credits ?? null },
@@ -58,16 +60,6 @@ const COLS: Col[] = [
 
 const DEFAULT_COLS: ColId[] = ['client', 'requested', 'stage', 'target', 'collected', 'credits', 'deliver']
 const STORE_KEY = 'socc-sales-columns'
-
-const STAGE_TONE: Record<string, string> = {
-  Submitted: 'bg-slate-500/15 text-slate-700 dark:text-slate-300',
-  'Doc Programming': 'bg-sky-500/15 text-sky-700 dark:text-sky-300',
-  'Survey Programming': 'bg-cyan-500/15 text-cyan-700 dark:text-cyan-300',
-  'EdWin QA': 'bg-indigo-500/15 text-indigo-700 dark:text-indigo-300',
-  Fielding: 'bg-blue-500/15 text-blue-700 dark:text-blue-300',
-  'Data QA': 'bg-violet-500/15 text-violet-700 dark:text-violet-300',
-  Delivery: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
-}
 
 /** "100 – 500", "100", or "—". The range is one cell because the two numbers are
  *  one fact; splitting them invites reading the floor as the target. */
@@ -218,7 +210,7 @@ export function SalesPipeline(
     const needle = q.trim().toLowerCase()
     let out = bucket === 'all' ? rows : rows.filter(r => bucketOf(r) === bucket)
     if (clients.length) out = out.filter(r => inAccounts(r, clients))
-    if (stages.length) out = out.filter(r => stages.includes(stageLabel(r.board_column)))
+    if (stages.length) out = out.filter(r => stages.includes(stageOf(r)))
     if (needle) {
       out = out.filter(r =>
         (r.project_name ?? '').toLowerCase().includes(needle) ||
@@ -253,7 +245,7 @@ export function SalesPipeline(
   const accountOpts = useMemo(
     () => accountOptions(inBucket, salesClients ?? []),
     [inBucket, salesClients])
-  const facetStages = useMemo(() => facetValues(inBucket, r => stageLabel(r.board_column)), [inBucket])
+  const facetStages = useMemo(() => facetValues(inBucket, r => stageOf(r)), [inBucket])
   const hasFilters = clients.length > 0 || stages.length > 0 || q.trim().length > 0
 
   return (
@@ -540,8 +532,8 @@ function cell(id: ColId, r: SalesRow) {
       return <span className="text-muted-foreground">{r.requested_by_name ?? '—'}</span>
     case 'stage':
       return (
-        <span className={`whitespace-nowrap rounded-full px-2 py-0.5 text-xs ${STAGE_TONE[r.board_column] ?? 'bg-muted text-muted-foreground'}`}>
-          {stageLabel(r.board_column)}
+        <span className={`whitespace-nowrap rounded-full border px-2 py-0.5 text-xs ${stageTone(r)}`}>
+          {stageOf(r)}
         </span>
       )
     case 'target':

@@ -18,7 +18,7 @@ import { InfoTooltip } from '@/components/shared/InfoTooltip'
 import { RowLink } from '@/components/shared/RowLink'
 import { Skeleton } from '@/components/shared/Skeleton'
 import { formatDate, getDueUrgency, urgencyPrefix } from '@/lib/utils/date'
-import { stageLabel } from '@/lib/utils/stage'
+import { stageOf, stageTone } from '@/lib/sales/stage'
 import { fmtNum } from '@/lib/utils/number'
 import { formatNRange } from '@/lib/utils/nRange'
 import type { Tables } from '@/lib/supabase/types'
@@ -439,15 +439,12 @@ export default function ClientPage() {
           )}
         </td>
         <td className="px-4 py-3 text-sm">
-          {p.status === 'Open' ? (
-            <span className="text-xs px-2 py-1 rounded bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
-              {p.phase === 'Scoping' ? 'Scoping' : stageLabel(p.board_column)}
-            </span>
-          ) : (
-            <span className="text-xs px-2 py-1 rounded bg-muted text-muted-foreground">
-              {p.status === 'Hold' ? 'On hold' : 'Archived'}
-            </span>
-          )}
+          {/* status-first used to win here, and every delivered survey is also
+              Closed -- so all 328 of them rendered as "Archived", the word this
+              app reserves for the studies that died WITHOUT delivering. */}
+          <span className={`text-xs px-2 py-1 rounded border ${stageTone(p)}`}>
+            {stageOf(p)}
+          </span>
         </td>
         <td className="px-4 py-3 text-sm text-muted-foreground whitespace-nowrap">
           {formatDate(p.submitted_date)}
@@ -517,15 +514,12 @@ export default function ClientPage() {
           </span>
         </td>
         <td className="px-4 py-3 text-sm">
-          {latest.status === 'Open' ? (
-            <span className="text-xs px-2 py-1 rounded bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
-              {latest.phase === 'Scoping' ? 'Scoping' : stageLabel(latest.board_column)}
-            </span>
-          ) : (
-            <span className="text-xs px-2 py-1 rounded bg-muted text-muted-foreground">
-              {latest.status === 'Hold' ? 'On hold' : 'Archived'}
-            </span>
-          )}
+          {/* The collapsed rerun group shows its LATEST wave's state, through the
+              same helper as a loose row -- so a group and the wave inside it
+              cannot disagree once expanded. */}
+          <span className={`text-xs px-2 py-1 rounded border ${stageTone(latest)}`}>
+            {stageOf(latest)}
+          </span>
         </td>
         <td className="px-4 py-3 text-sm text-muted-foreground whitespace-nowrap">
           {formatDate(latest.submitted_date)}

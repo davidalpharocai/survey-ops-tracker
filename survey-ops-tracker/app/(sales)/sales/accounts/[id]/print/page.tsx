@@ -52,7 +52,7 @@ export default async function AccountPrintPage({
     supabase.from('sales_clients').select('id, name, code').eq('id', id).maybeSingle(),
     supabase
       .from('sales_projects')
-      .select('id, project_code, project_name, board_column, status, phase, n_target, n_target_max, n_collected, n_actual, credits, submitted_date, launch_date, deliver_date, delivered_at, requested_by_name, longitudinal, rerun_number')
+      .select('id, project_code, project_name, board_column, status, phase, scoping_stage, n_target, n_target_max, n_collected, n_actual, credits, submitted_date, launch_date, deliver_date, delivered_at, requested_by_name, longitudinal, rerun_number')
       .eq('client_id', id)
       .order('deliver_date', { ascending: false, nullsFirst: false }),
     supabase.from('sales_terms').select('id, name, credits_total, starts_on, renews_on').eq('client_id', id),

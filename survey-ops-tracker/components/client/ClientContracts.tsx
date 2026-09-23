@@ -168,18 +168,26 @@ export function ClientContracts({ clientId }: { clientId: string }) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [draft, setDraft] = useState<Draft>(empty)
 
-  // The surveys attached to each contract, for the drawdown. Only the two
-  // columns the arithmetic needs.
+  // The surveys attached to each contract, for the drawdown.
+  //
+  // board_column / n_collected / n_actual are part of the arithmetic, not
+  // decoration: migration 100 derives consumption from the survey's STAGE ("a
+  // survey that has fielded has drawn them"), so rollUp asks hasDrawn(). Select
+  // only credits and term_id here and every survey looks un-fielded, and the
+  // drawdown silently reads zero.
   const { data: surveys = [] } = useQuery({
     queryKey: ['client-term-surveys', clientId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('survey_projects')
-        .select('id, credits, term_id')
+        .select('id, credits, term_id, board_column, n_collected, n_actual')
         .eq('client_id', clientId)
         .is('deleted_at', null)
       if (error) throw error
-      return (data ?? []) as { id: string; credits: number | null; term_id: string | null }[]
+      return (data ?? []) as {
+        id: string; credits: number | null; term_id: string | null
+        board_column: string | null; n_collected: number | null; n_actual: number | null
+      }[]
     },
     enabled: !!clientId,
     staleTime: 30_000,

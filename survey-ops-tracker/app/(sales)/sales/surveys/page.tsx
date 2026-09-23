@@ -40,7 +40,7 @@ export default async function SalesPipelinePage() {
     // compile time for its types, and a `+` defeats that inference — the rows
     // come back as GenericStringError[] and the cast below stops being checked.
     .select(
-      'id, project_code, project_name, client, client_id, requested_by_name, board_column, status, phase, n_target, n_target_max, n_collected, n_actual, credits, submitted_date, deliver_date, delivered_at'
+      'id, project_code, project_name, client, client_id, requested_by_name, board_column, status, phase, scoping_stage, n_target, n_target_max, n_collected, n_actual, credits, submitted_date, deliver_date, delivered_at'
     )
     .order('deliver_date', { ascending: true, nullsFirst: false })
 

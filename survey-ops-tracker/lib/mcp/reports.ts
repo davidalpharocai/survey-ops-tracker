@@ -1,4 +1,5 @@
 import 'server-only'
+import { stageLabel } from '@/lib/utils/stage'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { demoClientIds, withoutDemo } from '@/lib/metrics/demo'
 
@@ -49,7 +50,7 @@ export const REPORT_FIELDS: ReportField[] = [
   { key: 'type', label: 'Type', get: r => r.project_type },
   { key: 'phase', label: 'Phase', get: r => r.phase },
   { key: 'status', label: 'Status', get: r => r.status },
-  { key: 'stage', label: 'Stage', get: r => r.board_column },
+  { key: 'stage', label: 'Stage', get: r => stageLabel(r.board_column as string) },
   { key: 'captain', label: 'Captain', get: r => (r.captain as { initials?: string } | null)?.initials ?? '' },
   { key: 'salesperson', label: 'Salesperson', get: r => r.salesperson },
   { key: 'submitted_date', label: 'Submitted', get: r => r.submitted_date },

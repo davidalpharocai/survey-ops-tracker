@@ -1,6 +1,6 @@
-import Link from 'next/link'
+import { Suspense } from 'react'
 import { requireSalesUser } from '@/lib/sales-auth'
-import { fmtNum } from '@/lib/utils/number'
+import { ContactsTable, type ContactRow } from '@/components/sales/ContactsTable'
 
 export const dynamic = 'force-dynamic'
 
@@ -37,7 +37,7 @@ export default async function SalesContactsPage() {
     }
   }
 
-  const rows = (contacts ?? [])
+  const rows: ContactRow[] = (contacts ?? [])
     .map(c => ({
       ...c,
       account: clientName.get(c.client_id) ?? '—',
@@ -54,15 +54,10 @@ export default async function SalesContactsPage() {
 
   return (
     <div>
-      <h1 className="mb-1 text-xl font-semibold">Your contacts</h1>
-      <p className="mb-5 text-sm text-muted-foreground">
-        {rows.length > 0
-          ? `${fmtNum(rows.length)} contact${rows.length === 1 ? '' : 's'} across ${new Set(rows.map(r => r.client_id)).size} accounts.`
-          : 'Everyone we know at the clients you own.'}
-      </p>
+      <h1 className="mb-4 text-xl font-semibold">Your contacts</h1>
 
       {error && (
-        <p className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+        <p className="mb-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
           Couldn&apos;t load your contacts. Try again, or tell David if it keeps happening.
         </p>
       )}
@@ -74,48 +69,9 @@ export default async function SalesContactsPage() {
       )}
 
       {rows.length > 0 && (
-        <div className="overflow-x-auto rounded-lg border border-border">
-          <table className="w-full min-w-[44rem] text-sm">
-            <thead>
-              <tr className="border-b border-border bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
-                <th className="px-3 py-2 font-medium">Name</th>
-                <th className="px-3 py-2 font-medium">Account</th>
-                <th className="px-3 py-2 font-medium">Title</th>
-                <th className="px-3 py-2 font-medium">Email</th>
-                <th className="px-3 py-2 text-right font-medium">Surveys requested</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map(c => (
-                <tr key={c.id} className="border-b border-border/60 last:border-0 hover:bg-muted/30">
-                  <td className="px-3 py-2 font-medium">
-                    {[c.first_name, c.last_name].filter(Boolean).join(' ') || '—'}
-                  </td>
-                  <td className="px-3 py-2">
-                    <Link href={`/sales/accounts/${c.client_id}`} className="hover:underline">
-                      {c.account}
-                    </Link>
-                  </td>
-                  <td className="px-3 py-2 text-muted-foreground">{c.title || '—'}</td>
-                  <td className="px-3 py-2">
-                    {c.email ? (
-                      // A real mailto, because the reason you look a contact up
-                      // is usually to write to them.
-                      <a href={`mailto:${c.email}`} className="text-muted-foreground hover:text-foreground hover:underline">
-                        {c.email}
-                      </a>
-                    ) : (
-                      <span className="text-muted-foreground/40">—</span>
-                    )}
-                  </td>
-                  <td className="px-3 py-2 text-right tabular-nums">
-                    {c.requested || <span className="text-muted-foreground/40">—</span>}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <Suspense fallback={<p className="text-sm text-muted-foreground">Loading…</p>}>
+          <ContactsTable rows={rows} />
+        </Suspense>
       )}
     </div>
   )

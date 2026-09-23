@@ -43,7 +43,7 @@ export default async function SurveyListPrintPage({
 
   const { data } = await supabase
     .from('sales_projects')
-    .select('id, project_code, project_name, client, client_id, requested_by_name, board_column, status, phase, n_target, n_target_max, n_collected, n_actual, credits, submitted_date, launch_date, deliver_date, delivered_at')
+    .select('id, project_code, project_name, client, client_id, requested_by_name, board_column, status, phase, scoping_stage, n_target, n_target_max, n_collected, n_actual, credits, submitted_date, launch_date, deliver_date, delivered_at')
     .order('deliver_date', { ascending: true, nullsFirst: false })
 
   // The same predicates the list applies, in the same order, so the printed row

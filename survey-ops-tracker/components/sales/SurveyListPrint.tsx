@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 import { fmtNum } from '@/lib/utils/number'
 import { describeRange, type DateBasis, type Range } from '@/lib/sales/dateRange'
 import { BUCKETS } from '@/lib/sales/buckets'
+import { stageOf } from '@/lib/sales/stage'
 import type { SalesRow } from './SalesPipeline'
 
 /**
@@ -30,15 +31,12 @@ const COLS = [
 ] as const
 
 function cell(r: SalesRow, id: string): string {
-  const stage = r.status !== 'Open' ? r.status
-    : r.board_column === 'Delivery' || r.delivered_at ? 'Delivered'
-    : r.board_column
   switch (id) {
     case 'code': return r.project_code ?? '—'
     case 'survey': return r.project_name
     case 'client': return r.client ?? '—'
     case 'requested': return r.requested_by_name ?? '—'
-    case 'stage': return stage
+    case 'stage': return stageOf(r)
     case 'target':
       return r.n_target == null ? '—'
         : r.n_target_max && r.n_target_max !== r.n_target

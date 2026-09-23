@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { fmtNum } from '@/lib/utils/number'
 import { bucketOf } from '@/lib/sales/buckets'
+import { stageOf } from '@/lib/sales/stage'
 import { rollUp, describeConsumption, type Term } from '@/lib/sales/credits'
 import {
   DATE_BASES, PRESETS, rangeFor, filterByRange, describeRange,
@@ -29,6 +30,9 @@ export interface AccountProject {
   board_column: string
   status: string
   phase: string
+  /** Read by stageOf for a Scoping survey. Without it the list falls back to
+   *  the bare word "Scoping" while the detail page shows the sub-stage. */
+  scoping_stage?: string | null
   n_target: number | null
   n_target_max: number | null
   n_collected: number
@@ -70,14 +74,11 @@ const DEFAULT_COLS: ColId[] = ['code', 'survey', 'requested', 'stage', 'collecte
 const STORE_KEY = 'socc-sales-account-columns'
 
 export function cellFor(p: AccountProject, id: ColId): string {
-  const stage = p.status !== 'Open' ? p.status
-    : p.board_column === 'Delivery' || p.delivered_at ? 'Delivered'
-    : p.board_column
   switch (id) {
     case 'code': return p.project_code ?? '—'
     case 'survey': return p.project_name
     case 'requested': return p.requested_by_name ?? '—'
-    case 'stage': return stage
+    case 'stage': return stageOf(p)
     case 'target':
       return p.n_target == null ? '—'
         : p.n_target_max && p.n_target_max !== p.n_target
@@ -255,7 +256,12 @@ export function AccountDetail({
         {Object.keys(buckets).length > 0 && (
           <>
             {' · '}
-            {[['active', 'active'], ['scoping', 'scoping'], ['delivered', 'delivered'], ['hold', 'on hold']]
+            {/* All SIX, not four. Cancelled and archived rows are in the count
+                printed just above, so leaving them out of the breakdown makes
+                the parts fail to sum to the whole — which is the one property
+                that makes a breakdown worth reading. */}
+            {([['active', 'active'], ['scoping', 'scoping'], ['delivered', 'delivered'],
+               ['hold', 'on hold'], ['cancelled', 'cancelled'], ['archived', 'archived']] as const)
               .filter(([k]) => buckets[k])
               .map(([k, label]) => `${buckets[k]} ${label}`)
               .join(', ')}

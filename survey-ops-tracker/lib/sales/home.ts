@@ -31,6 +31,9 @@ export interface HomeRow extends BucketInput {
   project_code: string | null
   project_name: string | null
   client: string | null
+  /** The consolidated account key. `client` above is a stale label that splits
+   *  14 accounts across several spellings; this is what the filter groups on. */
+  client_id?: string | null
   due_date: string | null
   deliver_date: string | null
   submitted_date: string | null
@@ -40,7 +43,8 @@ export interface HomeRow extends BucketInput {
   requested_by_name?: string | null
   /* The three fields isRerunProject() needs. All already on the sales_projects
      allowlist, so hiding reruns cost no migration and exposed nothing new —
-     notably NOT the captain, which the view does not carry and should not. */
+     The captain is deliberately not among them here -- migration 118 adds it
+     to the view for the survey DETAIL page, and Home does not need it. */
   series_id?: string | null
   rerun_number?: number | null
   project_type?: string | null

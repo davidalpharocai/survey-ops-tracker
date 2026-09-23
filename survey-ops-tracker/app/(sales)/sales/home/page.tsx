@@ -3,6 +3,7 @@ import { requireSalesUser, mySalespersonName } from '@/lib/sales-auth'
 import { fmtNum } from '@/lib/utils/number'
 import { deliveredN, type DeliveryInput } from '@/lib/sales/deliveredN'
 import { salesHome, daysBetween, type HomeRow, type Judged, type Kind } from '@/lib/sales/home'
+import { HomeSearch, type HomeSearchRow } from '@/components/sales/HomeSearch'
 
 export const dynamic = 'force-dynamic'
 
@@ -175,10 +176,15 @@ export default async function SalesHomePage() {
         <h1 className="text-xl font-semibold">Today</h1>
         {name && <span className="text-sm text-muted-foreground">{name}</span>}
       </div>
-      <p className="mb-5 text-sm text-muted-foreground">
+      <p className="mb-4 text-sm text-muted-foreground">
         {fmtNum(h.counts.inField)} in field · {fmtNum(h.counts.scoping)} in scoping ·{' '}
         {fmtNum(h.counts.delivered)} delivered to date
       </p>
+
+      {/* Searches the WHOLE book already loaded above, not the ~25 rows the
+          cards below show. Renders nothing until someone types, so the curated
+          view stays the default. */}
+      <HomeSearch rows={rows as unknown as HomeSearchRow[]} />
 
       <Card
         title="In field now"
