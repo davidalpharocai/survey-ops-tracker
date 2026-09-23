@@ -38,6 +38,9 @@ export type AllContact = {
   id: string
   first_name: string | null
   last_name: string | null
+  /** Searched by the nav dropdown, so that typing an address finds the person
+   *  there as well as on the search page. Leaving it out made the two disagree. */
+  email: string | null
   title: string | null
   client_id: string
   clients: { name: string } | null
@@ -51,7 +54,7 @@ export function useAllContacts() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('client_contacts')
-        .select('id, first_name, last_name, title, client_id, archived, clients(name)')
+        .select('id, first_name, last_name, email, title, client_id, archived, clients(name)')
         .eq('archived', false)
       if (error) throw error
       // Same display-name order as every other contact list in the app.

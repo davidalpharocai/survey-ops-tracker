@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
+import { scoreRow, isSearchable, RANK } from '@/lib/search/match'
+import { searchPath } from '@/lib/search/objects'
 
 /**
  * One search box over everything a salesperson owns — accounts, contacts and
@@ -36,12 +38,17 @@ type Hit = {
   href: string
 }
 
+const CAP: Record<Hit['kind'], number> = { Account: 8, Contact: 10, Survey: 14 }
+
 export function SalesSearch() {
   const supabase = createClient()
   const router = useRouter()
   const [q, setQ] = useState('')
   const [open, setOpen] = useState(false)
-  const [cursor, setCursor] = useState(0)
+  // -1 means NOTHING is selected. That is what lets a bare Enter mean "search
+  // everything" rather than "open whichever row happened to sort first" --
+  // David, 2026-09-23: "without selecting something that popped up".
+  const [cursor, setCursor] = useState(-1)
   const boxRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -66,11 +73,11 @@ export function SalesSearch() {
     retry: false,
   })
 
-  const hits = useMemo<Hit[]>(() => {
+  const { hits, totals } = useMemo<{ hits: Hit[]; totals: Record<Hit['kind'], number> }>(() => {
     const needle = q.trim().toLowerCase()
-    if (needle.length < 2 || !data) return []
+    if (!isSearchable(needle) || !data) return { hits: [], totals: { Account: 0, Contact: 0, Survey: 0 } }
     const has = (...parts: (string | null | undefined)[]) =>
-      parts.some(p => p && p.toLowerCase().includes(needle))
+      scoreRow(parts, needle) !== RANK.miss
 
     const accounts: Hit[] = data.clients
       .filter(c => has(c.name, c.code))
@@ -109,12 +116,19 @@ export function SalesSearch() {
 
     // Accounts and contacts first: a name typed into this box is far more often
     // a who than a what, and surveys are the long tail that would otherwise bury
-    // them. Capped so the dropdown never becomes its own scrolling list — the
-    // Surveys tab is where you go to browse.
-    return [...accounts.slice(0, 5), ...people.slice(0, 5), ...surveys.slice(0, 8)]
+    // them.
+    //
+    // The caps roughly doubled on 2026-09-23 (David: "expand more so i can see
+    // more of whats populating as i type"), and each group now states its FULL
+    // count below, so a truncated list reads as truncated instead of as
+    // "that is all there is". Everything beyond these is on the search page.
+    return {
+      hits: [...accounts.slice(0, CAP.Account), ...people.slice(0, CAP.Contact), ...surveys.slice(0, CAP.Survey)],
+      totals: { Account: accounts.length, Contact: people.length, Survey: surveys.length },
+    }
   }, [q, data])
 
-  useEffect(() => setCursor(0), [q])
+  useEffect(() => setCursor(-1), [q])
 
   // Close on an outside click, and open the box on ⌘K / Ctrl-K for whoever wants
   // it. The box is visible either way; this is an accelerator, not the door.
@@ -143,6 +157,14 @@ export function SalesSearch() {
     router.push(h.href)
   }
 
+  function seeAll() {
+    const t = q.trim()
+    if (!t) return
+    setOpen(false)
+    setQ('')
+    router.push(searchPath('sales', t))
+  }
+
   const showDropdown = open && q.trim().length >= 2
 
   return (
@@ -160,16 +182,18 @@ export function SalesSearch() {
         onFocus={() => setOpen(true)}
         onKeyDown={e => {
           if (e.key === 'Escape') { setOpen(false); e.currentTarget.blur() }
-          if (!showDropdown || hits.length === 0) return
-          if (e.key === 'ArrowDown') { e.preventDefault(); setCursor(c => (c + 1) % hits.length) }
-          if (e.key === 'ArrowUp') { e.preventDefault(); setCursor(c => (c - 1 + hits.length) % hits.length) }
-          if (e.key === 'Enter') { e.preventDefault(); go(hits[cursor]) }
+          if (!showDropdown) return
+          if (e.key === 'ArrowDown' && hits.length) { e.preventDefault(); setCursor(c => (c + 1) % hits.length) }
+          if (e.key === 'ArrowUp' && hits.length) { e.preventDefault(); setCursor(c => (c <= 0 ? hits.length - 1 : c - 1)) }
+          // Enter fires even with zero hits: "nothing in the dropdown" is itself
+          // a reason to want the full search page.
+          if (e.key === 'Enter') { e.preventDefault(); if (cursor >= 0 && hits[cursor]) go(hits[cursor]); else seeAll() }
         }}
         className="w-44 rounded-md border border-border bg-background px-2.5 py-1.5 text-sm placeholder:text-muted-foreground/70 focus:w-64 focus:border-ring focus:outline-none md:w-56"
       />
 
       {showDropdown && (
-        <div className="absolute right-0 top-full z-50 mt-1 max-h-96 w-80 overflow-y-auto rounded-lg border border-border bg-card shadow-lg">
+        <div className="absolute right-0 top-full z-50 mt-1 max-h-[75vh] w-[min(32rem,92vw)] overflow-y-auto rounded-lg border border-border bg-card shadow-lg">
           {data?.failed ? (
             <p className="px-3 py-2.5 text-xs text-muted-foreground">
               Couldn&apos;t load search right now — this isn&apos;t &ldquo;nothing found&rdquo;. Try again, or tell David.
@@ -179,26 +203,58 @@ export function SalesSearch() {
               Nothing matching &ldquo;{q.trim()}&rdquo; on your accounts.
             </p>
           ) : (
-            hits.map((h, i) => (
-              <button
-                key={`${h.kind}-${h.id}`}
-                onClick={() => go(h)}
-                onMouseEnter={() => setCursor(i)}
-                className={cn(
-                  'flex w-full items-baseline gap-2 px-3 py-2 text-left transition-colors',
-                  i === cursor ? 'bg-muted' : 'hover:bg-muted/60',
-                )}
-              >
-                <span className="w-14 shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground">
-                  {h.kind}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm text-foreground">{h.title}</span>
-                  <span className="block truncate text-xs text-muted-foreground">{h.subtitle}</span>
-                </span>
-              </button>
-            ))
+            hits.map((h, i) => {
+              const firstOfKind = i === 0 || hits[i - 1].kind !== h.kind
+              const more = totals[h.kind] - CAP[h.kind]
+              return (
+                <div key={`${h.kind}-${h.id}`}>
+                  {firstOfKind && (
+                    <p className="flex items-baseline gap-2 border-t border-border/50 px-3 pt-2 pb-1 text-[10px] uppercase tracking-widest text-muted-foreground/70 first:border-t-0">
+                      <span>{h.kind}s</span>
+                      <span className="tabular-nums">{totals[h.kind]}</span>
+                      {/* Never a silent cap. */}
+                      {more > 0 && (
+                        <span className="normal-case tracking-normal text-muted-foreground/60">
+                          +{more} more on the search page
+                        </span>
+                      )}
+                    </p>
+                  )}
+                  <button
+                    onClick={() => go(h)}
+                    onMouseEnter={() => setCursor(i)}
+                    className={cn(
+                      'flex w-full items-baseline gap-2 px-3 py-2 text-left transition-colors',
+                      i === cursor ? 'bg-muted' : 'hover:bg-muted/60',
+                    )}
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm text-foreground">{h.title}</span>
+                      <span className="block truncate text-xs text-muted-foreground">{h.subtitle}</span>
+                    </span>
+                  </button>
+                </div>
+              )
+            })
           )}
+
+          {/* Always present, even when nothing matched above -- an empty
+              dropdown is exactly when someone wants the wider search. */}
+          <button
+            onClick={seeAll}
+            onMouseEnter={() => setCursor(-1)}
+            className={cn(
+              'flex w-full items-center gap-2 border-t border-border px-3 py-2.5 text-left text-sm transition-colors',
+              cursor === -1 ? 'bg-muted' : 'hover:bg-muted/60',
+            )}
+          >
+            <span className="truncate">
+              Search everything for <span className="font-medium text-foreground">&ldquo;{q.trim()}&rdquo;</span>
+            </span>
+            <span className="ml-auto shrink-0 rounded border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground">
+              &crarr;
+            </span>
+          </button>
         </div>
       )}
     </div>
