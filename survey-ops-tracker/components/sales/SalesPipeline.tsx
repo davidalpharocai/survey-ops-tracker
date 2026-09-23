@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { fmtNum } from '@/lib/utils/number'
 import { stageOf, stageTone } from '@/lib/sales/stage'
+import { useUrlSearch } from '@/lib/hooks/useUrlSearch'
 import { BUCKETS, bucketOf, countBuckets, migrateBucketId, type BucketId } from '@/lib/sales/buckets'
 import { accountOptions, inAccounts } from '@/lib/sales/accountIndex'
 
@@ -129,7 +130,9 @@ export function SalesPipeline(
   // back to the default group rather than filtering to an empty list, which
   // would read as "you have no surveys".
   const bucket: BucketId | 'all' = migrateBucketId(params.get('g') ?? 'active') ?? 'active'
-  const q = params.get('q') ?? ''
+  // Local while typing; the URL catches up on a pause. A replace() per
+  // keystroke was a full server round trip per letter on this page.
+  const [q, setQ] = useUrlSearch('q')
   const sortBy = (params.get('s') ?? 'deliver') as ColId
   const asc = params.get('d') !== 'desc'
   const clients = params.getAll('c')
@@ -288,7 +291,7 @@ export function SalesPipeline(
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <input
           value={q}
-          onChange={e => setOne('q', e.target.value || null)}
+          onChange={e => setQ(e.target.value)}
           placeholder="Search survey, code, client or contact…"
           className="min-w-[15rem] flex-1 rounded-lg border border-border bg-card px-3 py-1.5 text-sm focus:border-ring focus:outline-none"
         />
@@ -441,7 +444,7 @@ export function SalesPipeline(
               </p>
               <button
                 type="button"
-                onClick={() => setParams((sp: URLSearchParams) => { sp.delete('c'); sp.delete('st'); sp.delete('q'); sp.set('g', 'all') })}
+                onClick={() => { setQ(''); setParams((sp: URLSearchParams) => { sp.delete('c'); sp.delete('st'); sp.set('g', 'all') }) }}
                 className="mt-2 rounded-md border border-border px-2.5 py-1 text-xs text-foreground hover:border-ring"
               >
                 Clear everything and show all {fmtNum(rows.length)}

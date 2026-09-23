@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { fmtNum } from '@/lib/utils/number'
+import { useUrlSearch } from '@/lib/hooks/useUrlSearch'
 
 /**
  * The accounts list.
@@ -122,7 +123,8 @@ export function AccountsTable({ rows, offBook = 0 }: { rows: AccountRow[]; offBo
   const router = useRouter()
   const params = useSearchParams()
 
-  const q = params.get('q') ?? ''
+  // See useUrlSearch: typing is local, the URL catches up on a pause.
+  const [q, setQ] = useUrlSearch('q')
   const sortBy = params.get('s') ?? 'name'
   const asc = params.get('d') !== 'desc'
 
@@ -232,7 +234,7 @@ export function AccountsTable({ rows, offBook = 0 }: { rows: AccountRow[]; offBo
         <input
           type="search"
           value={q}
-          onChange={e => setParams(p => { const v = e.target.value; if (v) p.set('q', v); else p.delete('q') })}
+          onChange={e => setQ(e.target.value)}
           placeholder="Search accounts by name, code or term…"
           className="h-8 min-w-[16rem] flex-1 rounded-md border border-border bg-background px-2.5 text-sm"
           aria-label="Search accounts"
@@ -390,7 +392,7 @@ export function AccountsTable({ rows, offBook = 0 }: { rows: AccountRow[]; offBo
       {shown.length === 0 && rows.length > 0 && (
         <p className="mt-3 rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground">
           No account matches &ldquo;{q.trim()}&rdquo;.{' '}
-          <button type="button" className="underline hover:text-foreground" onClick={() => setParams(p => p.delete('q'))}>
+          <button type="button" className="underline hover:text-foreground" onClick={() => setQ('')}>
             Clear the search
           </button>
         </p>

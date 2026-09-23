@@ -75,15 +75,35 @@ export type DueFilterPreset =
 // of filter presets plus an arbitrary custom [from, to] range. "Today" uses
 // the same local-midnight notion of "now" as getDueUrgency so the filter and
 // the card colors never disagree about what day it is.
+/**
+ * The presets that ask "what is OUTSTANDING". A survey that is cancelled,
+ * delivered or closed is none of these, whatever its due date says.
+ *
+ * David, 2026-09-23: "in the list view, if i select overdue, it includes
+ * cancelled and delivered surveys. it should only only include open surveys."
+ *
+ * `custom` and `none` are deliberately NOT in this list. Those read as data
+ * questions — "what had a due date in this window", "what is missing one" — and
+ * someone using a date range to find delivered work should still find it.
+ */
+const WORKLOAD_PRESETS = new Set(['overdue', 'today', 'tomorrow', 'twodays', 'week', 'month'])
+
 export function matchesDuePreset(
   dueDate: string | null,
   preset: string | null,
   from?: string | null,
-  to?: string | null
+  to?: string | null,
+  /** Whether the row is still live work. Callers that have a project pass
+   *  isActiveOperational(p); the reruns board, which filters SERIES rather than
+   *  surveys, passes nothing and is unaffected. */
+  isOpen?: boolean,
 ): boolean {
   if (!preset) return true
   if (preset === 'none') return !dueDate
   if (!dueDate) return false
+  // Finished work cannot be overdue or due-soon. Checked before the date maths
+  // so no bucket can quietly readmit it.
+  if (isOpen === false && WORKLOAD_PRESETS.has(preset)) return false
   const today = startOfDay(new Date())
   const due = startOfDay(parseISO(dueDate))
   const days = differenceInCalendarDays(due, today)

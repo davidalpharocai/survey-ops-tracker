@@ -4,6 +4,7 @@ import { useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { fmtNum } from '@/lib/utils/number'
+import { useUrlSearch } from '@/lib/hooks/useUrlSearch'
 
 /**
  * The contacts list.
@@ -44,7 +45,9 @@ export interface ContactRow {
 export function ContactsTable({ rows }: { rows: ContactRow[] }) {
   const router = useRouter()
   const params = useSearchParams()
-  const q = params.get('q') ?? ''
+  // Local while typing, written to the URL once you pause -- a router.replace()
+  // per keystroke made this box lag on a force-dynamic page.
+  const [q, setQ] = useUrlSearch('q')
   const client = params.get('c') ?? ''
 
   const setParams = useCallback((mut: (sp: URLSearchParams) => void) => {
@@ -89,7 +92,7 @@ export function ContactsTable({ rows }: { rows: ContactRow[] }) {
         <input
           type="search"
           value={q}
-          onChange={e => setParams(p => { const v = e.target.value; if (v) p.set('q', v); else p.delete('q') })}
+          onChange={e => setQ(e.target.value)}
           placeholder="Search name, email, title or account…"
           className="h-8 min-w-[16rem] flex-1 rounded-md border border-border bg-background px-2.5 text-sm"
           aria-label="Search contacts"
@@ -168,7 +171,7 @@ export function ContactsTable({ rows }: { rows: ContactRow[] }) {
           <button
             type="button"
             className="underline hover:text-foreground"
-            onClick={() => setParams(p => { p.delete('q'); p.delete('c') })}
+            onClick={() => { setQ(''); setParams(p => p.delete('c')) }}
           >
             Clear the filters
           </button>

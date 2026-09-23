@@ -9,6 +9,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useCurrentMember } from '@/lib/hooks/useCurrentMember'
 import { useIsNewForMe } from '@/lib/hooks/useSeenProjects'
 import { STAGE_ORDER, getCheckboxesForColumn, type BoardColumn as BoardColumnType } from '@/lib/utils/stage'
+import { isActiveOperational } from '@/lib/utils/activeOperational'
 import { matchesDuePreset, type DeliveredWindow } from '@/lib/utils/date'
 import { useComplianceMaps } from '@/lib/hooks/useComplianceState'
 import { complianceGate } from '@/lib/utils/compliance'
@@ -144,7 +145,9 @@ export function Board({ projects, teamMembers, onMoveProject, wrapInContext = tr
         }
       }
       if (typeFilter && p.project_type !== typeFilter) return false
-      if (!matchesDuePreset(p.due_date, dueFilter, dueFrom, dueTo)) return false
+      // isActiveOperational: overdue and due-soon must not include cancelled,
+      // delivered or on-hold work.
+      if (!matchesDuePreset(p.due_date, dueFilter, dueFrom, dueTo, isActiveOperational(p))) return false
       if (stageFilter) {
         if (stageFilter === 'Closed') {
           if (p.status !== 'Closed') return false

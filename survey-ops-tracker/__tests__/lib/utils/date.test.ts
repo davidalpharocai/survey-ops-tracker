@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { getDueDateStatus, getDueUrgency, formatDate, autoStamp, matchesDuePreset, matchesDeliveredWindow } from '@/lib/utils/date'
+import { isActiveOperational } from '@/lib/utils/activeOperational'
 
 // Format in *local* time — toISOString() shifts to UTC, which is a different
 // calendar day in the evening/morning depending on the machine's timezone,
@@ -182,5 +183,61 @@ describe('matchesDeliveredWindow', () => {
     expect(m('2026-07-13', '30d')).toBe(false)    // 31 days back
     expect(m('2026-05-15', '90d')).toBe(true)     // exactly 90 days back
     expect(m('2026-05-14', '90d')).toBe(false)    // 91 days back
+  })
+})
+
+describe('due presets exclude work that is finished', () => {
+  // David, 2026-09-23: "if i select overdue, it includes cancelled and
+  // delivered surveys. it should only only include open surveys."
+  const past = '2020-01-01'
+
+  it('keeps an overdue OPEN survey', () => {
+    expect(matchesDuePreset(past, 'overdue', null, null, true)).toBe(true)
+  })
+
+  it('drops a cancelled or delivered survey from overdue', () => {
+    expect(matchesDuePreset(past, 'overdue', null, null, false)).toBe(false)
+  })
+
+  it('drops finished work from every workload bucket, not just overdue', () => {
+    for (const preset of ['overdue', 'today', 'tomorrow', 'twodays', 'week', 'month']) {
+      expect(matchesDuePreset(past, preset, null, null, false), preset).toBe(false)
+    }
+  })
+
+  it('leaves custom ranges alone, because that is a data question', () => {
+    expect(matchesDuePreset(past, 'custom', '2019-01-01', '2021-01-01', false)).toBe(true)
+  })
+
+  it('leaves the no-due-date filter alone', () => {
+    expect(matchesDuePreset(null, 'none', null, null, false)).toBe(true)
+  })
+
+  it('behaves exactly as before when the caller passes no openness', () => {
+    // The reruns board filters SERIES and has no project to judge.
+    expect(matchesDuePreset(past, 'overdue')).toBe(true)
+    expect(matchesDuePreset(past, 'overdue', null, null, undefined)).toBe(true)
+  })
+})
+
+describe('isActiveOperational', () => {
+  const P = (o: Record<string, unknown>) => ({ status: 'Open', phase: 'Active', board_column: 'Fielding', ...o })
+
+  it('is true only for live operational work', () => {
+    expect(isActiveOperational(P({}))).toBe(true)
+  })
+
+  it('excludes delivered, which can still carry status Open', () => {
+    expect(isActiveOperational(P({ board_column: 'Delivery' }))).toBe(false)
+  })
+
+  it('excludes cancelled, closed and on hold', () => {
+    for (const status of ['Cancelled', 'Closed', 'Hold']) {
+      expect(isActiveOperational(P({ status })), status).toBe(false)
+    }
+  })
+
+  it('excludes pre-sale scoping', () => {
+    expect(isActiveOperational(P({ phase: 'Scoping' }))).toBe(false)
   })
 })

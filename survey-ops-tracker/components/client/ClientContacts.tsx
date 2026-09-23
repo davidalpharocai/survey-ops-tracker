@@ -111,7 +111,15 @@ export function ClientContacts({ clientId }: { clientId: string }) {
                 />
               </div>
             ) : (
-              <div key={c.id} className="flex items-center justify-between gap-2 py-2 group">
+              /* David, 2026-09-23: "the contacts names here should span the whole
+                 width vs get cut off and the option to edit the contact".
+                 Both had the same cause: the action buttons were opacity-0 but
+                 STILL IN THE LAYOUT, so they reserved their full width at all
+                 times and squeezed the name into what was left -- a truncated
+                 name beside empty space. They are their own row now, always
+                 visible, so the name gets the width and Edit is findable
+                 without knowing to hover. */
+              <div key={c.id} className="flex flex-col gap-0.5 py-2 group">
                 <div className="min-w-0">
                   <p className="text-sm text-foreground truncate flex items-center gap-1.5">
                     {/* The name is the way into the contact's own page (every survey
@@ -136,7 +144,7 @@ export function ClientContacts({ clientId }: { clientId: string }) {
                   {contactSubtitle(c) && <p className="text-xs text-muted-foreground truncate">{contactSubtitle(c)}</p>}
                   {c.phone && <p className="text-xs text-muted-foreground truncate">{c.phone}</p>}
                 </div>
-                <div className="flex items-center gap-2 text-xs shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                   <button
                     onClick={() => toggleOccam(c.id, c.occam_invited)}
                     className="text-muted-foreground hover:text-foreground"

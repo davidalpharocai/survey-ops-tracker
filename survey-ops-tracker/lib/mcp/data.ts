@@ -11,6 +11,7 @@ import { VIEW_FINANCIALS } from '@/lib/auth/capabilityNames'
 import { isRestrictedAuditField } from '@/lib/utils/auditFormat'
 import type { Database } from '@/lib/supabase/types'
 import { demoClientIds, withoutDemo } from '@/lib/metrics/demo'
+import { isActiveOperational } from '@/lib/utils/activeOperational'
 
 /** Tool args are user-controlled: strip PostgREST-reserved chars, escape LIKE wildcards, cap length. */
 export function sanitizeQuery(q: string): string {
@@ -151,16 +152,11 @@ export async function getMe(
   return { name: member.name, initials: member.initials, role: profile.role }
 }
 
-/** The only projects that can be "due", "overdue", or "open/active": in-flight
- *  operational surveys. Excludes Closed & On-Hold (status='Hold'), pre-sale
- *  Scoping (phase), and Delivered — the final 'Delivery' board column, shown in
- *  the UI as "Delivered". A delivered project can still carry status='Open' until
- *  it's manually closed, so board_column must be checked, not status alone. */
-export function isActiveOperational(p: {
-  status?: unknown; phase?: unknown; board_column?: unknown
-}): boolean {
-  return p.status === 'Open' && p.phase === 'Active' && p.board_column !== 'Delivery'
-}
+/** Re-exported so every existing `from '@/lib/mcp/data'` import keeps working.
+ *  The definition moved to lib/utils/activeOperational so the board and the
+ *  list — client components — can use the same one rather than a copy.
+ *  Imported at the top as well, because this module calls it itself. */
+export { isActiveOperational }
 
 export async function searchProjects(args: {
   query?: string; status?: string; phase?: string; captain?: string; salesperson?: string;

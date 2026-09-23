@@ -11,6 +11,7 @@ import { useCurrentMember } from '@/lib/hooks/useCurrentMember'
 import { useViewMode } from '@/lib/hooks/useViewMode'
 import { useCanViewFinancials } from '@/lib/hooks/useCapabilities'
 import { exportProjectsCsv } from '@/lib/utils/exportCsv'
+import { isActiveOperational } from '@/lib/utils/activeOperational'
 import { matchesDuePreset } from '@/lib/utils/date'
 import { isTypingTarget } from '@/lib/utils/keyboard'
 import { isRerunProject } from '@/lib/reruns/isRerun'
@@ -194,7 +195,9 @@ export default function ListView() {
     }
     if (typeFilter && p.project_type !== typeFilter) return false
     if (contactFilter && p.requested_by_contact_id !== contactFilter) return false
-    if (!matchesDuePreset(p.due_date, dueFilter, dueFrom, dueTo)) return false
+    // isActiveOperational: overdue and due-soon must not include cancelled,
+    // delivered or on-hold work.
+    if (!matchesDuePreset(p.due_date, dueFilter, dueFrom, dueTo, isActiveOperational(p))) return false
     if (stageFilter) {
       if (stageFilter === 'Closed') {
         if (p.status !== 'Closed') return false
