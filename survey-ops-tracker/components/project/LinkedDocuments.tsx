@@ -1,7 +1,8 @@
 'use client'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useUpdateProject } from '@/lib/hooks/useProjects'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
+import { MAX_ATTACHMENT_BYTES, isInternalAttachment } from '@/lib/documents/attachments'
 
 interface LinkedDocumentsProps {
   projectId: string
@@ -62,6 +63,9 @@ export function LinkedDocuments({ projectId, documents }: LinkedDocumentsProps) 
   const [renaming, setRenaming] = useState<number | null>(null)
   const [renameDraft, setRenameDraft] = useState('')
   const [expanded, setExpanded] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
   const updateProject = useUpdateProject()
 
   // On a project with no docs yet, collapse to a one-line stub so the empty
@@ -72,13 +76,13 @@ export function LinkedDocuments({ projectId, documents }: LinkedDocumentsProps) 
         <span className="text-xs text-muted-foreground uppercase tracking-widest font-medium flex items-center">
           Linked Documents
           <span className="ml-1 normal-case tracking-normal text-muted-foreground/50">(0)</span>
-          <InfoTooltip text="Links to this project's docs (questionnaire, data files, etc.). Titles are fetched automatically when you add a link; hover a link to rename or remove it." />
+          <InfoTooltip text="This project's documents. Paste a link to a Google Doc or Drive file, or use 📎 to attach a file from your computer — attached files are stored in SOCC and are visible to the team only, never to the client or the sales view. Titles are fetched automatically for links; hover any row to rename or remove it." />
         </span>
         <button
           onClick={() => setExpanded(true)}
           className="text-xs text-blue-600 dark:text-blue-400 hover:underline shrink-0"
         >
-          + add a Google Doc
+          + link or attach
         </button>
       </div>
     )
@@ -107,6 +111,53 @@ export function LinkedDocuments({ projectId, documents }: LinkedDocumentsProps) 
     setAdding(false)
   }
 
+  /**
+   * Attach a file. David, 2026-09-23: "can we make it so one can attach
+   * something as well?"
+   *
+   * The bytes go to a PRIVATE bucket this app alone reads -- deliberately not to
+   * public.deliverables, which is the client-facing register and which migration
+   * 118 opened to the sales tier. What lands in the array is an ordinary
+   * {name,url,fmt} entry, so rename, remove and reorder already work on it.
+   */
+  async function handleAttach(file: File) {
+    if (!file || uploading) return
+    setUploadError(null)
+    if (file.size > MAX_ATTACHMENT_BYTES) {
+      setUploadError(`That file is ${(file.size / 1024 / 1024).toFixed(1)} MB — the limit is `
+        + `${Math.round(MAX_ATTACHMENT_BYTES / 1024 / 1024)} MB. Put it in Drive and paste the link instead.`)
+      return
+    }
+    setUploading(true)
+    try {
+      const body = new FormData()
+      body.append('projectId', projectId)
+      body.append('file', file)
+      const res = await fetch('/api/project-files', { method: 'POST', body })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        // Surfaced, never swallowed: a failed upload that clears the picker and
+        // says nothing is indistinguishable from one that worked.
+        setUploadError(json.error ?? `Upload failed (${res.status}).`)
+        return
+      }
+      updateProject.mutate({
+        id: projectId,
+        updates: {
+          linked_documents: [
+            ...documents,
+            JSON.stringify({ name: json.name ?? file.name, url: json.url, fmt: json.fmt ?? null }),
+          ],
+        },
+      })
+    } catch (e) {
+      setUploadError((e as Error).message || 'Upload failed.')
+    } finally {
+      setUploading(false)
+      if (fileRef.current) fileRef.current.value = ''
+    }
+  }
+
   function handleRemove(index: number) {
     updateProject.mutate({
       id: projectId,
@@ -129,7 +180,7 @@ export function LinkedDocuments({ projectId, documents }: LinkedDocumentsProps) 
     <div className="bg-card border border-border shadow-sm rounded-xl p-4">
       <h3 className="text-xs text-muted-foreground uppercase tracking-widest mb-3 font-medium flex items-center">
         Linked Documents
-        <InfoTooltip text="Links to this project's docs (questionnaire, data files, etc.). Titles are fetched automatically when you add a link; hover a link to rename or remove it." />
+        <InfoTooltip text="This project's documents. Paste a link to a Google Doc or Drive file, or use 📎 to attach a file from your computer — attached files are stored in SOCC and are visible to the team only, never to the client or the sales view. Titles are fetched automatically for links; hover any row to rename or remove it." />
       </h3>
       <div className="grid grid-cols-2 gap-2 mb-3">
         {documents.map((entry, i) => {
@@ -166,7 +217,9 @@ export function LinkedDocuments({ projectId, documents }: LinkedDocumentsProps) 
                 rel="noopener noreferrer"
                 className="flex items-center gap-2 bg-muted rounded-lg px-3 py-2 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-accent transition-colors min-w-0"
               >
-                <span>📄</span>
+                <span title={isInternalAttachment(url) ? 'Attached file, stored in SOCC' : 'Link'}>
+                  {isInternalAttachment(url) ? '📎' : '📄'}
+                </span>
                 <span className="truncate">
                   {name ?? fallbackName(url)}
                   {fmt && <span className="text-muted-foreground/60"> ({fmt})</span>}
@@ -185,7 +238,9 @@ export function LinkedDocuments({ projectId, documents }: LinkedDocumentsProps) 
                 </button>
                 <button
                   onClick={() => handleRemove(i)}
-                  title="Remove link"
+                  title={isInternalAttachment(url)
+                    ? 'Take this off the project. The file itself is kept.'
+                    : 'Remove link'}
                   className="text-muted-foreground/50 hover:text-red-600 dark:hover:text-red-400 text-xs px-1 py-1"
                 >
                   ✕
@@ -213,7 +268,27 @@ export function LinkedDocuments({ projectId, documents }: LinkedDocumentsProps) 
         >
           {adding ? 'Adding…' : 'Add'}
         </button>
+        {/* A paperclip rather than a worded button: this card is 320px of rail
+            and a third full-width control would wrap the row. */}
+        <button
+          onClick={() => fileRef.current?.click()}
+          disabled={uploading}
+          title={`Attach a file from this computer (max ${Math.round(MAX_ATTACHMENT_BYTES / 1024 / 1024)} MB). It is stored in SOCC, visible to the team only — never to the client or the sales view.`}
+          className="bg-muted hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed text-foreground text-xs px-3 py-2 rounded-lg transition-colors"
+        >
+          {uploading ? '…' : '📎'}
+        </button>
+        <input
+          ref={fileRef}
+          type="file"
+          className="hidden"
+          onChange={e => { const f = e.target.files?.[0]; if (f) handleAttach(f) }}
+        />
       </div>
+
+      {uploadError && (
+        <p className="mt-2 text-xs text-red-600 dark:text-red-400">{uploadError}</p>
+      )}
     </div>
   )
 }

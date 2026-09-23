@@ -1,5 +1,6 @@
 'use client'
 import { Caret } from '@/components/shared/Caret'
+import { isInternalAttachment } from '@/lib/documents/attachments'
 import { useState, useEffect, useRef } from 'react'
 import { useSubmissions, useRecipients, useInvalidateCompliance } from '@/lib/hooks/useSubmissions'
 import { useComplianceState } from '@/lib/hooks/useComplianceState'
@@ -12,15 +13,24 @@ import { formatDate } from '@/lib/utils/date'
 import type { DraftQuestion } from '@/lib/parsing/validate'
 import type { SurveyProject } from '@/lib/hooks/useProjects'
 
-// First linked-document URL (entries are a plain URL or JSON {name,url}) — used
-// to pre-suggest the results link for the after-fielding review.
+// First SHAREABLE linked-document URL (entries are a plain URL or JSON
+// {name,url}) — used to pre-suggest the results link for the after-fielding
+// review.
+//
+// ATTACHED FILES ARE SKIPPED, not merely deprioritised. This suggestion is sent
+// to an external reviewer at the CLIENT firm, and an attachment is an internal
+// file behind an analyst-only route: the reviewer would get a login page
+// instead of the results. Before attachments existed this took docs[0]
+// unconditionally, so a file attached first would have become the suggestion.
 function firstDocUrl(docs?: string[] | null): string | null {
-  if (!docs?.length) return null
-  const e = docs[0]
-  if (e.startsWith('{')) {
-    try { return (JSON.parse(e).url as string) ?? null } catch { return e }
+  for (const e of docs ?? []) {
+    let url: string | null = e
+    if (e.startsWith('{')) {
+      try { url = (JSON.parse(e).url as string) ?? null } catch { url = e }
+    }
+    if (url && !isInternalAttachment(url)) return url
   }
-  return e
+  return null
 }
 
 const STATUS_BADGE: Record<string, string> = {
