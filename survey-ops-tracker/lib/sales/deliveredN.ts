@@ -57,7 +57,53 @@ export interface DeliveryInput {
   /** For the note only — never part of the arithmetic. */
   deliver_date?: string | null
   due_date?: string | null
+  /** Where the survey is. Used ONLY to tell a survey that finished short from
+   *  one that has not finished at all — see stillCollecting below. */
+  board_column?: string | null
+  status?: string | null
 }
+
+/**
+ * Is this survey still gathering responses?
+ *
+ * ── WHY THIS EXISTS: THE UNDER-TARGET BAND WAS BEING APPLIED MID-FLIGHT ─────
+ * David, 2026-09-23, on a survey reading 7 in the tracker and 6 to a
+ * salesperson. The 6 was this file: 7 collected against a 75 target took the
+ * short-of-target branch and returned round(7 x 0.898) = 6, sitting one line
+ * under "N Collected 7".
+ *
+ * That band was measured on 26 surveys that FINISHED below target — the
+ * question it answers is "this study ended short; how much of what it gathered
+ * survived QA". PR00383 had not ended. It was in Fielding at 9% of target, and
+ * applying an end-of-life keep rate to a survey still in field states that it
+ * will deliver LESS THAN IT HAS ALREADY COLLECTED. Which is not a projection,
+ * it is a contradiction of the number printed directly above it.
+ *
+ * Measured across the live book the day this was found: 29 surveys were in that
+ * state. The worst was not the one that got noticed — PR00460 had 1,588 of an
+ * 1,800 target, still fielding, and was being shown as 1,426.
+ *
+ * Reading the stage rather than guessing from the numbers is deliberate: a
+ * survey at 9% of target might be nearly finished and badly short, or might have
+ * started yesterday, and nothing in the N fields distinguishes those. The board
+ * column does.
+ */
+function stillCollecting(p: DeliveryInput): boolean {
+  // Absent stage information, behave as before. A caller that does not pass the
+  // column gets the old projection rather than a silently different number.
+  if (p.board_column == null) return false
+  // Closed, Cancelled and Hold have all stopped gathering, whatever column they
+  // are parked in.
+  if (p.status != null && p.status !== 'Open') return false
+  const i = COLLECTING_STAGES.indexOf(p.board_column)
+  return i >= 0
+}
+
+/** Everything up to and including Fielding. Past Fielding — Data QA, Delivery —
+ *  collection is over and what is in hand is what there is. */
+const COLLECTING_STAGES = [
+  'Submitted', 'Doc Programming', 'Survey Programming', 'EdWin QA', 'Fielding',
+]
 
 /**
  * Measured on delivered surveys, 2026-09-17. Recomputed rather than assumed
@@ -106,7 +152,7 @@ export interface DeliveredN {
   low: number | null
   high: number | null
   /** Which behaviour the estimate came from, so the note can say it. */
-  basis: 'recorded' | 'at-or-over-target' | 'short-of-target' | null
+  basis: 'recorded' | 'at-or-over-target' | 'short-of-target' | 'still-collecting' | null
   /** The sentence for the line item. Empty when `value` is recorded. */
   note: string
 }
@@ -165,6 +211,23 @@ export function deliveredN(
         `over-collects delivers roughly what it sold, not everything it bought: across ${r.n} past ` +
         `surveys the delivered N came in at a median ${r.median.toFixed(2)}x target ` +
         `(${r.p25.toFixed(2)}–${r.p75.toFixed(2)}x). QA has not run yet.` + window,
+    }
+  }
+
+  // STILL IN FIELD: report what is in hand and say so. The under-target band
+  // below describes surveys that ENDED short, and applying it here would print
+  // a number smaller than the collection it is derived from.
+  if (stillCollecting(p)) {
+    return {
+      value: collected,
+      estimated: true,
+      low: null,
+      high: null,
+      basis: 'still-collecting',
+      note:
+        `${fmt(collected)} of a ${fmt(target)} target so far, and still in field. ` +
+        `No delivered figure is projected yet: what QA removes is measured against a ` +
+        `finished collection, and this one is not finished.` + dateNote(p),
     }
   }
 

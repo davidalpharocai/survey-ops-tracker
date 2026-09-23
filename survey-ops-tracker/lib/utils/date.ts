@@ -210,3 +210,24 @@ export function autoStamp(
   const entry = `[${today}] ${userName}: ${newText}`
   return existing ? `${existing}\n${entry}` : entry
 }
+
+/**
+ * A timestamp a person can judge freshness by: "Sep 23, 12:31 PM" today,
+ * "Sep 8" once it is older than a couple of days.
+ *
+ * LOCAL TIME, unlike formatDate above, and the difference is deliberate. The
+ * date-only fields in this app (due, deliver, launch) are rendered in UTC so a
+ * date typed as the 8th never displays as the 7th. This one renders a real
+ * INSTANT -- when someone changed a number -- and an instant shown in UTC to a
+ * reader in New York is four hours wrong at exactly the moment it matters most,
+ * which is "was this updated since I last looked".
+ */
+export function formatStamp(iso: string | null | undefined): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  const hoursOld = (Date.now() - d.getTime()) / 3_600_000
+  return hoursOld < 48
+    ? d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+    : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}

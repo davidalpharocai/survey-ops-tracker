@@ -12,6 +12,9 @@ export interface NumberCellProps {
   onSave: (n: number | null) => void
   placeholder?: string
   readOnly?: boolean
+  /** A small line under the value -- e.g. when the figure was last changed.
+   *  Rendered only when NOT editing, so the row does not jump as you type. */
+  hint?: string | null
 }
 
 /**
@@ -27,6 +30,7 @@ export function NumberCell({
   onSave,
   placeholder = 'e.g. 4200 or =4200+800',
   readOnly = false,
+  hint = null,
 }: NumberCellProps) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
@@ -113,6 +117,9 @@ export function NumberCell({
         <span className="text-muted-foreground/50">{readOnly ? '—' : '— set'}</span>
       ) : (
         <span className="truncate">{value.toLocaleString()}</span>
+      )}
+      {hint && (
+        <span className="mt-0.5 block text-[10px] leading-tight text-muted-foreground/70">{hint}</span>
       )}
     </FieldCell>
   )

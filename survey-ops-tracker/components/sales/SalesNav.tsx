@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { ThemeToggle } from '@/components/shared/ThemeToggle'
 import { SalesSearch } from './SalesSearch'
+import { AsOf } from './AsOf'
 
 /**
  * The sales tier's navigation ribbon.
@@ -36,7 +37,7 @@ const TABS = [
   { href: '/sales/whats-new', label: "What's new" },
 ] as const
 
-export function SalesNav({ name }: { name: string | null }) {
+export function SalesNav({ name, renderedAt }: { name: string | null; renderedAt: string }) {
   const pathname = usePathname()
 
   return (
@@ -75,6 +76,7 @@ export function SalesNav({ name }: { name: string | null }) {
         })}
 
         <div className="ml-auto flex items-center gap-2">
+          <AsOf iso={renderedAt} />
           <SalesSearch />
           <ThemeToggle />
           {/* Whose book this is. Small, but a scoped tool that never says whose

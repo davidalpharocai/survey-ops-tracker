@@ -159,3 +159,83 @@ describe('measureDeliveryStats: the ratios sharpen from the live book', () => {
     expect(s.overTargetRatio).toEqual(DELIVERY_STATS.overTargetRatio)
   })
 })
+
+describe('a survey still in field is not given an end-of-life projection', () => {
+  // David, 2026-09-23: PR00383 read 7 in the tracker and 6 to a salesperson.
+  // The 6 was round(7 * 0.898) -- the QA keep rate for surveys that FINISHED
+  // short, applied to one still collecting.
+  const inField = (over: Partial<DeliveryInput> = {}) =>
+    deliveredN({
+      n_target: 75, n_collected: 7, n_actual: null,
+      board_column: 'Fielding', status: 'Open', ...over,
+    })!
+
+  it('never shows less than has already been collected', () => {
+    const d = inField()
+    expect(d.value).toBe(7)
+    expect(d.value).toBeGreaterThanOrEqual(7)
+    expect(d.basis).toBe('still-collecting')
+  })
+
+  it('offers no band, because there is nothing to bound yet', () => {
+    const d = inField()
+    expect(d.low).toBeNull()
+    expect(d.high).toBeNull()
+  })
+
+  it('says why rather than going quiet', () => {
+    expect(inField().note).toMatch(/still in field/i)
+    expect(inField().note).toContain('75')
+  })
+
+  it('holds for the worst live case, which was the big one', () => {
+    // PR00460: 1,588 of 1,800, still fielding -- was being shown as 1,426.
+    const d = deliveredN({
+      n_target: 1800, n_collected: 1588, n_actual: null,
+      board_column: 'Fielding', status: 'Open',
+    })!
+    expect(d.value).toBe(1588)
+  })
+
+  it('still projects once collection is over', () => {
+    for (const stage of ['Data QA', 'Delivery']) {
+      const d = deliveredN({
+        n_target: 75, n_collected: 7, n_actual: null, board_column: stage, status: 'Open',
+      })!
+      expect(d.basis, stage).toBe('short-of-target')
+      expect(d.value, stage).toBe(6)
+    }
+  })
+
+  it('projects for a survey that is no longer open, whatever column it sits in', () => {
+    for (const status of ['Closed', 'Cancelled', 'Hold']) {
+      const d = deliveredN({
+        n_target: 75, n_collected: 7, n_actual: null, board_column: 'Fielding', status,
+      })!
+      expect(d.basis, status).toBe('short-of-target')
+    }
+  })
+
+  it('leaves the over-target branch alone: it is anchored on target, not on collection', () => {
+    const d = deliveredN({
+      n_target: 1000, n_collected: 2000, n_actual: null,
+      board_column: 'Fielding', status: 'Open',
+    })!
+    expect(d.basis).toBe('at-or-over-target')
+  })
+
+  it('a recorded actual still wins over everything', () => {
+    const d = deliveredN({
+      n_target: 75, n_collected: 7, n_actual: 4,
+      board_column: 'Fielding', status: 'Open',
+    })!
+    expect(d.value).toBe(4)
+    expect(d.estimated).toBe(false)
+  })
+
+  it('behaves exactly as before when the caller passes no stage', () => {
+    const d = deliveredN({ n_target: 75, n_collected: 7, n_actual: null })!
+    expect(d.basis).toBe('short-of-target')
+    expect(d.value).toBe(6)
+  })
+})

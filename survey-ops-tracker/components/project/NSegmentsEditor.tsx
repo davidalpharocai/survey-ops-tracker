@@ -19,6 +19,8 @@ import {
   type SegmentInput,
 } from '@/lib/hooks/useProjectSegments'
 import { useUpdateProject, type SurveyProject } from '@/lib/hooks/useProjects'
+import { useNCollectedUpdatedAt } from '@/lib/hooks/useNFreshness'
+import { formatStamp } from '@/lib/utils/date'
 import { cn } from '@/lib/utils'
 import { commitNumber } from '@/lib/utils/formula'
 import { fmtNum } from '@/lib/utils/number'
@@ -128,6 +130,7 @@ function AudienceRemaining({ size, used }: { size: number | null; used: number |
 export function NSegmentsEditor({ project }: { project: SurveyProject }) {
   const { data: segments = [] } = useProjectSegments(project.id)
   const updateProject = useUpdateProject()
+  const { data: nUpdatedAt } = useNCollectedUpdatedAt(project.id)
   const split = useSplitProject(project.id)
   const addSeg = useAddSegment(project.id)
   const removeSeg = useRemoveSegment(project.id)
@@ -196,10 +199,14 @@ export function NSegmentsEditor({ project }: { project: SurveyProject }) {
         value={project.n_internal_target ?? null}
         onSave={v => saveProject({ n_internal_target: v })}
       />
+      {/* David, 2026-09-23: "we should add a time stamp to when the N was last
+          updated." Blank when it has never been changed -- dating it to the
+          project's creation would imply someone had checked. */}
       <NumberCell
         label="N Collected"
         tooltip={sumNote(TIP.nCollected)}
         value={project.n_collected}
+        hint={nUpdatedAt ? `updated ${formatStamp(nUpdatedAt)}` : null}
         onSave={v => saveProject({ n_collected: v ?? 0 })}
       />
       <NumberCell

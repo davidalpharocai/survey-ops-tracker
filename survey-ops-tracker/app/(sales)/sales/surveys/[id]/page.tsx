@@ -191,7 +191,12 @@ export default async function SalesSurveyPage({ params }: { params: Promise<{ id
           {dn?.estimated && (
             <p className="mt-3 border-t border-border/60 pt-3 text-xs text-muted-foreground">
               <span className="font-medium text-foreground">
-                Anticipated N Actual ≈ {fmtNum(dn.value)}
+                {/* A survey still in field has not anticipated anything yet --
+                    calling its running total "Anticipated N Actual" is what
+                    made a 7 look like a 6 one line further down. */}
+                {dn.basis === 'still-collecting'
+                  ? `Collected so far: ${fmtNum(dn.value)}`
+                  : `Anticipated N Actual ≈ ${fmtNum(dn.value)}`}
                 {dn.low != null && dn.high != null && ` (${fmtNum(dn.low)}–${fmtNum(dn.high)})`}
               </span>
               <br />

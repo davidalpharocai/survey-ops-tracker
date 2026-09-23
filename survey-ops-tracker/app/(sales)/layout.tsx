@@ -1,5 +1,6 @@
 import { ImpersonationBanner } from '@/components/shared/ImpersonationBanner'
 import { SalesNav } from '@/components/sales/SalesNav'
+import { SalesLiveRefresh } from '@/components/sales/SalesLiveRefresh'
 import { createClient } from '@/lib/supabase/server'
 import { mySalespersonName } from '@/lib/sales-auth'
 
@@ -40,7 +41,11 @@ export default async function SalesShell({ children }: { children: React.ReactNo
           see it before they read a single number. Renders nothing when nobody
           is impersonating. */}
       <ImpersonationBanner />
-      <SalesNav name={name} />
+      {/* The analyst shell mounts RealtimeSync here. This tier cannot use it --
+          realtime honours RLS and 105 closed the base tables to sales, so the
+          subscription would deliver nothing. This re-renders instead. */}
+      <SalesLiveRefresh />
+      <SalesNav name={name} renderedAt={new Date().toISOString()} />
       <main className="mx-auto max-w-6xl p-6">{children}</main>
     </div>
   )

@@ -135,6 +135,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         kind: 'FIXED',
         audience: 'all',
+        text: 'A survey still in field could show an anticipated delivered N BELOW the number it had already collected — one survey read 7 collected with 6 anticipated directly underneath. The estimate that produced it was measured on surveys that FINISHED short of target, and it was being applied to surveys that had not finished at all. A survey still collecting now shows what it has collected so far and says no figure is projected yet. 29 surveys were affected; the largest had gathered 1,588 of an 1,800 target and was being shown as 1,426.',
+      },
+      {
+        kind: 'IMPROVED',
+        audience: 'all',
+        text: 'Sales pages now bring themselves up to date when you come back to the tab, and once a minute while you are looking at them. The bar at the top says what time the page last read the database, so a screen left open can no longer look current when it is not.',
+      },
+      {
+        kind: 'FIXED',
+        audience: 'all',
         text: 'Delivered surveys were labelled Closed or Archived nearly everywhere they appeared, because a delivered survey is also closed. They say Delivered now.',
       },
       {
@@ -161,6 +171,10 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         kind: 'FIXED',
         text: 'Adding a contract on a client page had never once worked. The database refused every write, and the form cleared itself as though it had saved, so it looked like nothing happened. Adding, editing and removing all work now, and a save that fails keeps what you typed on screen instead of throwing it away.',
+      },
+      {
+        kind: 'IMPROVED',
+        text: 'N Collected on a project now carries the date and time it was last changed, under the number. The sales view has shown this for a while; the side where the figure is actually edited did not.',
       },
       {
         kind: 'FIXED',
