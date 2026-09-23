@@ -92,9 +92,14 @@ try { prevState = JSON.parse(fs.readFileSync(STATE, 'utf8')) } catch { /* first 
 /* ── 1. read every input, tolerating zip or csv ────────────────────────── */
 
 /** Minimal ZIP reader: central directory -> stored/deflated entries. Avoids a
- *  dependency, and the export is a plain zip with no encryption. */
-function unzip(buf) {
-  const out = []
+ *  dependency, and the export is a plain zip with no encryption.
+ *
+ *  A GENERATOR, deliberately. PureSpectrum splits a large export into 50,000-row
+ *  chunks — a 52MB zip of 8 parts inflates to 255MB. Returning them all at once
+ *  held every part in memory simultaneously and killed the process with
+ *  "Ineffective mark-compacts near heap limit" on a real April-May export.
+ *  Yielding one at a time means only the part being parsed is resident. */
+function* unzip(buf) {
   let eocd = buf.length - 22
   while (eocd >= 0 && buf.readUInt32LE(eocd) !== 0x06054b50) eocd--
   if (eocd < 0) throw new Error('not a zip file (no end-of-central-directory)')
@@ -113,10 +118,10 @@ function unzip(buf) {
     const lExtraLen = buf.readUInt16LE(lho + 28)
     const start = lho + 30 + lNameLen + lExtraLen
     const raw = buf.subarray(start, start + csize)
-    out.push({ name, data: method === 0 ? raw : zlib.inflateRawSync(raw) })
+    // inflate lazily, at the moment this part is consumed, not before
+    yield { name, get data() { return method === 0 ? raw : zlib.inflateRawSync(raw) } }
     p += 46 + nameLen + extraLen + cmtLen
   }
-  return out
 }
 
 /** RFC4180 CSV. The export quotes fields containing commas (project names,
@@ -198,7 +203,18 @@ for (const f of files) {
       }
       if (!COL.cpi) warn('WARNING: no per-respondent CPI column found — spend cannot be computed from this file.')
     }
-    for (const row of rows) { if (row[COL.tx]) byTx.set(row[COL.tx], row) }
+    // Keep ONLY the columns COL names. byTx has to retain every distinct
+    // transaction (rule 1 dedupes on it), so holding whole raw rows — 25+ string
+    // fields including user agents — is what actually dominates memory on a
+    // 160,000-respondent export. The nine fields below are all anything
+    // downstream reads.
+    for (const row of rows) {
+      const tx = row[COL.tx]
+      if (!tx) continue
+      const slim = {}
+      for (const k of Object.values(COL)) if (k) slim[k] = row[k]
+      byTx.set(tx, slim)
+    }
     n += rows.length
   }
   report.files.push({ file: path.basename(f), rows: n })
@@ -214,7 +230,13 @@ for (const r of byTx.values()) {
   const s = String(r[COL.status] ?? '').trim()
   seenStatus.set(s, (seenStatus.get(s) ?? 0) + 1)
 }
-const completes = [...byTx.values()].filter(r => String(r[COL.status] ?? '').trim().toLowerCase() === STATUS_COMPLETE)
+// built with a loop rather than [...byTx.values()].filter(): the spread
+// materialises a second array holding every transaction before filtering,
+// which on a 160,000-row export is a needless copy at peak memory.
+const completes = []
+for (const r of byTx.values()) {
+  if (String(r[COL.status] ?? '').trim().toLowerCase() === STATUS_COMPLETE) completes.push(r)
+}
 report.completes = completes.length
 log(`completes: ${completes.length.toLocaleString('en-US')}`)
 // Rule 2: an unrecognised status is surfaced, never silently dropped.
