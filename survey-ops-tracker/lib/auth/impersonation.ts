@@ -42,7 +42,7 @@ export const IMPERSONATION_COOKIE = 'socc_impersonator'
 // The rule list and the authorisation decision live in impersonationRules.ts,
 // which has no `server-only` so it can be unit-tested. Re-exported here so a
 // caller needs only one import.
-export { IMPERSONATABLE_ROLES, decideImpersonation } from './impersonationRules'
+export { IMPERSONATABLE_ROLES, decideImpersonation, signInLinkAtRisk } from './impersonationRules'
 export type { ImpersonationDecision, ImpersonationRequest } from './impersonationRules'
 
 export interface Impersonator {

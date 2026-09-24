@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { decideImpersonation, IMPERSONATABLE_ROLES } from './impersonationRules'
+import { decideImpersonation, IMPERSONATABLE_ROLES, signInLinkAtRisk } from './impersonationRules'
 
 const DAVID = { id: 'admin-1', email: 'david@alpharoc.ai' }
 
@@ -108,5 +108,35 @@ describe('decideImpersonation', () => {
     // Pinned deliberately. Adding to this list is a decision to allow writes as
     // another person, and it should fail a test rather than pass quietly.
     expect([...IMPERSONATABLE_ROLES]).toEqual(['sales', 'compliance'])
+  })
+})
+
+describe('signInLinkAtRisk', () => {
+  const NOW = new Date('2026-09-24T18:30:00Z') // 2:30pm ET
+  const at = (min: number) => new Date(NOW.getTime() + min * 60_000).toISOString()
+
+  it('is safe when the last link was used', () => {
+    expect(signInLinkAtRisk({ recovery_sent_at: at(-20), last_sign_in_at: at(-19) }, 'alex@alpharoc.ai', NOW)).toBeNull()
+  })
+
+  it('refuses while a requested link is still waiting to be clicked', () => {
+    // The case that silently broke Alex's sign-in: he asks for a link, an admin
+    // starts a view-as before he clicks it, and his link now says "expired".
+    const r = signInLinkAtRisk({ recovery_sent_at: at(-5), last_sign_in_at: at(-600) }, 'alex@alpharoc.ai', NOW)
+    expect(r).toMatch(/asked for a sign-in link 5 minutes ago/)
+    expect(r).toMatch(/after 3:25 PM ET/)
+  })
+
+  it('is safe once the waiting link has expired anyway', () => {
+    expect(signInLinkAtRisk({ recovery_sent_at: at(-61), last_sign_in_at: at(-600) }, 'alex@alpharoc.ai', NOW)).toBeNull()
+  })
+
+  it('refuses someone who has never signed in, so their invitation survives', () => {
+    const r = signInLinkAtRisk({ recovery_sent_at: null, last_sign_in_at: null }, 'john@alpharoc.ai', NOW)
+    expect(r).toMatch(/has not signed in yet/)
+  })
+
+  it('is safe for someone who has signed in and never asked for a link since', () => {
+    expect(signInLinkAtRisk({ recovery_sent_at: null, last_sign_in_at: at(-60) }, 'alex@alpharoc.ai', NOW)).toBeNull()
   })
 })

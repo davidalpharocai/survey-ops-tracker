@@ -81,6 +81,19 @@ export async function POST() {
     }, { status: 500 })
   }
 
+  // End the viewed session on the server before handing back. Stop used to just
+  // overwrite the cookies, which left a live session on the viewed person's
+  // account for every view-as ever started: held by nobody, harmless to them,
+  // but a session nobody holds should not exist. scope 'local' ends THIS minted
+  // session only, never the person's own devices. Best-effort: failing to tidy
+  // up must not strand the admin in someone else's session.
+  try {
+    const viewed = await createUserClient()
+    await viewed.auth.signOut({ scope: 'local' })
+  } catch {
+    // Left for Supabase to hold; the restore below is what matters.
+  }
+
   const swap = await createUserClient()
   await swap.auth.setSession({
     access_token: session.session.access_token,

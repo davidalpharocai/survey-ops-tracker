@@ -93,6 +93,10 @@ export const CHANGELOG: ChangelogEntry[] = [
         text: 'Opening the sign-in page while already signed in showed the "Email me a sign-in link" form, as if you had been signed out. It now takes you straight in, so a bookmark to the sign-in page no longer costs you a new link each visit.',
       },
       {
+        kind: 'FIXED',
+        text: 'View as could quietly break the sign-in of the person being viewed: starting it cancelled any sign-in link they had just asked for, and pressing Sign out while viewing signed them out on every device. It now refuses to start while they have a link waiting or before their first sign-in, and ending it only ends the viewing session.',
+      },
+      {
         kind: 'NEW',
         text: "A salesperson can be set up to work another salesperson's book: their own login, exactly that person's accounts and surveys, with the header saying whose book it is. John Farrall is set up this way on Alex Pinsky's book, ready for Monday.",
       },

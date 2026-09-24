@@ -6,6 +6,7 @@ import {
   IMPERSONATION_COOKIE,
   encodeImpersonator,
   decideImpersonation,
+  signInLinkAtRisk,
 } from '@/lib/auth/impersonation'
 
 export const dynamic = 'force-dynamic'
@@ -69,6 +70,21 @@ export async function POST(req: Request) {
     // it narrows the type for everything below rather than asserting non-null.
     return NextResponse.json({ error: `No account for ${email}.` }, { status: 404 })
   }
+
+  // 3b. WOULD IT TOUCH THEIR ACCOUNT. Step 5 replaces the target's one
+  //     outstanding sign-in token, so a link they asked for and have not
+  //     clicked yet would die, or an invitation they have not accepted would be
+  //     used up. Refused in exactly that window (signInLinkAtRisk, tested).
+  //     Fails CLOSED: if we cannot read their state we cannot promise not to
+  //     break their sign-in, and step 5 needs the same auth API anyway.
+  const { data: authUser, error: authError } = await admin.auth.admin.getUserById(target.id)
+  if (authError || !authUser?.user) {
+    return NextResponse.json({
+      error: `Could not check whether ${target.email ?? email} has a sign-in link waiting, so View as was not started: ${authError?.message ?? 'no user returned'}`,
+    }, { status: 503 })
+  }
+  const risk = signInLinkAtRisk(authUser.user, target.email ?? email, new Date())
+  if (risk) return NextResponse.json({ error: risk }, { status: 409 })
 
   // 4. RECORD IT BEFORE DOING IT. If the audit insert fails the impersonation
   //    does not happen: an unlogged one is worse than none.

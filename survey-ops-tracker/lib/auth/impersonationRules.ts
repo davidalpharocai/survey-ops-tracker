@@ -72,3 +72,45 @@ export function decideImpersonation(req: ImpersonationRequest): ImpersonationDec
   }
   return { ok: true }
 }
+
+/** How long an emailed sign-in link stays usable. Matches the "expires in 1
+ *  hour" the magic-link template promises (docs/email-templates). */
+export const SIGN_IN_LINK_TTL_MINUTES = 60
+
+/** The auth fields that say whether a sign-in link is waiting, as returned by
+ *  admin.auth.admin.getUserById. */
+export interface SignInState {
+  recovery_sent_at?: string | null
+  last_sign_in_at?: string | null
+}
+
+/**
+ * Would viewing as this person cancel a sign-in link they are about to use?
+ * Returns the reason to refuse, or null when it is safe.
+ *
+ * "View as" mints the target's session with generateLink, and Supabase keeps
+ * ONE outstanding sign-in token per account: minting a new one replaces it. So
+ * if the person has asked for a link and not clicked it yet, starting a view-as
+ * silently kills that link, and when they click it they are told it expired.
+ * David, 2026-09-24: "i can view as them but it doesnt effect them?" This is
+ * the one way it still could, so the route refuses in exactly that window.
+ *
+ * Someone who has NEVER signed in is refused outright: their invitation is the
+ * outstanding token, and viewing as them would use it up before they do.
+ */
+export function signInLinkAtRisk(u: SignInState, email: string, now: Date): string | null {
+  if (!u.last_sign_in_at) {
+    return `${email} has not signed in yet, so their invitation link is still waiting in their inbox. Viewing as them now would use it up. Once they have signed in once, View as works without touching their account.`
+  }
+  if (!u.recovery_sent_at) return null
+  const sent = new Date(u.recovery_sent_at).getTime()
+  const used = new Date(u.last_sign_in_at).getTime()
+  if (Number.isNaN(sent) || used >= sent) return null
+  const clears = sent + SIGN_IN_LINK_TTL_MINUTES * 60_000
+  if (now.getTime() >= clears) return null
+  const ago = Math.max(0, Math.floor((now.getTime() - sent) / 60_000))
+  const at = new Date(clears).toLocaleTimeString('en-US', {
+    timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit',
+  })
+  return `${email} asked for a sign-in link ${ago === 0 ? 'less than a minute' : ago === 1 ? '1 minute' : `${ago} minutes`} ago and has not used it yet. Viewing as them now would cancel that link. Try again once they have signed in, or after ${at} ET.`
+}
