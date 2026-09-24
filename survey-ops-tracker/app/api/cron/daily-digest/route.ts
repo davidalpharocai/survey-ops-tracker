@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { safeEqual } from '@/lib/utils/secureCompare'
 import { logSystemEvent } from '@/lib/server/observability'
+import { getDueUrgency } from '@/lib/utils/date'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -52,8 +53,11 @@ export async function GET(req: NextRequest) {
 
   // Delivered projects (board_column 'Delivery') keep status 'Open', so exclude
   // them — a delivered project past its due date isn't overdue.
-  const overdue = (projects ?? []).filter(p => p.board_column !== 'Delivery' && p.due_date && p.due_date <= today)
-  const dueSoon = (projects ?? []).filter(p => p.board_column !== 'Delivery' && p.due_date && p.due_date > today && p.due_date <= soon)
+  // Strictly past. The digest told the team every morning that work due TODAY
+  // was already late; the canonical rule (lib/utils/date, the list, the
+  // connector) has always been due_date < today.
+  const overdue = (projects ?? []).filter(p => p.board_column !== 'Delivery' && getDueUrgency(p.due_date) === 'overdue')
+  const dueSoon = (projects ?? []).filter(p => p.board_column !== 'Delivery' && p.due_date && p.due_date >= today && p.due_date <= soon)
   const behind = (projects ?? []).filter(
     p =>
       p.board_column === 'Fielding' &&

@@ -159,7 +159,7 @@ export default function ContactPage() {
     const open = rows.filter(p => p.status === 'Open')
     // A delivered project keeps status 'Open' (board_column 'Delivery') until
     // archived, so exclude it from the overdue count — it's done.
-    const overdue = open.filter(p => p.board_column !== 'Delivery' && p.due_date && p.due_date <= today).length
+    const overdue = open.filter(p => p.board_column !== 'Delivery' && getDueUrgency(p.due_date) === 'overdue').length
     const collected = rows.reduce((s, p) => s + (p.n_collected ?? 0), 0)
     const withData = rows.filter(p => (p.n_collected ?? 0) > 0).length
     let avgGapDays: number | null = null

@@ -10,6 +10,7 @@ import { differenceInCalendarDays, parseISO } from 'date-fns'
 import { fmtNum } from '@/lib/utils/number'
 import { formatNRange, sumNRange } from '@/lib/utils/nRange'
 import Link from 'next/link'
+import { getDueUrgency } from '@/lib/utils/date'
 
 // Read-only analytics derived from data already captured — no new tables.
 interface InsightProject {
@@ -89,8 +90,11 @@ export default function InsightsPage() {
 
     // Delivered projects keep status 'Open' (board_column 'Delivery'), so guard
     // on the column — a delivered project past its due date isn't overdue.
-    const overdue = open.filter(p => p.board_column !== 'Delivery' && p.due_date && p.due_date <= today)
-    const dueThisWeek = open.filter(p => p.board_column !== 'Delivery' && p.due_date && p.due_date > today && p.due_date <= weekOut)
+    // Strictly past, via the same helper the list and the connector use. This
+    // page said "Overdue 5" and the list it linked to said 3: the two rows due
+    // TODAY were late here and on time one click later. Due today is due.
+    const overdue = open.filter(p => p.board_column !== 'Delivery' && getDueUrgency(p.due_date) === 'overdue')
+    const dueThisWeek = open.filter(p => p.board_column !== 'Delivery' && p.due_date && p.due_date >= today && p.due_date <= weekOut)
     const behind = open.filter(
       p => p.board_column === 'Fielding' && p.n_target != null && p.n_collected < p.n_target
     )
@@ -118,7 +122,7 @@ export default function InsightsPage() {
       const name = p.captain?.name ?? 'Unassigned'
       const c = capMap.get(name) ?? { id: p.captain?.id ?? 'unassigned', open: 0, overdue: 0 }
       c.open++
-      if (p.board_column !== 'Delivery' && p.due_date && p.due_date <= today) c.overdue++
+      if (p.board_column !== 'Delivery' && getDueUrgency(p.due_date) === 'overdue') c.overdue++
       capMap.set(name, c)
     }
     const workload = [...capMap.entries()]

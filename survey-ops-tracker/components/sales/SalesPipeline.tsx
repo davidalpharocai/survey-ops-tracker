@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { fmtNum } from '@/lib/utils/number'
 import { stageOf, stageTone } from '@/lib/sales/stage'
+import { deliveredN } from '@/lib/sales/deliveredN'
 import { useUrlSearch } from '@/lib/hooks/useUrlSearch'
 import { BUCKETS, bucketOf, countBuckets, migrateBucketId, type BucketId } from '@/lib/sales/buckets'
 import { accountOptions, inAccounts } from '@/lib/sales/accountIndex'
@@ -28,6 +29,12 @@ export interface SalesRow {
   n_target_max: number | null
   n_collected: number
   n_actual: number | null
+  /** When N collected was last edited, from sales_n_collected_freshness (111).
+   *  Three states, deliberately: undefined = the freshness read failed or was
+   *  not made (say nothing); null = the read succeeded and there is no audit
+   *  row, so the count has NEVER been recorded; a string = the last edit.
+   *  The column default is 0, and 0 is not a measurement. */
+  n_collected_updated_at?: string | null
   credits: number | null
   submitted_date: string | null
   deliver_date: string | null
@@ -542,10 +549,35 @@ function cell(id: ColId, r: SalesRow) {
     case 'target':
       return targetText(r.n_target, r.n_target_max)
     case 'collected': {
-      // n_actual is the delivered figure and supersedes n_collected once it
-      // exists — showing the in-field count on a delivered study understates
-      // what the client actually received.
-      const shownN = r.n_actual ?? r.n_collected
+      // A count nobody has ever recorded is not a measurement of zero. When the
+      // freshness read succeeded and there is no audit row, the 0 here is the
+      // column default and nothing else; printing it as "0 · 0%" in amber calls
+      // it a result. Alex's list, 2026-09-23: PR00482, Submitted, target 1,000,
+      // shown exactly that way. Strict null: undefined means we could not tell.
+      if (r.n_actual == null && r.n_collected === 0 && r.n_collected_updated_at === null) {
+        return (
+          <span className="text-muted-foreground/70" title="No count has been recorded for this survey yet.">
+            not recorded
+          </span>
+        )
+      }
+      // Routed through deliveredN — the estimator /sales/home and the survey page
+      // already use — so this column cannot read 162% while they read 101%. A
+      // study that over-collects delivers roughly what it sold, and the raw ratio
+      // was the exact number David asked to stop seeing (2026-09-17: "if the
+      // target is 1000 and we collected 2000, it shouldnt be 2000/1000"). The
+      // estimator shipped to two of three surfaces and skipped this one; measured
+      // on Alex's own list on 2026-09-23, 404/250 rendered as 162% and 352/250 as
+      // 141%, both in green, one click from a page saying ~101%.
+      //
+      // A RANGED target keeps progressOf's "in range / to floor" wording — that is
+      // not a percentage and was never the complaint. A survey still in field
+      // shows what is in hand, unmarked: "7 so far" is a count, not an estimate.
+      const raw = r.n_actual ?? r.n_collected
+      const ranged = r.n_target != null && r.n_target_max != null && r.n_target_max !== r.n_target
+      const d = ranged ? null : deliveredN(r)
+      const shownN = d?.value ?? raw
+      const est = d != null && d.estimated && d.basis !== 'still-collecting'
       const prog = progressOf(shownN, r.n_target, r.n_target_max)
       const tone =
         prog == null ? ''
@@ -558,10 +590,10 @@ function cell(id: ColId, r: SalesRow) {
             : 'text-amber-600 dark:text-amber-400')
       return (
         <>
-          {fmtNum(shownN)}
+          {est && <span className="text-muted-foreground/70">~</span>}{fmtNum(shownN)}
           {prog != null && (
-            <span className={`ml-1.5 whitespace-nowrap text-xs ${tone}`}>
-              {prog.kind === 'pct' ? `${prog.pct}%` : prog.label}
+            <span className={`ml-1.5 whitespace-nowrap text-xs ${tone}`} title={est ? d?.note : undefined}>
+              {prog.kind === 'pct' ? `${prog.pct}%${est ? ' est.' : ''}` : prog.label}
             </span>
           )}
         </>

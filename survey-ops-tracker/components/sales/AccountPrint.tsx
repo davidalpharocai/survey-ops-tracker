@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react'
 import { fmtNum } from '@/lib/utils/number'
-import { rollUp, describeConsumption, type Term } from '@/lib/sales/credits'
+import { currentTerm, consumptionFor, rollUp, describeConsumption, type Term } from '@/lib/sales/credits'
 import { describeRange, type DateBasis, type Range } from '@/lib/sales/dateRange'
 import { ACCOUNT_COLS, cellFor, type AccountProject } from './AccountDetail'
 
@@ -22,10 +22,14 @@ import { ACCOUNT_COLS, cellFor, type AccountProject } from './AccountDetail'
  * change how every other screen prints.
  */
 export function AccountPrint({
-  client, rows, totalCount, undated, basis, range, cols, terms, generatedOn, generatedBy,
+  client, rows, allRows, totalCount, undated, basis, range, cols, terms, generatedOn, generatedBy,
 }: {
   client: { id: string; name: string; code: string | null }
+  /** The rows in the selected range — what the table prints. */
   rows: AccountProject[]
+  /** Every survey on the account — what the credit position is computed from.
+   *  The position is a fact about the contract, not about the range. */
+  allRows: AccountProject[]
   totalCount: number
   undated: number
   basis: DateBasis
@@ -44,9 +48,13 @@ export function AccountPrint({
   }, [])
 
   const shown = ACCOUNT_COLS.filter(c => (cols.length ? cols.includes(c.id) : true))
-  const allowance = terms.reduce<number | null>(
-    (t, x) => (x.credits_total == null ? t : (t ?? 0) + Number(x.credits_total)), null)
-  const credits = rollUp(rows, allowance)
+  // Same arithmetic as the screen and the accounts list: the in-force term over
+  // EVERY survey attached to it, not the date-filtered rows. This is the copy
+  // that leaves the building, and it was printing "46 remaining" for an account
+  // 35 over its allowance whenever a range was selected (see AccountDetail).
+  const term = currentTerm(terms, generatedOn)
+  const credits = term ? consumptionFor(term, allRows) : rollUp(allRows, null)
+  const drawnInRange = rollUp(rows, null).used
 
   return (
     <>
@@ -114,6 +122,17 @@ export function AccountPrint({
             {undated > 0 && ` · ${undated} excluded for having no ${basis} date`}
           </div>
           <div style={{ marginTop: 2 }}>{describeConsumption(credits)}</div>
+          {term && (
+            <div style={{ marginTop: 2 }}>
+              Against {term.name}
+              {term.starts_on && ` · ${term.starts_on}`}{term.renews_on && ` to ${term.renews_on}`}
+            </div>
+          )}
+          {(range.from || range.to) && (
+            <div style={{ marginTop: 2 }}>
+              {fmtNum(drawnInRange)} credit{drawnInRange === 1 ? '' : 's'} drawn by the surveys listed below.
+            </div>
+          )}
         </div>
 
         {rows.length === 0 ? (

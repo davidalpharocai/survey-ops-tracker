@@ -328,7 +328,9 @@ export default function ClientPage() {
     const open = rows.filter(p => p.status === 'Open')
     // A delivered project keeps status 'Open' (board_column 'Delivery') until
     // archived, so exclude it from the overdue count — it's done.
-    const overdue = open.filter(p => p.board_column !== 'Delivery' && p.due_date && p.due_date <= today).length
+    // Same rule as the rows below it: the header counted a due-today survey as
+    // overdue while its own row rendered it in plain gray.
+    const overdue = open.filter(p => p.board_column !== 'Delivery' && getDueUrgency(p.due_date) === 'overdue').length
     const withSpend = rows.filter(p => p.actual_spend != null && p.actual_spend > 0)
     const totalSpend = withSpend.reduce((s, p) => s + (p.actual_spend ?? 0), 0)
     const withBudget = rows.filter(p => p.budget != null && p.budget > 0)

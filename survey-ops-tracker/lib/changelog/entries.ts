@@ -83,6 +83,30 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: '2026-09-23',
     changes: [
       {
+        kind: 'FIXED',
+        audience: 'all',
+        text: 'A survey whose response count has never been entered showed 0 and an amber 0% in the survey list and its export, which reads as a result. It now says not recorded, and a real zero still shows as zero.',
+      },
+      {
+        kind: 'FIXED',
+        audience: 'all',
+        text: 'The survey list\'s Collected column showed the raw count against target, so a study that gathered 404 against a 250 target read 162% in green while the home page and the survey page said about 101%. All three now use the same estimate of what will be delivered, marked with ~ and \'est.\' when it is one; a survey still in field shows what it has so far, unmarked.',
+      },
+      {
+        kind: 'FIXED',
+        audience: 'all',
+        text: 'Exporting the survey list with an account selected produced an empty PDF headed with a database key where the account\'s name belonged, and selecting the Delivered stage chip silently dropped those rows from the export. The export now applies exactly the filters the screen does and prints the account\'s name.',
+      },
+      {
+        kind: 'FIXED',
+        audience: 'all',
+        text: 'An account\'s credit balance changed when you changed the date range: the surveys counted moved with the range but the allowance did not, so an account 35 credits over its contract read as 46 remaining once you looked at this quarter. The balance now always describes the current contract, and a range gets its own line saying how many credits the listed surveys drew. The account PDF had the same fault and the same fix.',
+      },
+      {
+        kind: 'FIXED',
+        text: 'Insights, the client and contact pages and the morning Slack digest counted work due today as overdue; the survey list and the board did not, so the Insights tile said 5 and the list it opened said 3. Everything now agrees: overdue means the due date has passed.',
+      },
+      {
         kind: 'NEW',
         audience: 'all',
         text: 'Search everything at once. Type in the search box and press Enter without picking anything from the list, and you land on a results page grouped by what was found — surveys, accounts, contacts, contracts, files — each with its own count, so you can narrow to the kind of thing you meant.',

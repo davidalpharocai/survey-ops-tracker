@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { fmtNum } from '@/lib/utils/number'
 import { bucketOf } from '@/lib/sales/buckets'
 import { stageOf } from '@/lib/sales/stage'
-import { rollUp, describeConsumption, type Term } from '@/lib/sales/credits'
+import { currentTerm, consumptionFor, rollUp, describeConsumption, type Term } from '@/lib/sales/credits'
 import {
   DATE_BASES, PRESETS, rangeFor, filterByRange, describeRange,
   type DateBasis, type PresetId, type Range,
@@ -38,6 +38,8 @@ export interface AccountProject {
   n_collected: number
   n_actual: number | null
   credits: number | null
+  /** Which contract the credits draw from. Read by consumptionFor. */
+  term_id?: string | null
   submitted_date: string | null
   launch_date: string | null
   deliver_date: string | null
@@ -141,12 +143,26 @@ export function AccountDetail({
     return b
   }, [rows])
 
-  // Credits over the FILTERED set, against the term allowance, so the headline
-  // answers "in this period" rather than quietly mixing a period's usage with a
-  // lifetime allowance.
-  const allowance = terms.reduce<number | null>(
-    (t, x) => (x.credits_total == null ? t : (t ?? 0) + Number(x.credits_total)), null)
-  const credits = useMemo(() => rollUp(rows, allowance), [rows, allowance])
+  // The position against the IN-FORCE term, over every survey attached to it —
+  // the same arithmetic the accounts list uses, so two sales screens cannot
+  // disagree about one account. The previous version summed credits_total
+  // across every term the account ever had and divided the DATE-FILTERED
+  // surveys by it: period numerator, lifetime denominator. Measured live on
+  // DE Shaw, 2026-09-23: "35 OVER the allowance" at All time became "46
+  // remaining" at This quarter, bar blue instead of red, with nothing changed
+  // but the range. AccountPrint ran the identical two lines, so that sentence
+  // was going out as a PDF. The comment that stood here said the opposite of
+  // what the code did, which is how it survived review.
+  //
+  // With no in-force term there is no allowance to divide by, and rollUp with
+  // a null total says so rather than inventing one.
+  const term = useMemo(() => currentTerm(terms, today), [terms, today])
+  const credits = useMemo(
+    () => (term ? consumptionFor(term, projects) : rollUp(projects, null)),
+    [term, projects])
+  // What the selected range actually drew — its own line, no denominator, so a
+  // period's usage is never presented as a share of a lifetime allowance.
+  const drawnInRange = useMemo(() => rollUp(rows, null).used, [rows])
 
   const exportUrl = `/sales/accounts/${client.id}/print?basis=${basis}&preset=${preset}` +
     (preset === 'custom' ? `&from=${custom.from ?? ''}&to=${custom.to ?? ''}` : '') +
@@ -167,7 +183,11 @@ export function AccountDetail({
       <section className="mb-5 rounded-lg border border-border bg-card p-4">
         <h2 className="mb-2 flex items-baseline justify-between text-xs font-medium uppercase tracking-widest text-muted-foreground">
           <span>Credits</span>
-          {terms.length > 0 && <span className="normal-case tracking-normal">{terms.map(t => t.name).join(', ')}</span>}
+          {terms.length > 0 && (
+            <span className="normal-case tracking-normal">
+              {term ? `${term.name} (current)` : terms.map(t => t.name).join(', ')}
+            </span>
+          )}
         </h2>
         {credits.pct != null && (
           <div className="mb-2 h-2 w-full overflow-hidden rounded-full bg-muted">
@@ -178,6 +198,11 @@ export function AccountDetail({
           </div>
         )}
         <p className="text-sm text-foreground">{describeConsumption(credits)}</p>
+        {preset !== 'all' && (
+          <p className="mt-1 text-xs text-muted-foreground">
+            {fmtNum(drawnInRange)} credit{drawnInRange === 1 ? '' : 's'} drawn by the surveys in this range.
+          </p>
+        )}
       </section>
 
       {/* ---- Filter ---- */}

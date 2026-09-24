@@ -44,7 +44,21 @@ export default async function SalesPipelinePage() {
     )
     .order('deliver_date', { ascending: true, nullsFirst: false })
 
-  const rows = (data ?? []) as SalesRow[]
+  // N-collected freshness, from migration 111's two-column view — the same read
+  // /sales/home does, for the same reason: a survey whose count has never been
+  // touched must not print its column default as a measured 0. Cast because
+  // 111 is applied by hand and the generated types lag it. If this read fails,
+  // rows stay unannotated and the cell says nothing special — a failed read is
+  // a statement about our access, not about the data.
+  const freshRes = await (supabase as unknown as {
+    from: (t: string) => {
+      select: (c: string) => Promise<{ data: { project_id: string; last_updated: string }[] | null; error: unknown }>
+    }
+  }).from('sales_n_collected_freshness').select('*')
+  const lastUpdated = new Map<string, string>((freshRes.data ?? []).map(f => [f.project_id, f.last_updated]))
+  const annotate = (r: SalesRow): SalesRow =>
+    freshRes.error ? r : { ...r, n_collected_updated_at: lastUpdated.get(r.id) ?? null }
+  const rows = ((data ?? []) as SalesRow[]).map(annotate)
 
   // Account NAMES for the picker. sales_clients is owner-scoped while
   // sales_projects is owner-OR-named-salesperson, so the two disagree in both

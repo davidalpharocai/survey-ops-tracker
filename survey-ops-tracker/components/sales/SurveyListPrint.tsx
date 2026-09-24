@@ -42,7 +42,11 @@ function cell(r: SalesRow, id: string): string {
         : r.n_target_max && r.n_target_max !== r.n_target
           ? `${fmtNum(r.n_target)}–${fmtNum(r.n_target_max)}`
           : fmtNum(r.n_target)
-    case 'collected': { const v = r.n_actual ?? r.n_collected; return v == null ? '—' : fmtNum(v) }
+    case 'collected': {
+      // Never recorded is not zero — see SalesPipeline's cell; this page goes to a client.
+      if (r.n_actual == null && r.n_collected === 0 && r.n_collected_updated_at === null) return 'not recorded'
+      const v = r.n_actual ?? r.n_collected; return v == null ? '—' : fmtNum(v)
+    }
     // Blank, never 0 — an unpriced survey is not a free one, and this page goes
     // to the client.
     case 'credits': return r.credits == null ? '—' : fmtNum(r.credits)
