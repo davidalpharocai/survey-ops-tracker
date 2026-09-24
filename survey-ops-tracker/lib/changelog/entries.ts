@@ -80,6 +80,25 @@ export function changelogFor(audience: ChangeAudience): ChangelogEntry[] {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    date: '2026-09-24',
+    changes: [
+      {
+        kind: 'FIXED',
+        audience: 'all',
+        text: 'Signing out on one device signed you out on every device, so signing out on a phone meant a fresh sign-in link on the laptop too. Sign out now ends only the session on the device you press it on.',
+      },
+      {
+        kind: 'FIXED',
+        audience: 'all',
+        text: 'Opening the sign-in page while already signed in showed the "Email me a sign-in link" form, as if you had been signed out. It now takes you straight in, so a bookmark to the sign-in page no longer costs you a new link each visit.',
+      },
+      {
+        kind: 'NEW',
+        text: "A salesperson can be set up to work another salesperson's book: their own login, exactly that person's accounts and surveys, with the header saying whose book it is. John Farrall is set up this way on Alex Pinsky's book, ready for Monday.",
+      },
+    ],
+  },
+  {
     date: '2026-09-23',
     changes: [
       {

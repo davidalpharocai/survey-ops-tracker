@@ -35,9 +35,19 @@ export async function POST() {
   // in place is the exact trap this route was written to remove. The worst case
   // here is a refresh token that stays valid server-side until it expires; the
   // browser no longer holds anything that can present it.
+  //
+  // scope: 'local' — THIS browser only. supabase-js defaults signOut() to
+  // 'global', which revokes every session the account holds on every device.
+  // So signing out on a phone signed the same person's laptop out too, and David
+  // pressing Sign out while viewing as Alex (an impersonated session IS
+  // Alex's) ended Alex's own sessions everywhere, with nothing on Alex's
+  // screen to say why. David, 2026-09-24: "Alex has to keep sending himself a
+  // link in order to sign in ... once youre signed in on that device, youre
+  // signed in." permission_audit shows three "view as Alex" sessions that were
+  // never handed back with Stop, the most recent the evening before he said it.
   try {
     const supabase = await createClient()
-    await supabase.auth.signOut()
+    await supabase.auth.signOut({ scope: 'local' })
   } catch {
     // Swallowed on purpose — see above. Never let this throw the user back into
     // a shell they cannot leave.

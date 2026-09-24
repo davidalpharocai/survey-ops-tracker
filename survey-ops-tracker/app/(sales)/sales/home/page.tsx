@@ -1,5 +1,6 @@
 import Link from 'next/link'
-import { requireSalesUser, mySalespersonName } from '@/lib/sales-auth'
+import { requireSalesUser, mySalesIdentity } from '@/lib/sales-auth'
+import { salesHeaderLabel } from '@/lib/sales/identity'
 import { fmtNum } from '@/lib/utils/number'
 import { deliveredN, type DeliveryInput } from '@/lib/sales/deliveredN'
 import { salesHome, daysBetween, type HomeRow, type Judged, type Kind } from '@/lib/sales/home'
@@ -119,7 +120,8 @@ function Row({ href, children }: { href: string; children: React.ReactNode }) {
 
 export default async function SalesHomePage() {
   const { supabase, user } = await requireSalesUser('/sales/home')
-  const name = await mySalespersonName(supabase, user.email)
+  const identity = await mySalesIdentity(supabase, user.email)
+  const name = salesHeaderLabel(identity)
   const today = TODAY()
 
   /* Paged. PostgREST caps a response at 1000 rows and truncates SILENTLY, so a

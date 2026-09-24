@@ -38,8 +38,10 @@ export async function POST() {
   if (!(roles ?? []).some(r => r.role === 'admin')) {
     // Do NOT restore, and do not leave them stranded in someone else's session
     // either: clear both and make them sign in as themselves.
+    // 'local': this is the TARGET's session. The default ('global') would sign
+    // the person being viewed out of every device they own.
     const userClient = await createUserClient()
-    await userClient.auth.signOut()
+    await userClient.auth.signOut({ scope: 'local' })
     const res = NextResponse.json({
       ok: false,
       error: `${imp.adminEmail} no longer holds the admin role, so the session was not restored. Signed out — please sign in again.`,

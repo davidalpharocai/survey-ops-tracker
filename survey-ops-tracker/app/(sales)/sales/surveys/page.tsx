@@ -1,4 +1,5 @@
-import { requireSalesUser, mySalespersonName } from '@/lib/sales-auth'
+import { requireSalesUser, mySalesIdentity } from '@/lib/sales-auth'
+import { salesHeaderLabel, bookOwner } from '@/lib/sales/identity'
 import { SalesPipeline, type SalesRow } from '@/components/sales/SalesPipeline'
 
 export const dynamic = 'force-dynamic'
@@ -32,7 +33,9 @@ export const dynamic = 'force-dynamic'
  */
 export default async function SalesPipelinePage() {
   const { supabase, user } = await requireSalesUser('/sales')
-  const name = await mySalespersonName(supabase, user.email)
+  const identity = await mySalesIdentity(supabase, user.email)
+  const name = salesHeaderLabel(identity)
+  const owner = bookOwner(identity)
 
   const { data, error } = await supabase
     .from('sales_projects')
@@ -92,8 +95,8 @@ export default async function SalesPipelinePage() {
           is broken, and on the evidence of a blank page, fairly. */}
       {!error && rows.length === 0 && (
         <p className="rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground">
-          {name
-            ? `No surveys are currently on ${name}'s accounts.`
+          {owner
+            ? `No surveys are currently on ${owner}'s accounts.`
             : 'Your account is not linked to a salesperson yet — ask David to finish setting it up.'}
         </p>
       )}

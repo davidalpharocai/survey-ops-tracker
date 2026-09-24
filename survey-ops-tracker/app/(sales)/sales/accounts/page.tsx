@@ -1,5 +1,6 @@
 import { Suspense } from 'react'
-import { requireSalesUser, mySalespersonName } from '@/lib/sales-auth'
+import { requireSalesUser, mySalesIdentity } from '@/lib/sales-auth'
+import { salesHeaderLabel, bookOwner } from '@/lib/sales/identity'
 import { countBuckets } from '@/lib/sales/buckets'
 import { creditPosition, type Term } from '@/lib/sales/credits'
 import { AccountsTable, type AccountRow } from '@/components/sales/AccountsTable'
@@ -27,7 +28,9 @@ export const dynamic = 'force-dynamic'
  */
 export default async function SalesAccountsPage() {
   const { supabase, user } = await requireSalesUser('/sales/accounts')
-  const name = await mySalespersonName(supabase, user.email)
+  const identity = await mySalesIdentity(supabase, user.email)
+  const name = salesHeaderLabel(identity)
+  const owner = bookOwner(identity)
 
   const [{ data: clients, error: cErr }, { data: projects, error: pErr }, { data: contacts }, terms] =
     await Promise.all([
@@ -103,8 +106,8 @@ export default async function SalesAccountsPage() {
 
       {!failed && rows.length === 0 && (
         <p className="rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground">
-          {name
-            ? `No accounts are assigned to ${name} yet — ask David to set the owner on your clients.`
+          {owner
+            ? `No accounts are assigned to ${owner} yet — ask David to set the owner on your clients.`
             : 'Your account is not linked to a salesperson yet — ask David to finish setting it up.'}
         </p>
       )}

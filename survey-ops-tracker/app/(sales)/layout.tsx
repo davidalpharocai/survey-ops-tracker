@@ -2,7 +2,8 @@ import { ImpersonationBanner } from '@/components/shared/ImpersonationBanner'
 import { SalesNav } from '@/components/sales/SalesNav'
 import { SalesLiveRefresh } from '@/components/sales/SalesLiveRefresh'
 import { createClient } from '@/lib/supabase/server'
-import { mySalespersonName } from '@/lib/sales-auth'
+import { mySalesIdentity } from '@/lib/sales-auth'
+import { salesHeaderLabel } from '@/lib/sales/identity'
 
 export const dynamic = 'force-dynamic'
 
@@ -33,7 +34,8 @@ export default async function SalesShell({ children }: { children: React.ReactNo
   // No gate here — each page calls requireSalesUser, which redirects. A layout
   // that also redirected would race with it and could bounce a legitimate user
   // mid-navigation.
-  const name = user?.email ? await mySalespersonName(supabase, user.email) : null
+  // "John Farrall · Alex Pinsky's book" for someone working another's book (121).
+  const name = user?.email ? salesHeaderLabel(await mySalesIdentity(supabase, user.email)) : null
 
   return (
     <div className="min-h-screen bg-background text-foreground">

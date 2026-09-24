@@ -1,6 +1,7 @@
 import 'server-only'
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import type { SalesIdentity } from '@/lib/sales/identity'
 
 /**
  * Gate for the sales tier, mirroring requirePortalUser (lib/portal-auth.ts).
@@ -50,12 +51,27 @@ export async function mySalespersonName(
   supabase: Awaited<ReturnType<typeof createClient>>,
   email: string | null | undefined
 ): Promise<string | null> {
-  if (!email) return null
+  return (await mySalesIdentity(supabase, email)).name
+}
+
+/** The name above, plus whose book this person works when it is not their own
+ *  (121). See lib/sales/identity.ts for why the page needs to say so.
+ *
+ *  select('*') rather than naming sees_book_of: 121 is applied by hand, and
+ *  PostgREST rejects a whole select when one named column does not exist yet,
+ *  which would take the person's own name off every page along with it. Before
+ *  121 the field is simply absent and bookOf is null, which is the truth. */
+export async function mySalesIdentity(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  email: string | null | undefined
+): Promise<SalesIdentity> {
+  if (!email) return { name: null, bookOf: null }
   const { data } = await supabase
     .from('salespeople')
-    .select('canonical_name')
+    .select('*')
     .ilike('email', email)
     .eq('active', true)
     .maybeSingle()
-  return data?.canonical_name ?? null
+  const row = data as { canonical_name?: string | null; sees_book_of?: string | null } | null
+  return { name: row?.canonical_name ?? null, bookOf: row?.sees_book_of ?? null }
 }

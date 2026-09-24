@@ -48,7 +48,8 @@ export async function allowAction(params: AuthorizeParams) {
 // login) can switch to their analyst account without a manual logout.
 export async function reauthAction(nextUrl: string) {
   const supabase = await createClient()
-  await supabase.auth.signOut()
+  // 'local': switching accounts here must not sign this person out elsewhere.
+  await supabase.auth.signOut({ scope: 'local' })
   const safe = nextUrl.startsWith('/') && !nextUrl.startsWith('//') && !nextUrl.includes('\\')
     ? nextUrl : '/'
   redirect(`/login?next=${encodeURIComponent(safe)}`)

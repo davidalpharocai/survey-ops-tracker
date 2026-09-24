@@ -43,10 +43,13 @@ export default function LoginForm() {
   const searchParams = useSearchParams()
   const supabase = createClient()
 
-  // Kicked out by the server for a non-company account: end the session
+  // Kicked out by the server for a non-company account: end the session.
+  // Every signOut on this page is scope 'local' — this browser only. The
+  // default ('global') ends the account's sessions on every device, so a bounce
+  // through here on one machine used to sign the person out on all of them.
   useEffect(() => {
     if (searchParams.get('unauthorized')) {
-      supabase.auth.signOut()
+      supabase.auth.signOut({ scope: 'local' })
       setError(`Only @${ALLOWED_EMAIL_DOMAIN} accounts can access this app.`)
     }
     // A real, allowed account whose tier has no surface here yet (a sales
@@ -55,7 +58,7 @@ export default function LoginForm() {
     // back here on every attempt, which reads as a broken login rather than a
     // deliberate answer.
     if (searchParams.get('pending')) {
-      supabase.auth.signOut()
+      supabase.auth.signOut({ scope: 'local' })
       setError("Your account doesn't have access to this view yet. Ask David to finish setting it up.")
     }
     // /api/auth/signout could not be reached, so SignOutButton sent us here to
@@ -63,7 +66,7 @@ export default function LoginForm() {
     // cause — it clears what it can and says nothing, because arriving at a
     // signed-out login page is the outcome they asked for.
     if (searchParams.get('signout-failed')) {
-      supabase.auth.signOut()
+      supabase.auth.signOut({ scope: 'local' })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
