@@ -47,8 +47,10 @@ next-env.d.ts
 scripts/*.xlsx
 scripts/project-id-mapping.csv
 
-# generated data exports
-exports/
+# generated data exports. Anchored to the repo root: the unanchored `exports/`
+# also matched app/api/exports/, so the export audit route was never committed,
+# never deployed, and every CSV pull from 2026-08-25 on went unlogged.
+/exports/
 
 # Analysis scratch. Every _-prefixed script under scripts/ is a throwaway probe
 # written to answer one question — 340 of them accumulated in a single week of
