@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  salesHome, judgeLive, commitmentDate, pctOfTarget, quietAccounts, isHiddenRerun, type HomeRow,
+  salesHome, judgeLive, commitmentDate, pctOfTarget, quietAccounts, waveLabel, type HomeRow,
 } from './home'
 
 /**
@@ -229,36 +229,40 @@ describe('quietAccounts', () => {
   })
 })
 
-describe('reruns are hidden from Home', () => {
+describe('repeat waves are shown and labelled, not hidden', () => {
   const rerun = (o: Partial<HomeRow> = {}) =>
     row({ id: 'rr', project_name: 'Weekly Tracker - 16th Rerun', rerun_number: 16, ...o })
 
-  it('recognises a rerun by wave number, series, or legacy type', () => {
-    expect(isHiddenRerun(row({ rerun_number: 2 }))).toBe(true)
-    expect(isHiddenRerun(row({ series_id: 'abc' }))).toBe(true)
-    expect(isHiddenRerun(row({ project_type: 'Rerun' }))).toBe(true)
+  it('names a repeat wave by number, series, or legacy type', () => {
+    expect(waveLabel(row({ rerun_number: 2 }))).toBe('wave 2')
+    expect(waveLabel(row({ series_id: 'abc' }))).toBe('repeat wave')
+    expect(waveLabel(row({ project_type: 'Rerun' }))).toBe('repeat wave')
   })
 
-  it('does NOT call a first wave a rerun', () => {
+  it('does NOT call a first wave a repeat', () => {
     // rerun_number DEFAULTS TO 1 on all 401 rows, so a `!= null` test calls the
     // entire book a rerun. That bug produced a wrong reconciliation count before
     // it was caught; this test exists so it cannot come back.
-    expect(isHiddenRerun(row({ rerun_number: 1 }))).toBe(false)
-    expect(isHiddenRerun(row({ rerun_number: null }))).toBe(false)
-    expect(isHiddenRerun(row())).toBe(false)
+    expect(waveLabel(row({ rerun_number: 1 }))).toBe(null)
+    expect(waveLabel(row({ rerun_number: null }))).toBe(null)
+    expect(waveLabel(row())).toBe(null)
   })
 
-  it('keeps reruns out of every list and every count', () => {
+  it('puts a live repeat wave in the field list and the counts', () => {
+    // THE REGRESSION THIS EXISTS FOR. PR00463 was fielding in Alex's book
+    // against a 2 Oct delivery date and did not appear on his Home at all; the
+    // search box found it, because that reads the whole book. Reported by Alex
+    // on 2026-09-28. The old rule dropped 11 of his 25 live surveys.
     const h = salesHome([
       row({ id: 'live', deliver_date: '2026-09-20' }),
       rerun({ id: 'r-live', deliver_date: '2026-09-20' }),
       rerun({ id: 'r-shipped', board_column: 'Delivery', deliver_date: '2026-09-11' }),
       rerun({ id: 'r-stalled', phase: 'Scoping', board_column: 'Submitted', submitted_date: '2026-07-01' }),
     ], TODAY)
-    expect(h.inField.map(j => j.row.id)).toEqual(['live'])
-    expect(h.shipped).toEqual([])
-    expect(h.stalled).toEqual([])
-    expect(h.counts).toMatchObject({ inField: 1, scoping: 0, delivered: 0 })
+    expect(h.inField.map(j => j.row.id).sort()).toEqual(['live', 'r-live'])
+    expect(h.shipped.map(r => r.id)).toEqual(['r-shipped'])
+    expect(h.stalled.map(r => r.id)).toEqual(['r-stalled'])
+    expect(h.counts).toMatchObject({ inField: 2, scoping: 1, delivered: 1 })
   })
 
   it('still counts a live rerun as work in flight, so the account is not called quiet', () => {

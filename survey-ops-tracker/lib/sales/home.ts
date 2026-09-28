@@ -41,34 +41,51 @@ export interface HomeRow extends BucketInput {
   n_collected: number | null
   n_actual: number | null
   requested_by_name?: string | null
-  /* The three fields isRerunProject() needs. All already on the sales_projects
-     allowlist, so hiding reruns cost no migration and exposed nothing new —
-     The captain is deliberately not among them here -- migration 118 adds it
-     to the view for the survey DETAIL page, and Home does not need it. */
+  /* The three fields isRerunProject() needs, all already on the sales_projects
+     allowlist. They no longer decide what is SHOWN — only what a row is called
+     (see waveLabel). */
   series_id?: string | null
   rerun_number?: number | null
   project_type?: string | null
 }
 
 /**
- * Reruns are hidden from Home (David, 2026-09-14).
+ * Repeat waves are LABELLED here, not hidden. This reverses the 2026-09-14 rule.
  *
- * WHY THE RULE IS "ALL RERUNS" AND NOT "RERUNS SREE CAPTAINS", which is what was
- * actually asked: sales_projects does not expose captain_id, and adding it would
- * be a disclosure decision taken for one filter. Measured first — of the 13 live
- * reruns in the book, 12 are Sree's; the 13th is PR00442 "Holocene Weekly Tracker
- * - 16th Rerun" under Anne Wei, which is the same standing-tracker shape. So the
- * two rules differ by ONE survey, and the simpler one neither names a person in
- * SQL nor breaks the day Sree hands a tracker over.
+ * ── WHAT THE OLD RULE DID ───────────────────────────────────────────────────
+ * It dropped every rerun from every list on this page. The intent was Sree's
+ * standing tracker waves, which run themselves and which no salesperson works;
+ * "all reruns" was chosen instead because sales_projects did not expose the
+ * captain, and the two rules were measured to differ by one survey.
  *
- * Uses the app's own isRerunProject rather than a local test. The local test I
- * first wrote keyed on `rerun_number != null` — and rerun_number DEFAULTS TO 1 on
- * every row, so it called all 401 projects reruns. isRerunProject gets it right
- * with `(rerun_number ?? 1) > 1`.
+ * ── WHY IT IS GONE (Alex via David, 2026-09-28) ─────────────────────────────
+ * "although PR00463 is fielding (along with others in Alex's book), it's not
+ * showing up on his home screen. he had to search for it." Exactly so, and the
+ * search box found it because HomeSearch reads the whole fetched book while
+ * these lists do not. Measured that day, the rule was hiding 11 of Alex's 25
+ * live surveys — including PR00463 and PR00464, both fielding against a 2 Oct
+ * delivery date, and PR00451 due 28 Sep. Those are his own repeat business, not
+ * somebody's autopilot tracker.
+ *
+ * ── AND WHY THE CLUTTER IT GUARDED AGAINST CANNOT HAPPEN ────────────────────
+ * The decisive number: of the 14 live Sree-captained waves, TEN carry no
+ * salesperson at all, so sales_projects — which is scoped to the reader's own
+ * book — never showed them to anybody in the first place. Removing the filter
+ * adds 11 rows to Alex's Home and 1 to Jenna's. There was no flood to prevent.
+ *
+ * A wave number is worth SAYING, though, which is what this returns: a
+ * salesperson reading "wave 8" knows at a glance that it is a standing study
+ * rather than new work. Uses the app's own isRerunProject — a local test keyed
+ * on `rerun_number != null` calls the whole book a rerun, because that column
+ * DEFAULTS TO 1 on every row.
  */
-export const isHiddenRerun = (r: HomeRow) => isRerunProject({
-  series_id: r.series_id, rerun_number: r.rerun_number, project_type: r.project_type,
-})
+export function waveLabel(r: HomeRow): string | null {
+  if (!isRerunProject({ series_id: r.series_id, rerun_number: r.rerun_number, project_type: r.project_type })) {
+    return null
+  }
+  const n = r.rerun_number ?? 1
+  return n > 1 ? `wave ${n}` : 'repeat wave'
+}
 
 /** Worst first. Used for both the badge and the sort, so they cannot disagree. */
 export type Kind = 'late' | 'due' | 'over' | 'ok'
@@ -202,11 +219,9 @@ export function salesHome(rows: HomeRow[], today: string): SalesHome {
   let scoping = 0
 
   for (const r of rows) {
-    // Hidden from every LIST, and from the counts that describe those lists.
-    // Deliberately NOT hidden from quietAccounts below: an account with a rerun
-    // in flight is not a quiet account, and saying it is would invent a lapsed
-    // relationship out of work that is actively running.
-    if (isHiddenRerun(r)) continue
+    // Every row the reader owns is judged. Nothing is dropped here: a survey a
+    // salesperson can see in search but not in their own lists reads as a bug,
+    // and on 2026-09-28 it was reported as one.
     const bucket = bucketOf(r)
     if (bucket === 'active') {
       inField.push(judgeLive(r, today))

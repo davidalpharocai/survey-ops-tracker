@@ -29,6 +29,13 @@ export const SALESPEOPLE = [
   'Jenna Shrove',
   'Vineet Kapur',
   'Shanu Aggarwal',
+  // Added 2026-09-28 with the change that gives John his own book. Migration
+  // 121 deliberately left him OFF this list while he worked Alex's book: a
+  // survey tagged "John Farrall" would have been invisible to him, because
+  // sees_book_of pointed his whole view at Alex's name instead of his own.
+  // Listing him is what makes it possible to assign him anything at all, so it
+  // has to land with — not after — clearing that delegation.
+  'John Farrall',
   'Internal',
 ] as const
 
@@ -57,6 +64,7 @@ export const EMAIL_BY_SALESPERSON: Readonly<Record<string, string>> = {
   'Jenna Shrove': 'jenna@alpharoc.ai',
   'Vineet Kapur': 'vineet@alpharoc.ai',
   'Shanu Aggarwal': 'shanu@alpharoc.ai',
+  'John Farrall': 'john@alpharoc.ai',
   'Steven Stubbs': 'steven@alpharoc.ai',
 }
 

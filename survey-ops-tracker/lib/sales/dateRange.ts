@@ -21,7 +21,66 @@
  * Pure, and takes `today` as an argument: a module that reads the clock cannot
  * be tested for the quarter boundary, which is exactly where this kind of code
  * is wrong.
+ *
+ * EVERY DATE HERE IS A NEW YORK DATE. The team works in Eastern Time and so do
+ * the clients reading the PDF. `new Date().toLocaleDateString('en-CA')` is the
+ * SERVER's zone, which on Vercel is UTC, so from 8pm ET onward "today" was
+ * already tomorrow: a This quarter export run on the evening of 30 September
+ * came out as Q4, and a survey delivered at 9:53pm ET on 24 August printed as
+ * delivered on the 25th. `todayET` and `etDate` are the one place that
+ * conversion happens.
  */
+import { bucketOf } from './buckets'
+
+const NY = 'America/New_York'
+
+/** YYYY-MM-DD of an instant, in New York. Built from formatToParts rather than
+ *  trusting a locale's date order, so no ICU update can reshuffle it. */
+function ymdInNewYork(d: Date): string {
+  const parts = new Intl.DateTimeFormat('en-US', { timeZone: NY, year: 'numeric', month: '2-digit', day: '2-digit' })
+    .formatToParts(d)
+  const get = (t: string) => parts.find(p => p.type === t)?.value ?? ''
+  return `${get('year')}-${get('month')}-${get('day')}`
+}
+
+/** Today's date in Eastern Time. Takes `now` so a test can stand at 11pm ET. */
+export function todayET(now: Date = new Date()): string {
+  return ymdInNewYork(now)
+}
+
+/** The Eastern-Time calendar date of a timestamp such as `delivered_at`.
+ *  A bare date passes through untouched (it has no time to convert), and
+ *  anything unparseable is null rather than "Invalid Date". */
+export function etDate(ts: string | null | undefined): string | null {
+  if (!ts) return null
+  if (/^\d{4}-\d{2}-\d{2}$/.test(ts)) return ts
+  const d = new Date(ts)
+  return Number.isNaN(d.getTime()) ? null : ymdInNewYork(d)
+}
+
+/** The Eastern-Time CLOCK TIME of a timestamp, as "8:24 AM".
+ *
+ *  Alex, 2026-09-28: he wants to see when N collected was last touched without
+ *  opening the survey, "the date and time". A date alone does not answer it —
+ *  several of his studies are updated more than once a day (PR00383, PR00392,
+ *  PR00427 and PR00461 all changed within the same minute this morning), so
+ *  "updated today" and "updated an hour ago" look identical.
+ *
+ *  Same New York rule and the same formatToParts discipline as `etDate`: the
+ *  server clock is UTC, and a 9pm ET edit rendered in the server's zone reads
+ *  as the next morning. Returns null for a bare date (it has no time to show)
+ *  rather than inventing midnight. */
+export function etTime(ts: string | null | undefined): string | null {
+  if (!ts) return null
+  if (/^\d{4}-\d{2}-\d{2}$/.test(ts)) return null
+  const d = new Date(ts)
+  if (Number.isNaN(d.getTime())) return null
+  const parts = new Intl.DateTimeFormat('en-US', { timeZone: NY, hour: 'numeric', minute: '2-digit', hour12: true })
+    .formatToParts(d)
+  const get = (t: string) => parts.find(p => p.type === t)?.value ?? ''
+  const period = get('dayPeriod')
+  return `${get('hour')}:${get('minute')}${period ? ' ' + period.toUpperCase() : ''}`
+}
 
 export type DateBasis = 'delivered' | 'submitted' | 'launched'
 
@@ -85,41 +144,65 @@ export function rangeFor(preset: PresetId, today: string, custom?: Range): Range
   }
 }
 
+export interface DatedRow {
+  delivered_at?: string | null
+  deliver_date?: string | null
+  submitted_date?: string | null
+  launch_date?: string | null
+  /** Read on the delivered basis only: a row counts as delivered by where it
+   *  sits (bucketOf), never by whether it happens to carry a date. */
+  board_column?: string | null
+  status?: string | null
+  phase?: string | null
+}
+
+const isDelivered = (row: DatedRow) =>
+  bucketOf({ status: row.status ?? null, phase: row.phase ?? null, board_column: row.board_column ?? null }) === 'delivered'
+
 /** The date a row is filtered on, for a given basis. Null when the row has no
  *  such date — which excludes it from any bounded range. */
-export function dateOf(
-  row: { delivered_at?: string | null; deliver_date?: string | null; submitted_date?: string | null; launch_date?: string | null },
-  basis: DateBasis
-): string | null {
+export function dateOf(row: DatedRow, basis: DateBasis): string | null {
   if (basis === 'submitted') return row.submitted_date ?? null
   if (basis === 'launched') return row.launch_date ?? null
-  // Delivered: the ACTUAL date where we have it, falling back to the promised
-  // one. A project marked delivered carries delivered_at; one still in flight
-  // has only a target, and using it means "expected to deliver in this window",
-  // which is the useful reading for a forward-looking range.
-  return (row.delivered_at ?? '').slice(0, 10) || row.deliver_date || null
+  // Delivered means DELIVERED. This used to fall back to the promised date for
+  // a survey still in flight, which read "expected to deliver in this window"
+  // into a filter labelled Delivered — so DE Shaw's This quarter export listed
+  // PR00257, in field and past due, among the work the client had received,
+  // and its 13 credits rode into "drawn this quarter". A survey that has not
+  // been delivered has no delivered date, whatever it was promised for.
+  //
+  // For one that has: the actual date, in Eastern Time, where we have it; the
+  // promised date where the card reached Delivery without a timestamp.
+  if (!isDelivered(row)) return null
+  return etDate(row.delivered_at) ?? row.deliver_date ?? null
 }
 
 export interface FilterResult<T> {
   rows: T[]
   /** Rows dropped for having no date on the chosen basis. Surfaced so a short
-   *  list is explained rather than merely short. */
+   *  list is explained rather than merely short. On the delivered basis this
+   *  counts only DELIVERED rows with no date — see notDelivered. */
   undated: number
+  /** Delivered basis only: rows dropped because they have not been delivered.
+   *  Kept apart from `undated` because the two need different fixes — one is
+   *  work still in flight, the other a record missing its date. Always 0 on the
+   *  other bases and for an unbounded range. */
+  notDelivered: number
 }
 
-export function filterByRange<
-  T extends { delivered_at?: string | null; deliver_date?: string | null; submitted_date?: string | null; launch_date?: string | null },
->(rows: T[], basis: DateBasis, range: Range): FilterResult<T> {
-  if (range.from == null && range.to == null) return { rows, undated: 0 }
+export function filterByRange<T extends DatedRow>(rows: T[], basis: DateBasis, range: Range): FilterResult<T> {
+  if (range.from == null && range.to == null) return { rows, undated: 0, notDelivered: 0 }
   let undated = 0
+  let notDelivered = 0
   const kept = rows.filter(r => {
+    if (basis === 'delivered' && !isDelivered(r)) { notDelivered++; return false }
     const d = dateOf(r, basis)
     if (!d) { undated++; return false }
     if (range.from && d < range.from) return false
     if (range.to && d > range.to) return false
     return true
   })
-  return { rows: kept, undated }
+  return { rows: kept, undated, notDelivered }
 }
 
 /** "Delivered 1 Jul – 30 Sep 2026", for the export header. A PDF that states

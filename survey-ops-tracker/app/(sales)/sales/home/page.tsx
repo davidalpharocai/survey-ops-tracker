@@ -3,8 +3,9 @@ import { requireSalesUser, mySalesIdentity } from '@/lib/sales-auth'
 import { salesHeaderLabel } from '@/lib/sales/identity'
 import { fmtNum } from '@/lib/utils/number'
 import { deliveredN, type DeliveryInput } from '@/lib/sales/deliveredN'
-import { salesHome, daysBetween, type HomeRow, type Judged, type Kind } from '@/lib/sales/home'
+import { salesHome, daysBetween, waveLabel, type HomeRow, type Judged, type Kind } from '@/lib/sales/home'
 import { HomeSearch, type HomeSearchRow } from '@/components/sales/HomeSearch'
+import { etDate, etTime, todayET } from '@/lib/sales/dateRange'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,7 +17,10 @@ export const dynamic = 'force-dynamic'
  * header for why a "what changed" feed was the wrong build.
  */
 
-const TODAY = () => new Date().toISOString().slice(0, 10)
+// Today in EASTERN time, as every other sales page and the PDF count it. The
+// server's clock is UTC, a day ahead after 8pm ET, which put "N updated today"
+// and every "due in N days" a day off each evening.
+const TODAY = () => todayET()
 
 const KIND_STYLE: Record<Exclude<Kind, 'ok'>, { label: string; className: string }> = {
   late: { label: 'Late', className: 'bg-red-500/12 text-red-700 dark:text-red-400 border-red-500/30' },
@@ -25,21 +29,37 @@ const KIND_STYLE: Record<Exclude<Kind, 'ok'>, { label: string; className: string
 }
 
 /**
- * "2 days ago", and — the case that matters — "never updated".
+ * When N collected was last touched — the STAMP, and then how old it is.
  *
- * Of the 30 surveys in field on 2026-09-14, only 12 had ever recorded an
- * n_collected change; among those the figures were fresh (median 2 days, oldest
- * 11). So the common case is not a stale number, it is one that has never been
- * touched — and a survey showing 0 of 400 with no history is not behind, it is
- * UNMEASURED. Returns null when we could not read freshness at all, because
- * "we don't know" must not be rendered as "never".
+ * Alex via David, 2026-09-28: "he should be able to see the last updated for N
+ * collected on the home screen vs having to click in. it should show the date
+ * and time." It used to say only "N updated 2 days ago", with the date hidden
+ * in a title attribute that a tooltip shows and a phone does not. The exact
+ * time earns its space: on 28 Sep four of his studies (PR00383, PR00392,
+ * PR00427, PR00461) were all last changed within the same minute at 8:24 AM,
+ * and "updated today" cannot tell that from an edit made at nine at night.
+ *
+ * ET, not the server's zone — the same correction as everywhere else on this
+ * page. Slicing the UTC timestamp dated a 9pm ET edit to the next day.
+ *
+ * THE CASE THAT MATTERS IS STILL "never". Of Alex's 25 live surveys on 28 Sep,
+ * 8 have no recorded n_collected change at all. A survey showing 0 of 3,000
+ * with no history is not behind, it is UNMEASURED, and those are opposite
+ * things to tell a salesperson. Returns null when we could not read freshness
+ * at all, because "we don't know" must not be rendered as "never".
  */
 function freshness(last: string | undefined, today: string, available: boolean) {
   if (!available) return null
   if (!last) return { text: 'N never updated', stale: true, title: 'No change to N collected has ever been recorded for this survey, so this figure is not a measurement — it is the value the row was created with.' }
-  const d = daysBetween(today, last.slice(0, 10))
-  const text = d <= 0 ? 'N updated today' : d === 1 ? 'N updated yesterday' : `N updated ${d} days ago`
-  return { text, stale: d > 7, title: `N collected last changed ${last.slice(0, 10)}.` }
+  const day = etDate(last) ?? last.slice(0, 10)
+  const clock = etTime(last)
+  const d = daysBetween(today, day)
+  const ago = d <= 0 ? 'today' : d === 1 ? 'yesterday' : `${d} days ago`
+  return {
+    text: `N updated ${day}${clock ? `, ${clock} ET` : ''} · ${ago}`,
+    stale: d > 7,
+    title: `N collected last changed ${day}${clock ? ` at ${clock} Eastern` : ''}.`,
+  }
 }
 
 function Card({ title, aside, children }: { title: string; aside?: string; children: React.ReactNode }) {
@@ -164,11 +184,18 @@ export default async function SalesHomePage() {
 
   const h = salesHome(rows, today)
 
+  // A retry the reader can press, and a support line that names a role rather
+  // than a person: this page is read by salespeople who may never have met
+  // whoever built it. A plain <a href>, so the retry is a fresh server render.
   if (failed) {
     return (
-      <p className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-        Couldn&apos;t load your surveys. Try again, or tell David if it keeps happening.
-      </p>
+      <div role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+        <p>Couldn&apos;t load your surveys.</p>
+        <p className="mt-1 text-xs">
+          <a href="/sales/home" className="font-medium underline underline-offset-2 hover:opacity-80">Try again</a>
+          <span className="text-destructive/80"> · If it keeps happening, contact your AlphaROC administrator.</span>
+        </p>
+      </div>
     )
   }
 
@@ -215,6 +242,10 @@ export default async function SalesHomePage() {
                   <span className="block truncate text-sm font-medium">{j.row.project_name}</span>
                   <span className="block truncate text-xs text-muted-foreground">
                     {j.row.client}
+                    {/* Repeat waves used to be dropped from this list entirely.
+                        They are shown now (see waveLabel), and named, so a
+                        standing study still reads differently from new work. */}
+                    {waveLabel(j.row) && ` · ${waveLabel(j.row)}`}
                     {j.commitDate ? ` · due ${j.commitDate}` : ' · no delivery date set'}
                     {j.why.length > 0 && ` · ${j.why.join(' · ')}`}
                   </span>

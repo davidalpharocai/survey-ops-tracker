@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { rangeFor, dateOf, filterByRange, describeRange } from './dateRange'
+import { rangeFor, dateOf, filterByRange, describeRange, todayET, etDate, etTime } from './dateRange'
 
 /** Fixed "today" — a Wednesday in Q3, chosen so quarter and year boundaries are
  *  a known distance away rather than whatever the clock happens to say. */
@@ -55,6 +55,7 @@ describe('rangeFor', () => {
 
 describe('dateOf', () => {
   const row = {
+    board_column: 'Delivery', status: 'Closed', phase: 'Active',
     delivered_at: '2026-08-20T14:00:00Z',
     deliver_date: '2026-08-15',
     submitted_date: '2026-06-01',
@@ -70,36 +71,63 @@ describe('dateOf', () => {
     expect(dateOf(row, 'delivered')).toBe('2026-08-20')
   })
 
-  it('falls back to the promised date for a survey still in flight', () => {
+  it('reads the delivery timestamp in EASTERN time, not UTC', () => {
+    // PR00358: delivered 9:53pm ET on 24 August, which is already the 25th in
+    // UTC. The slice(0, 10) this replaced printed the 25th.
+    expect(dateOf({ ...row, delivered_at: '2026-08-25T01:53:27.453012+00:00' }, 'delivered')).toBe('2026-08-24')
+  })
+
+  it('uses the promised date for a DELIVERED card that has no timestamp', () => {
     expect(dateOf({ ...row, delivered_at: null }, 'delivered')).toBe('2026-08-15')
+  })
+
+  it('gives a survey that is NOT delivered no delivered date, whatever it was promised for', () => {
+    // PR00257: in field and past due. The old fallback put it in "delivered
+    // this quarter" through its due date.
+    const inField = { ...row, board_column: 'Fielding', status: 'Open', delivered_at: null, deliver_date: '2026-09-23' }
+    expect(dateOf(inField, 'delivered')).toBeNull()
+    // and a row with no stage at all is not taken as delivered
+    expect(dateOf({ deliver_date: '2026-09-23' }, 'delivered')).toBeNull()
   })
 
   it('is null when the row has no date on that basis', () => {
     expect(dateOf({}, 'delivered')).toBeNull()
-    expect(dateOf({ delivered_at: null, deliver_date: null }, 'delivered')).toBeNull()
+    expect(dateOf({ board_column: 'Delivery', delivered_at: null, deliver_date: null }, 'delivered')).toBeNull()
     expect(dateOf({ submitted_date: null }, 'submitted')).toBeNull()
   })
 })
 
 describe('filterByRange', () => {
+  const D = { board_column: 'Delivery', status: 'Closed', phase: 'Active' }
   const rows = [
-    { id: 'a', deliver_date: '2026-08-01', submitted_date: '2026-01-01' },
-    { id: 'b', deliver_date: '2026-09-05', submitted_date: '2026-02-01' },
-    { id: 'c', deliver_date: null, submitted_date: '2026-03-01' },   // in flight
-    { id: 'd', deliver_date: '2025-12-01', submitted_date: '2025-11-01' },
+    { id: 'a', ...D, deliver_date: '2026-08-01', submitted_date: '2026-01-01' },
+    { id: 'b', ...D, deliver_date: '2026-09-05', submitted_date: '2026-02-01' },
+    { id: 'c', board_column: 'Fielding', status: 'Open', phase: 'Active', deliver_date: '2026-08-10', submitted_date: '2026-03-01' },   // in flight
+    { id: 'd', ...D, deliver_date: '2025-12-01', submitted_date: '2025-11-01' },
+    { id: 'e', ...D, deliver_date: null, delivered_at: null, submitted_date: null },   // delivered, no date on record
   ]
 
   it('keeps every row, undated included, when the range is unbounded', () => {
     const r = filterByRange(rows, 'delivered', { from: null, to: null })
-    expect(r.rows).toHaveLength(4)
+    expect(r.rows).toHaveLength(5)
     expect(r.undated).toBe(0)
+    expect(r.notDelivered).toBe(0)
   })
 
-  it('excludes a row with no date on the chosen basis, and counts it', () => {
-    // The in-flight survey has not been delivered, so it is not part of "what
-    // you received this quarter" — but the caller is told it was dropped.
+  it('counts NOT DELIVERED apart from delivered-with-no-date', () => {
+    // The in-flight survey is not part of "what you received this quarter",
+    // even though its due date falls inside it; the delivered one with no date
+    // is a missing record. Different fixes, so different counts.
     const r = filterByRange(rows, 'delivered', { from: '2026-07-01', to: '2026-09-30' })
     expect(r.rows.map(x => x.id)).toEqual(['a', 'b'])
+    expect(r.notDelivered).toBe(1)
+    expect(r.undated).toBe(1)
+  })
+
+  it('never counts notDelivered on the other bases', () => {
+    const r = filterByRange(rows, 'submitted', { from: '2026-01-01', to: '2026-12-31' })
+    expect(r.rows.map(x => x.id)).toEqual(['a', 'b', 'c'])
+    expect(r.notDelivered).toBe(0)
     expect(r.undated).toBe(1)
   })
 
@@ -117,6 +145,61 @@ describe('filterByRange', () => {
   it('handles an open-ended range at either side', () => {
     expect(filterByRange(rows, 'delivered', { from: '2026-01-01', to: null }).rows.map(x => x.id)).toEqual(['a', 'b'])
     expect(filterByRange(rows, 'delivered', { from: null, to: '2026-01-01' }).rows.map(x => x.id)).toEqual(['d'])
+  })
+})
+
+describe('todayET / etDate', () => {
+  it('is still today in New York after 8pm, when UTC has moved on', () => {
+    // 9:30pm EDT on 24 September is 01:30 UTC on the 25th.
+    expect(todayET(new Date('2026-09-25T01:30:00Z'))).toBe('2026-09-24')
+    expect(new Date('2026-09-25T01:30:00Z').toISOString().slice(0, 10)).toBe('2026-09-25')
+  })
+
+  it('turns over at midnight Eastern', () => {
+    expect(todayET(new Date('2026-09-25T03:59:00Z'))).toBe('2026-09-24')
+    expect(todayET(new Date('2026-09-25T04:00:00Z'))).toBe('2026-09-25')
+  })
+
+  it('follows the clocks in winter (EST, five hours behind)', () => {
+    expect(todayET(new Date('2026-12-01T04:30:00Z'))).toBe('2026-11-30')
+    expect(todayET(new Date('2026-12-01T05:00:00Z'))).toBe('2026-12-01')
+  })
+
+  it('moves the quarter on the ET date, not the UTC one', () => {
+    // The evening of 30 September ET is already 1 October UTC.
+    expect(rangeFor('qtd', todayET(new Date('2026-10-01T02:00:00Z')))).toEqual({ from: '2026-07-01', to: '2026-09-30' })
+  })
+
+  it('passes a bare date through, and refuses nonsense rather than printing Invalid Date', () => {
+    expect(etDate('2026-08-15')).toBe('2026-08-15')
+    expect(etDate(null)).toBeNull()
+    expect(etDate('')).toBeNull()
+    expect(etDate('not a date')).toBeNull()
+  })
+})
+
+describe('etTime: the clock time sales sees next to "N updated"', () => {
+  it('reads the wall clock in New York, not on the server', () => {
+    // 12:24 UTC is 8:24 in the morning in New York during daylight time, which
+    // is when four of Alex's studies were last touched on 28 Sep. Rendered in
+    // the server's own zone it would say lunchtime.
+    expect(etTime('2026-09-28T12:24:30.000Z')).toBe('8:24 AM')
+  })
+
+  it('does not roll an evening edit into the next day', () => {
+    // The bug this page has had twice: 01:23 UTC is still 9:23 PM yesterday in
+    // New York. The date and the time have to come from the same conversion.
+    expect(etDate('2026-09-24T01:23:44.000Z')).toBe('2026-09-23')
+    expect(etTime('2026-09-24T01:23:44.000Z')).toBe('9:23 PM')
+  })
+
+  it('says nothing rather than inventing midnight for a bare date', () => {
+    // A date with no time carries no time. Showing "12:00 AM" would be a
+    // measurement we never made.
+    expect(etTime('2026-08-15')).toBeNull()
+    expect(etTime(null)).toBeNull()
+    expect(etTime('')).toBeNull()
+    expect(etTime('not a date')).toBeNull()
   })
 })
 
