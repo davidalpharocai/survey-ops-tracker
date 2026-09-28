@@ -12,23 +12,37 @@
  * closed but repeatable; then the queue; then what is coming.
  */
 
+import { useState } from 'react'
 import { fmtNum } from '@/lib/utils/number'
-import { Bar, Card, Empty, Figure, Note, ProjectLink, Row, money, pct } from './shared'
+import { Bar, BlockedFigure, Card, Empty, Figure, Note, ProjectLink, Row, money, pct, type CardBlocks } from './shared'
 import { Drillable } from './DrillPanel'
-import type { Backlog, BudgetVariance, Exception, Exposure } from '@/lib/finance/analysis'
+import {
+  BADGE_HELP, BADGE_LABEL, FINANCE_BADGES,
+  type Backlog, type BudgetVariance, type Exception, type Exposure, type Holds,
+} from '@/lib/finance/analysis'
 
-export function NowTab({ exposure, variance, queue, back, canFinance, onDrill }: {
+/** Rows the worklist shows before "Show all". */
+const QUEUE_PREVIEW = 20
+
+export function NowTab({ exposure, variance, queue, back, holds, canFinance, blocks, onDrill }: {
   exposure: Exposure[]
   variance: BudgetVariance
+  /** Built by exceptions() with the reader's capability, so for a reader
+   *  without it no row exists because of a price or a budget. */
   queue: Exception[]
   back: Backlog
+  /** Surveys on hold — their own bucket, never inside the live figures. */
+  holds?: Holds
   canFinance: boolean
+  /** What did not load. A price-built figure shows the reason instead of a
+   *  number; a spend-built one says it is a floor. */
+  blocks: CardBlocks
   /** Opens the rows behind a figure. Every headline here is a population, and
    *  a population you cannot open is a dead end. */
   onDrill: (key: string) => void
 }) {
-  const worstPct = exposure[0] ? Math.max(...exposure.map(e =>
-    e.budget && e.budget > 0 ? e.spend / e.budget : 0)) : 0
+  const [showAll, setShowAll] = useState(false)
+  const shown = showAll ? queue : queue.slice(0, QUEUE_PREVIEW)
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
@@ -36,10 +50,13 @@ export function NowTab({ exposure, variance, queue, back, canFinance, onDrill }:
         wide
         tone={exposure.length > 0 ? 'alert' : undefined}
         title="Live exposure — money still moving"
-        tip="In-flight surveys that have already passed their cost ceiling or their N target. Delivered work is history and belongs on The book; this is the only band on the page that changes an action today."
+        tip={canFinance
+          ? 'Live surveys that have already passed their budget or their N target. The date filter does not apply here — an overspend matters whenever the survey launched. Surveys on hold are counted separately below, never in this list.'
+          : 'Live surveys that have already collected more than their N target. The date filter does not apply here — an overspend matters whenever the survey launched. Surveys on hold are counted separately below, never in this list.'}
+        floor={blocks.costs}
       >
         {exposure.length === 0 ? (
-          <Empty>No survey in flight is past its ceiling or its target.</Empty>
+          <Empty>{canFinance ? 'No live survey is past its budget or its target.' : 'No live survey is past its target.'}</Empty>
         ) : (
           <>
             <div className="divide-y divide-border/60">
@@ -53,7 +70,8 @@ export function NowTab({ exposure, variance, queue, back, canFinance, onDrill }:
                     </span>
                     <span className="shrink-0 tabular-nums text-red-600 dark:text-red-400">
                       {money(e.spend)}
-                      {e.budget != null && e.budget > 0 && (
+                      {/* Budget is finance-only, here as everywhere else. */}
+                      {canFinance && e.budget != null && e.budget > 0 && (
                         <span className="text-muted-foreground"> / {money(e.budget)}</span>
                       )}
                     </span>
@@ -62,8 +80,8 @@ export function NowTab({ exposure, variance, queue, back, canFinance, onDrill }:
                     {e.reasons.join(' · ')}
                     {e.overTargetCost > 0 && <> · about {money(e.overTargetCost)} already unbillable</>}
                   </div>
-                  {e.budget != null && e.budget > 0 && (
-                    <Bar value={e.spend} max={Math.max(e.spend, e.budget) * (worstPct > 1 ? 1 : 1)} tone="neg" />
+                  {canFinance && e.budget != null && e.budget > 0 && (
+                    <Bar value={e.spend} max={Math.max(e.spend, e.budget)} tone="neg" />
                   )}
                 </div>
               ))}
@@ -77,11 +95,20 @@ export function NowTab({ exposure, variance, queue, back, canFinance, onDrill }:
             </Note>
           </>
         )}
+        {holds && holds.surveys > 0 && (
+          <Note>
+            <span className="font-medium text-foreground">
+              {fmtNum(holds.surveys)} survey{holds.surveys === 1 ? ' is' : 's are'} on hold
+            </span>{holds.spend > 0 && <> with {money(holds.spend)} already spent</>}. Kept out of every live
+            figure on this page. Resume or cancel each one.
+          </Note>
+        )}
       </Card>
 
-      <Card
+      {canFinance && <Card
         title="Budget variance"
         tip="survey_projects.budget is a COST CEILING — the most we intend to spend — not client revenue. Overrun and headroom are shown side by side and never netted: headroom on one survey cannot pay for an overrun on another, and subtracting them reports roughly zero and hides both."
+        floor={blocks.costs}
       >
         <div className="grid grid-cols-2 divide-x divide-border/60">
           <Drillable onOpen={() => onDrill('breach')} title="Show the surveys that blew their ceiling">
@@ -108,7 +135,7 @@ export function NowTab({ exposure, variance, queue, back, canFinance, onDrill }:
                   <span className="ml-2 text-xs text-muted-foreground">· {b.route}</span>
                 </>}
                 v={<span className="text-red-600 dark:text-red-400">{Math.round(b.pct * 100)}%</span>}
-                sub={`${money(b.spend)} against ${money(b.budget)}${b.lifecycle === 'inflight' ? ` — still in ${b.board}` : ''}`}
+                sub={`${money(b.spend)} against ${money(b.budget)}${b.lifecycle === 'active' ? ` — still in ${b.board}` : ''}`}
               />
             ))}
           </div>
@@ -125,65 +152,98 @@ export function NowTab({ exposure, variance, queue, back, canFinance, onDrill }:
             ) : null
           })()}
         </Note>
-      </Card>
+      </Card>}
 
       <Card
         title="What to look at"
-        tip="One row per survey, worst first, deduplicated — a survey that is both loss-making and over budget occupies one line, not two. Ranked by dollars at stake."
+        tip={canFinance
+          ? "One row per survey, carrying every badge that applies — losing money and going over budget are different events and are never merged. Ranked by dollars at stake: a cost outlier counts the total it cost above a typical survey on its route (the whole book's median, so the yardstick does not move with the filter). Each row ends with what to do."
+          : "One row per survey: cost outliers and surveys whose segment counts do not add up to the survey's N actual. Ranked by dollars at stake: a cost outlier counts the total it cost above a typical survey on its route (the whole book's median, so the yardstick does not move with the filter). Each row ends with what to do."}
+        floor={blocks.costs}
       >
+        {canFinance && blocks.prices && (
+          <Note tone="neg">
+            {blocks.prices}, so surveys that lost money or were given away at $0 cannot be flagged
+            here. The list below is missing them, not clear of them.
+          </Note>
+        )}
         {queue.length === 0 ? (
           <Empty>Nothing in this view is out of line.</Empty>
         ) : (
-          <div className="max-h-[420px] divide-y divide-border/60 overflow-y-auto">
-            {queue.slice(0, 20).map(e => (
-              <div key={e.id + e.kind} className="px-4 py-2.5">
-                <div className="flex items-baseline justify-between gap-3 text-sm">
-                  <span className="min-w-0 truncate">
-                    <ProjectLink id={e.id} code={e.code} />
-                    <span className="ml-2 text-muted-foreground">{e.account}</span>
-                  </span>
-                  <span className={
-                    'shrink-0 rounded px-1.5 py-0.5 text-[11px] font-medium uppercase tracking-wide ' +
-                    (e.kind === 'loss' ? 'bg-red-500/10 text-red-700 dark:text-red-400'
-                      : e.kind === 'over-budget' ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400'
-                        : 'bg-muted text-muted-foreground')
-                  }>
-                    {e.kind.replace('-', ' ')}
-                  </span>
+          <>
+            <div className="max-h-[420px] divide-y divide-border/60 overflow-y-auto">
+              {shown.map(e => (
+                <div key={e.id} className="px-4 py-2.5">
+                  <div className="flex items-baseline justify-between gap-3 text-sm">
+                    <span className="min-w-0 truncate">
+                      <ProjectLink id={e.id} code={e.code} />
+                      <span className="ml-2 text-muted-foreground">{e.account}</span>
+                    </span>
+                    <span className="flex shrink-0 flex-wrap justify-end gap-1">
+                      {/* A second lock: exceptions() already builds a
+                          non-holder's list without these badges. */}
+                      {e.badges.filter(b => canFinance || !FINANCE_BADGES.includes(b)).map(b => (
+                        <span key={b} title={BADGE_HELP[b]} className={
+                          'rounded px-1.5 py-0.5 text-[11px] font-medium uppercase tracking-wide ' +
+                          (b === 'lost-money' ? 'bg-red-500/10 text-red-700 dark:text-red-400'
+                            : b === 'over-budget' ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400'
+                              : 'bg-muted text-muted-foreground')
+                        }>
+                          {BADGE_LABEL[b]}
+                        </span>
+                      ))}
+                    </span>
+                  </div>
+                  {e.items.filter(i => canFinance || !FINANCE_BADGES.includes(i.badge)).map(i => (
+                    <div key={i.badge}>
+                      <div className="mt-0.5 text-[13px]">{i.headline}</div>
+                      <div className="mt-0.5 text-xs text-muted-foreground">{i.detail}</div>
+                    </div>
+                  ))}
+                  <div className="mt-1 text-xs font-medium text-primary">{e.verb} →</div>
                 </div>
-                <div className="mt-0.5 text-[13px]">{e.headline}</div>
-                <div className="mt-0.5 text-xs text-muted-foreground">{e.detail}</div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+            <Note>
+              Showing {fmtNum(shown.length)} of {fmtNum(queue.length)}.{' '}
+              {queue.length > QUEUE_PREVIEW && (
+                <button onClick={() => setShowAll(v => !v)} className="font-medium text-primary underline-offset-2 hover:underline">
+                  {showAll ? 'Show fewer' : 'Show all'}
+                </button>
+              )}
+            </Note>
+          </>
         )}
       </Card>
 
       {canFinance && (
         <Card
           wide
-          title="Backlog — contracted, not yet billed"
-          tip="In-flight surveys that carry a client rate, valued at their target N. An UPPER bound: it assumes every one lands exactly on target, and surveys regularly come in short."
+          title="Backlog — sold, not yet delivered"
+          tip="Live surveys that carry a client price, valued at the N sold. An UPPER bound: it assumes every one lands exactly on target, and surveys regularly come in short. Surveys on hold and in scoping are not included."
+          floor={blocks.prices ? null : blocks.costs}
         >
+          {blocks.prices ? <BlockedFigure text={blocks.prices} /> : <>
           <div className="grid grid-cols-2 divide-x divide-border/60">
             <Figure
               value={money(back.revenueAtTarget)} label="if every one lands on target"
-              sub={`${fmtNum(back.surveys)} in-flight surveys carrying a rate · ${money(back.spentSoFar)} spent against it so far`}
+              sub={`${fmtNum(back.surveys)} live surveys carrying a price · ${money(back.spentSoFar)} spent against it so far`}
               tone="pos"
             />
             <Figure
-              value={fmtNum(back.unpriced)} label="in-flight surveys with no rate"
+              value={fmtNum(back.unpriced)} label="live surveys with no price or no target"
               sub="invisible to this figure — the pipeline is larger than the number beside it"
               size="md"
             />
           </div>
           <Note>
-            Revenue is billed at rate × min(delivered, target), so this is a ceiling and not a
-            forecast. {back.surveys > 0 && back.spentSoFar > 0 && (
+            Revenue is price × min(delivered after QA, the top of the N sold), so this is a
+            ceiling and not a forecast. {back.surveys > 0 && back.spentSoFar > 0 && (
               <>Field cost committed so far is {pct(back.spentSoFar, back.revenueAtTarget)}% of the
                 value at target.</>
             )}
           </Note>
+          </>}
         </Card>
       )}
     </div>

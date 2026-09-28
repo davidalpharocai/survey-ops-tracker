@@ -156,6 +156,28 @@ describe('creditCoverage', () => {
     const rows = [P({ id: 'a', credits: 10, term_id: 't1' }), P({ id: 'b', credits: 10 })]
     expect(creditCoverage(rows, new Map([['a', 50]]), VALUES).both).toBe(1)
   })
+
+  it('counts "priced" by revenue.ts: the survey rate, never a segment price alone', () => {
+    // The invoice uses one rate (David, 2026-09-27). A survey whose only prices
+    // sit on its segments has no rate to bill at, so it is not priced here
+    // either — one definition, the same one revenue uses.
+    const segPriced = P({
+      id: 's', credits: 5, term_id: 't1',
+      segments: [
+        { id: 'a', project_id: 's', n_target: 10, n_actual: 10, price_per_n: 40 },
+        { id: 'b', project_id: 's', n_target: 10, n_actual: 10, price_per_n: 60 },
+      ],
+    })
+    const surveyPriced = P({
+      id: 'h', credits: 5, term_id: 't1',
+      segments: [
+        { id: 'c', project_id: 'h', n_target: 10, n_actual: 10, price_per_n: 40 },
+        { id: 'd', project_id: 'h', n_target: 10, n_actual: 10, price_per_n: null },
+      ],
+    })
+    expect(creditCoverage([segPriced, surveyPriced], new Map([['h', 50]]), VALUES).both).toBe(1)
+    expect(creditRevenue(segPriced, undefined, new Map()).revenue).toBeNull()
+  })
 })
 
 describe('creditValues: derived, never stored', () => {

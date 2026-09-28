@@ -12,23 +12,31 @@
  * the number that opened it.
  */
 
-import type { DrillRow } from '@/components/finance/DrillPanel'
-import type { Breach, Exposure, SurveyPnl, UnpricedAccount } from './analysis'
+import type { DrillRow } from './drill'
+import type { Breach, Exposure, SurveyPnl } from './analysis'
+import type { Lever } from './savings'
 
+// Every N here is the SURVEY's — `actual` is the delivered N the bill uses
+// (revenue.ts deliveredNOf) — the same figure moneyLost and foregone read. A
+// segment whose count does not add up is a note on the row, never a reason to
+// drop it (David, 2026-09-27: the bill is the survey's) — except where the
+// survey's N actual is only the roll-up of the segments that have a count
+// (`partialRollUp`, PR00231). Scrub and over-delivery at cost cannot be
+// measured on that, so moneyLost lists it apart and these rows leave it out
+// too, or the strip would disagree with the figure that opened it.
 const scrubN = (r: SurveyPnl) =>
-  r.collected != null && r.actual != null ? Math.max(0, r.collected - r.actual) : 0
-const overN = (r: SurveyPnl) =>
-  r.target != null && r.actual != null && r.collected != null
-    ? Math.max(0, Math.min(r.actual, r.collected) - r.target) : 0
-const shortN = (r: SurveyPnl) =>
-  r.target != null && r.actual != null ? Math.max(0, r.target - r.actual) : 0
+  !r.partialRollUp && r.collected != null && r.actual != null ? Math.max(0, r.collected - r.actual) : 0
+// Over the TOP of the survey's sold range — the row's own overN, from revenue.ts
+// overDeliveredOf, the same rule the bill and moneyLost use. Never re-derived
+// here, so the drill cannot drift from the figure that opened it.
+const overN = (r: SurveyPnl) => (r.partialRollUp ? 0 : r.overN ?? 0)
 
 const base = (r: SurveyPnl) => ({
   id: r.id, code: r.code, account: r.account, route: r.route,
   target: r.target, collected: r.collected, actual: r.actual,
   cost: r.cost, cpc: r.cpc, cpqr: r.cpqr, rate: r.rate,
   revenue: r.revenue, margin: r.margin, marginPct: r.marginPct,
-  reconciled: r.reconciled,
+  reconciled: r.reconciled, free: r.free,
 })
 
 /** Surveys that bought completes QA then removed, priced at each survey's own
@@ -47,8 +55,8 @@ export function scrubRows(pnl: SurveyPnl[]): DrillRow[] {
     .sort((a, b) => b.contribution - a.contribution)
 }
 
-/** Completes bought past the promised N. Billing caps at min(), so these earn
- *  nothing at all. */
+/** N delivered past the top of the survey's sold range. Billing caps at min(),
+ *  so these earn nothing at all. */
 export function overTargetRows(pnl: SurveyPnl[]): DrillRow[] {
   return pnl
     .filter(r => r.lifecycle === 'delivered' && r.cost > 0 && r.paidCompletes > 0 && overN(r) > 0)
@@ -60,21 +68,25 @@ export function overTargetRows(pnl: SurveyPnl[]): DrillRow[] {
     .sort((a, b) => b.contribution - a.contribution)
 }
 
-/** Delivered short of target, priced at the CLIENT rate — revenue never billed.
- *  A different currency from the two above and never summed with them. */
+/** Delivered short of the N sold, priced at the CLIENT price — revenue never
+ *  billed. A different currency from the two above and never summed with them.
+ *  Each row carries the shortfall revenue.ts computed for it (on the survey, at
+ *  the survey's own rate), so the strip checks against foregone() to the cent.
+ *  A $0 price is a price: a short free trial is a row worth $0. */
 export function foregoneRows(pnl: SurveyPnl[]): DrillRow[] {
   return pnl
-    .filter(r => r.lifecycle === 'delivered' && r.rate != null && r.rate > 0 && shortN(r) > 0)
-    .map(r => ({ ...base(r), shortN: shortN(r), contribution: shortN(r) * r.rate! }))
+    .filter(r => r.lifecycle === 'delivered' && r.shortValue != null && r.shortN > 0)
+    .map(r => ({ ...base(r), shortN: r.shortN, contribution: r.shortValue as number }))
     .sort((a, b) => b.contribution - a.contribution)
 }
 
-/** Every survey in the margin figure. `contribution` is margin dollars, so the
- *  strip reconciles against the headline margin and a negative row visibly
- *  drags the running total down. */
+/** Every survey in the margin figure — the margin set, `inMargin`, the same
+ *  test marginOf applies. `contribution` is margin dollars (−cost on a survey
+ *  given away at $0), so the strip reconciles against the headline margin to
+ *  the cent and a negative row visibly drags the running total down. */
 export function marginRows(pnl: SurveyPnl[]): DrillRow[] {
   return pnl
-    .filter(r => r.lifecycle === 'delivered' && r.revenue != null && r.cost > 0)
+    .filter(r => r.inMargin)
     .map(r => ({ ...base(r), contribution: r.margin ?? 0 }))
     .sort((a, b) => (a.contribution as number) - (b.contribution as number))
 }
@@ -135,25 +147,33 @@ export function exposureRows(rows: Exposure[]): DrillRow[] {
   }))
 }
 
-/** Recorded spend on surveys with no client rate — it can never reach a margin.
- *  Rows are SURVEYS, not accounts, so the panel drills past the account rollup
- *  to the thing someone actually has to price. */
+/** Recorded spend on surveys with no client price — it can never reach a
+ *  margin. Rows are SURVEYS, not accounts, so the panel drills past the account
+ *  rollup to the thing someone actually has to price. A $0 price is a price. */
 export function unpricedRows(pnl: SurveyPnl[], accountId?: string | null): DrillRow[] {
   return pnl
-    .filter(r => r.cost > 0 && r.rate == null && (!accountId || r.accountId === accountId))
+    .filter(r => r.cost > 0 && !r.priced && (!accountId || r.accountId === accountId))
     .map(r => ({ ...base(r), contribution: r.cost }))
     .sort((a, b) => b.contribution - a.contribution)
 }
 
-/** The account rollup, for the portfolio-level view of the same money. */
-export function unpricedAccountRows(accounts: UnpricedAccount[]): DrillRow[] {
-  return accounts.map(a => ({
-    // Not a survey, so there is no project to link to — the panel renders the
-    // code cell and an account has none. Carrying the account name as the code
-    // keeps the row readable and the link inert.
-    id: a.accountId ?? a.account,
-    code: a.account,
-    surveys: a.surveys,
-    contribution: a.spend,
-  }))
+/**
+ * The surveys behind a savings lever: EVERY id the lever counted, looked up in
+ * the P&L of the population the lever was computed on. `contribution` is each
+ * survey's full recorded cost — a lever's saving is a slice of these rows and
+ * cannot be allocated row by row without inventing an allocation — so the
+ * strip checks the rows against spendOfIds(lever.ids) and against the id list.
+ *
+ * Built from the lever's ids, never by filtering some other population down to
+ * them: that is how the old drill showed "0 rows ✓" for a lever with 57
+ * surveys behind it. An id with no P&L row is not dropped; it is left for the
+ * reconciliation to name.
+ */
+export function leverRows(lever: Pick<Lever, 'ids'>, pnl: SurveyPnl[]): DrillRow[] {
+  const by = new Map(pnl.map(r => [r.id, r]))
+  return lever.ids
+    .map(id => by.get(id))
+    .filter((r): r is SurveyPnl => r != null)
+    .map(r => ({ ...base(r), contribution: r.cost }))
+    .sort((a, b) => b.contribution - a.contribution)
 }

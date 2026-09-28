@@ -68,20 +68,59 @@ export function csvIncludedRestricted(columns: CsvColumn[]): boolean {
   return columns.some(c => c.restricted === true)
 }
 
-function cell(v: unknown): string {
+/**
+ * Text that a spreadsheet would run as a formula: a cell starting with `=`,
+ * `+`, `-` or `@` (and tab or carriage return, which some spreadsheets strip
+ * before looking). A project name, a note or a client label is typed by people,
+ * and a CSV opened in Excel executes `=HYPERLINK(...)` or worse on open.
+ */
+const FORMULA_START = /^[=+\-@\t\r]/
+
+/**
+ * One CSV cell, quoted when it must be and defused when it could be a formula.
+ *
+ * The guard applies to TEXT only. A value that arrives as a JavaScript number
+ * cannot carry a formula, so a negative amount (a recovered reward, a loss)
+ * stays a number the spreadsheet can add up, rather than turning into text
+ * behind an apostrophe. Text that merely looks like a negative number ("-12")
+ * is defused anyway: from text we cannot tell a number from the start of a
+ * formula, and a text cell with an apostrophe still reads correctly.
+ *
+ * Shared by every CSV the app writes (the project lists and the finance hub),
+ * so the guard cannot be present in one exporter and missing from another.
+ */
+export function csvCell(v: unknown): string {
   if (v == null) return ''
   if (typeof v === 'boolean') return v ? 'Yes' : 'No'
-  const s = String(v)
-  return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s
+  if (typeof v === 'number') return Number.isFinite(v) ? String(v) : ''
+  let s = String(v)
+  if (FORMULA_START.test(s)) s = "'" + s
+  return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s
 }
 
 /** The CSV text (no BOM, no download) — the whole file as a pure function, so
  *  the column gating can be tested without a DOM. */
 export function buildProjectsCsv(projects: SurveyProject[], columns: CsvColumn[]): string {
   return [
-    columns.map(c => cell(c.header)).join(','),
-    ...projects.map(p => columns.map(c => cell(c.value(p))).join(',')),
+    columns.map(c => csvCell(c.header)).join(','),
+    ...projects.map(p => columns.map(c => csvCell(c.value(p))).join(',')),
   ].join('\r\n')
+}
+
+/**
+ * Hand a CSV to the browser as a file. A BOM goes first so Excel opens UTF-8
+ * correctly (without it, "−$3,586" and every accented name arrive mangled).
+ * Returns nothing and never throws on the audit side: logging is the caller's
+ * next step, and a download must never wait on it.
+ */
+export function downloadCsv(text: string, filename: string): void {
+  const blob = new Blob(['\uFEFF' + text], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 export interface ExportCsvOptions {
@@ -94,33 +133,64 @@ export interface ExportCsvOptions {
   filters?: Record<string, unknown>
 }
 
+/** What happened to the audit note for one export. The download never waits
+ *  on this and never fails because of it; the caller shows it ("Logged as
+ *  export #…", or that the log failed) so a missing audit row is visible. */
+export interface ExportLogResult {
+  ok: boolean
+  /** HTTP status, or 0 when the request never reached the server. */
+  status: number
+  /** The data_exports row id, when the server returned one. */
+  id: string | null
+  /** Why it failed, in words, when it did. */
+  error: string | null
+}
+
 /**
- * Fire-and-forget note to /api/exports/log. The row is written server-side with
- * the service-role client (data_exports grants `authenticated` no INSERT — an
+ * Note to /api/exports/log. The row is written server-side with the
+ * service-role client (data_exports grants `authenticated` no INSERT — an
  * analyst-writable audit log could be forged by the people it audits), and the
- * server takes the actor from the session, so all we send is what was exported.
+ * server takes the actor from the session, so all we send is what was exported
+ * and the filters behind it.
  *
- * Awaited by the caller but never allowed to fail the export: the download has
- * already happened by the time this runs, and a lost log row must not surface as
- * a broken button.
+ * The response IS read now. For weeks this was fire-and-forget: the route was
+ * never deployed (a .gitignore rule swallowed it), production answered 404 to
+ * every export, and nothing noticed because nothing looked. A non-2xx answer, a
+ * network failure or a body reporting `ok: false` is logged to the console and
+ * returned — never thrown, because the file has already been handed to the
+ * browser by the time this runs and a lost log row must not surface as a broken
+ * button.
+ *
+ * Exported so the finance exporter shares the one audit path rather than
+ * writing a second one that could drift out of step with it.
  */
-/** Exported so the finance exporter can share the one audit path rather than
- *  writing a second one that could drift out of step with it. */
 export async function logExport(entry: {
   route: string
   rowCount: number
+  /** Everything that scoped the rows — tab, date range, account, route,
+   *  lifecycle, scoping. Nulls and empties are dropped server-side. */
   filters?: Record<string, unknown>
   includedRestricted: boolean
-}): Promise<void> {
+}): Promise<ExportLogResult> {
   try {
-    await fetch('/api/exports/log', {
+    const res = await fetch('/api/exports/log', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(entry),
       keepalive: true,
     })
-  } catch {
-    // Offline, blocked, route missing — nothing the exporter can do about it.
+    const body = (await res.json().catch(() => null)) as { ok?: boolean; id?: string; error?: string } | null
+    if (!res.ok || body?.ok === false) {
+      const error = body?.error ?? `export log returned ${res.status}`
+      console.error('[exportCsv] the export was not logged:', error)
+      return { ok: false, status: res.status, id: null, error }
+    }
+    return { ok: true, status: res.status, id: typeof body?.id === 'string' ? body.id : null, error: null }
+  } catch (err) {
+    // Offline, blocked, route missing. The download already happened.
+    const error = err instanceof Error ? err.message : String(err)
+    console.error('[exportCsv] the export was not logged:', error)
+    return { ok: false, status: 0, id: null, error }
   }
 }
 
@@ -133,20 +203,14 @@ export async function logExport(entry: {
 export async function exportProjectsCsv(
   projects: SurveyProject[],
   opts: ExportCsvOptions
-): Promise<void> {
+): Promise<ExportLogResult> {
   const columns = csvColumnsFor(opts.canViewFinancials)
-  // BOM so Excel opens UTF-8 correctly
-  const blob = new Blob(['﻿' + buildProjectsCsv(projects, columns)], {
-    type: 'text/csv;charset=utf-8',
-  })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `survey-ops-export-${new Date().toISOString().split('T')[0]}.csv`
-  a.click()
-  URL.revokeObjectURL(url)
+  downloadCsv(
+    buildProjectsCsv(projects, columns),
+    `survey-ops-export-${new Date().toISOString().split('T')[0]}.csv`,
+  )
 
-  await logExport({
+  return logExport({
     route: opts.route,
     rowCount: projects.length,
     filters: opts.filters,

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  spendOf, routeOf, routeCosts, legsOf, spendByClient, unbillable, blastEfficiency,
+  spendOf, routeOf, routeCosts, legsOf, spendByClient, costBreakdown, COST_LINES,
   coverage, applyFilters, finDate,
   type FinProject, type FinBlast, type FinCost, type FinSupplier,
 } from './hub'
@@ -145,55 +145,133 @@ describe('spendByClient', () => {
   })
 })
 
-describe('unbillable', () => {
-  it('splits scrub from over-target and prices both at this survey rate', () => {
-    // 1,000 target, 1,300 collected, 1,100 survived QA:
-    //   over-target = min(1100,1300) - 1000 = 100
-    //   scrub       = 1300 - 1100           = 200
-    const rows = [P({ id: 'x', n_target: 1000, n_collected: 1300, n_actual: 1100 })]
-    const s: FinSupplier[] = [{ project_id: 'x', cpi: 2, n_collected: 1300 }]
-    const u = unbillable(rows, [], s, [])
-    expect(u).toMatchObject({ overTarget: 100, scrub: 200, surveys: 1 })
-    expect(u.overTargetCost).toBeCloseTo(200)
-    expect(u.scrubCost).toBeCloseTo(400)
+describe('recovered rewards are their own line — David, 2026-09-24', () => {
+  it('splits a credit out of "other" and keeps the net total the trigger stores', () => {
+    // A recovered incentive is a NEGATIVE cost line. Folded into "other" it
+    // turned that line negative and drew it as a positive bar.
+    const b: FinBlast[] = [{ project_id: 'p1', bid: 100, completes: 10, people: 0, cost_per_send: 0, channel: 'sms' }]
+    const c: FinCost[] = [
+      { project_id: 'p1', amount: 50, route: 'blast' },
+      { project_id: 'p1', amount: -300, route: 'blast' },
+    ]
+    expect(spendOf(P(), b, [], c)).toMatchObject({ reward: 1000, other: 50, recovered: -300, total: 750 })
   })
 
-  it('says nothing about a survey with no n_actual, rather than assuming none was lost', () => {
-    const rows = [P({ id: 'x', n_target: 100, n_collected: 300, n_actual: null })]
-    const s: FinSupplier[] = [{ project_id: 'x', cpi: 1, n_collected: 300 }]
-    expect(unbillable(rows, [], s, []).surveys).toBe(0)
+  it('breaks cost down into gross rewards, recovered, net and the rest', () => {
+    const rows = [P({ id: 'a' }), P({ id: 'b' })]
+    const b: FinBlast[] = [
+      { project_id: 'a', bid: 100, completes: 10, people: 1000, cost_per_send: 0.02, channel: 'sms' },
+      { project_id: 'b', bid: 50, completes: 4, people: 0, cost_per_send: 0, channel: 'email' },
+    ]
+    const s: FinSupplier[] = [{ project_id: 'b', cpi: 2, n_collected: 100 }]
+    const c: FinCost[] = [{ project_id: 'a', amount: -250, route: 'blast' }, { project_id: 'b', amount: 40 }]
+    const k = costBreakdown(rows, b, s, c)
+    expect(k).toMatchObject({
+      panel: 200, rewardsGross: 1200, recovered: -250, rewardsNet: 950, sends: 20, other: 40,
+      recoveredSurveys: 1, recoveredLines: 1,
+    })
+    expect(k.total).toBe(200 + 1200 - 250 + 20 + 40)
+    // The total equals the sum of every survey's own net spend, to the cent.
+    const net = rows.reduce((t, p) => t + spendOf(p, b, s, c).total, 0)
+    expect(k.total).toBeCloseTo(net, 10)
   })
 
-  it('ignores work that has not been delivered', () => {
-    const rows = [P({ id: 'x', board_column: 'Fielding', n_target: 100, n_collected: 300, n_actual: 250 })]
-    const s: FinSupplier[] = [{ project_id: 'x', cpi: 1, n_collected: 300 }]
-    expect(unbillable(rows, [], s, []).surveys).toBe(0)
+  it('labels every line once, recovered included, for every consumer', () => {
+    expect(COST_LINES.map(l => l.key)).toEqual(['panel', 'rewardsGross', 'recovered', 'sends', 'other', 'total'])
+    expect(COST_LINES.find(l => l.key === 'recovered')!.label).toBe('Rewards recovered')
+  })
+
+  it('carries the credit on the route leg it belongs to', () => {
+    const b: FinBlast[] = [{ project_id: 'p1', bid: 10, completes: 10, people: 0, cost_per_send: 0, channel: 'sms' }]
+    const c: FinCost[] = [{ project_id: 'p1', amount: -30, route: 'blast' }]
+    const { legs } = legsOf(P({ n_actual: 10, n_collected: 10 }), b, [], c)
+    expect(legs[0]).toMatchObject({ route: 'blast', spend: 70, recovered: -30 })
+  })
+
+  it('blocks a mixed survey whose credit names no route, rather than dropping it from both legs', () => {
+    const b: FinBlast[] = [{ project_id: 'p1', bid: 10, completes: 5, people: 0, cost_per_send: 0, channel: 'sms' }]
+    const s: FinSupplier[] = [{ project_id: 'p1', cpi: 1, n_collected: 5 }]
+    const c: FinCost[] = [{ project_id: 'p1', amount: -20, route: null }]
+    expect(legsOf(P({ n_actual: 10 }), b, s, c).reason).toBe('unrouted-cost')
   })
 })
 
-describe('blastEfficiency', () => {
-  it('counts a zero-complete blast as dead, but not an unrecorded one', () => {
-    // NULL completes means "not in yet" — they trickle for days. Counting that
-    // as a dead send would condemn every blast sent in the last week.
-    const rows = [P({ id: 'p1' })]
-    const b: FinBlast[] = [
-      { project_id: 'p1', bid: 25, completes: 0, people: 1000, cost_per_send: 0.02, channel: 'sms' },
-      { project_id: 'p1', bid: 25, completes: null, people: 1000, cost_per_send: 0.02, channel: 'sms' },
-    ]
-    const e = blastEfficiency(rows, b)
-    expect(e.deadSends).toBe(1000)
-    expect(e.deadSpend).toBeCloseTo(20)
-    expect(e.sends).toBe(2000)
+describe('legsOf: a segmented survey whose segments do not add up', () => {
+  it('partitions the money but gives no delivered N when the survey N actual is only the partial roll-up (PR00231)', () => {
+    // 342 is the one counted segment; the $9,000 covers both. Cost per complete
+    // still has its leg (it never reads `delivered`); CPQR gets no denominator.
+    const s: FinSupplier[] = [{ project_id: 'p1', cpi: 1, n_collected: 9000 }]
+    const p = P({
+      n_actual: 342, n_collected: 9000,
+      segments: [
+        { id: 'a', project_id: 'p1', n_target: 400, n_actual: 342 },
+        { id: 'b', project_id: 'p1', n_target: 4600, n_actual: null },
+      ],
+    })
+    const l = legsOf(p, [], s, [])
+    expect(l.legs[0]).toMatchObject({ route: 'panel', spend: 9000, paid: 9000, delivered: null })
+    expect(l.reason).toBe('ok')
+    expect(l.splitReason).toBe('partial-n-actual')
+    // Cost per complete bought is real on it, and keeps it.
+    expect(routeCosts([p], [], s, [])).toEqual([{ route: 'panel', p25: 1, median: 1, p75: 1, n: 1 }])
   })
 
-  it('does not count email sends as spend', () => {
-    const rows = [P({ id: 'p1' })]
-    const b: FinBlast[] = [{ project_id: 'p1', bid: 0, completes: 0, people: 5000, cost_per_send: 0.02, channel: 'email' }]
-    expect(blastEfficiency(rows, b).sendSpend).toBe(0)
+  it('divides by a TYPED survey N actual whose segments do not add up', () => {
+    // The survey says 400; the one counted segment says 342. 400 is somebody's
+    // statement about the whole survey (the invoice reads it), so it stands.
+    const s: FinSupplier[] = [{ project_id: 'p1', cpi: 1, n_collected: 900 }]
+    const p = P({
+      n_actual: 400, n_collected: 900,
+      segments: [
+        { id: 'a', project_id: 'p1', n_target: 400, n_actual: 342 },
+        { id: 'b', project_id: 'p1', n_target: 400, n_actual: null },
+      ],
+    })
+    const l = legsOf(p, [], s, [])
+    expect(l.legs[0]).toMatchObject({ delivered: 400 })
+    expect(l.splitReason).toBe('ok')
+  })
+
+  it('blocks the delivered split of a MIXED survey whose N actual is a partial roll-up', () => {
+    const b: FinBlast[] = [{ project_id: 'p1', bid: 10, completes: 50, people: 0, cost_per_send: 0, channel: 'sms' }]
+    const s: FinSupplier[] = [{ project_id: 'p1', cpi: 1, n_collected: 500 }]
+    const p = P({
+      n_actual: 100, n_collected: 550, n_actual_panel: 80, n_actual_blast: 20, n_actual_split_method: 'transaction_id',
+      segments: [
+        { id: 'a', project_id: 'p1', n_target: 100, n_actual: 100 },
+        { id: 'b', project_id: 'p1', n_target: 400, n_actual: null },
+      ],
+    })
+    const l = legsOf(p, b, s, [])
+    expect(l.legs.map(x => x.delivered)).toEqual([null, null])
+    expect(l.splitReason).toBe('partial-n-actual')
+  })
+
+  it('uses the segments total only when the survey N actual is blank and every segment has one', () => {
+    const s: FinSupplier[] = [{ project_id: 'p1', cpi: 1, n_collected: 300 }]
+    const full = P({ n_actual: null, n_collected: 300, segments: [
+      { id: 'a', project_id: 'p1', n_target: 100, n_actual: 120 },
+      { id: 'b', project_id: 'p1', n_target: 100, n_actual: 80 },
+    ] })
+    expect(legsOf(full, [], s, []).legs[0].delivered).toBe(200)
+    const half = P({ n_actual: null, n_collected: 300, segments: [
+      { id: 'a', project_id: 'p1', n_target: 100, n_actual: 120 },
+      { id: 'b', project_id: 'p1', n_target: 100, n_actual: null },
+    ] })
+    const l = legsOf(half, [], s, [])
+    expect(l.legs[0].delivered).toBeNull()
+    expect(l.splitReason).toBe('no-n-actual')
   })
 })
 
 describe('coverage: the caveat travels with the numbers', () => {
+  it('does not count an empty rerun placeholder as an uncosted delivered survey', () => {
+    // 20 such shells dragged July cost coverage from 85% to 73%.
+    const rows = [P({ id: 'a' }), P({ id: 'shell', is_placeholder: true })]
+    const b: FinBlast[] = [{ project_id: 'a', bid: 1, completes: 1, people: 0, cost_per_send: 0, channel: 'sms' }]
+    expect(coverage(rows, b, [], [])).toMatchObject({ delivered: 1, deliveredCosted: 1, deliveredPct: 100 })
+  })
+
   it('counts delivered surveys with no recorded cost', () => {
     const rows = [P({ id: 'a' }), P({ id: 'b' }), P({ id: 'c', board_column: 'Fielding' })]
     const b: FinBlast[] = [{ project_id: 'a', bid: 1, completes: 1, people: 0, cost_per_send: 0, channel: 'sms' }]

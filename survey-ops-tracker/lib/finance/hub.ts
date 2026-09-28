@@ -3,18 +3,20 @@
  *
  * ── WHAT THIS CAN AND CANNOT ANSWER ─────────────────────────────────────────
  * It answers "what did our work COST, where did the money go, and — on the part
- * of the book that carries a client rate — what did it earn". Revenue is real
- * but PARTIAL: project_financials.price_per_n exists on 57 of 403 surveys, so
- * every margin figure is a statement about the priced subset and has to name
- * that subset beside itself. It is no longer true that margin is incomputable;
- * it is true that margin is computable on about an eighth of the delivered book.
+ * of the book that carries a client price — what did it earn". Revenue is real
+ * but PARTIAL: only a minority of delivered surveys carry a price, so every
+ * margin figure is a statement about the priced subset and has to name that
+ * subset beside itself. How large the subset is changes as prices are entered
+ * (David is backfilling them toward 1 June), which is why it is computed on
+ * every load (lib/finance/coverage.ts) and never written into a comment or a
+ * sentence. Revenue itself is defined in ONE place, lib/finance/revenue.ts.
  *
  * ── EVERY FIGURE CARRIES ITS COVERAGE ───────────────────────────────────────
- * Only about a third of delivered surveys have any recorded cost. A total drawn
- * from them is a FLOOR, not a total, and the difference is large enough to
- * change decisions — so `coverage` travels with every rollup and the UI is
- * expected to show it. A cost report that quietly reports a third of the cost
- * is worse than no cost report, because it will be believed.
+ * Not every delivered survey has a recorded cost. A total drawn from the ones
+ * that do is a FLOOR, not a total, and the difference is large enough to change
+ * decisions — so `coverage` travels with every rollup and the UI is expected to
+ * show it. A cost report that quietly reports part of the cost is worse than no
+ * cost report, because it will be believed.
  *
  * ── ROUTE IS MEASURED, NEVER LABELLED ───────────────────────────────────────
  * project_type is wrong on 11 of the 117 projects that hold any field row —
@@ -31,7 +33,26 @@
  * the account is resolved through the key and the label is used for nothing.
  */
 
+import {
+  nActualIsPartialRollUp, overDeliveredOf, perRespondentNOf, revenueDetail, shortfallOf,
+  type RevenueSegment,
+} from './revenue'
+import { classOf, NO_ROWS, classify } from './lifecycle'
+
 export type Route = 'blast' | 'panel' | 'both' | 'none'
+
+/** One row of `project_segments` (039 / 078 / 082). Attached to its survey by
+ *  the loader as `FinProject.segments`. The bill never reads it — it is the
+ *  survey's (revenue.ts, David 2026-09-27) — except to roll up a blank survey
+ *  N actual from a full set of segment counts; otherwise it feeds the data
+ *  notes (segments that do not add up, a segment priced differently). */
+export interface FinSegment extends RevenueSegment {
+  id: string
+  project_id: string
+  label?: string | null
+  n_collected?: number | null
+  sort_order?: number | null
+}
 
 export interface FinProject {
   id: string
@@ -49,14 +70,13 @@ export interface FinProject {
   n_target: number | null
   n_collected: number | null
   n_actual: number | null
-  /** Cancellation. Read alongside `status`, because the two agree on all nine
-   *  cancelled surveys today and a future path that sets only one must not
-   *  drop out of the money. */
+  /** Cancellation. Read alongside `status`, because a future path that sets
+   *  only one of the two must not drop out of the money. */
   cancelled_at?: string | null
   /** The COST CEILING — the most we intend to spend (David, 2026-08-24). NOT
    *  client revenue, and never to be reconciled against contract value as if
-   *  the two should agree. 33 surveys carry one; 24 of those also carry a cost
-   *  and are the only ones variance can speak about. */
+   *  the two should agree. Only surveys carrying both a budget and a recorded
+   *  cost can say anything about variance; budgetVariance counts them. */
   budget?: number | null
   /** Who at the account asked for this. The only trustworthy contact link —
    *  the suffix in `client` agrees with it on all 58 surveys that carry both
@@ -71,6 +91,21 @@ export interface FinProject {
    *  REFUSED by every rate in this file; it is stored so the knowledge is not
    *  lost, not so it can be divided by. */
   n_actual_split_method?: string | null
+  /** 078: the top of the sold N range — the cap on billed N. Falls back to
+   *  n_target when null (lib/finance/revenue.ts). */
+  n_target_max?: number | null
+  /** A rerun wave the spawner created ahead of time. Only an EMPTY one is
+   *  excluded (lib/finance/lifecycle.ts); one that holds data is real work. */
+  is_placeholder?: boolean | null
+  /** 100: credits drawn and the contract they draw from. Counts, not dollars. */
+  credits?: number | null
+  term_id?: string | null
+  /** The trigger-maintained stored spend, read only to check that this file's
+   *  recomputation agrees with it (the load integrity line). */
+  actual_spend?: number | null
+  delivered_at?: string | null
+  /** Attached by the loader from project_segments. Absent = not segmented. */
+  segments?: FinSegment[] | null
 }
 
 /** One row of `clients`. `name` is the consolidated account. */
@@ -109,16 +144,31 @@ export interface FinSupplier {
   project_id: string
   cpi: number | null
   n_collected: number | null
+  /** Which panel, and which launch (wave) it was bought in. Optional so the
+   *  arithmetic tests can stay small; the loader always supplies them. */
+  supplier_id?: string | null
+  launch_id?: string | null
+  suppliers?: { name: string | null } | null
 }
 export interface FinCost {
   project_id: string
+  /** NEGATIVE is a credit. Today every credit on file is a recovered blast
+   *  incentive — a reward that went unclaimed and came back — and they are
+   *  reported as their own line, never folded into "other" (David,
+   *  2026-09-24: "recoveries as separate line so it's easier to see the
+   *  breakout and back into them"). */
   amount: number | null
   /** 117: 'blast' | 'panel', or null for an unattributed line. A flat cost on a
    *  SINGLE-route survey needs no route — there is only one place it can belong
-   *  — so this matters only on mixed surveys, where PR00425's $8,697.85 ZoomInfo
-   *  line is 64% of the survey's whole cost. */
+   *  — so this matters only on mixed surveys, where a flat contacts-export line
+   *  can be most of the survey's cost and must not be smeared across routes. */
   route?: string | null
+  kind?: string | null
+  description?: string | null
 }
+
+/** A cost line that gives money back. */
+export const isCredit = (c: FinCost) => Number(c.amount ?? 0) < 0
 
 export interface Filters {
   /** Inclusive ISO bounds on the survey's own date (deliver, else launch, else submitted). */
@@ -154,34 +204,37 @@ export const isDelivered = (p: FinProject) => p.board_column === 'Delivery'
  * (unless a manual adjustment is instructed)."
  *
  * A cancelled survey is the purest form of money lost — every dollar it spent
- * bought nothing that can ever be billed. Nine surveys are cancelled today and
- * they carry $746, so this is small; the principle is not. The gate that hid
- * them, `isDelivered`, also hides $30,620 of spend on 78 in-flight surveys —
- * 8.9% of everything recorded — which is the bigger version of the same fault.
+ * bought nothing that can ever be billed. The sums involved are small; the
+ * principle is not. The gate that hid them, `isDelivered`, also hid the spend
+ * on every in-flight survey, which is the bigger version of the same fault.
  *
- * `status` and `cancelled_at` agree on all nine, so either would do; both are
- * checked because a future cancellation path that sets only one should not
- * silently fall out of the numbers.
+ * `status` and `cancelled_at` agreed on every cancelled survey when this was
+ * written, so either would do; both are checked because a future cancellation
+ * path that sets only one should not silently fall out of the numbers.
  *
  * There is no "manual adjustment" mechanism yet. Default is to include.
  */
 export const isCancelled = (p: FinProject) =>
   p.status === 'Cancelled' || p.cancelled_at != null
 
-/** Work that is neither finished nor cancelled: it is still running, and the
- *  money it has already spent is real. Kept distinct from both so a reader can
- *  see committed-but-unfinished cost instead of it vanishing. */
-export const isInFlight = (p: FinProject) => !isDelivered(p) && !isCancelled(p)
+// "Is this survey live / scoping / on hold?" is NOT answered here any more —
+// lib/finance/lifecycle.ts `classify` is the one classifier, in one order.
 
 export interface Spend {
-  /** bid x completes — the respondent reward. */
+  /** bid x completes — the respondent reward, GROSS of anything recovered. */
   reward: number
   /** people x cost_per_send, and ZERO on an email blast (migration 112). */
   send: number
   /** cpi x n_collected across supplier rows. */
   panel: number
-  /** flat cost lines. */
+  /** Flat cost lines that cost money (amount ≥ 0). Credits are NOT in here. */
   other: number
+  /** Flat cost lines that GIVE money back (amount < 0), so ≤ 0. Every one on
+   *  file today is a recovered blast incentive. Its own line so a month that has
+   *  had its recoveries booked is never silently compared with one that has not. */
+  recovered: number
+  /** reward + send + panel + other + recovered — the net, which is what the
+   *  database's actual_spend trigger stores. */
   total: number
   /** Completes we actually paid for, across both routes. The denominator for
    *  every per-complete figure — NOT n_actual, which is post-QA and 12-20%
@@ -239,10 +292,11 @@ export function spendOf(
   // unrecorded channel keeps paying, which is what the SQL does too.
   const send = b.reduce((t, x) => t + (x.channel !== 'email' ? (x.people ?? 0) * (x.cost_per_send ?? 0) : 0), 0)
   const panel = s.reduce((t, x) => t + (x.cpi ?? 0) * (x.n_collected ?? 0), 0)
-  const other = c.reduce((t, x) => t + Number(x.amount ?? 0), 0)
+  const other = c.reduce((t, x) => t + (isCredit(x) ? 0 : Number(x.amount ?? 0)), 0)
+  const recovered = c.reduce((t, x) => t + (isCredit(x) ? Number(x.amount) : 0), 0)
   return {
-    reward, send, panel, other,
-    total: reward + send + panel + other,
+    reward, send, panel, other, recovered,
+    total: reward + send + panel + other + recovered,
     paidCompletes:
       b.reduce((t, x) => t + (x.completes ?? 0), 0) +
       s.reduce((t, x) => t + (x.n_collected ?? 0), 0),
@@ -261,8 +315,11 @@ export function routeOf(
 export interface Leg {
   route: 'blast' | 'panel'
   /** Spend attributable to this route — its own field rows, plus the flat cost
-   *  lines routed to it. */
+   *  lines routed to it. NET of recovered rewards. */
   spend: number
+  /** The credits (recovered rewards) inside `spend`, ≤ 0, so a caller can show
+   *  the rate gross as well as net: spend − recovered is the gross figure. */
+  recovered: number
   /** Completes we PAID for on this route. */
   paid: number
   /**
@@ -294,6 +351,7 @@ export type LegBlock =
   | 'estimated'       // a split that is a judgement, not a measurement
   | 'unrouted-cost'   // mixed, with flat cost lines that name no route
   | 'no-n-actual'     // nothing delivered to attribute
+  | 'partial-n-actual' // the survey's N actual sums only the segments that have a count
   | 'under-recorded'  // the field rows do not cover the N the survey claims
 
 export interface Legs {
@@ -349,16 +407,26 @@ export interface Legs {
  *      absent because it looks answered.
  *   3. The method is not 'estimated'. An estimate is stored so the knowledge
  *      survives, and refused here so it cannot become a printed rate.
- *   4. Every flat cost line names a route. This is the one that bites: PR00425
- *      carries an $8,697.85 contacts export that is 64% of its entire cost, and
- *      admitting the survey while leaving that unplaced prices its blast leg at
- *      $170.63 against a truth of $714.25 — four times too cheap, pooled into a
+ *   4. Every flat cost line names a route. This is the one that bites: a mixed
+ *      survey's contacts export can be most of its entire cost (it was on
+ *      PR00425 when this was written), and admitting the survey while leaving
+ *      that unplaced prices its blast leg several times too cheap, pooled into a
  *      median beside single-route surveys that DO carry their flat costs. An
  *      unattributed cost is not a small cost.
  *
- * Deliberately NOT pro rata. Splitting PR00425's list purchase by delivered N
- * would put 94% of it on the panel side, which bought none of it — 63% wrong on
- * the blast leg. The remainder is shown, not smeared.
+ * Deliberately NOT pro rata. Splitting a list purchase by delivered N puts most
+ * of it on the panel side, which bought none of it. The remainder is shown, not
+ * smeared.
+ *
+ * The delivered N is the SURVEY's (revenue.ts perRespondentNOf): the figure
+ * the bill uses, with one exception. A segmented survey whose segment counts do
+ * not add up still divides by its own N actual — David, 2026-09-27: "when we
+ * bill its just the n actual" — and carries the segmentsDisagree note. But when
+ * that N actual is only the 078 roll-up of the segments that HAVE a count
+ * (PR00231), it covers part of the survey while the spend covers all of it, so
+ * `delivered` is null with the reason 'partial-n-actual' and CPQR leaves the
+ * survey out and lists it. Cost per complete is untouched: it never reads
+ * `delivered`.
  */
 export function legsOf(
   p: FinProject, blasts: FinBlast[], suppliers: FinSupplier[], costs: FinCost[],
@@ -368,7 +436,11 @@ export function legsOf(
   if (route === 'none') return { legs: [], unrouted: 0, reason: 'none', splitReason: 'none' }
 
   const sp = spendOf(p, blasts, suppliers, costs, ix)
-  const nActual = p.n_actual == null ? null : Number(p.n_actual)
+  // The survey's delivered N — its own n_actual, or the segments' sum only when
+  // that is blank and every segment has one — unless it is a partial roll-up,
+  // which no per-respondent rate may divide by.
+  const nActual = perRespondentNOf(p)
+  const nReason: LegBlock = nActualIsPartialRollUp(p) ? 'partial-n-actual' : 'no-n-actual'
 
   // ── single route: one leg, everything on it ───────────────────────────────
   //
@@ -380,13 +452,14 @@ export function legsOf(
       legs: [{
         route,
         spend: sp.total,
+        recovered: sp.recovered,
         paid: sp.paidCompletes,
         delivered: nActual,
         collected: Number(p.n_collected ?? 0),
       }],
       unrouted: 0,
       reason: 'ok',
-      splitReason: nActual == null ? 'no-n-actual' : 'ok',
+      splitReason: nActual == null ? nReason : 'ok',
     }
   }
 
@@ -402,13 +475,16 @@ export function legsOf(
 
   // 1. CAN THE MONEY BE PARTITIONED? Only the flat cost lines are in doubt; the
   //    field rows carry their own route. An unattributed line blocks BOTH legs
-  //    rather than being smeared across them: on PR00425 that line is 64% of the
-  //    survey's cost, and pro-rata by delivered N would put 94% of a list
-  //    purchase on the panel side, which bought none of it.
+  //    rather than being smeared across them: a list purchase can be most of a
+  //    mixed survey's cost, and pro-rata by delivered N would put most of it on
+  //    the panel side, which bought none of it. A credit that names no route
+  //    blocks too — it would otherwise drop out of both legs unseen.
   const flat = (r: 'blast' | 'panel') =>
     c.reduce((t, x) => t + (x.route === r ? Number(x.amount ?? 0) : 0), 0)
+  const credit = (r: 'blast' | 'panel') =>
+    c.reduce((t, x) => t + (x.route === r && isCredit(x) ? Number(x.amount) : 0), 0)
   const unrouted = c.reduce((t, x) => t + (x.route == null ? Number(x.amount ?? 0) : 0), 0)
-  if (unrouted > 0) {
+  if (c.some(x => x.route == null && Number(x.amount ?? 0) !== 0)) {
     return { legs: [], unrouted, reason: 'unrouted-cost', splitReason: 'unrouted-cost' }
   }
 
@@ -418,7 +494,7 @@ export function legsOf(
   let splitReason: LegBlock = 'ok'
   const panelN = p.n_actual_panel
   const blastN = p.n_actual_blast
-  if (nActual == null) splitReason = 'no-n-actual'
+  if (nActual == null) splitReason = nReason
   else if (panelN == null || blastN == null) splitReason = 'no-split'
   // A split is a statement about a number that moves. Once it stops agreeing it
   // is stale, and stale is worse than absent because it looks answered.
@@ -433,6 +509,7 @@ export function legsOf(
       {
         route: 'panel',
         spend: sp.panel + flat('panel'),
+        recovered: credit('panel'),
         paid: panelPaid,
         delivered: delivered ? delivered.panel : null,
         collected: panelPaid,
@@ -440,6 +517,7 @@ export function legsOf(
       {
         route: 'blast',
         spend: sp.reward + sp.send + flat('blast'),
+        recovered: credit('blast'),
         paid: blastPaid,
         delivered: delivered ? delivered.blast : null,
         collected: blastPaid,
@@ -630,80 +708,6 @@ export function spendByClient(
   return { clients, total, coverage: { costed, of: rows.length } }
 }
 
-export interface Unbillable {
-  /** Completes collected beyond the promised N. Not chargeable — revenue is
-   *  rate x min(delivered, target), so these are pure cost. */
-  overTarget: number
-  /** Completes that never survived QA into the deliverable. The bigger half:
-   *  measured at roughly two-thirds of the waste, so "stop over-delivering"
-   *  fixes about a third of it. */
-  scrub: number
-  /** Priced at each survey's OWN cost per complete, never a route default. */
-  overTargetCost: number
-  scrubCost: number
-  surveys: number
-}
-
-export function unbillable(
-  rows: FinProject[], blasts: FinBlast[], suppliers: FinSupplier[], costs: FinCost[],
-): Unbillable {
-  const ix = buildIndex(blasts, suppliers, costs)
-  const u: Unbillable = { overTarget: 0, scrub: 0, overTargetCost: 0, scrubCost: 0, surveys: 0 }
-  for (const p of rows) {
-    if (!isDelivered(p)) continue
-    const target = p.n_target ?? 0
-    const got = p.n_collected ?? 0
-    const actual = p.n_actual
-    if (!(target > 0 && got > 0 && actual != null)) continue
-    const sp = spendOf(p, blasts, suppliers, costs, ix)
-    if (sp.total <= 0 || sp.paidCompletes <= 0) continue
-    const rate = sp.total / sp.paidCompletes
-    const over = Math.max(0, Math.min(actual, got) - target)
-    const scrub = Math.max(0, got - actual)
-    if (over === 0 && scrub === 0) continue
-    u.overTarget += over; u.scrub += scrub
-    u.overTargetCost += over * rate; u.scrubCost += scrub * rate
-    u.surveys++
-  }
-  return u
-}
-
-export interface BlastEfficiency {
-  sends: number
-  completes: number
-  /** Completes per send. Quoted as a percentage; it is well under 1%. */
-  responseRate: number
-  sendSpend: number
-  rewardSpend: number
-  /** Sends that produced nothing at all, and what they cost. */
-  deadSends: number
-  deadSpend: number
-  blasts: number
-}
-
-export function blastEfficiency(rows: FinProject[], blasts: FinBlast[]): BlastEfficiency {
-  const ids = new Set(rows.map(p => p.id))
-  const mine = blasts.filter(b => ids.has(b.project_id))
-  const e: BlastEfficiency = {
-    sends: 0, completes: 0, responseRate: 0, sendSpend: 0, rewardSpend: 0,
-    deadSends: 0, deadSpend: 0, blasts: mine.length,
-  }
-  for (const b of mine) {
-    const people = b.people ?? 0
-    const comp = b.completes ?? 0
-    const send = b.channel !== 'email' ? people * (b.cost_per_send ?? 0) : 0
-    e.sends += people
-    e.completes += comp
-    e.sendSpend += send
-    e.rewardSpend += (b.bid ?? 0) * comp
-    // `completes === 0` only — a NULL means "not recorded yet", and counting
-    // that as a dead send would condemn every blast sent in the last week.
-    if (b.completes === 0 && people > 0) { e.deadSends += people; e.deadSpend += send }
-  }
-  e.responseRate = e.sends > 0 ? e.completes / e.sends : 0
-  return e
-}
-
 export interface Coverage {
   delivered: number
   deliveredCosted: number
@@ -717,152 +721,245 @@ export function coverage(
   rows: FinProject[], blasts: FinBlast[], suppliers: FinSupplier[], costs: FinCost[],
 ): Coverage {
   const ix = buildIndex(blasts, suppliers, costs)
-  const delivered = rows.filter(isDelivered)
-  let deliveredCosted = 0, unreconciled = 0, unattributed = 0
+  let delivered = 0, deliveredCosted = 0, unreconciled = 0, unattributed = 0
   for (const p of rows) {
+    const cls = classOf(p, ix)
+    // An empty rerun shell is not a delivered survey with no cost — it is not a
+    // survey at all, and counting it dragged July's cost coverage from 85% to
+    // 73%.
+    if (cls === 'placeholder') continue
     const sp = spendOf(p, blasts, suppliers, costs, ix)
-    if (isDelivered(p) && sp.total > 0) deliveredCosted++
+    if (cls === 'delivered') {
+      delivered++
+      if (sp.total > 0) deliveredCosted++
+    }
     const got = Number(p.n_collected ?? 0)
     if (got > 0 && sp.paidCompletes < got) { unreconciled++; unattributed += got - sp.paidCompletes }
   }
   return {
-    delivered: delivered.length,
+    delivered,
     deliveredCosted,
-    deliveredPct: pct(deliveredCosted, delivered.length),
+    deliveredPct: pct(deliveredCosted, delivered),
     unreconciled,
     unattributedCompletes: unattributed,
   }
 }
 
 /* ────────────────────────────────────────────────────────────────────────────
- * REVENUE
+ * WHERE THE MONEY WENT
  *
- * The billing rule is  revenue = rate x min(n_actual, n_target).  Two halves of
- * that deserve to be said out loud because both are counter-intuitive:
- *
- *   · Delivering ABOVE target earns nothing. The cap is min(), not max().
- *   · QA scrub does not reduce the bill at all unless it drags n_actual BELOW
- *     target. A survey that buys 1,300, scrubs 200 and still hands over 1,100
- *     against a 1,000 target bills the full 1,000. The scrub cost real money
- *     and cost zero revenue — which is why scrub is priced at COST below, and
- *     never at the client rate.
+ * Recovered rewards are their own line, never netted into "Other" (David,
+ * 2026-09-24). Folded in, 43 credits turned "Other cost lines" into a negative
+ * figure drawn as a positive bar, and made the months that had their recoveries
+ * booked look cheaper than the ones still waiting for theirs.
  * ──────────────────────────────────────────────────────────────────────────── */
 
-/**
- * rate x min(n_actual, n_target), or null when the rate or the N is missing.
+export interface CostBreakdown {
+  panel: number
+  /** bid × completes, before anything came back. */
+  rewardsGross: number
+  /** Credits, ≤ 0. */
+  recovered: number
+  /** rewardsGross + recovered. */
+  rewardsNet: number
+  sends: number
+  /** Flat cost lines that cost money. */
+  other: number
+  /** panel + rewardsGross + recovered + sends + other. */
+  total: number
+  /** Surveys carrying at least one credit, and the credit lines themselves. */
+  recoveredSurveys: number
+  recoveredLines: number
+}
+
+/** The breakdown's lines, in display order, with the words to show. One copy so
+ *  every tile, drill and export labels the same money the same way. */
+export const COST_LINES: { key: keyof CostBreakdown; label: string; help: string }[] = [
+  { key: 'panel', label: 'Panel (PureSpectrum)', help: 'What we paid panels: each panel’s price per complete × the completes we bought from it.' },
+  { key: 'rewardsGross', label: 'Blast rewards (gross)', help: 'Incentives issued to blast respondents: the bid × completes, before any unclaimed reward came back.' },
+  { key: 'recovered', label: 'Rewards recovered', help: 'Incentives that went unclaimed and came back to us, shown as a negative. Booked in batches, so a recent month may still be waiting for its recoveries.' },
+  { key: 'sends', label: 'SMS sends', help: 'The per-message cost of text blasts, at the rate recorded on each blast. Email sends are free.' },
+  { key: 'other', label: 'Other costs', help: 'Flat vendor lines, such as contact-list exports.' },
+  { key: 'total', label: 'Total field cost', help: 'Everything above, net of recovered rewards. No salaries or overhead.' },
+]
+
+export function costBreakdown(
+  rows: FinProject[], blasts: FinBlast[], suppliers: FinSupplier[], costs: FinCost[],
+  ix: FinIndex = buildIndex(blasts, suppliers, costs),
+): CostBreakdown {
+  const out: CostBreakdown = {
+    panel: 0, rewardsGross: 0, recovered: 0, rewardsNet: 0, sends: 0, other: 0, total: 0,
+    recoveredSurveys: 0, recoveredLines: 0,
+  }
+  for (const p of rows) {
+    const sp = spendOf(p, blasts, suppliers, costs, ix)
+    out.panel += sp.panel
+    out.rewardsGross += sp.reward
+    out.recovered += sp.recovered
+    out.sends += sp.send
+    out.other += sp.other
+    const credits = (ix.costs.get(p.id) ?? []).filter(isCredit).length
+    if (credits > 0) { out.recoveredSurveys++; out.recoveredLines += credits }
+  }
+  out.rewardsNet = out.rewardsGross + out.recovered
+  out.total = out.panel + out.rewardsGross + out.recovered + out.sends + out.other
+  return out
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * REVENUE
  *
- * NULL rate and ZERO rate are different facts and are treated differently:
+ * Revenue is computed in ONE place — lib/finance/revenue.ts — and everything
+ * here reads it from there:
  *
- *   NULL  = nobody recorded a price. Revenue is UNKNOWN, so this returns null
- *           and the survey stays out of every margin figure. Folding it in as
- *           zero would drag margin toward a statement about bookkeeping.
- *   0     = the price IS zero, and David confirmed the three cases on file
- *           (2026-09-17): PR00440 is internal work and PR00435/PR00431 are free
- *           trials. That is a real price, so it returns 0 and the survey enters
- *           margin carrying its real cost against no revenue — which is the
- *           honest shape of a free trial. Excluding it would flatter the book
- *           by hiding work we chose to give away.
+ *     revenue = price per N × min(n_actual, n_target_max ?? n_target)
  *
- * An earlier version treated 0 as "unpriced" on the assumption it was an empty
- * field. It was not.
- */
-export function revenueOf(p: FinProject, rate: number | null | undefined): number | null {
-  if (rate == null || rate < 0) return null
-  const t = p.n_target, a = p.n_actual
-  if (t == null || a == null) return null
-  return rate * Math.min(Number(a), Number(t))
+ * Two halves of that deserve to be said out loud because both are
+ * counter-intuitive:
+ *
+ *   · Delivering ABOVE the sold range earns nothing. Over-delivery is a
+ *     courtesy and is never billed afterwards.
+ *   · QA scrub does not reduce the bill at all unless it drags n_actual BELOW
+ *     the cap. A survey that buys 1,300, scrubs 200 and still hands over 1,100
+ *     against a 1,000 target bills the full 1,000. The scrub cost real money
+ *     and cost zero revenue — which is why scrub is priced at COST below, and
+ *     never at the client price.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+export interface MarginPart {
+  surveys: number
+  revenue: number
+  cost: number
+  margin: number
+  /** margin ÷ revenue, or null when there is no revenue to divide by. */
+  pct: number | null
 }
 
 export interface Margin {
   revenue: number
   cost: number
   margin: number
-  /** As a fraction of revenue. */
-  pct: number
-  /** Surveys contributing to ALL THREE figures above. */
+  /** As a fraction of revenue. null — not 0 — when nothing is priced. */
+  pct: number | null
+  /** Surveys contributing to ALL THREE figures above: the MARGIN SET —
+   *  delivered, priced (a real $0 included), delivered N and a cap present,
+   *  and spend above $0. Every margin figure on the page is drawn from it. */
   surveys: number
+  ids: string[]
+  /** The margin set without the surveys given away at $0 — "we keep X% on
+   *  paid work". A $0 price never enters a ratio, so this is the ratio to quote
+   *  beside the book figure, which does include the free work's cost. */
+  paid: MarginPart
+  /** Surveys in the margin set priced at exactly $0: their cost is in `cost`
+   *  above and their revenue is $0. */
+  free: { surveys: number; cost: number; ids: string[] }
   /** Delivered + priced but carrying no recorded cost. Their revenue is
    *  EXCLUDED above, because counting revenue whose cost was never logged
    *  reports a margin of 100% on that survey and lifts the whole ratio. */
   pricedNoCost: number
   pricedNoCostRevenue: number
-  /** Delivered surveys this card cannot turn into revenue — no rate, OR a rate
-   *  of 0, OR a missing n_target/n_actual. NOT the same as "has no rate": 44
-   *  delivered surveys carry a rate and only 38 of them yield a revenue figure,
-   *  and a banner that called this "no client rate" was undercounting the rate
-   *  card by six. Kept separate from `rated` below for exactly that reason. */
+  pricedNoCostIds: string[]
+  /** Delivered and priced, but the revenue cannot be computed yet: no delivered
+   *  N or no N target on the survey. Each is one field away from the margin
+   *  set, so they are listed, never lost. (A segment never blocks it: the bill
+   *  is the survey's.) */
+  pricedBlocked: number
+  pricedBlockedIds: string[]
+  /** Delivered surveys with no price at all. */
   unpriced: number
-  /** Delivered surveys carrying ANY rate row, including the ones above that
-   *  cannot be turned into revenue. This is what "how much of the book is
-   *  priced" means, and it is the number the banner quotes. */
+  /** Delivered surveys carrying a price, $0 included. What "how much of the book
+   *  is priced" means. */
   rated: number
   delivered: number
+  /** Recorded spend on every delivered survey in `rows`, priced or not — the
+   *  denominator of "these surveys hold X% of the spend". */
+  spend: number
+  /** Spend on delivered surveys with no price, and how many carry it. */
+  spendNoPrice: number
+  surveysNoPrice: number
   /** Cost of work that was called off. David, 2026-09-15: cancelled surveys
    *  count. Held apart from `cost` so the delivered book's own performance
    *  stays readable, and folded into the two figures below. */
   cancelledCost: number
   cancelledSurveys: number
   marginAfterCancelled: number
-  pctAfterCancelled: number
+  pctAfterCancelled: number | null
 }
 
+const part = (): MarginPart => ({ surveys: 0, revenue: 0, cost: 0, margin: 0, pct: null })
+
 /**
- * Margin on the part of the book that carries BOTH a rate and a recorded cost.
+ * Margin on the part of the book that carries BOTH a price and a recorded cost.
  *
  * The exclusion in `pricedNoCost` is the whole point of this function. Including
- * those surveys takes the measured margin from 39.8% to 47.8%, not because the
- * work got more profitable but because five surveys contributed revenue and no
- * cost. That higher number is what this function exists to stop anyone printing.
- * (These figures move whenever a rate is corrected — they were 46%/58% before
- * seven DE Shaw rates were restored on 2026-09-15. The RATIO between them is
- * the durable point, not either number.)
+ * those surveys lifts the measured margin, not because the work got more
+ * profitable but because some surveys contributed revenue and no cost. That
+ * higher number is what this function exists to stop anyone printing.
  */
 export function marginOf(
   rows: FinProject[], rates: Map<string, number>,
   blasts: FinBlast[], suppliers: FinSupplier[], costs: FinCost[],
 ): Margin {
   const ix = buildIndex(blasts, suppliers, costs)
-  let revenue = 0, cost = 0, surveys = 0
-  let pricedNoCost = 0, pricedNoCostRevenue = 0, unpriced = 0, rated = 0, delivered = 0
-  let cancelledCost = 0, cancelledSurveys = 0
+  const m: Margin = {
+    revenue: 0, cost: 0, margin: 0, pct: null, surveys: 0, ids: [],
+    paid: part(), free: { surveys: 0, cost: 0, ids: [] },
+    pricedNoCost: 0, pricedNoCostRevenue: 0, pricedNoCostIds: [],
+    pricedBlocked: 0, pricedBlockedIds: [],
+    unpriced: 0, rated: 0, delivered: 0,
+    spend: 0, spendNoPrice: 0, surveysNoPrice: 0,
+    cancelledCost: 0, cancelledSurveys: 0, marginAfterCancelled: 0, pctAfterCancelled: null,
+  }
   for (const p of rows) {
+    const cls = classOf(p, ix)
     // Cancelled work is cost with no revenue, and it belongs in the margin a
     // finance reader sees — but reported separately, because burying it inside
     // `cost` would make the delivered book look worse than it performed while
-    // hiding the reason. The page shows margin both ways.
-    if (isCancelled(p)) {
+    // hiding the reason.
+    if (cls === 'cancelled') {
       const sp = spendOf(p, blasts, suppliers, costs, ix)
-      if (sp.total > 0) { cancelledCost += sp.total; cancelledSurveys++ }
+      if (sp.total > 0) { m.cancelledCost += sp.total; m.cancelledSurveys++ }
       continue
     }
-    if (!isDelivered(p)) continue
-    delivered++
-    if (rates.has(p.id)) rated++
-    const rev = revenueOf(p, rates.get(p.id))
-    if (rev == null) { unpriced++; continue }
+    if (cls !== 'delivered') continue
+    m.delivered++
     const sp = spendOf(p, blasts, suppliers, costs, ix)
-    if (sp.total <= 0) { pricedNoCost++; pricedNoCostRevenue += rev; continue }
-    revenue += rev; cost += sp.total; surveys++
+    m.spend += sp.total
+    const rv = revenueDetail(p, rates.get(p.id))
+    if (!rv.priced) {
+      m.unpriced++
+      if (sp.total > 0) { m.spendNoPrice += sp.total; m.surveysNoPrice++ }
+      continue
+    }
+    m.rated++
+    if (rv.revenue == null) { m.pricedBlocked++; m.pricedBlockedIds.push(p.id); continue }
+    if (sp.total <= 0) {
+      m.pricedNoCost++; m.pricedNoCostRevenue += rv.revenue; m.pricedNoCostIds.push(p.id)
+      continue
+    }
+    m.revenue += rv.revenue; m.cost += sp.total; m.surveys++; m.ids.push(p.id)
+    if (rv.free) { m.free.surveys++; m.free.cost += sp.total; m.free.ids.push(p.id) }
+    else if (rv.ratioEligible) { m.paid.surveys++; m.paid.revenue += rv.revenue; m.paid.cost += sp.total }
   }
-  return {
-    revenue, cost, margin: revenue - cost,
-    pct: revenue > 0 ? (revenue - cost) / revenue : 0,
-    surveys, pricedNoCost, pricedNoCostRevenue, unpriced, rated, delivered,
-    cancelledCost, cancelledSurveys,
-    marginAfterCancelled: revenue - cost - cancelledCost,
-    pctAfterCancelled: revenue > 0 ? (revenue - cost - cancelledCost) / revenue : 0,
-  }
+  m.margin = m.revenue - m.cost
+  m.pct = m.revenue > 0 ? m.margin / m.revenue : null
+  m.paid.margin = m.paid.revenue - m.paid.cost
+  m.paid.pct = m.paid.revenue > 0 ? m.paid.margin / m.paid.revenue : null
+  m.marginAfterCancelled = m.margin - m.cancelledCost
+  m.pctAfterCancelled = m.revenue > 0 ? m.marginAfterCancelled / m.revenue : null
+  return m
 }
 
 export interface Foregone {
-  /** Delivered surveys that finished short of the N they promised. */
+  /** Delivered surveys that finished short of the N they sold. */
   surveys: number
   n: number
-  /** n x the CLIENT rate — revenue we could have billed and did not. */
+  /** n x the CLIENT price — revenue we could have billed and did not. */
   dollars: number
-  /** Short of target but carrying no rate, so unpriceable. Reported because
-   *  19x as much short N sits here as in the priced figure (8,298 against 443),
-   *  and a reader who does not see it will read the priced number as the whole. */
+  ids: string[]
+  /** Short of target but carrying no price, so unpriceable. Reported because
+   *  far more short N sits here than in the priced figure, and a reader who does
+   *  not see it will read the priced number as the whole. */
   unpricedSurveys: number
   unpricedN: number
 }
@@ -871,33 +968,72 @@ export interface Foregone {
  * REVENUE FOREGONE — David, 2026-09-14: "N we can't bill (N we didn't deliver
  * x $/ N)".
  *
- * This is the half measured against the CLIENT rate, because the thing lost is
- * revenue. It is NOT cash that left the building, and it must never be added to
+ * Measured against the CLIENT price, because the thing lost is revenue, and
+ * against the N SOLD (n_target): delivering inside a sold range is not short.
+ * On the SURVEY as a whole (revenue.ts shortfallOf), like the bill: a segment
+ * that fell short while another made up for it is not short, because the
+ * invoice never saw the segments. A $0 price is a price, so a free trial that
+ * came up short is priced at $0 of foregone revenue rather than counted as
+ * unpriced.
+ *
+ * It is NOT cash that left the building, and it must never be added to
  * `moneyLost` below: one is an invoice that was never raised and the other is an
- * invoice we paid. Adding them produces a "total waste" figure that double-counts
- * nothing but means nothing either.
+ * invoice we paid.
  */
 export function foregone(rows: FinProject[], rates: Map<string, number>): Foregone {
-  const f: Foregone = { surveys: 0, n: 0, dollars: 0, unpricedSurveys: 0, unpricedN: 0 }
+  const f: Foregone = { surveys: 0, n: 0, dollars: 0, ids: [], unpricedSurveys: 0, unpricedN: 0 }
   for (const p of rows) {
-    if (!isDelivered(p)) continue
-    const t = p.n_target, a = p.n_actual
-    if (t == null || a == null || !(Number(t) > 0)) continue
-    const short = Math.max(0, Number(t) - Number(a))
-    if (short <= 0) continue
-    const r = rates.get(p.id)
-    if (r != null && r > 0) { f.surveys++; f.n += short; f.dollars += short * r }
-    else { f.unpricedSurveys++; f.unpricedN += short }
+    // No child rows here, and none are needed: Delivered is decided by the
+    // board column before any row-dependent test.
+    if (classify(p, NO_ROWS) !== 'delivered') continue
+    const s = shortfallOf(p, rates.get(p.id))
+    if (!s || s.n <= 0) continue
+    if (s.dollars != null) { f.surveys++; f.n += s.n; f.dollars += s.dollars; f.ids.push(p.id) }
+    else { f.unpricedSurveys++; f.unpricedN += s.n }
   }
   return f
 }
 
-export interface LostBucket { surveys: number; n: number; dollars: number }
+export interface LostBucket {
+  surveys: number
+  n: number
+  dollars: number
+  /** The surveys counted, so a drill can check its rows against the figure's
+   *  own ids instead of against themselves. */
+  ids: string[]
+}
+
+/**
+ * Delivered surveys a PER-RESPONDENT figure had to leave out because the
+ * survey's N actual is only the partial roll-up of its segments (revenue.ts
+ * perRespondentNOf) — PR00231 on live data. Their bill is unaffected; what
+ * cannot be measured is anything that sets the survey's whole cost or its
+ * whole bought N against that part-count. Listed, never dropped, so the card
+ * that leaves them out can say how much it left out and why.
+ */
+export interface PartialRollUpNote {
+  surveys: number
+  /** Recorded spend on them — the money the figure is not describing. */
+  spend: number
+  /** N bought on them (n_collected), none of which the figure can call
+   *  scrubbed or delivered. */
+  collected: number
+  ids: string[]
+}
+
+export const emptyPartialRollUp = (): PartialRollUpNote => ({ surveys: 0, spend: 0, collected: 0, ids: [] })
+
 export interface MoneyLost {
-  /** Completes bought past the promised N. The cap is min(), so these bill zero. */
+  /** N delivered past the top of the survey's sold range, priced at the
+   *  survey's own cost per complete. The bill is capped with min(), so these
+   *  earn nothing. */
   overTarget: LostBucket
   /** Completes bought that never survived QA into the deliverable. */
   scrub: LostBucket
+  /** Delivered surveys whose N actual counts only the segments that have one:
+   *  neither their scrub nor their over-delivery can be measured, so both
+   *  buckets above leave them out and they are listed here instead. */
+  partialRollUp: PartialRollUpNote
   /** Surveys in one of those states whose cost was never recorded, so the
    *  dollars could not be computed. The N is still real. */
   uncostedSurveys: number
@@ -909,10 +1045,17 @@ export interface MoneyLost {
    *  partial loss like scrub or over-delivery — the whole spend bought nothing
    *  billable, so the bucket is the survey's total cost, not a slice of it. */
   cancelled: LostBucket
-  /** Spend on surveys still running. NOT a loss — it is work in progress, and
-   *  it is carried here only so that it stops being invisible. Never add it to
-   *  the loss total. */
+  /** Spend on LIVE surveys. NOT a loss — it is work in progress, and it is
+   *  carried here only so that it stops being invisible. Never add it to the
+   *  loss total. */
   inFlight: LostBucket
+  /** Spend on surveys ON HOLD — its own bucket, never inside the live figure. */
+  hold: LostBucket
+  /** Spend on surveys closed without delivery (Archived). */
+  archived: LostBucket
+  /** Spend on surveys still in scoping (cost lines only — a survey buying
+   *  respondents is not scoping). Normally $0. */
+  scoping: LostBucket
 }
 
 /**
@@ -920,91 +1063,80 @@ export interface MoneyLost {
  *
  * Cash that left for interviews we cannot bill, priced at each survey's OWN
  * measured cost per complete. Never at a route default (that mispriced one
- * survey 24x) and never at the client rate, which would answer a different and
- * far larger question — the same scrub comes to $52,612 at cost across 14,148 N,
- * and $146,076 at the client rate across the 2,345 N that carry one.
+ * survey 24x) and never at the client price, which would answer a different and
+ * far larger question.
+ *
+ * A delivered survey whose N actual is a partial segment roll-up is in neither
+ * scrub nor over-delivery: it goes to `partialRollUp` (see PartialRollUpNote).
  */
 export function moneyLost(
   rows: FinProject[], blasts: FinBlast[], suppliers: FinSupplier[], costs: FinCost[],
 ): MoneyLost {
   const ix = buildIndex(blasts, suppliers, costs)
-  const z = (): LostBucket => ({ surveys: 0, n: 0, dollars: 0 })
+  const z = (): LostBucket => ({ surveys: 0, n: 0, dollars: 0, ids: [] })
   const m: MoneyLost = {
-    overTarget: z(), scrub: z(), uncostedSurveys: 0, uncostedN: 0, scrubStillHitTarget: 0,
-    cancelled: z(), inFlight: z(),
+    overTarget: z(), scrub: z(), partialRollUp: emptyPartialRollUp(),
+    uncostedSurveys: 0, uncostedN: 0, scrubStillHitTarget: 0,
+    cancelled: z(), inFlight: z(), hold: z(), archived: z(), scoping: z(),
   }
   for (const p of rows) {
-    // Cancelled and in-flight work is measured FIRST, and on its whole spend
-    // rather than a slice — a cancelled survey did not lose part of its money,
-    // it lost all of it. Both were invisible while this function looked only at
-    // `isDelivered`, which is what David caught on 2026-09-15.
-    if (isCancelled(p) || isInFlight(p)) {
+    const cls = classOf(p, ix)
+    if (cls === 'placeholder') continue
+    // Work that was not delivered is measured on its WHOLE spend rather than a
+    // slice — a cancelled survey did not lose part of its money, it lost all of
+    // it — and each class keeps its own bucket, so hold never reads as live.
+    if (cls !== 'delivered') {
       const sp = spendOf(p, blasts, suppliers, costs, ix)
       if (sp.total > 0) {
-        const b = isCancelled(p) ? m.cancelled : m.inFlight
+        const b = cls === 'cancelled' ? m.cancelled
+          : cls === 'active' ? m.inFlight
+            : cls === 'hold' ? m.hold
+              : cls === 'archived' ? m.archived : m.scoping
         b.surveys++
         b.n += Number(p.n_collected ?? 0)
         b.dollars += sp.total
+        b.ids.push(p.id)
       }
       continue
     }
-    if (!isDelivered(p)) continue
-    const t = Number(p.n_target ?? 0), g = Number(p.n_collected ?? 0), a = p.n_actual
-    if (a == null || !(g > 0)) continue
-    const A = Number(a)
-    const over = t > 0 ? Math.max(0, Math.min(A, g) - t) : 0
-    const scrub = Math.max(0, g - A)
+    const g = Number(p.n_collected ?? 0)
+    // A survey N actual that is only the roll-up of the segments that have a
+    // count (PR00231) would call every uncounted segment's interviews scrubbed.
+    // Its bill stands; its scrub and over-delivery are unknown, so it is listed
+    // rather than measured.
+    if (nActualIsPartialRollUp(p)) {
+      const sp = spendOf(p, blasts, suppliers, costs, ix)
+      const n = m.partialRollUp
+      n.surveys++; n.spend += sp.total; n.collected += g; n.ids.push(p.id)
+      continue
+    }
+    // The survey's delivered N — the figure the bill uses (revenue.ts). Not a
+    // partial roll-up: that was listed above.
+    const A = perRespondentNOf(p)
+    const t = Number(p.n_target ?? 0)
+    // Over-delivery by the same rule that caps the bill (revenue.ts
+    // overDeliveredOf): on the SURVEY, above the top of its sold range. A
+    // segment past its own target while another fell short is not over — the
+    // invoice never saw the segments (David, 2026-09-27) — so billed + over =
+    // delivered on every survey, and the project page states the same N.
+    const over = overDeliveredOf(p) ?? 0
+    // Scrub needs both counts: bought (collected) less what survived QA.
+    const scrub = A != null && g > 0 ? Math.max(0, g - A) : 0
     if (over === 0 && scrub === 0) continue
     const sp = spendOf(p, blasts, suppliers, costs, ix)
     if (sp.total <= 0 || sp.paidCompletes <= 0) {
       m.uncostedSurveys++; m.uncostedN += over + scrub; continue
     }
     const rate = sp.total / sp.paidCompletes
-    if (over > 0) { m.overTarget.surveys++; m.overTarget.n += over; m.overTarget.dollars += over * rate }
+    if (over > 0) {
+      m.overTarget.surveys++; m.overTarget.n += over; m.overTarget.dollars += over * rate
+      m.overTarget.ids.push(p.id)
+    }
     if (scrub > 0) {
       m.scrub.surveys++; m.scrub.n += scrub; m.scrub.dollars += scrub * rate
-      if (t > 0 && A >= t) m.scrubStillHitTarget++
+      m.scrub.ids.push(p.id)
+      if (t > 0 && A != null && A >= t) m.scrubStillHitTarget++
     }
   }
   return m
-}
-
-export interface RateBand { rate: number; surveys: number; accounts: string[] }
-
-/**
- * The rate card as it actually stands, so the page can show its own provenance.
- *
- * A backfill can put one number on a third of the book in a single sitting, and
- * on a dashboard that is indistinguishable from a third of the book having
- * negotiated the same price. It happened here: 53 surveys were written at
- * $200.00/N, which implied $3.1M of contract value until David caught that the
- * rate belongs to B2B expert work and not to PureSpectrum panel studies, where
- * he has "never seen it be more than $7-15". 36 were cleared; 16 remain, all
- * B2B. This function exists so the UI can show that concentration rather than
- * hide it, because the same mistake will be made again.
- */
-export function rateBands(
-  rows: FinProject[], rates: Map<string, number>, accounts: Map<string, string>,
-): RateBand[] {
-  const by = new Map<number, Set<string>>()
-  const n = new Map<number, number>()
-  for (const p of rows) {
-    const r = rates.get(p.id)
-    if (r == null) continue
-    n.set(r, (n.get(r) ?? 0) + 1)
-    if (!by.has(r)) by.set(r, new Set())
-    by.get(r)!.add(accountOf(p, accounts))
-  }
-  return [...n.entries()]
-    .map(([rate, surveys]) => ({ rate, surveys, accounts: [...(by.get(rate) ?? [])].sort() }))
-    .sort((a, b) => b.surveys - a.surveys || b.rate - a.rate)
-}
-
-/** Surveys priced at exactly $0 — work given away on purpose. All three on file
- *  are legitimate (one internal, two free trials), so these are surfaced as
- *  context rather than flagged as an error: they carry real cost against no
- *  revenue, and a reader looking at margin should know which surveys those are
- *  rather than wondering why the ratio moved. */
-export function zeroRates(rows: FinProject[], rates: Map<string, number>): FinProject[] {
-  return rows.filter(p => rates.get(p.id) === 0)
 }

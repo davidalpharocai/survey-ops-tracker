@@ -4,20 +4,20 @@
  * Tab 2 — UNIT ECONOMICS. What one respondent costs, and what we charge for it.
  *
  * This is the pricing tab, and it exists because the old page could show what
- * an account SPENT but never what it PAID — so the largest finding in the data
- * was invisible: BAM's blast work costs about the same per complete as DE
- * Shaw's and realises roughly $22/N less. That is a price review, not an
- * execution problem, and no card could say so.
+ * an account SPENT but never what it PAID. Price and cost are now both per
+ * BILLED respondent and split by route, so reading across an account's route
+ * row gives what we keep per respondent — and a price gap between two accounts
+ * on the same route, at the same cost, reads as the price review it is.
  */
 
 import { fmtNum } from '@/lib/utils/number'
-import { Bar, Card, Empty, Note, Row, money, money2, moneyAuto, pct1 } from './shared'
+import { Bar, BlockedFigure, Card, Empty, Note, Row, money, money2, moneyAuto, pct1, type CardBlocks } from './shared'
 import { Drillable } from './DrillPanel'
 import type { AccountPnl, BidLadder } from '@/lib/finance/analysis'
 import type { Cpqr, MixedCoverage } from '@/lib/finance/cpqr'
 import type { RouteCost } from '@/lib/finance/hub'
 
-export function UnitTab({ cpqr, mixed, rates, accounts, ladder, incidence, canFinance, onDrill }: {
+export function UnitTab({ cpqr, mixed, rates, accounts, ladder, incidence, canFinance, blocks, onDrill }: {
   cpqr: Cpqr[]
   /** 117: the mixed-route surveys these rates could not price, and why. */
   mixed?: MixedCoverage
@@ -26,18 +26,26 @@ export function UnitTab({ cpqr, mixed, rates, accounts, ladder, incidence, canFi
   ladder: BidLadder | null
   incidence: { reach: number; completes: number; rate: number } | null
   canFinance: boolean
+  /** What did not load. A price-built figure shows the reason instead of a
+   *  number; a spend-built one says it is a floor. */
+  blocks: CardBlocks
   onDrill: (key: string) => void
 }) {
   const panel = cpqr.find(c => c.route === 'panel')
   const blast = cpqr.find(c => c.route === 'blast')
-  const priced = accounts.filter(a => a.measured > 0 && a.realisedRate != null)
-  const maxRate = priced.length ? Math.max(...priced.map(a => a.realisedRate!)) : 0
+  // Every account with a survey in the margin set. Per-respondent figures live
+  // on the ROUTE rows; an account fielded more than one way prints none on its
+  // blended row, because a price averaged across routes describes the mix.
+  const priced = accounts.filter(a => a.measured > 0)
+  const maxRate = Math.max(0, ...priced.flatMap(a => a.routes.map(r => r.realisedRate ?? 0)))
+  const ROUTE_NAME: Record<string, string> = { blast: 'Blast', panel: 'Panel', both: 'Both routes', none: 'No field rows' }
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       <Card
         title="CPQR — cost per qualified respondent"
-        tip="Recorded spend ÷ n_actual, the post-QA count the client actually received. Cost per complete divides by what we PAID for instead; the gap between the two is the scrub. Delivered surveys only, and only those whose recorded completes cover both the N collected and the N delivered — without that guard this card reported blast at half its true cost and an impossible 116% QA yield. A survey fielded both ways contributes one observation to each route, built from that route's own spend and its own delivered respondents, and only once both can be established."
+        floor={blocks.costs}
+        tip="Recorded spend (net of recovered rewards) ÷ n_actual, the post-QA count the client actually received. The 'per complete bought' figure on each row is the same spend ÷ the completes we PAID for, on exactly the same surveys — so the gap between the two is exactly the scrub. Delivered surveys only, and only those whose recorded completes cover both the N collected and the N delivered — without that guard this card reported blast at half its true cost and an impossible 116% QA yield. A survey fielded both ways contributes one observation to each route, built from that route's own spend and its own delivered respondents, and only once both can be established."
       >
         {cpqr.length === 0 ? (
           <Empty>No delivered survey here has both a recorded cost and a post-QA count.</Empty>
@@ -59,6 +67,10 @@ export function UnitTab({ cpqr, mixed, rates, accounts, ladder, incidence, canFi
                 <div className="mt-0.5 text-xs tabular-nums text-muted-foreground">
                   typical survey {money2(c.median)} · {money2(c.p25)} – {money2(c.p75)} · n={c.n}
                 </div>
+                <div className="mt-0.5 text-xs tabular-nums text-muted-foreground">
+                  {money2(c.perComplete)} per complete bought, on the same surveys
+                  {c.recovered < 0 && <> · {money2(c.blendedGross)} per qualified before {money(-c.recovered)} of rewards came back</>}
+                </div>
                 <div className="mt-0.5 text-xs text-muted-foreground">
                   {fmtNum(c.paid)} bought → {fmtNum(c.qualified)} delivered ·{' '}
                   <span className="font-medium text-red-600 dark:text-red-400">
@@ -76,7 +88,7 @@ export function UnitTab({ cpqr, mixed, rates, accounts, ladder, incidence, canFi
             {(panel || blast) && (
               <Note>
                 <span className="font-medium text-foreground">Use the right one of those two.</span>{' '}
-                The book figure is what every bought complete cost you across the portfolio; the
+                The book figure is what one qualified respondent cost across the whole book; the
                 typical-survey figure is what to expect on the next one, and they differ because a
                 handful of studies scrub catastrophically rather than because the routes behave
                 differently. Per-survey keep runs{' '}
@@ -142,7 +154,8 @@ export function UnitTab({ cpqr, mixed, rates, accounts, ladder, incidence, canFi
 
       <Card
         title="Cost per complete — what we bought"
-        tip="Total recorded cost ÷ completes we PAID for. Sits beside CPQR deliberately: the difference between the two cards is exactly what QA removed, and showing only one of them hides it."
+        floor={blocks.costs}
+        tip="The median survey's recorded cost ÷ completes we PAID for, on surveys whose records cover their collected N. A different statistic and a different set of surveys from the CPQR card, so do not subtract one from the other — the CPQR card's own 'per complete bought' line is the like-for-like comparison."
       >
         {rates.length === 0 ? (
           <Empty>Nothing in this view reconciles well enough to price.</Empty>
@@ -172,48 +185,74 @@ export function UnitTab({ cpqr, mixed, rates, accounts, ladder, incidence, canFi
         <Card
           wide
           title="Account P&L — what they pay against what they cost"
-          tip="Realised rate is revenue ÷ billable N: what an account ACTUALLY pays per interview, which the rate card may never have charged because billing caps at min(delivered, target). Cost per complete is computed on the same surveys, so the two can be compared without crossing populations. `n` is on every row — a realised rate from two surveys is not comparable to one from fourteen."
+          floor={blocks.prices ? null : blocks.costs}
+          tip="Price and cost are both per BILLED respondent (min of delivered and the N sold), on the same surveys, so price minus cost is what we keep per respondent. Split by route: an account fielded more than one way shows its per-respondent figures on each route row only, because a panel price averaged with a blast price describes the mix, not the client. `n` is on every row — a figure from two surveys is not comparable to one from fourteen."
         >
-          {priced.length === 0 ? (
-            <Empty>No account in this view has a survey with both a rate and a recorded cost.</Empty>
+          {blocks.prices ? (
+            <BlockedFigure text={blocks.prices} />
+          ) : priced.length === 0 ? (
+            <Empty>No account in this view has a survey with both a client price and a recorded cost.</Empty>
           ) : (
             <>
               <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-x-4 border-b border-border/60 px-4 py-1.5 text-[11px] uppercase tracking-wider text-muted-foreground">
-                <span>Account</span><span className="text-right">Realised $/N</span>
-                <span className="text-right">Cost/complete</span><span className="text-right">Margin</span>
-                <span className="text-right">n</span>
+                <span>Account · route</span>
+                <span className="text-right" title="Client price ÷ billed respondents">Price / billed N</span>
+                <span className="text-right" title="Our field cost ÷ the same billed respondents">Cost / billed N</span>
+                <span className="text-right" title="(Client price − our cost) ÷ client price. Field contribution, before salaries and overhead.">We keep</span>
+                <span className="text-right" title="Surveys behind the row">n</span>
               </div>
               <div className="divide-y divide-border/60">
-                {priced.slice(0, 12).map(a => (
-                  <div key={a.accountId ?? a.account} className="px-4 py-2.5">
-                    <div className="grid grid-cols-[1fr_auto_auto_auto_auto] items-baseline gap-x-4 text-sm">
-                      <span className="min-w-0 truncate">{a.account}</span>
-                      <span className="tabular-nums text-right">{money(a.realisedRate!)}</span>
-                      <span className="tabular-nums text-right text-muted-foreground">
-                        {a.costPerComplete != null ? moneyAuto(a.costPerComplete) : '—'}
-                      </span>
-                      <span className={
-                        'tabular-nums text-right ' +
-                        ((a.marginPct ?? 0) < 0.2 ? 'text-red-600 dark:text-red-400' : '')
-                      }>
-                        {a.marginPct != null ? Math.round(a.marginPct * 100) + '%' : '—'}
-                      </span>
-                      <span className="tabular-nums text-right text-xs text-muted-foreground">{a.measured}</span>
+                {priced.slice(0, 12).map(a => {
+                  const lines = a.routes.length > 1
+                    ? [{ key: 'all', label: a.account, row: a, sub: false }, ...a.routes.map(r => ({ key: r.route, label: ROUTE_NAME[r.route] ?? r.route, row: r, sub: true }))]
+                    : [{ key: 'all', label: `${a.account}${a.routes[0] ? ` · ${ROUTE_NAME[a.routes[0].route] ?? a.routes[0].route}` : ''}`, row: a.routes[0] ?? a, sub: false }]
+                  return (
+                    <div key={a.accountId ?? a.account} className="px-4 py-2.5">
+                      {lines.map(l => (
+                        <div key={l.key} className={l.sub ? 'mt-1 pl-4' : ''}>
+                          <div className="grid grid-cols-[1fr_auto_auto_auto_auto] items-baseline gap-x-4 text-sm">
+                            <span className={'min-w-0 truncate ' + (l.sub ? 'text-muted-foreground' : '')}>{l.label}</span>
+                            <span className="tabular-nums text-right">{l.row.realisedRate != null ? moneyAuto(l.row.realisedRate) : '—'}</span>
+                            <span className="tabular-nums text-right text-muted-foreground">
+                              {l.row.costPerBilledN != null ? moneyAuto(l.row.costPerBilledN) : '—'}
+                            </span>
+                            <span className={
+                              'tabular-nums text-right ' +
+                              ((l.row.marginPct ?? 0) < 0.2 ? 'text-red-600 dark:text-red-400' : '')
+                            }>
+                              {l.row.marginPct != null ? Math.round(l.row.marginPct * 100) + '%' : '—'}
+                            </span>
+                            <span className="tabular-nums text-right text-xs text-muted-foreground">{l.row.measured}</span>
+                          </div>
+                          {l.row.realisedRate != null && (
+                            <Bar value={l.row.realisedRate} max={maxRate} tone={(l.row.marginPct ?? 0) < 0.2 ? 'neg' : 'primary'} />
+                          )}
+                        </div>
+                      ))}
+                      {a.routes.length > 1 && (
+                        <div className="mt-0.5 text-xs text-muted-foreground">
+                          Fielded more than one way, so per-respondent figures are shown per route only.
+                        </div>
+                      )}
+                      {a.freeSurveys > 0 && (
+                        <div className="mt-0.5 text-xs text-muted-foreground">
+                          Includes {fmtNum(a.freeSurveys)} survey{a.freeSurveys === 1 ? '' : 's'} given away at $0.
+                        </div>
+                      )}
+                      {a.unpricedSpend > 0 && (
+                        <div className="mt-0.5 text-xs text-muted-foreground">
+                          {money(a.unpricedSpend)} of this account&apos;s spend carries no price and is not in the
+                          figures above
+                        </div>
+                      )}
                     </div>
-                    <Bar value={a.realisedRate!} max={maxRate} tone={(a.marginPct ?? 0) < 0.2 ? 'neg' : 'primary'} />
-                    {a.unpricedSpend > 0 && (
-                      <div className="mt-0.5 text-xs text-muted-foreground">
-                        {money(a.unpricedSpend)} of this account&apos;s spend carries no rate and is not in the
-                        figures above
-                      </div>
-                    )}
-                  </div>
-                ))}
+                  )
+                })}
               </div>
               <Note>
-                Margin here is <span className="font-medium text-foreground">contribution after field cost only</span> —
-                no labour, no overhead, no platform cost. SOCC has no labour table, so this is the
-                gross margin on bought interviews and nothing more.
+                &ldquo;We keep&rdquo; is <span className="font-medium text-foreground">field contribution</span> —
+                client price minus recorded field cost, before salaries and overhead. SOCC has no labour
+                table, so this is the contribution on bought interviews and nothing more.
               </Note>
             </>
           )}
@@ -224,7 +263,8 @@ export function UnitTab({ cpqr, mixed, rates, accounts, ladder, incidence, canFi
         <Card
           wide
           title="The bid ladder — does paying more buy more?"
-          tip="Each project compared against its OWN lowest bid, so a cheap project and an expensive one are never compared with each other. Blast efficiency elsewhere averages every bid into one response rate, which destroys this signal entirely."
+          floor={blocks.costs}
+          tip="Each project compared against its OWN lowest bid, so a cheap project and an expensive one are never compared with each other. Averaging every bid into one response rate would destroy this signal. Rewards are as issued, before any unclaimed reward came back."
         >
           <div className="grid grid-cols-2 divide-x divide-border/60 text-sm">
             <div className="px-4 py-3">

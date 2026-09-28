@@ -10,7 +10,9 @@
  *
  *   credits      price the SCOPE. Agreed once, up front, when the work is sold.
  *                A survey "costs 44 credits" whatever it goes on to deliver.
- *   price_per_n  prices the DELIVERY, and bills at min(n_actual, n_target).
+ *   price_per_n  prices the DELIVERY, and bills the survey's n_actual up to the
+ *                top of its sold range — lib/finance/revenue.ts, the one
+ *                revenue rule, on the survey as a whole.
  *
  * A survey carrying both is therefore NOT double-priced. It has a contracted
  * value and a delivered value, and the gap between them is the shortfall seen
@@ -38,15 +40,17 @@
  * is the mistake this codebase keeps paying for.
  *
  * ── WHY THE IMPLIED RATE IS SHOWN AND NEVER WRITTEN BACK ────────────────────
- * Eight surveys carry both units today and imply a median $198.28 a credit,
- * $200.00 at p75. It is tempting to write $200 onto DE Shaw's contract from
- * that. Migration 100 refused the same shortcut and the reasoning holds: a
+ * The surveys that carry both units imply a rate per credit (impliedCreditRate
+ * computes it on every load; it clustered near $200 when this was written). It
+ * is tempting to write that onto a contract. Migration 100 refused the same
+ * shortcut and the reasoning holds: a
  * derived rate presented as an agreed one is a number the business never
  * confirmed. The app shows it, labelled implied, and David types the contract
  * total. Suggesting is not the same as claiming.
  */
 
 import type { FinProject } from './hub'
+import { billedNOf, hasPrice, revenueDetail } from './revenue'
 
 /** One row of `client_terms` — the contract a survey draws down. */
 export interface FinTerm {
@@ -116,11 +120,11 @@ const num = (v: unknown): number | null => {
   return Number.isFinite(n) ? n : null
 }
 
-/** Billable N: min(delivered, promised). The cap is min(), so over-delivery
- *  bills nothing — pricing against n_collected would overstate every rate. */
+/** Billed N: min(delivered, the top of the sold range) — revenue.ts's rule,
+ *  re-exported under the name this file's callers use. Over-delivery bills
+ *  nothing, and n_collected (pre-QA) is never a fallback. */
 export function billableN(p: FinProject): number | null {
-  const t = num(p.n_target), a = num(p.n_actual)
-  return t != null && a != null ? Math.min(t, a) : null
+  return billedNOf(p)
 }
 
 /**
@@ -179,8 +183,9 @@ export function creditRevenue(
   rate: number | null | undefined,
   values: Map<string, number>,
 ): CreditRevenue {
-  const bill = billableN(p)
-  const fromRate = rate != null && rate >= 0 && bill != null ? rate * bill : null
+  // The one revenue function, so a credit-priced survey's rate figure is the
+  // same number the hub and the project page show.
+  const fromRate = revenueDetail(p, rate).revenue
   const v = valueCredits(p, values)
   const fromCredits = v?.contracted ?? null
 
@@ -212,8 +217,7 @@ export interface ImpliedCreditRate {
  * credit count and a client rate.
  *
  * This is the cross-check that makes `credit_value` safe to type: a wrong rate
- * announces itself against this instead of quietly restating revenue. Measured
- * today it is a median $198.28 and $200.00 at p75 across eight surveys.
+ * announces itself against this instead of quietly restating revenue.
  *
  * Read the spread carefully rather than the point. A survey that came up short
  * implies a LOW rate per credit — PR00257 implies $58.33 because it delivered 7
@@ -227,11 +231,10 @@ export function impliedCreditRate(
   for (const p of rows) {
     const credits = num(p.credits)
     if (credits == null || credits <= 0) continue
-    const r = rates.get(p.id)
-    if (r == null || !(r > 0)) continue
-    const bill = billableN(p)
-    if (bill == null || bill <= 0) continue
-    const revenue = r * bill
+    const rv = revenueDetail(p, rates.get(p.id))
+    // $0 never divides: a free survey says nothing about what a credit is worth.
+    if (rv.revenue == null || !rv.ratioEligible) continue
+    const revenue = rv.revenue
     out.push({ id: p.id, code: p.project_code, credits, revenue, perCredit: revenue / credits })
   }
   if (!out.length) return null
@@ -255,7 +258,8 @@ export interface CreditCoverage {
   /** …of which sit on a contract with an agreed dollar rate, so they can show
    *  a $/N at all. */
   valued: number
-  /** Surveys priced BOTH ways — the cross-check population. */
+  /** Surveys carrying credits AND a price per N ($0 included — it is a price;
+   *  impliedCreditRate is what leaves $0 out of the per-credit rate). */
   both: number
   /** Credits on surveys with no contract. The size of the bookkeeping gap. */
   unattachedCredits: number
@@ -275,8 +279,10 @@ export function creditCoverage(
     } else {
       c.unattachedCredits += credits
     }
-    const r = rates.get(p.id)
-    if (r != null && r > 0) c.both++
+    // "Priced" is revenue.ts's one definition: the survey carries a rate, a
+    // real $0 counted. A segment's own price does not price the survey — the
+    // invoice uses one rate (David, 2026-09-27) — so this agrees with revenue.
+    if (hasPrice(p, rates.get(p.id))) c.both++
   }
   return c
 }

@@ -1,6 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { cpqrByRoute, cpqrWithCoverage, blastIncidence } from './cpqr'
-import type { FinBlast, FinProject, FinSupplier } from './hub'
+import { cpqrWithCoverage, blastIncidence, nearestRank } from './cpqr'
+import { buildIndex, type FinBlast, type FinCost, type FinProject, type FinSupplier } from './hub'
+
+// The rates alone. cpqrByRoute was this one-liner and had no caller outside
+// its tests, so it was deleted; the tests keep their shape through this.
+const cpqrByRoute = (...a: Parameters<typeof cpqrWithCoverage>) => cpqrWithCoverage(...a).rates
 
 /**
  * Guards CPQR.
@@ -228,5 +232,116 @@ describe('cpqrByRoute: mixed-route surveys', () => {
     expect(panelAfter.n).toBe(2)
     expect(panelAfter.spend).toBeCloseTo(100 + 2085.70, 2)
     expect(panelAfter.qualified).toBe(50 + 236)
+  })
+})
+
+describe('one population for the dumbbell', () => {
+  it('prices per complete bought and per qualified respondent on the SAME surveys', () => {
+    // So the gap between the two dots is exactly the scrub: blended × (1 − scrub)
+    // = perComplete. The old cost-per-complete card used a different population
+    // and a median, and its help text claimed the same identity falsely.
+    const rows = [
+      P({ id: 'a', project_type: 'PS', n_collected: 100, n_actual: 80 }),
+      P({ id: 'b', project_type: 'PS', n_collected: 200, n_actual: 100 }),
+    ]
+    const r = cpqrByRoute(rows, [], [S('a', 1, 100), S('b', 2, 200)], [])[0]
+    expect(r.perComplete).toBeCloseTo(500 / 300)
+    expect(r.blended).toBeCloseTo(500 / 180)
+    expect(r.blended * (1 - r.scrubRate)).toBeCloseTo(r.perComplete)
+    expect(r.ids.sort()).toEqual(['a', 'b'])
+  })
+
+  it('hands back each admitted leg, so a per-survey figure can be drawn from the SAME surveys', () => {
+    const rows = [
+      P({ id: 'a', project_type: 'PS', n_collected: 100, n_actual: 80 }),
+      P({ id: 'b', project_type: 'PS', n_collected: 200, n_actual: 100 }),
+      P({ id: 'bad', project_type: 'PS', n_collected: 100, n_actual: 100 }), // under-recorded: out
+    ]
+    const r = cpqrByRoute(rows, [], [S('a', 1, 100), S('b', 2, 200), S('bad', 1, 20)], [])[0]
+    expect(r.observations.map(o => o.id)).toEqual(['a', 'b'])
+    expect(r.observations.map(o => o.id).sort()).toEqual([...r.ids].sort())
+    const a = r.observations.find(o => o.id === 'a')!
+    expect(a).toMatchObject({ spend: 100, paid: 100, delivered: 80, mixed: false })
+    expect(a.cpqr).toBeCloseTo(1.25)
+    expect(a.keep).toBeCloseTo(0.8)
+    // The pooled figures are the observations added up.
+    const spend = r.observations.reduce((t, o) => t + o.spend, 0)
+    const got = r.observations.reduce((t, o) => t + o.delivered, 0)
+    expect(r.blended).toBeCloseTo(spend / got)
+    // And the typical-survey quartiles come from the same per-survey rates.
+    expect(r.median).toBe(nearestRank(r.observations.map(o => o.cpqr as number), 0.5))
+  })
+
+  it('gives the same answer with the caller’s index as without it', () => {
+    const rows = [P({ id: 'a', project_type: 'PS', n_collected: 100, n_actual: 80 })]
+    const sup = [S('a', 1, 100)]
+    const ix = buildIndex([], sup, [])
+    expect(cpqrWithCoverage(rows, [], sup, [], ix)).toEqual(cpqrWithCoverage(rows, [], sup, []))
+  })
+
+  it('reports blast CPQR net of recovered rewards, with the gross beside it', () => {
+    const rows = [P({ id: 'x', n_collected: 10, n_actual: 10 })]
+    const c: FinCost[] = [{ project_id: 'x', amount: -20, route: 'blast' }]
+    const r = cpqrByRoute(rows, [B('x', 10, 10)], [], c)[0]
+    expect(r).toMatchObject({ spend: 80, recovered: -20 })
+    expect(r.blended).toBeCloseTo(8)
+    expect(r.blendedGross).toBeCloseTo(10)
+  })
+
+  it('holds OUT a survey whose N actual is only the partial segment roll-up, and names it (PR00231)', () => {
+    // Its survey N actual (342) is the one counted segment's; its $9,000 bought
+    // 9,000 N across both. Admitted, it read as $26 a respondent and 96%
+    // scrubbed, and on live data (28 Sep) it moved the panel card's pooled
+    // scrub from 26.5% to 34.4%. The bill still reads 342 (revenue.ts); a rate
+    // cannot.
+    const q = P({ id: 'q', project_type: 'PS', n_collected: 9000, n_actual: 342, segments: [
+      { id: 's1', project_id: 'q', n_target: 400, n_actual: 342 },
+      { id: 's2', project_id: 'q', n_target: 4600, n_actual: null },
+    ] })
+    const ok = P({ id: 'ok', project_type: 'PS', n_collected: 100, n_actual: 80 })
+    const out = cpqrWithCoverage([q, ok], [], [S('q', 1, 9000), S('ok', 1, 100)], [])
+    const panel = out.rates.find(r => r.route === 'panel')!
+    // Only 'ok' is in the rate: $100 over 80, 20% scrubbed.
+    expect(panel).toMatchObject({ n: 1, spend: 100, qualified: 80, paid: 100, ids: ['ok'], partialHeldOut: 1, excluded: 0 })
+    expect(panel.scrubRate).toBeCloseTo(0.2)
+    expect(out.partialRollUp).toEqual({ surveys: 1, spend: 9000, collected: 9000, ids: ['q'] })
+    // It is held out, not "counted with a note".
+    expect(out.segmentNotes.surveys).toBe(0)
+    // Alone, it produces no card at all rather than a card built from it.
+    expect(cpqrWithCoverage([q], [], [S('q', 1, 9000)], []).rates).toEqual([])
+  })
+
+  it('counts a survey whose TYPED N actual disagrees with its segments, and lists it', () => {
+    // PR00257 / PR00288 / PR00230 shape: the survey's N actual was typed and is
+    // not the counted segments' sum. It is the invoice's figure, so it is the
+    // denominator; the segment counts are a note for the Improve tab.
+    const p = P({ id: 't', project_type: 'PS', n_collected: 600, n_actual: 500, segments: [
+      { id: 's1', project_id: 't', n_target: 250, n_actual: 342 },
+      { id: 's2', project_id: 't', n_target: 250, n_actual: null },
+    ] })
+    const out = cpqrWithCoverage([p], [], [S('t', 1, 600)], [])
+    expect(out.rates[0]).toMatchObject({ n: 1, spend: 600, qualified: 500, ids: ['t'], partialHeldOut: 0 })
+    expect(out.segmentNotes).toMatchObject({ surveys: 1, spend: 600, ids: ['t'] })
+    expect(out.partialRollUp.surveys).toBe(0)
+    // Segments that add up raise no note.
+    const even = P({ id: 'e', project_type: 'PS', n_collected: 100, n_actual: 90, segments: [
+      { id: 's3', project_id: 'e', n_target: 50, n_actual: 60 },
+      { id: 's4', project_id: 'e', n_target: 50, n_actual: 30 },
+    ] })
+    expect(cpqrWithCoverage([even], [], [S('e', 1, 100)], []).segmentNotes.surveys).toBe(0)
+  })
+
+  it('records a MIXED partial roll-up under the mixed coverage reasons, and in the note', () => {
+    const m = P({
+      id: 'm', n_collected: 550, n_actual: 100, n_actual_panel: 80, n_actual_blast: 20,
+      n_actual_split_method: 'transaction_id', segments: [
+        { id: 'a', project_id: 'm', n_target: 100, n_actual: 100 },
+        { id: 'b', project_id: 'm', n_target: 400, n_actual: null },
+      ],
+    })
+    const out = cpqrWithCoverage([m], [B('m', 10, 50)], [S('m', 1, 500)], [])
+    expect(out.mixed).toMatchObject({ surveys: 1, priced: 0, blockedSpend: 1000 })
+    expect(out.mixed.reasons['partial-n-actual']).toBe(1)
+    expect(out.partialRollUp).toMatchObject({ surveys: 1, spend: 1000, ids: ['m'] })
   })
 })

@@ -12,13 +12,10 @@
 
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
 
-export const money = (n: number) => '$' + Math.round(n).toLocaleString('en-US')
-export const money2 = (n: number) =>
-  '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-/** Money at the precision the number deserves: cents under $10, whole dollars
- *  above. A panel complete at "$2" loses the decision; a $78,000 overrun does
- *  not need its cents. */
-export const moneyAuto = (n: number) => (Math.abs(n) < 10 ? money2(n) : money(n))
+// ONE copy of the money formatters, in lib so the library's own sentences
+// format numbers the same way the tiles do. Negatives print as −$3,586 (the old
+// helper printed "$-24,655"); moneyAuto keeps cents under $10.
+export { money, money2, moneyAuto } from '@/lib/finance/format'
 export const pct = (a: number, b: number) => (b > 0 ? Math.round((a / b) * 100) : 0)
 /** A rate as a percentage, at the precision it actually needs. Blast response
  *  is 0.1186% — one decimal place renders that as "0.1%" and throws the
@@ -32,7 +29,31 @@ export const pct1 = (x: number) => {
   return Math.round(v) + '%'
 }
 
-export function Card({ title, tip, children, wide, tone }: {
+/**
+ * What the page could not read, in the words a card shows (lib/finance/load.ts
+ * priceBlockText / costFloorText). A failed read is never $0 and never "none".
+ */
+export interface CardBlocks {
+  /** Set when client prices cannot be trusted. A card built on prices shows
+   *  this INSTEAD of its figures. */
+  prices: string | null
+  /** Set when a field-cost table failed. A card built on spend keeps its
+   *  figure, which is now a floor, and shows this line above it. */
+  costs: string | null
+}
+
+export const NO_BLOCKS: CardBlocks = { prices: null, costs: null }
+
+/** In place of a figure that cannot be computed: the reason, never a $0. */
+export function BlockedFigure({ text }: { text: string }) {
+  return (
+    <p className="px-4 py-6 text-center text-sm text-destructive">
+      {text}. This figure is missing, not zero.
+    </p>
+  )
+}
+
+export function Card({ title, tip, children, wide, tone, floor }: {
   title: string
   tip?: string
   children: React.ReactNode
@@ -40,6 +61,9 @@ export function Card({ title, tip, children, wide, tone }: {
   /** `alert` is for a band that describes money still moving — it earns colour
    *  because it is the one thing on the page that is a phone call. */
   tone?: 'alert'
+  /** A table this card's figure depends on did not load (CardBlocks.costs):
+   *  said under the title, so the figure below is read as a floor. */
+  floor?: string | null
 }) {
   return (
     <section className={
@@ -57,6 +81,11 @@ export function Card({ title, tip, children, wide, tone }: {
         }>{title}</span>
         {tip && <InfoTooltip text={tip} />}
       </h2>
+      {floor && (
+        <p className="border-b border-destructive/30 bg-destructive/5 px-4 py-1.5 text-xs text-destructive">
+          {floor}
+        </p>
+      )}
       {children}
     </section>
   )

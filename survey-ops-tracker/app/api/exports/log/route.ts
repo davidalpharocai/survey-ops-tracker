@@ -34,7 +34,11 @@ export async function POST(req: Request) {
   // an export we had no way of preventing would be the wrong failure.
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const body = (await req.json().catch(() => ({}))) as Record<string, unknown>
+  // A body that is not a JSON object (null, an array, a number) is treated as
+  // empty rather than read from — `null.route` would throw and answer 500 for
+  // the wrong reason.
+  const parsed: unknown = await req.json().catch(() => null)
+  const body = (parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {}) as Record<string, unknown>
   const route = typeof body.route === 'string' && body.route ? body.route : 'unknown-csv'
   const rowCount = Number(body.rowCount)
 
@@ -47,7 +51,7 @@ export async function POST(req: Request) {
   const claimed = body.includedRestricted === true
   const includedRestricted = claimed || (await canViewFinancials(user.id))
 
-  await logDataExport({
+  const written = await logDataExport({
     actorEmail: user.email,
     route,
     rowCount: Number.isFinite(rowCount) ? rowCount : 0,
@@ -55,5 +59,13 @@ export async function POST(req: Request) {
     includedRestricted,
   })
 
-  return NextResponse.json({ ok: true })
+  // Say whether the row was written, and which row. The browser never blocks
+  // the download on this, but it reads it: "Logged as export #…" when the
+  // insert returned its id, and a 500 when it did not, so a lost audit row is
+  // visible instead of silent. The database's own message stays in the server
+  // log (lib/server/exportLog.ts) — the browser gets plain words, not internals.
+  if (!written.ok || !written.id) {
+    return NextResponse.json({ ok: false, error: 'the audit row could not be written' }, { status: 500 })
+  }
+  return NextResponse.json({ ok: true, id: written.id })
 }
