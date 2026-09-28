@@ -1,5 +1,6 @@
 'use client'
 import Link from 'next/link'
+import { createContext, useContext } from 'react'
 import {
   getDueUrgency,
   urgencyTextClass,
@@ -16,6 +17,23 @@ import { useLatestSubmissionStatuses } from '@/lib/hooks/useSubmissions'
 import { isRerunProject } from '@/lib/reruns/isRerun'
 import { RerunChip } from '@/components/reruns/RerunChip'
 import { riskOf, RISK_STYLE } from '@/lib/utils/risk'
+import { InfoTooltip } from '@/components/shared/InfoTooltip'
+import type { FieldActivity } from '@/lib/board/sections'
+
+/**
+ * Facts about scoping-lane cards that the slim board row cannot carry. Today:
+ * whether a survey still marked Scoping has started fielding (blasts, panel
+ * suppliers, send fees or responses — see fieldActivityOf). ScopingBoard reads
+ * the child rows once for the whole lane and provides the answers here, keyed
+ * by project id; a card anywhere else sits outside a provider and reads null.
+ * A context rather than a prop so the shared BoardColumn does not have to
+ * thread a scoping-only fact through every pipeline column too.
+ */
+export const ScopingSignalsContext = createContext<ReadonlyMap<string, FieldActivity> | null>(null)
+
+// Shown behind the (i) on every held card, scoping lane and pipeline alike.
+const HOLD_HELP =
+  'Paused. The card is greyed out and sorted to the bottom of its column, and Finance counts holds on their own, never as live work. To restart it, open the project and press ▶ Resume. If it is not coming back, use More → Cancel project.'
 
 // Due-date urgency: a neutral card box plus a strong colored LEFT bar (so a
 // board full of overdue cards doesn't become an undifferentiated wall of red).
@@ -107,6 +125,9 @@ export function ProjectCard({ project, onClick, isNew }: ProjectCardProps) {
   const waitingOn = deriveWaitingOn(project)
   // Only surface external waits — "Us — x" is already implied by the column
   const showWaitingOn = waitingOn === 'Client' || waitingOn.startsWith('Field')
+  // Only ever set inside the scoping lane, and only for a survey whose phase
+  // still says Scoping while it already has fielding on record (PR00443 shape).
+  const fieldActivity = useContext(ScopingSignalsContext)?.get(project.id) ?? null
 
   return (
     <div
@@ -115,13 +136,16 @@ export function ProjectCard({ project, onClick, isNew }: ProjectCardProps) {
         onHold ? 'opacity-60' : ''
       } cursor-pointer hover:ring-1 hover:ring-ring transition-colors`}
     >
-      {/* Hold badge floats on the top-right corner, on purpose */}
+      {/* Hold badge floats on the top-right corner, on purpose. Words, not only
+          the ⏸ glyph, so a paused deal reads as paused at a glance; the (i)
+          says what a hold means and how to end one. The (i) swallows its click
+          so reading the help does not open the project. */}
       {onHold && (
-        <span
-          className="absolute -top-2.5 right-2 text-[12px] px-2 py-0.5 rounded-full bg-muted border border-muted-foreground/40 text-muted-foreground"
-          title="On hold — paused; greyed out and sorted to the bottom of the column"
-        >
-          ⏸ Hold
+        <span className="absolute -top-2.5 right-2 inline-flex items-center text-[12px] pl-2 pr-1 py-0.5 rounded-full bg-muted border border-muted-foreground/40 text-muted-foreground whitespace-nowrap">
+          ⏸ On hold
+          <span onClick={e => e.stopPropagation()} className="inline-flex">
+            <InfoTooltip text={HOLD_HELP} />
+          </span>
         </span>
       )}
 
@@ -220,6 +244,21 @@ Delivery risk only — budget is judged on the project page.`}
           )}
         </span>
       </div>
+
+      {/* Still marked Scoping but already fielding. Its own line rather than a
+          chip in the title row: the question is the point, and it would crush
+          the title at chip size. Amber because it is a record to fix, not a
+          delivery risk (those are red). */}
+      {fieldActivity && (
+        <div className="mb-1.5 flex w-fit max-w-full items-center text-[11px] leading-snug pl-1.5 pr-0.5 py-0.5 rounded-md border bg-amber-500/10 border-amber-500/40 text-amber-700 dark:text-amber-300">
+          <span>Has field activity — move it out of Scoping?</span>
+          <span onClick={e => e.stopPropagation()} className="inline-flex shrink-0">
+            <InfoTooltip
+              text={`Still marked Scoping, but it already has ${fieldActivity.summary}. If it is being fielded, the deal is sold: drag the card down into the pipeline column it has reached, so every report counts it as live work.`}
+            />
+          </span>
+        </div>
+      )}
 
       {/* Client */}
       <p className="text-muted-foreground text-xs mb-2">{project.client}</p>

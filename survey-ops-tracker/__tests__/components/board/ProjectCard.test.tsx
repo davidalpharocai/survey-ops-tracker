@@ -1,7 +1,8 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { describe, it, expect, vi } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { ProjectCard } from '@/components/board/ProjectCard'
+import { ProjectCard, ScopingSignalsContext } from '@/components/board/ProjectCard'
+import { fieldActivityOf } from '@/lib/board/sections'
 import type { SlimProject } from '@/lib/hooks/useProjects'
 
 const asProject = (p: object) => p as SlimProject
@@ -89,5 +90,55 @@ describe('ProjectCard', () => {
     // no snippet paragraph rendered — check there's no element with the snippet's line-clamp class
     const snippets = document.querySelectorAll('p.line-clamp-2')
     expect(snippets.length).toBe(0)
+  })
+})
+
+describe('ProjectCard — On hold badge', () => {
+  it('says "On hold" in words, with an (i) that explains how to end the hold', () => {
+    render(<ProjectCard project={asProject({ ...mockProject, status: 'Hold' })} />, { wrapper })
+    expect(screen.getByText(/On hold/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Resume/ })).toBeInTheDocument()
+  })
+  it('reading the (i) does not open the project', () => {
+    const onClick = vi.fn()
+    render(<ProjectCard project={asProject({ ...mockProject, status: 'Hold' })} onClick={onClick} />, { wrapper })
+    fireEvent.click(screen.getByRole('button', { name: /Resume/ }))
+    expect(onClick).not.toHaveBeenCalled()
+  })
+  it('an open card has no hold badge', () => {
+    render(<ProjectCard project={asProject(mockProject)} />, { wrapper })
+    expect(screen.queryByText(/On hold/)).not.toBeInTheDocument()
+  })
+})
+
+describe('ProjectCard — "Has field activity" flag', () => {
+  const scoping = { ...mockProject, id: 's1', phase: 'Scoping' as const, board_column: 'Submitted' as const }
+  const activity = fieldActivityOf({ phase: 'Scoping', n_collected: 23 }, { blasts: 17, panel: 0, sendCosts: 0 })!
+
+  it('shows inside the scoping lane when the lane says the survey has fielded, and names what was found', () => {
+    const onClick = vi.fn()
+    render(
+      <ScopingSignalsContext.Provider value={new Map([['s1', activity]])}>
+        <ProjectCard project={asProject(scoping)} onClick={onClick} />
+      </ScopingSignalsContext.Provider>,
+      { wrapper }
+    )
+    expect(screen.getByText(/Has field activity — move it out of Scoping\?/)).toBeInTheDocument()
+    const info = screen.getByRole('button', { name: /17 blasts logged and 23 responses collected/ })
+    fireEvent.click(info)
+    expect(onClick).not.toHaveBeenCalled()
+  })
+  it('is absent for a card the lane did not flag', () => {
+    render(
+      <ScopingSignalsContext.Provider value={new Map([['someone-else', activity]])}>
+        <ProjectCard project={asProject(scoping)} />
+      </ScopingSignalsContext.Provider>,
+      { wrapper }
+    )
+    expect(screen.queryByText(/Has field activity/)).not.toBeInTheDocument()
+  })
+  it('is absent outside the scoping lane (no provider)', () => {
+    render(<ProjectCard project={asProject(scoping)} />, { wrapper })
+    expect(screen.queryByText(/Has field activity/)).not.toBeInTheDocument()
   })
 })

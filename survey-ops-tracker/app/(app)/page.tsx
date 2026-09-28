@@ -1,6 +1,6 @@
 'use client'
 import { Caret } from '@/components/shared/Caret'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { DragDropContext, type DropResult } from '@hello-pangea/dnd'
 import { Board, type DropResolver } from '@/components/board/Board'
@@ -10,7 +10,7 @@ import { ProjectCard } from '@/components/board/ProjectCard'
 import { ViewToggle } from '@/components/shared/ViewToggle'
 import { ColorKey } from '@/components/shared/ColorKey'
 import { Skeleton, SkeletonCard } from '@/components/shared/Skeleton'
-import { useProjects, useMoveProjectToColumn, useUpdateProject, fetchFullProjects, type SlimProject } from '@/lib/hooks/useProjects'
+import { useProjects, useMoveProjectToColumn, useUpdateProject, fetchFullProjects, type SlimProject, type SurveyProject } from '@/lib/hooks/useProjects'
 import { useTeamMembers } from '@/lib/hooks/useTeamMembers'
 import { useQueryClient } from '@tanstack/react-query'
 import { useIsNewForMe } from '@/lib/hooks/useSeenProjects'
@@ -20,6 +20,8 @@ import { useCanViewFinancials } from '@/lib/hooks/useCapabilities'
 import { exportProjectsCsv } from '@/lib/utils/exportCsv'
 import { isTypingTarget } from '@/lib/utils/keyboard'
 import { cardOrder, dropSortOrder, type BoardSortMode } from '@/lib/utils/ordering'
+import { partitionBoard, boardExportRows, boardExportHelp, laneCounts, laneStageOf, scopingLaneOrder } from '@/lib/board/sections'
+import { fmtNum } from '@/lib/utils/number'
 import { STAGE_ORDER, getCheckboxesForColumn, type BoardColumn as BoardColumnType } from '@/lib/utils/stage'
 import { useComplianceMaps } from '@/lib/hooks/useComplianceState'
 import { complianceGate } from '@/lib/utils/compliance'
@@ -116,21 +118,22 @@ export default function BoardPage() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
 
-  const scopingProjects = projects.filter(
-    p => p.phase === 'Scoping' && p.status === 'Open'
-  )
+  // The three sections come from ONE classifier (lib/board/sections.ts), which
+  // puts every phase × status somewhere on purpose. They used to be three
+  // separate filters here, and a deal on hold while still in Scoping matched
+  // none of them: nine surveys were on no section and missing from the CSV.
+  //   Scoping lane = phase Scoping, status Open or Hold (held ones greyed + badged),
+  //                  in the column its stage names (a stage that is no column,
+  //                  e.g. 'Closed', is listed as unsorted instead of drawn nowhere)
+  //   Pipeline     = phase Active, status Open or Hold — only in-flight work is draggable
+  //   Archived     = status Closed (delivered/archived by hand) or Cancelled, any phase
+  // Memoised so the scoping lane gets the same array between renders, and its
+  // field-activity flags (built from that array) are not rebuilt on every keystroke.
+  const sections = useMemo(() => partitionBoard(projects), [projects])
+  const scopingProjects = sections.scoping
   const knownClients = [...new Set(projects.map(p => p.client))].sort()
-  // The draggable board only ever shows in-flight work; Closed lives in its own section
-  const activeProjects = projects.filter(
-    p => p.phase === 'Active' && (p.status === 'Open' || p.status === 'Hold')
-  )
-  // Archived section = closed (delivered/manually archived) plus cancelled. A
-  // client can cancel at any stage — including while still in Scoping — so
-  // Cancelled folds in regardless of phase (it would otherwise fall off the
-  // board entirely, since scopingProjects requires status 'Open').
-  const closedProjects = projects.filter(
-    p => (p.phase === 'Active' && p.status === 'Closed') || p.status === 'Cancelled'
-  )
+  const activeProjects = sections.pipeline
+  const closedProjects = sections.archived
   // When a "Delivered in X" window is active, scope the Archived section to
   // projects DELIVERED within it (status Closed = delivered/archived; excludes
   // Cancelled), by deliver_date. 'all' shows everything archived, as before.
@@ -143,10 +146,14 @@ export default function BoardPage() {
   // order to protect and the board's sort mode doesn't apply here (see cardOrder).
   // .slice() because sort() mutates and closedProjects also feeds the CSV export.
   const archivedShown = archivedInWindow.slice().sort(cardOrder('delivered', boardSort))
-  const exportableProjects =
-    mode === 'full'
-      ? [...scopingProjects, ...activeProjects, ...closedProjects]
-      : activeProjects
+  // Same partition as the render, so the file holds what the sections hold —
+  // held scoping deals included, and any row no section claims (listed on the
+  // page below) is written out rather than dropped.
+  const exportMode = mode === 'full' ? 'full' : 'operations'
+  const exportableProjects = boardExportRows(sections, exportMode)
+  // The pipeline's collapsed count, split like the Scoping lane's: open work in
+  // the number, holds beside it (see laneCounts).
+  const pipelineCounts = laneCounts(activeProjects)
 
   // The board runs on a slim fetch — pull the full rows on demand so the
   // CSV gets every column (slack channel, linked docs, ...). The rows always
@@ -156,11 +163,35 @@ export default function BoardPage() {
     if (exporting) return
     setExporting(true)
     try {
-      await exportProjectsCsv(await fetchFullProjects(exportableProjects.map(p => p.id)), {
+      const ids = exportableProjects.map(p => p.id)
+      // A failed read must say so. This used to have no catch: the button
+      // quietly went back to "Export CSV", nothing downloaded, and nothing
+      // said why. (fetchFullProjects now splits the ids into small requests,
+      // so a long board no longer outgrows the URL limit, but a network or
+      // server failure can still happen.)
+      let rows: SurveyProject[]
+      try {
+        rows = await fetchFullProjects(ids)
+      } catch (err) {
+        const why = err instanceof Error ? err.message : (err as { message?: string } | null)?.message ?? String(err)
+        toast(`Export failed: the projects did not load (${why}). Nothing was downloaded.`)
+        return
+      }
+      await exportProjectsCsv(rows, {
         canViewFinancials,
         route: 'board-csv',
         filters: { mode, deliveredWithin, sort: boardSort },
       })
+      // A project deleted (or merged away) after the board loaded does not come
+      // back from the full read. The file is still right, but it is shorter than
+      // the board, so say by how much rather than let the counts disagree quietly.
+      if (rows.length < ids.length) {
+        const gone = ids.length - rows.length
+        toast(
+          `The file has ${fmtNum(rows.length)} of the ${fmtNum(ids.length)} projects on the board: ` +
+            `${fmtNum(gone)} ${gone === 1 ? 'was' : 'were'} deleted or merged since the board loaded. Refresh the page to see the current board.`
+        )
+      }
     } finally {
       setExporting(false)
     }
@@ -196,7 +227,8 @@ export default function BoardPage() {
     // filter and folds the retired Delivery column into Data QA), so we use the
     // resolver it lends us. The scoping lane renders straight from
     // scopingProjects, unfiltered, so here it's the same cards in two orders —
-    // and it renders flat, without the pipeline's priority ranking.
+    // and it renders without the pipeline's priority ranking, with held deals
+    // sunk to the bottom (scopingLaneOrder — the same comparator the lane uses).
     const i = result.destination.index
     let sortOrder: number
     if (toPipeline) {
@@ -205,13 +237,14 @@ export default function BoardPage() {
       if (!pipelineDrop.current) return
       sortOrder = pipelineDrop.current(to as BoardColumnType, i, id)
     } else {
+      // laneStageOf: the same column rule the lane renders with.
       const inStage = (order: (a: SlimProject, b: SlimProject) => number) =>
         scopingProjects
-          .filter(p => (p.scoping_stage ?? 'New Inquiry') === to && p.id !== id)
+          .filter(p => laneStageOf(p) === to && p.id !== id)
           .sort(order)
       sortOrder = dropSortOrder(
-        inStage(cardOrder('scoping', boardSort)),
-        inStage(cardOrder('scoping', 'manual')),
+        inStage(scopingLaneOrder<SlimProject>(boardSort)),
+        inStage(scopingLaneOrder<SlimProject>('manual')),
         i
       )
     }
@@ -349,7 +382,7 @@ export default function BoardPage() {
           <button
             onClick={handleExport}
             disabled={exporting || exportableProjects.length === 0}
-            title="Downloads the projects currently shown (respects the Operations/Full View toggle)"
+            title={boardExportHelp(sections, exportMode)}
             className="text-xs border border-border text-muted-foreground hover:text-foreground hover:border-ring px-3 py-2 rounded-lg transition-colors disabled:opacity-40"
           >
             {exporting ? 'Exporting…' : '⬇ Export CSV'}
@@ -367,6 +400,32 @@ export default function BoardPage() {
       {/* Color key */}
       <ColorKey />
 
+      {/* The classifier's safety net. Every status × phase the database allows
+          has a section, so this stays empty — it can only fill with a value
+          the app has never heard of (a new status written before the app knew
+          it), or a scoping deal whose stage is no column (the enum's 'Closed').
+          Those rows are listed, linked and exported, never dropped. */}
+      {sections.unsorted.length > 0 && (
+        <div className="bg-amber-500/10 border border-amber-500/40 rounded-xl px-3 py-2 text-xs text-amber-800 dark:text-amber-200">
+          <p className="font-medium">
+            {fmtNum(sections.unsorted.length)} {sections.unsorted.length === 1 ? 'survey fits' : 'surveys fit'} no
+            board section, so {sections.unsorted.length === 1 ? 'it is' : 'they are'} listed here and included in the
+            CSV. Open each one and fix what is named next to it.
+          </p>
+          <ul className="mt-1 flex flex-col gap-0.5">
+            {sections.unsorted.map(({ project, why }) => (
+              <li key={project.id}>
+                <Link href={`/projects/${project.id}`} className="underline hover:text-foreground">
+                  {project.project_code ? `${project.project_code} · ` : ''}
+                  {project.project_name}
+                </Link>{' '}
+                — {why}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {/* Full View: one shared drag context spanning scoping + pipeline, so a
           scoping card dropped on a pipeline column gets promoted on the spot */}
       {mode === 'full' ? (
@@ -380,8 +439,19 @@ export default function BoardPage() {
             <Caret open={!pipelineCollapsed} className="text-foreground" />
             Operations Pipeline
             {pipelineCollapsed && (
-              <span className="bg-muted text-muted-foreground px-2 py-0.5 rounded-full normal-case tracking-normal">
-                {activeProjects.length}
+              <span
+                className="bg-muted text-muted-foreground px-2 py-0.5 rounded-full normal-case tracking-normal"
+                title="Open projects in the pipeline. Projects on hold are not in this number; they are counted next to it."
+              >
+                {fmtNum(pipelineCounts.open)}
+              </span>
+            )}
+            {pipelineCollapsed && pipelineCounts.held > 0 && (
+              <span
+                className="bg-muted border border-muted-foreground/40 text-muted-foreground px-2 py-0.5 rounded-full normal-case tracking-normal whitespace-nowrap"
+                title="Projects on hold in the pipeline. Open one and press ▶ Resume to restart it, or use More → Cancel project if it is not coming back."
+              >
+                ⏸ {fmtNum(pipelineCounts.held)} on hold
               </span>
             )}
           </button>
