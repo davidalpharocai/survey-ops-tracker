@@ -1,8 +1,10 @@
 import { Suspense } from 'react'
+import Link from 'next/link'
 import { requireSalesUser, mySalesIdentity } from '@/lib/sales-auth'
 import { salesHeaderLabel, bookOwner } from '@/lib/sales/identity'
 import { countBuckets } from '@/lib/sales/buckets'
 import { creditPosition, type Term } from '@/lib/sales/credits'
+import { todayET } from '@/lib/sales/dateRange'
 import { AccountsTable, type AccountRow } from '@/components/sales/AccountsTable'
 
 export const dynamic = 'force-dynamic'
@@ -50,8 +52,10 @@ export default async function SalesAccountsPage() {
 
   // Resolved once on the server, so every account's "current term" is decided
   // against the same date — two accounts evaluated either side of midnight would
-  // otherwise disagree about which term is running.
-  const today = new Date().toLocaleDateString('en-CA')
+  // otherwise disagree about which term is running. Eastern Time, as the
+  // account page and the PDF use: the server's zone is UTC, a day ahead after
+  // 8pm ET.
+  const today = todayET()
 
   const rows: AccountRow[] = (clients ?? []).map(c => {
     const own = (projects ?? []).filter(p => p.client_id === c.id)
@@ -74,6 +78,8 @@ export default async function SalesAccountsPage() {
       creditsAllTime: cr.usedAllTime,
       creditsCommitted: cr.committed,
       unpriced: cr.unpriced,
+      unpricedDrawn: cr.unpricedDrawn,
+      unpricedDrawnTerm: cr.unpricedDrawnThisTerm,
       termName: cr.term?.name ?? null,
     }
   })
@@ -98,10 +104,18 @@ export default async function SalesAccountsPage() {
         {name && <span className="text-sm text-muted-foreground">{name}</span>}
       </div>
 
+      {/* The same retry and support line as the sales home page: a link the
+          reader can press, and a role rather than a person, because this page
+          is read by salespeople who may never have met whoever built it. The
+          page is force-dynamic, so following the link re-runs the reads. */}
       {failed && (
-        <p className="mb-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-          Couldn&apos;t load your accounts. Try again, or tell David if it keeps happening.
-        </p>
+        <div role="alert" className="mb-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+          <p>Couldn&apos;t load your accounts.</p>
+          <p className="mt-1 text-xs">
+            <Link href="/sales/accounts" className="font-medium underline underline-offset-2 hover:opacity-80">Try again</Link>
+            <span className="text-destructive/80"> · If it keeps happening, contact your AlphaROC administrator.</span>
+          </p>
+        </div>
       )}
 
       {!failed && rows.length === 0 && (
@@ -112,7 +126,9 @@ export default async function SalesAccountsPage() {
         </p>
       )}
 
-      {rows.length > 0 && (
+      {/* Not under a failed read: with sales_projects missing, every account
+          would list 0 surveys beneath the error, and a failed read is not 0. */}
+      {!failed && rows.length > 0 && (
         // useSearchParams needs a Suspense boundary in an App Router page that
         // is otherwise server-rendered.
         <Suspense fallback={<p className="text-sm text-muted-foreground">Loading…</p>}>

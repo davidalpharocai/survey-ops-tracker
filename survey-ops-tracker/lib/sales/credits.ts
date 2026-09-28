@@ -82,7 +82,7 @@ export interface Term {
 }
 
 export interface Consumption {
-  /** Σ of the credits DRAWN — priced AND fielded. A FLOOR when `unpriced` > 0. */
+  /** Σ of the credits DRAWN — priced AND fielded. A FLOOR when `unpricedDrawn` > 0. */
   used: number
   /** Σ priced but not yet fielded: committed, not consumed. Reported rather
    *  than dropped, so the difference between this and the old all-inclusive
@@ -94,6 +94,13 @@ export interface Consumption {
   priced: number
   /** Surveys with no credit figure — not free, just not priced yet. */
   unpriced: number
+  /** Unpriced surveys that HAVE drawn (fielded or collected). These, and only
+   *  these, make `used` a minimum: they took credits we have not counted. */
+  unpricedDrawn: number
+  /** Unpriced surveys that have not fielded. They have drawn nothing, priced
+   *  or not, so they leave `used` exact. Reported so the reader is told they
+   *  exist rather than left to wonder why a figure is not qualified. */
+  unpricedUndrawn: number
   /** The allowance, or null when the term does not state one. */
   total: number | null
   /** total − used, or null when there is no allowance to draw down. */
@@ -102,7 +109,9 @@ export interface Consumption {
    *  100: going over the allowance is a real thing that must be visible, not
    *  clamped into looking fine. */
   pct: number | null
-  /** True when any figure here is missing data — the caller must say so. */
+  /** True when `used` is a minimum — some survey has DRAWN credits it has no
+   *  price for — and the caller must say so. An unpriced survey still in
+   *  design does not make the figure a floor: it has drawn nothing. */
   isFloor: boolean
 }
 
@@ -125,7 +134,15 @@ export function rollUp(surveys: CreditSurvey[], total: number | null): Consumpti
   const drawn = priced.filter(hasDrawn)
   const used = drawn.reduce((t, s) => t + Number(s.credits), 0)
   const committed = priced.filter(s => !hasDrawn(s)).reduce((t, s) => t + Number(s.credits), 0)
-  const unpriced = surveys.length - priced.length
+  const unpricedRows = surveys.filter(s => s.credits == null)
+  const unpriced = unpricedRows.length
+  // Split the unpriced by whether they have drawn. Before this, ANY unpriced
+  // survey made the figure a floor, so DE Shaw read "at least" because of two
+  // surveys still in design that had drawn nothing — while the printed
+  // statement, counting only what had drawn, called a different number exact.
+  // One rule now, here, so the screen and the paper cannot disagree about what
+  // makes a figure a minimum.
+  const unpricedDrawn = unpricedRows.filter(hasDrawn).length
   const remaining = total == null ? null : total - used
   return {
     used,
@@ -133,12 +150,14 @@ export function rollUp(surveys: CreditSurvey[], total: number | null): Consumpti
     committedCount: priced.length - drawn.length,
     priced: drawn.length,
     unpriced,
+    unpricedDrawn,
+    unpricedUndrawn: unpriced - unpricedDrawn,
     total,
     remaining,
     // Guard the divisor: an allowance of 0 is a term that bought nothing, and
     // dividing by it gives Infinity, which renders as a bar of unbounded width.
     pct: total == null || total <= 0 ? null : (used / total) * 100,
-    isFloor: unpriced > 0,
+    isFloor: unpricedDrawn > 0,
   }
 }
 
@@ -172,8 +191,16 @@ export interface CreditPosition {
   committed: number
   /** Surveys carrying credits but no term_id — in usedAllTime, not in the term. */
   untermed: number
-  /** Surveys with no credit figure at all, so every figure above is a floor. */
+  /** Surveys with no credit figure at all. */
   unpriced: number
+  /** Of those, the ones that have DRAWN — the only ones that make the used
+   *  figures a floor (see rollUp). Account-wide: it qualifies usedAllTime. */
+  unpricedDrawn: number
+  /** The same, counted inside the term in force only. It is what qualifies
+   *  usedThisTerm (a floor) and remaining (a ceiling). Using the account-wide
+   *  count there marked a term figure as a minimum because of a survey on an
+   *  older contract. */
+  unpricedDrawnThisTerm: number
 }
 
 export function creditPosition(
@@ -194,6 +221,8 @@ export function creditPosition(
     committed: allTime.committed,
     untermed: surveys.filter(s => s.credits != null && s.term_id == null).length,
     unpriced: allTime.unpriced,
+    unpricedDrawn: allTime.unpricedDrawn,
+    unpricedDrawnThisTerm: thisTerm.unpricedDrawn,
   }
 }
 
@@ -218,17 +247,31 @@ export function describeConsumption(c: Consumption): string {
         c.committedCount === 1 ? 'it is' : 'they are'} committed but not drawn.`
     : ''
 
+  // Unpriced surveys that have not fielded. They drew nothing, so they do not
+  // qualify the figure, but a reader who knows they exist and sees no mention
+  // of them would assume they were forgotten. "more" only when the floor
+  // sentence has already counted some unpriced surveys.
+  const k = c.unpricedUndrawn
+  const idle = k > 0
+    ? ` ${k} ${c.isFloor ? 'more' : `survey${k === 1 ? '' : 's'}`} ${k === 1 ? 'is' : 'are'} not priced and ${
+        k === 1 ? 'has' : 'have'} not fielded, so ${k === 1 ? 'it has' : 'they have'} drawn nothing.`
+    : ''
+
   if (c.total == null) {
     if (c.priced === 0) return 'No term recorded, and none of these surveys is priced in credits yet.' + held
     return `${n(c.used)} credits used across ${c.priced} survey${c.priced === 1 ? '' : 's'}${
-      c.isFloor ? `, with ${c.unpriced} not yet priced` : ''
-    }. No term allowance recorded to measure it against.` + held
+      c.isFloor ? `, with ${c.unpricedDrawn} more that ${c.unpricedDrawn === 1 ? 'has' : 'have'} fielded but ${
+        c.unpricedDrawn === 1 ? 'is' : 'are'} not yet priced` : ''
+    }. No term allowance recorded to measure it against.` + idle + held
   }
 
-  if (c.priced === 0) {
-    return `${n(c.total)} credits on the term. None of the ${c.unpriced} survey${
-      c.unpriced === 1 ? '' : 's'
-    } here is priced yet, so nothing is drawn down — that is "not recorded", not "nothing used".` + held
+  // Nothing priced has drawn, but something unpriced HAS: the amount drawn is
+  // unknown, which is not the same as zero. When nothing at all has drawn, the
+  // general sentence below is simply true ("0 of 375 used") and says so.
+  if (c.priced === 0 && c.unpricedDrawn > 0) {
+    return `${n(c.total)} credits on the term. ${c.unpricedDrawn} survey${
+      c.unpricedDrawn === 1 ? ' has' : 's have'
+    } fielded here but none is priced yet, so the amount drawn is "not recorded", which is not the same as "nothing used".` + idle + held
   }
 
   const head = `${n(c.used)} of ${n(c.total)} credits used`
@@ -239,8 +282,10 @@ export function describeConsumption(c: Consumption): string {
       : c.remaining != null
         ? `, ${n(c.remaining)} remaining`
         : ''
+  // Only the unpriced surveys that have DRAWN make this a floor — see rollUp.
   const floor = c.isFloor
-    ? `. ${c.unpriced} survey${c.unpriced === 1 ? ' is' : 's are'} not priced yet, so the used figure is a floor.`
+    ? `. ${c.unpricedDrawn} survey${c.unpricedDrawn === 1 ? ' that has' : 's that have'} fielded ${
+        c.unpricedDrawn === 1 ? 'is' : 'are'} not priced yet, so the used figure is a floor.`
     : '.'
-  return head + pct + left + floor + held
+  return head + pct + left + floor + idle + held
 }

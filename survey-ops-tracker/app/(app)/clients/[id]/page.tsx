@@ -12,6 +12,7 @@ import { ClientContacts } from '@/components/client/ClientContacts'
 import { ClientContracts } from '@/components/client/ClientContracts'
 import { ClientNotes } from '@/components/client/ClientNotes'
 import { ClientNameHeading } from '@/components/client/ClientNameHeading'
+import { ClientDisplayNameCard } from '@/components/client/ClientDisplayNameCard'
 import { NewProjectModal } from '@/components/board/NewProjectModal'
 import { MergeButton } from '@/components/merge/MergeButton'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
@@ -727,6 +728,9 @@ export default function ClientPage() {
             once a client is on a contract. */}
         <div className="flex flex-col gap-4">
           <ClientContracts clientId={clientId} />
+          {/* Beside the contracts because it feeds the same document: the
+              statement a salesperson sends shows this name over this drawdown. */}
+          <ClientDisplayNameCard client={c} />
           <ClientContacts clientId={clientId} />
           <ClientNotes clientId={clientId} />
           <ClientComplianceCard client={c} />

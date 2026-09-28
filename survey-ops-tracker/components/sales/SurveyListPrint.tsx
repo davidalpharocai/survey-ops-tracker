@@ -1,182 +1,223 @@
 'use client'
 
-import { useEffect } from 'react'
-import { fmtNum } from '@/lib/utils/number'
-import { describeRange, type DateBasis, type Range } from '@/lib/sales/dateRange'
-import { BUCKETS } from '@/lib/sales/buckets'
-import { stageOf } from '@/lib/sales/stage'
-import type { SalesRow } from './SalesPipeline'
+import { useEffect, useMemo, useState } from 'react'
+import { currentTerm, type Term } from '@/lib/sales/credits'
+import type { DateBasis, Range } from '@/lib/sales/dateRange'
+import {
+  activityFigures, clientStage, describeRangeForClient, documentTitle, fmtDayLong, fmtDay, footerText, listNames,
+  n0, nb, preSendChecks, printedName, showingLabel, timeET, type StatementRow,
+} from '@/lib/sales/statement'
+import { serif, sans } from './print/fonts'
+import { statementCss } from './print/statementCss'
+import { Masthead, type MetaRow } from './print/Masthead'
+import { ListStrip } from './print/ListStrip'
+import { Ledger } from './print/Ledger'
+import { Notes, noteNumber, listNotes, unexplainedMarks } from './print/Notes'
+import { PreSendPanel } from './print/PreSendPanel'
+import { usePrintWhenReady } from './print/usePrintWhenReady'
+import { usePrintChoice } from './print/usePrintChoice'
+import { choiceNotes, ledgerColumns, type UrlChoice } from '@/lib/sales/printColumns'
 
 /**
- * The printed survey list — the cross-account counterpart to the account report.
+ * The printed survey list — the same parts as the Survey Activity Statement,
+ * so the two documents look and count alike.
  *
- * STATES ITS OWN FILTER, in full: the group, the date basis and range, any
- * account or stage chips, and the search text. A table of 40 rows sent to a
- * client is only checkable if the reader can see what produced it, and the
- * sender needs to know too — "everything we delivered last quarter" and
- * "everything ACTIVE we delivered last quarter" are different documents that
- * look identical once printed.
+ * CLIENT OR INTERNAL, decided by the selection, not by a checkbox. Exactly one
+ * account selected: a client document, "Prepared for" that account. None, or
+ * more than one: it covers several clients' work, so it prints marked Internal
+ * — in the letterhead, in a band above it and in every page footer — gains an
+ * Account column, and never says "Prepared for". Account names come from
+ * sales_clients by client_id; for an account the reader works on without
+ * owning, which sales_clients does not return, from the shortest of that
+ * account's survey labels (accountNameOf), exactly as the screen names it.
+ *
+ * STATES ITS OWN FILTER: the group, the dates, any stage chips and the search,
+ * each printed only when set. "Everything delivered last quarter" and
+ * "everything ACTIVE delivered last quarter" are different documents that look
+ * identical once printed.
+ *
+ * WHAT PRINTS IS CHOSEN, as on the statement (lib/sales/printColumns), with its
+ * own saved default: a list and a statement are different documents, and a
+ * salesperson who drops Requested by from lists may still want it on statements.
+ * Every figure follows its own column, the summary strip included, so a column
+ * turned off is off the whole page.
  */
+export type ListRow = StatementRow & { client_id: string | null }
 
-const COLS = [
-  { id: 'code', label: 'Code', num: false },
-  { id: 'survey', label: 'Survey', num: false },
-  { id: 'client', label: 'Account', num: false },
-  { id: 'requested', label: 'Requested by', num: false },
-  { id: 'stage', label: 'Stage', num: false },
-  { id: 'target', label: 'Target', num: true },
-  { id: 'collected', label: 'Collected', num: true },
-  { id: 'credits', label: 'Credits', num: true },
-  { id: 'deliver', label: 'Delivered', num: false },
-] as const
-
-function cell(r: SalesRow, id: string): string {
-  switch (id) {
-    case 'code': return r.project_code ?? '—'
-    case 'survey': return r.project_name
-    case 'client': return r.client ?? '—'
-    case 'requested': return r.requested_by_name ?? '—'
-    case 'stage': return stageOf(r)
-    case 'target':
-      return r.n_target == null ? '—'
-        : r.n_target_max && r.n_target_max !== r.n_target
-          ? `${fmtNum(r.n_target)}–${fmtNum(r.n_target_max)}`
-          : fmtNum(r.n_target)
-    case 'collected': {
-      // Never recorded is not zero — see SalesPipeline's cell; this page goes to a client.
-      if (r.n_actual == null && r.n_collected === 0 && r.n_collected_updated_at === null) return 'not recorded'
-      const v = r.n_actual ?? r.n_collected; return v == null ? '—' : fmtNum(v)
-    }
-    // Blank, never 0 — an unpriced survey is not a free one, and this page goes
-    // to the client.
-    case 'credits': return r.credits == null ? '—' : fmtNum(r.credits)
-    case 'deliver': return (r.delivered_at ?? '').slice(0, 10) || r.deliver_date || '—'
-    default: return ''
-  }
-}
+const BASIS_WORD: Record<DateBasis, string> = { delivered: 'delivery', submitted: 'submission', launched: 'launch' }
 
 export function SurveyListPrint({
-  rows, totalBeforeDates, undated, basis, range, cols, bucket, clients, stages, search,
-  salesperson, generatedOn, generatedBy,
+  rows, totalBeforeDates, undated, notDelivered, basis, range, bucket, stages, search, mode, account, selectedCount,
+  selectedNames, accountNameById, bookOwner, contact, terms, preparedBy, today, generatedAt, neverRecordedIds,
+  printChoice,
 }: {
-  rows: SalesRow[]
+  rows: ListRow[]
   totalBeforeDates: number
   undated: number
+  notDelivered: number
   basis: DateBasis
   range: Range
-  cols: string[]
   bucket: string
-  clients: string[]
+  /** Stage chips, already in client words. */
   stages: string[]
   search: string
-  salesperson: string | null
-  generatedOn: string
-  generatedBy: string
+  mode: 'client' | 'internal'
+  /** Client mode: the one account, with its saved display name when 122 is
+   *  applied. `own` is false for an account the reader works on without owning
+   *  it (named as salesperson on its surveys): it is not in sales_clients, so
+   *  its name comes from the survey records and it has no saved name. */
+  account: { id: string; name: string; displayName: string | null; own: boolean } | null
+  /** How many accounts the URL selected (0 = the whole book). */
+  selectedCount: number
+  /** Internal mode: the selected accounts' names. */
+  selectedNames: string[]
+  accountNameById: Record<string, string>
+  /** Whose book this is, for "Alex Pinsky's book, all accounts". */
+  bookOwner: string | null
+  contact: { name: string; email: string | null } | null
+  /** Client mode: the account's contracts, for the before-the-contract check. */
+  terms: Term[]
+  preparedBy: string | null
+  today: string
+  generatedAt: string
+  neverRecordedIds: string[]
+  /** The link's `cols` and `sections`, parsed (printColumns.parseUrlChoice). */
+  printChoice?: UrlChoice
 }) {
-  useEffect(() => {
-    const id = requestAnimationFrame(() => requestAnimationFrame(() => window.print()))
-    return () => cancelAnimationFrame(id)
-  }, [])
+  const internalName = account?.name ?? ''
+  const [typed, setTyped] = useState(account?.displayName ?? internalName)
+  const { name, set: nameSet } = printedName(typed, account?.displayName, internalName)
+  const time = timeET(new Date(generatedAt))
+  const ranged = range.from != null || range.to != null
+  const never = useMemo(() => new Set(neverRecordedIds), [neverRecordedIds])
+  const accounts = useMemo(() => new Set(rows.map(r => r.client_id ?? '(none)')).size, [rows])
+  const internal = mode === 'internal'
 
-  const shown = COLS.filter(c => (cols.length ? cols.includes(c.id) || c.id === 'survey' : true))
-  const bucketLabel = bucket === 'all' ? 'All surveys' : (BUCKETS.find(b => b.id === bucket)?.label ?? bucket)
-  const creditTotal = rows.reduce((t, r) => t + (r.credits ?? 0), 0)
-  const unpriced = rows.filter(r => r.credits == null).length
+  const A = useMemo(() => activityFigures(rows, ranged ? range : null), [rows, ranged, range])
+  const { prints, controls } = usePrintChoice('list', printChoice ?? {}, { internal })
+  const allNotes = listNotes({ rows, neverRecorded: never, internalAccounts: internal ? accounts : null, time, today, prints })
+  const notes = prints.notes ? allNotes : []
+  // A footnote mark only where its note prints.
+  const fn = { unpriced: noteNumber(notes, 'unpriced'), final: noteNumber(notes, 'final') }
+  // Every mark the page would print with nothing left to explain it — the
+  // credit figures AND the Final column's estimate and "not recorded", which
+  // only the notes account for.
+  const cNotes = choiceNotes(prints, {
+    unexplained: unexplainedMarks({ rows, neverRecorded: never, prints, notes: allNotes }),
+  })
+
+  const term = internal ? null : currentTerm(terms, today)
+  const checks = preSendChecks({
+    rows, terms: internal ? [] : terms, term, today, nameSet, internalName, doc: 'list', mode, accounts,
+    neverRecorded: never, prints,
+  })
+  const print = usePrintWhenReady(checks.length === 0)
+
+  const title = documentTitle({ doc: 'list', mode, name, today })
+  useEffect(() => { document.title = title }, [title])
+
+  const foot = footerText({ doc: 'list', mode, name, accounts, today })
+  const rangeText = ranged ? nb(describeRangeForClient(basis, range)) : null
+  const allDelivered = rows.length > 0 && rows.every(p => clientStage(p).group === 'delivered')
+
+  const meta: MetaRow[] = [
+    { label: 'List date', value: `${fmtDayLong(today)}, ${time}`, strong: true },
+    { label: 'Showing', value: showingLabel(bucket) },
+  ]
+  if (internal) {
+    meta.push({
+      label: 'Accounts',
+      value: selectedNames.length ? listNames(selectedNames)
+        : bookOwner ? `${bookOwner}’s book, all accounts` : 'All accounts',
+    })
+    meta.push({ label: 'Dates', value: rangeText ?? 'All' })
+  } else if (rangeText) {
+    meta.push({ label: 'Dates', value: rangeText })
+  }
+  if (stages.length) meta.push({ label: 'Stages', value: listNames(stages) })
+  if (search) meta.push({ label: 'Search', value: `“${search}”` })
+  if (!internal && contact) {
+    meta.push({ label: 'Your AlphaROC contact', value: contact.email ? `${contact.name} · ${contact.email}` : contact.name })
+  }
+
+  const modeLine = internal
+    ? <><b className="text-foreground">Prints marked Internal</b> because {selectedCount === 0
+        ? 'no single account is selected'
+        : `${n0(selectedCount)} accounts are selected`}. Filter the list to exactly one account to print it as a client document.</>
+    : <><b className="text-foreground">Prints as a client document</b> because exactly one account is selected ({internalName}).
+        {account && !account.own && <> It is not one of your own accounts, so the list covers only the surveys on it that you can
+          see, and the name comes from those survey records.</>}
+        {' '}With no account, or more than one, it prints marked Internal with an Account column.</>
 
   return (
     <>
-      <style>{`
-        @page { size: A4 landscape; margin: 14mm 12mm 16mm; }
-        @media print {
-          nav, header, .no-print { display: none !important; }
-          body { background: #fff !important; }
-          main { max-width: none !important; padding: 0 !important; margin: 0 !important; }
-          * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-          thead { display: table-header-group; }
-          tr { break-inside: avoid; }
-        }
-        .pp { color:#111; background:#fff; font-size:10.5px; }
-        .pp table { width:100%; border-collapse:collapse; }
-        .pp th, .pp td { padding:4px 6px; border-bottom:1px solid #e5e7eb; text-align:left; }
-        .pp th { background:#f3f4f6; font-size:8.5px; text-transform:uppercase; letter-spacing:.04em; color:#4b5563; }
-        .pp td.num, .pp th.num { text-align:right; font-variant-numeric:tabular-nums; }
-      `}</style>
+      <style dangerouslySetInnerHTML={{
+        __html: statementCss({ footerLeft: foot.left, footerRight: foot.right, footerFont: sans.style.fontFamily }),
+      }} />
 
-      <div className="no-print mb-4 flex items-center gap-3">
-        <button
-          onClick={() => window.print()}
-          className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground"
-        >
-          Print / Save as PDF
-        </button>
-        <span className="text-xs text-muted-foreground">
-          Choose &ldquo;Save as PDF&rdquo; as the destination. Landscape A4 is preset.
-        </span>
-      </div>
+      <PreSendPanel
+        heading={internal ? 'Check before printing this list' : 'Check before sending this list'}
+        modeLine={modeLine}
+        checks={checks}
+        name={internal ? undefined : { value: typed, onChange: setTyped, internalName, saved: account?.displayName ?? null }}
+        onPrint={print}
+        choice={controls}
+        choiceNotes={cNotes}
+      />
 
-      <div className="pp">
-        <div style={{ borderBottom: '2px solid #010B40', paddingBottom: 8, marginBottom: 10 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-            <div>
-              <div style={{ fontSize: 8.5, letterSpacing: '.08em', textTransform: 'uppercase', color: '#6b7280' }}>
-                AlphaROC · Survey activity
-              </div>
-              <div style={{ fontSize: 17, fontWeight: 600, marginTop: 2 }}>
-                {salesperson ? `${salesperson} — ${bucketLabel}` : bucketLabel}
-              </div>
-            </div>
-            <div style={{ textAlign: 'right', fontSize: 8.5, color: '#6b7280', lineHeight: 1.5 }}>
-              <div>Generated {generatedOn}</div>
-              {generatedBy && <div>{generatedBy}</div>}
-            </div>
+      <article className={`st st-sheet ${serif.variable} ${sans.variable}`} aria-label="Survey List">
+        <Masthead docTitle="Survey List" preparedFor={name} internalAccounts={internal ? accounts : null} meta={meta} />
+
+        {prints.activity && <ListStrip
+          A={A}
+          delivered={bucket === 'delivered'}
+          ranged={ranged}
+          groupTotal={totalBeforeDates}
+          groupNoun={bucket === 'all' ? 'surveys' : showingLabel(bucket).toLowerCase()}
+          undated={undated}
+          notDelivered={notDelivered}
+          basisWord={BASIS_WORD[basis]}
+          fnUnpriced={fn.unpriced}
+          fnFinal={fn.final}
+          status={prints.status}
+          target={prints.target}
+          final={prints.final}
+          credits={prints.credits}
+        />}
+
+        <section aria-label="Surveys">
+          <div className="st-sec">
+            <h2>Surveys</h2><span className="st-sec-rule" />
+            <span className="st-sec-aside">
+              {allDelivered ? 'Most recent delivery first' : 'In progress by due date, then delivered, most recent first'}
+            </span>
           </div>
-        </div>
+          <Ledger
+            rows={rows}
+            grouped={false}
+            accountCol={internal}
+            accountNameById={accountNameById}
+            today={today}
+            currentTermId={null}
+            neverRecorded={never}
+            totalLabel={n => `Total · ${n0(n)} ${n === 1 ? 'survey' : 'surveys'} listed`}
+            fn={fn}
+            columns={ledgerColumns(prints)}
+          />
+        </section>
 
-        {/* Every filter that produced these rows, spelled out. */}
-        <div style={{ fontSize: 9.5, color: '#4b5563', marginBottom: 10, lineHeight: 1.6 }}>
-          <div>
-            <strong style={{ color: '#111' }}>{describeRange(basis, range)}</strong>
-            {' · '}{fmtNum(rows.length)} of {fmtNum(totalBeforeDates)} surveys in this group
-            {undated > 0 && ` · ${undated} excluded for having no ${basis} date`}
-          </div>
-          {(clients.length > 0 || stages.length > 0 || search) && (
-            <div style={{ marginTop: 2 }}>
-              Filtered to
-              {clients.length > 0 && <> accounts: <strong>{clients.join(', ')}</strong></>}
-              {stages.length > 0 && <> stages: <strong>{stages.join(', ')}</strong></>}
-              {search && <> matching &ldquo;<strong>{search}</strong>&rdquo;</>}
-            </div>
-          )}
-          {creditTotal > 0 && (
-            <div style={{ marginTop: 2 }}>
-              {fmtNum(creditTotal)} credits across these surveys
-              {unpriced > 0 && ` — ${unpriced} not yet priced, so that total is a floor`}
-            </div>
-          )}
-        </div>
-
-        {rows.length === 0 ? (
-          <p style={{ fontSize: 10.5, color: '#6b7280' }}>No surveys match this filter.</p>
-        ) : (
-          <table>
-            <thead>
-              <tr>{shown.map(c => <th key={c.id} className={c.num ? 'num' : undefined}>{c.label}</th>)}</tr>
-            </thead>
-            <tbody>
-              {rows.map(r => (
-                <tr key={r.id}>
-                  {shown.map(c => <td key={c.id} className={c.num ? 'num' : undefined}>{cell(r, c.id)}</td>)}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-
-        <div style={{ marginTop: 12, fontSize: 8, color: '#9ca3af', borderTop: '1px solid #e5e7eb', paddingTop: 6 }}>
-          Response counts are as recorded at the time of generation. A blank credit figure means the
-          survey has not been priced yet — it does not mean zero.
-        </div>
-      </div>
+        <Notes
+          notes={notes}
+          sign={{
+            left: internal
+              ? 'Prepared by AlphaROC for internal use. Not for sending to a client.'
+              : contact
+                ? `Prepared by AlphaROC for ${name}. Questions about this list or your allowance: ${contact.name}${contact.email ? `, ${contact.email}` : ''}.`
+                : `Prepared by AlphaROC for ${name}. Questions about this list or your allowance: your AlphaROC contact.`,
+            right: `Generated ${fmtDay(today)}, ${time}${preparedBy ? ` by ${preparedBy}` : ''}`,
+          }}
+        />
+      </article>
     </>
   )
 }

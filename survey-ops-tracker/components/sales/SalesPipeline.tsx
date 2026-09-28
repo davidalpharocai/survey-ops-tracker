@@ -356,7 +356,7 @@ export function SalesPipeline(
           href={`/sales/surveys/print?${params.toString()}`}
           target="_blank"
           rel="noopener"
-          title="Print exactly what is on screen — same group, filters, search and columns"
+          title="Print the surveys on screen — same group, filters and search. The printed list has every column unless you, or your saved default, turn one off in its own “What prints” box. The columns chosen here do not carry over."
           className="rounded-lg border border-border bg-card px-3 py-1.5 text-sm text-muted-foreground hover:border-ring hover:text-foreground"
         >
           ⎙ Export

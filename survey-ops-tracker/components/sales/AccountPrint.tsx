@@ -1,168 +1,208 @@
 'use client'
 
-import { useEffect } from 'react'
-import { fmtNum } from '@/lib/utils/number'
-import { currentTerm, consumptionFor, rollUp, describeConsumption, type Term } from '@/lib/sales/credits'
-import { describeRange, type DateBasis, type Range } from '@/lib/sales/dateRange'
-import { ACCOUNT_COLS, cellFor, type AccountProject } from './AccountDetail'
+import { useEffect, useMemo, useState } from 'react'
+import type { Term } from '@/lib/sales/credits'
+import type { DateBasis, Range } from '@/lib/sales/dateRange'
+import {
+  activityFigures, clientStage, describeRangeForClient, documentTitle, fmtDay, fmtDayLong, footerText, n0, nb,
+  preSendChecks, printedName, statementFigures, timeET, type Glyph,
+} from '@/lib/sales/statement'
+import { choiceNotes, ledgerColumns, type UrlChoice } from '@/lib/sales/printColumns'
+import type { AccountProject } from './AccountDetail'
+import { serif, sans } from './print/fonts'
+import { statementCss } from './print/statementCss'
+import { Masthead, type MetaRow } from './print/Masthead'
+import { ContractCluster } from './print/ContractCluster'
+import { ActivityCluster } from './print/ActivityCluster'
+import { Ledger } from './print/Ledger'
+import { Notes, noteNumber, statementNotes, unexplainedMarks } from './print/Notes'
+import { PreSendPanel } from './print/PreSendPanel'
+import { usePrintWhenReady } from './print/usePrintWhenReady'
+import { usePrintChoice } from './print/usePrintChoice'
 
 /**
- * The printed account report — a page designed to be saved as a PDF and sent to
- * a hedge-fund client, so it has to look like a document rather than a webpage
- * someone printed by accident.
+ * The Survey Activity Statement — the page a salesperson saves as a PDF and
+ * sends to a client. Set out like a statement from a prime broker, because
+ * that is the kind of document the people reading it already trust.
  *
- * What earns its place, from what good reports actually carry: a title and the
- * account, a generated-on stamp with who produced it, an explicit statement of
- * the filter that produced the rows, the row count against the total so a short
- * table is explained, the credit position, and repeating table headers with page
- * numbers. A number without its filter cannot be checked.
+ * A thin composition. Every figure and phrase comes from lib/sales/statement.ts
+ * and every part from components/sales/print/, which the Survey List shares, so
+ * the two documents cannot drift apart.
  *
- * The print stylesheet is inline and scoped here rather than in globals.css:
- * these rules are about ONE page, and putting @page in the global sheet would
- * change how every other screen prints.
+ * TWO SCOPES, each stated where it is used. The contract panel is a fact about
+ * the contract in force, over every survey on it (`allRows`). The activity
+ * panel and the table follow the reader's date range (`rows`). Mixing them is
+ * the bug that turned "35 over" into "46 remaining" on a quarter's export.
+ *
+ * WHAT PRINTS IS CHOSEN in the pre-send panel (lib/sales/printColumns): every
+ * column and section unless turned off, from the link, then the reader's saved
+ * default, then everything. Every figure follows ITS OWN column — the ledger,
+ * its totals, the activity panel's target and final counts and the notes — so
+ * a figure the salesperson turned off is off the whole page, not just the
+ * table, and nothing on the page points at something that is not there. The one
+ * panel that keeps a figure of its own is the contract summary, which has its
+ * own tick and says so in the pre-send panel. The account page's own column
+ * picker does not reach the PDF.
  */
 export function AccountPrint({
-  client, rows, allRows, totalCount, undated, basis, range, cols, terms, generatedOn, generatedBy,
+  client, displayName, contact, preparedBy, rows, allRows, undated, notDelivered, basis, range, terms, today,
+  generatedAt, neverRecordedIds, printChoice,
 }: {
   client: { id: string; name: string; code: string | null }
+  /** clients.display_name (migration 122), when saved. */
+  displayName: string | null
+  /** The account's salesperson, from the salespeople table. */
+  contact: { name: string; email: string | null } | null
+  /** Who is printing it, by canonical name — never a raw email. */
+  preparedBy: string | null
   /** The rows in the selected range — what the table prints. */
   rows: AccountProject[]
-  /** Every survey on the account — what the credit position is computed from.
-   *  The position is a fact about the contract, not about the range. */
+  /** Every survey on the account — what the contract position is computed from. */
   allRows: AccountProject[]
-  totalCount: number
   undated: number
+  notDelivered: number
   basis: DateBasis
   range: Range
-  cols: string[]
   terms: Term[]
-  generatedOn: string
-  generatedBy: string
+  /** Today in Eastern Time, resolved once on the server. */
+  today: string
+  /** When the page was drawn, ISO. Printed as "2:43 pm ET". */
+  generatedAt: string
+  /** Surveys whose n_collected was never recorded (no freshness row). */
+  neverRecordedIds: string[]
+  /** The link's `cols` and `sections`, parsed (printColumns.parseUrlChoice). */
+  printChoice?: UrlChoice
 }) {
-  // Open the print dialog once the page has painted. rAF rather than a timeout:
-  // printing before layout settles produces a first page with a half-drawn
-  // table, and a fixed delay is a guess about the reader's machine.
-  useEffect(() => {
-    const id = requestAnimationFrame(() => requestAnimationFrame(() => window.print()))
-    return () => cancelAnimationFrame(id)
-  }, [])
+  const [typed, setTyped] = useState(displayName ?? client.name)
+  const { name, set: nameSet } = printedName(typed, displayName, client.name)
+  const time = timeET(new Date(generatedAt))
+  const ranged = range.from != null || range.to != null
+  const never = useMemo(() => new Set(neverRecordedIds), [neverRecordedIds])
 
-  const shown = ACCOUNT_COLS.filter(c => (cols.length ? cols.includes(c.id) : true))
-  // Same arithmetic as the screen and the accounts list: the in-force term over
-  // EVERY survey attached to it, not the date-filtered rows. This is the copy
-  // that leaves the building, and it was printing "46 remaining" for an account
-  // 35 over its allowance whenever a range was selected (see AccountDetail).
-  const term = currentTerm(terms, generatedOn)
-  const credits = term ? consumptionFor(term, allRows) : rollUp(allRows, null)
-  const drawnInRange = rollUp(rows, null).used
+  const F = useMemo(() => statementFigures({ rows: allRows, terms, today }), [allRows, terms, today])
+  const A = useMemo(() => activityFigures(rows, ranged ? range : null), [rows, ranged, range])
+  const termId = F.term?.id ?? null
+  const { prints, controls } = usePrintChoice('statement', printChoice ?? {})
+  const allNotes = statementNotes({ rows, F, neverRecorded: never, currentTermId: termId, time, today, prints })
+  const notes = prints.notes ? allNotes : []
+  // A footnote mark only where its note prints: with the notes off, a "1"
+  // would point at nothing.
+  const fn = {
+    unpriced: noteNumber(notes, 'unpriced'),
+    final: noteNumber(notes, 'final'),
+    offTerm: noteNumber(notes, 'drawn') != null ? '†' : null,
+  }
+  // Every mark the page would print with nothing left to explain it — the
+  // credit figures AND the Final column's estimate and "not recorded", which
+  // only the notes account for.
+  const cNotes = choiceNotes(prints, {
+    unexplained: unexplainedMarks({ rows, neverRecorded: never, prints, notes: allNotes }),
+  })
+
+  const checks = preSendChecks({
+    rows: allRows, printed: rows, terms, term: F.term, today, nameSet, internalName: client.name,
+    doc: 'statement', mode: 'client', neverRecorded: never, prints,
+  })
+  const print = usePrintWhenReady(checks.length === 0)
+
+  // Chrome names the saved PDF after the document title.
+  const title = documentTitle({ doc: 'statement', mode: 'client', name, today })
+  useEffect(() => { document.title = title }, [title])
+
+  const foot = footerText({ doc: 'statement', mode: 'client', name, accounts: 1, today })
+  const glyphs = new Set<Glyph>(rows.map(p => clientStage(p).glyph))
+  const rangeText = ranged ? nb(describeRangeForClient(basis, range)) : null
+
+  const meta: MetaRow[] = [
+    { label: 'Statement date', value: `${fmtDayLong(today)}, ${time}`, strong: true },
+    { label: 'Period', value: rangeText ?? 'All surveys to date' },
+    {
+      label: 'Contract in force',
+      value: F.term ? `${F.term.name}${F.term.starts_on ? `, from ${fmtDay(F.term.starts_on)}` : ''}` : 'None recorded',
+    },
+  ]
+  if (contact) {
+    meta.push({ label: 'Your AlphaROC contact', value: contact.email ? `${contact.name} · ${contact.email}` : contact.name })
+  }
+
+  // What the range left out, said out loud: a short table must explain itself.
+  let aside = 'In progress by due date, then delivered, most recent first'
+  if (ranged) {
+    const out: string[] = []
+    if (notDelivered > 0) out.push(`${n0(notDelivered)} not yet delivered`)
+    if (undated > 0) {
+      out.push(basis === 'delivered'
+        ? `${n0(undated)} delivered with no delivery date on record`
+        : `${n0(undated)} with no ${basis === 'submitted' ? 'submission' : 'launch'} date`)
+    }
+    aside = `${n0(rows.length)} in the period.${out.length ? ` Not listed: ${out.join(', ')}.` : ''}`
+  }
 
   return (
     <>
-      <style>{`
-        @page { size: A4 landscape; margin: 14mm 12mm 16mm; }
-        @media print {
-          /* The app shell is chrome, not content. */
-          nav, header, .no-print { display: none !important; }
-          body { background: #fff !important; }
-          main { max-width: none !important; padding: 0 !important; margin: 0 !important; }
-          /* Force the ink. Browsers drop backgrounds by default, which turns a
-             header band into invisible text on white. */
-          * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-          thead { display: table-header-group; }   /* repeat headers per page */
-          tr { break-inside: avoid; }
-          .print-page { color: #111; }
-        }
-        .print-page { color: #111; background: #fff; font-size: 11px; }
-        .print-page table { width: 100%; border-collapse: collapse; }
-        .print-page th, .print-page td { padding: 4px 6px; border-bottom: 1px solid #e5e7eb; text-align: left; }
-        .print-page th { background: #f3f4f6; font-size: 9px; text-transform: uppercase; letter-spacing: .04em; color: #4b5563; }
-        .print-page td.num, .print-page th.num { text-align: right; font-variant-numeric: tabular-nums; }
-      `}</style>
+      <style dangerouslySetInnerHTML={{
+        __html: statementCss({ footerLeft: foot.left, footerRight: foot.right, footerFont: sans.style.fontFamily }),
+      }} />
 
-      {/* Screen-only, because a viewer who lands here from a bookmark should not
-          be stuck if their browser blocked the automatic dialog. */}
-      <div className="no-print mb-4 flex items-center gap-3">
-        <button
-          onClick={() => window.print()}
-          className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground"
-        >
-          Print / Save as PDF
-        </button>
-        <span className="text-xs text-muted-foreground">
-          Choose &ldquo;Save as PDF&rdquo; as the destination. Landscape A4 is preset.
-        </span>
-      </div>
+      <PreSendPanel
+        heading={<>Check before sending to {name}</>}
+        checks={checks}
+        name={{ value: typed, onChange: setTyped, internalName: client.name, saved: displayName }}
+        onPrint={print}
+        choice={controls}
+        choiceNotes={cNotes}
+      />
 
-      <div className="print-page">
-        <div style={{ borderBottom: '2px solid #010B40', paddingBottom: 8, marginBottom: 10 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-            <div>
-              <div style={{ fontSize: 9, letterSpacing: '.08em', textTransform: 'uppercase', color: '#6b7280' }}>
-                AlphaROC · Survey activity
-              </div>
-              <div style={{ fontSize: 18, fontWeight: 600, marginTop: 2 }}>
-                {client.name}
-                {client.code && <span style={{ fontSize: 11, color: '#6b7280', marginLeft: 8 }}>{client.code}</span>}
-              </div>
-            </div>
-            <div style={{ textAlign: 'right', fontSize: 9, color: '#6b7280', lineHeight: 1.5 }}>
-              <div>Generated {generatedOn}</div>
-              {generatedBy && <div>{generatedBy}</div>}
-            </div>
-          </div>
-        </div>
+      <article className={`st st-sheet ${serif.variable} ${sans.variable}`} aria-label="Survey Activity Statement">
+        <Masthead docTitle="Survey Activity Statement" preparedFor={name} internalAccounts={null} meta={meta} />
 
-        {/* The filter, stated on the page. Without it the reader cannot tell a
-            complete report from a filtered one, and neither can the sender. */}
-        <div style={{ fontSize: 10, color: '#4b5563', marginBottom: 10, lineHeight: 1.6 }}>
-          <div>
-            <strong style={{ color: '#111' }}>{describeRange(basis, range)}</strong>
-            {' · '}
-            {fmtNum(rows.length)} of {fmtNum(totalCount)} surveys
-            {undated > 0 && ` · ${undated} excluded for having no ${basis} date`}
-          </div>
-          <div style={{ marginTop: 2 }}>{describeConsumption(credits)}</div>
-          {term && (
-            <div style={{ marginTop: 2 }}>
-              Against {term.name}
-              {term.starts_on && ` · ${term.starts_on}`}{term.renews_on && ` to ${term.renews_on}`}
-            </div>
-          )}
-          {(range.from || range.to) && (
-            <div style={{ marginTop: 2 }}>
-              {fmtNum(drawnInRange)} credit{drawnInRange === 1 ? '' : 's'} drawn by the surveys listed below.
-            </div>
-          )}
-        </div>
-
-        {rows.length === 0 ? (
-          <p style={{ fontSize: 11, color: '#6b7280' }}>No surveys fall in this range.</p>
-        ) : (
-          <table>
-            <thead>
-              <tr>
-                {shown.map(c => (
-                  <th key={c.id} className={c.numeric ? 'num' : undefined}>{c.label}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map(p => (
-                <tr key={p.id}>
-                  {shown.map(c => (
-                    <td key={c.id} className={c.numeric ? 'num' : undefined}>{cellFor(p, c.id)}</td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        {(prints.contract || prints.activity) && (
+          <section className={`st-summary${prints.contract && prints.activity ? '' : ' st-summary-one'}`} aria-label="Summary">
+            {prints.contract && <ContractCluster F={F} fnUnpriced={fn.unpriced} />}
+            {prints.activity && (
+              <ActivityCluster
+                A={A}
+                scope={`${rangeText ?? 'All time'} · ${n0(rows.length)} ${rows.length === 1 ? 'survey' : 'surveys'}`}
+                ranged={ranged}
+                fnFinal={fn.final}
+                glyphs={glyphs}
+                status={prints.status}
+                target={prints.target}
+                final={prints.final}
+                credits={prints.credits}
+              />
+            )}
+          </section>
         )}
 
-        <div style={{ marginTop: 12, fontSize: 8.5, color: '#9ca3af', borderTop: '1px solid #e5e7eb', paddingTop: 6 }}>
-          Response counts are as recorded at the time of generation. A blank credit figure means the
-          survey has not been priced yet — it does not mean zero.
-        </div>
-      </div>
+        <section aria-label="Surveys">
+          <div className="st-sec">
+            <h2>Surveys</h2><span className="st-sec-rule" />
+            <span className={`st-sec-aside${ranged ? ' st-wrap' : ''}`}>{aside}</span>
+          </div>
+          <Ledger
+            rows={rows}
+            grouped
+            today={today}
+            currentTermId={termId}
+            neverRecorded={never}
+            totalLabel={(n, credits) =>
+              `Total${credits ? ' credits drawn' : ''} · ${ranged ? '' : 'all '}${n0(n)} ${n === 1 ? 'survey' : 'surveys'} listed`}
+            fn={fn}
+            columns={ledgerColumns(prints)}
+          />
+        </section>
+
+        <Notes
+          notes={notes}
+          sign={{
+            left: contact
+              ? `Prepared by AlphaROC for ${name}. Questions about this statement or your allowance: ${contact.name}${contact.email ? `, ${contact.email}` : ''}.`
+              : `Prepared by AlphaROC for ${name}. Questions about this statement or your allowance: your AlphaROC contact.`,
+            right: `Generated ${fmtDay(today)}, ${time}${preparedBy ? ` by ${preparedBy}` : ''}`,
+          }}
+        />
+      </article>
     </>
   )
 }

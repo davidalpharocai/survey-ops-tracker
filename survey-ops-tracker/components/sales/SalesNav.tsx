@@ -48,7 +48,9 @@ export function SalesNav({ name, renderedAt }: { name: string | null; renderedAt
     // and the search box were scrolling out of reach on exactly the screens that
     // need them most. z-40 sits under the search dropdown's z-50 so the dropdown
     // still paints over the page.
-    <nav className="sticky top-0 z-40 border-b border-border bg-card/95 backdrop-blur-sm">
+    // data-print="hide": the print pages hide the app shell by this marker
+    // rather than by hiding every <header>, which also hid the document's own.
+    <nav data-print="hide" className="sticky top-0 z-40 border-b border-border bg-card/95 backdrop-blur-sm">
       <div className="mx-auto flex max-w-6xl items-center gap-1 px-6 py-2">
         <Link href="/sales/home" className="mr-3 shrink-0 text-sm font-bold hover:opacity-80">
           AlphaROC

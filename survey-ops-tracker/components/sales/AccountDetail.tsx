@@ -7,20 +7,32 @@ import { bucketOf } from '@/lib/sales/buckets'
 import { stageOf } from '@/lib/sales/stage'
 import { currentTerm, consumptionFor, rollUp, describeConsumption, type Term } from '@/lib/sales/credits'
 import {
-  DATE_BASES, PRESETS, rangeFor, filterByRange, describeRange,
+  DATE_BASES, PRESETS, rangeFor, filterByRange, describeRange, etDate, todayET,
   type DateBasis, type PresetId, type Range,
 } from '@/lib/sales/dateRange'
+import { drawnFigure, finalText, responseCells, sortForStatement } from '@/lib/sales/statement'
 
 /**
  * One account: contacts, credit position, and a filterable survey list that can
  * be exported as a PDF.
  *
- * THE FILTER STATE IS THE EXPORT STATE. The date basis, the range and the chosen
- * columns are all passed to the print route as query parameters, so what prints
- * is exactly what is on screen — David asked for "a pdf with desired columns and
- * filtered data and within a date range", and the only way to keep that promise
- * is for one set of state to drive both. A second filter UI on the export dialog
- * would be a second thing to disagree.
+ * THE FILTER STATE IS THE EXPORT STATE. The date basis and the range are passed
+ * to the print route as query parameters, so the statement covers exactly the
+ * surveys on screen — David asked for "a pdf with desired columns and filtered
+ * data and within a date range", and the only way to keep that promise is for
+ * one set of state to drive both. A second filter UI on the export dialog would
+ * be a second thing to disagree.
+ *
+ * The COLUMNS are the exception: the PDF chooses its own in its pre-send panel
+ * (David, 2026-09-27; lib/sales/printColumns), everything unless turned off.
+ * The picker below shapes this table only.
+ *
+ * THE CELLS ARE THE PDF'S CELLS. Target, Final and Collected come from
+ * responseCells and the row order from sortForStatement — the functions the
+ * statement prints with. This screen used to show `n_actual ?? n_collected`
+ * under "Collected", so a count typed in mid-field read 1,171 here and 1,350 on
+ * the PDF under the same word (PR00481, 2026-09-27), and the rows came out in
+ * a different order from the document the client reads.
  */
 
 export interface AccountProject {
@@ -58,53 +70,95 @@ export interface AccountContact {
   phone: string | null
 }
 
-type ColId = 'code' | 'survey' | 'requested' | 'stage' | 'target' | 'collected' | 'credits' | 'submitted' | 'deliver'
+type ColId = 'code' | 'survey' | 'requested' | 'stage' | 'target' | 'final' | 'collected' | 'credits' | 'submitted' | 'deliver'
 
-export const ACCOUNT_COLS: { id: ColId; label: string; numeric?: boolean }[] = [
-  { id: 'code', label: 'Code' },
-  { id: 'survey', label: 'Survey' },
-  { id: 'requested', label: 'Requested by' },
-  { id: 'stage', label: 'Stage' },
-  { id: 'target', label: 'Target', numeric: true },
-  { id: 'collected', label: 'Collected', numeric: true },
-  { id: 'credits', label: 'Credits', numeric: true },
-  { id: 'submitted', label: 'Submitted' },
-  { id: 'deliver', label: 'Delivered' },
+// `hint` is each header's explainer (shown as its tooltip).
+export const ACCOUNT_COLS: { id: ColId; label: string; hint: string; numeric?: boolean }[] = [
+  { id: 'code', label: 'Code', hint: 'The survey’s AlphaROC reference code.' },
+  { id: 'survey', label: 'Survey', hint: 'The survey’s name, and the audience after the dash.' },
+  { id: 'requested', label: 'Requested by', hint: 'The person at the client who asked for this survey.' },
+  { id: 'stage', label: 'Stage', hint: 'Where the survey is in the pipeline today.' },
+  { id: 'target', label: 'Target', numeric: true, hint: 'Responses agreed with the client. A range sold shows as lowest–highest.' },
+  { id: 'final', label: 'Final', numeric: true, hint: 'Responses delivered after quality review, as the PDF prints them. Only a delivered survey has a final count; “≈ … est.” is an estimate while a survey is in quality review, and a dash means none yet.' },
+  { id: 'collected', label: 'Collected', numeric: true, hint: 'Responses gathered in field, before quality review, as the PDF prints them. A dash means no count is on record, or the survey has not reached field yet.' },
+  { id: 'credits', label: 'Credits', numeric: true, hint: 'Credits the survey is priced at. A dash means not priced yet, which is not the same as zero.' },
+  { id: 'submitted', label: 'Submitted', hint: 'The day the request came in.' },
+  { id: 'deliver', label: 'Delivered', hint: 'The day a delivered survey went out, in US Eastern Time. A survey not yet delivered shows its due date, marked “due”.' },
 ]
 
-const DEFAULT_COLS: ColId[] = ['code', 'survey', 'requested', 'stage', 'collected', 'credits', 'deliver']
-const STORE_KEY = 'socc-sales-account-columns'
+const DEFAULT_COLS: ColId[] = ['code', 'survey', 'requested', 'stage', 'final', 'collected', 'credits', 'deliver']
+// v2: Final became its own column. A choice saved under the old key (v1) is
+// carried over with Final added beside Collected, because v1's Collected
+// showed the final count on delivered surveys — dropping it silently would
+// take the delivered figure off a table the reader had set up to show it.
+const STORE_KEY = 'socc-sales-account-columns-v2'
+const STORE_KEY_V1 = 'socc-sales-account-columns'
 
-export function cellFor(p: AccountProject, id: ColId): string {
+/** A saved column choice, or null. v1 choices gain Final beside Collected. */
+function savedCols(): ColId[] | null {
+  const valid = (xs: unknown): ColId[] | null => {
+    if (!Array.isArray(xs)) return null
+    const v = xs.filter((c): c is ColId => ACCOUNT_COLS.some(x => x.id === c))
+    return v.length ? v : null
+  }
+  const v2 = localStorage.getItem(STORE_KEY)
+  if (v2) return valid(JSON.parse(v2))
+  const v1 = localStorage.getItem(STORE_KEY_V1)
+  const old = v1 ? valid(JSON.parse(v1)) : null
+  if (!old) return null
+  return old.includes('collected') && !old.includes('final')
+    ? ACCOUNT_COLS.map(c => c.id).filter(c => old.includes(c) || c === 'final')
+    : old
+}
+
+/**
+ * One cell's text. `neverRecorded` is true when the survey's N collected has
+ * never been entered (no row in the freshness view, migration 111), which is
+ * what lets Collected print a dash instead of the column default 0 — the same
+ * argument, meaning the same thing, as on the PDF.
+ */
+export function cellFor(p: AccountProject, id: ColId, neverRecorded = false): string {
   switch (id) {
     case 'code': return p.project_code ?? '—'
     case 'survey': return p.project_name
     case 'requested': return p.requested_by_name ?? '—'
     case 'stage': return stageOf(p)
-    case 'target':
-      return p.n_target == null ? '—'
-        : p.n_target_max && p.n_target_max !== p.n_target
-          ? `${fmtNum(p.n_target)}–${fmtNum(p.n_target_max)}`
-          : fmtNum(p.n_target)
+    case 'target': return responseCells(p, neverRecorded).target ?? '—'
+    case 'final': {
+      const f = responseCells(p, neverRecorded).final
+      return f.kind === 'estimate' ? `${finalText(f)} est.` : finalText(f)
+    }
     case 'collected': {
-      const v = p.n_actual ?? p.n_collected
+      const v = responseCells(p, neverRecorded).collected
       return v == null ? '—' : fmtNum(v)
     }
     // Blank, never 0. A survey with no credit figure is unpriced, and printing
     // "0" on a page the client reads asserts it was free.
     case 'credits': return p.credits == null ? '—' : fmtNum(p.credits)
     case 'submitted': return p.submitted_date ?? '—'
-    case 'deliver': return (p.delivered_at ?? '').slice(0, 10) || p.deliver_date || '—'
+    // A delivered survey shows the day it was delivered, in Eastern Time — the
+    // same day the PDF prints. Slicing the UTC timestamp put anything delivered
+    // after 8pm ET on the next day. One still in flight shows its PROMISED date,
+    // marked as such: a bare date under "Delivered" read as work that had gone
+    // out when it had not.
+    case 'deliver':
+      if (bucketOf({ status: p.status, phase: p.phase, board_column: p.board_column }) === 'delivered') {
+        return etDate(p.delivered_at) ?? p.deliver_date ?? '—'
+      }
+      return p.deliver_date ? `due ${p.deliver_date}` : '—'
   }
 }
 
 export function AccountDetail({
-  client, projects, contacts, terms,
+  client, projects, contacts, terms, neverRecordedIds,
 }: {
   client: { id: string; name: string; code: string | null; salesperson: string | null; created_at: string }
   projects: AccountProject[]
   contacts: AccountContact[]
   terms: Term[]
+  /** Surveys whose N collected was never recorded (no freshness row). Empty
+   *  when freshness could not be read — a failed read marks nothing. */
+  neverRecordedIds: string[]
 }) {
   const [basis, setBasis] = useState<DateBasis>('delivered')
   const [preset, setPreset] = useState<PresetId>('all')
@@ -113,13 +167,9 @@ export function AccountDetail({
   const [cols, setCols] = useState<ColId[]>(() => {
     // localStorage throws outright in some contexts (private windows, blocked
     // site data), so every read and write is guarded.
-    try {
-      const raw = localStorage.getItem(STORE_KEY)
-      const parsed = raw ? (JSON.parse(raw) as ColId[]) : null
-      const valid = parsed?.filter(c => ACCOUNT_COLS.some(x => x.id === c))
-      return valid?.length ? valid : DEFAULT_COLS
-    } catch { return DEFAULT_COLS }
+    try { return savedCols() ?? DEFAULT_COLS } catch { return DEFAULT_COLS }
   })
+  const never = useMemo(() => new Set(neverRecordedIds), [neverRecordedIds])
 
   function toggleCol(id: ColId) {
     const next = cols.includes(id) ? cols.filter(c => c !== id) : [...ACCOUNT_COLS.map(c => c.id).filter(c => cols.includes(c) || c === id)]
@@ -129,10 +179,17 @@ export function AccountDetail({
   }
 
   // Today, resolved once per render rather than inside rangeFor, so the filter
-  // and the export header cannot straddle midnight differently.
-  const today = new Date().toLocaleDateString('en-CA')
+  // and the export header cannot straddle midnight differently. In EASTERN
+  // time, as the PDF is: the browser's own zone put a Pacific reader and a
+  // London reader on different quarters on the evening of 30 September.
+  const today = todayET()
   const range = useMemo(() => rangeFor(preset, today, custom), [preset, today, custom])
-  const { rows, undated } = useMemo(() => filterByRange(projects, basis, range), [projects, basis, range])
+  // In the statement's order, so the rows a salesperson looks at and the rows
+  // the client reads come out the same way round.
+  const { rows, undated, notDelivered } = useMemo(() => {
+    const r = filterByRange(projects, basis, range)
+    return { ...r, rows: sortForStatement(r.rows) }
+  }, [projects, basis, range])
 
   const buckets = useMemo(() => {
     const b: Record<string, number> = {}
@@ -161,12 +218,37 @@ export function AccountDetail({
     () => (term ? consumptionFor(term, projects) : rollUp(projects, null)),
     [term, projects])
   // What the selected range actually drew — its own line, no denominator, so a
-  // period's usage is never presented as a share of a lifetime allowance.
-  const drawnInRange = useMemo(() => rollUp(rows, null).used, [rows])
+  // period's usage is never presented as a share of a lifetime allowance. It
+  // carries "At least" on the same rule as the PDF's period line: only when an
+  // unpriced survey in the range has drawn.
+  const inRange = useMemo(() => rollUp(rows, null), [rows])
 
+  // No `cols`: the PDF has its own choice of what prints, starting from the
+  // reader's saved default (lib/sales/printColumns), so the picker shapes this
+  // table only.
   const exportUrl = `/sales/accounts/${client.id}/print?basis=${basis}&preset=${preset}` +
-    (preset === 'custom' ? `&from=${custom.from ?? ''}&to=${custom.to ?? ''}` : '') +
-    `&cols=${cols.join(',')}`
+    (preset === 'custom' ? `&from=${custom.from ?? ''}&to=${custom.to ?? ''}` : '')
+
+  // Why the table is shorter than the account, in two parts on the delivered
+  // basis: work not yet delivered is not a missing record, and a delivered
+  // survey with no date is. They need different fixes, so they are counted
+  // apart.
+  const excluded: { text: string; title: string }[] = []
+  if (basis === 'delivered') {
+    if (notDelivered > 0) excluded.push({
+      text: `${notDelivered} not yet delivered`,
+      title: 'Still in progress, on hold or stopped, so not part of what was delivered in this range.',
+    })
+    if (undated > 0) excluded.push({
+      text: `${undated} with no delivered date`,
+      title: 'Delivered, but the record carries no delivery date, so it cannot fall inside a date range.',
+    })
+  } else if (undated > 0) {
+    excluded.push({
+      text: `${undated} excluded for having no ${basis} date`,
+      title: `These have no ${basis} date, so they cannot fall inside a date range.`,
+    })
+  }
 
   return (
     <div>
@@ -200,7 +282,15 @@ export function AccountDetail({
         <p className="text-sm text-foreground">{describeConsumption(credits)}</p>
         {preset !== 'all' && (
           <p className="mt-1 text-xs text-muted-foreground">
-            {fmtNum(drawnInRange)} credit{drawnInRange === 1 ? '' : 's'} drawn by the surveys in this range.
+            {drawnFigure(inRange).kind === 'unknown'
+              // Nothing priced has drawn in the range: "At least 0" would read
+              // as "nothing used". The PDF says "Not yet priced" here too.
+              ? `Credits drawn by the surveys in this range are not known yet — ${inRange.unpricedDrawn} of them ${
+                  inRange.unpricedDrawn === 1 ? 'has' : 'have'} drawn credits and ${inRange.unpricedDrawn === 1 ? 'is' : 'are'} not yet priced.`
+              : <>
+                  {inRange.isFloor ? 'At least ' : ''}{fmtNum(inRange.used)} credit{inRange.used === 1 ? '' : 's'} drawn by the surveys in this range
+                  {inRange.unpricedDrawn > 0 && ` — ${inRange.unpricedDrawn} of them not yet priced`}.
+                </>}
           </p>
         )}
       </section>
@@ -263,6 +353,7 @@ export function AccountDetail({
           href={exportUrl}
           target="_blank"
           rel="noopener"
+          title="Opens the Survey Activity Statement for this account and date range, ready to save as a PDF. It prints every column unless you, or your saved default, turn one off in its own “What prints” box. The columns chosen here do not carry over."
           className="ml-auto rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90"
         >
           Export PDF
@@ -273,11 +364,9 @@ export function AccountDetail({
           how somebody reports a quiet shortfall as a real one. */}
       <p className="mb-3 text-xs text-muted-foreground">
         {describeRange(basis, range)} · {fmtNum(rows.length)} of {fmtNum(projects.length)} surveys
-        {undated > 0 && (
-          <span title={`These have no ${basis} date, so they cannot fall inside a date range.`}>
-            {' '}· {undated} excluded for having no {basis} date
-          </span>
-        )}
+        {excluded.map(x => (
+          <span key={x.text} title={x.title}>{' '}· {x.text}</span>
+        ))}
         {Object.keys(buckets).length > 0 && (
           <>
             {' · '}
@@ -305,7 +394,7 @@ export function AccountDetail({
             <thead>
               <tr className="border-b border-border bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
                 {ACCOUNT_COLS.filter(c => cols.includes(c.id)).map(c => (
-                  <th key={c.id} className={`px-3 py-2 font-medium ${c.numeric ? 'text-right' : ''}`}>{c.label}</th>
+                  <th key={c.id} title={c.hint} className={`px-3 py-2 font-medium ${c.numeric ? 'text-right' : ''}`}>{c.label}</th>
                 ))}
               </tr>
             </thead>
@@ -319,7 +408,7 @@ export function AccountDetail({
                           {cellFor(p, c.id)}
                         </Link>
                       ) : (
-                        cellFor(p, c.id)
+                        cellFor(p, c.id, never.has(p.id))
                       )}
                     </td>
                   ))}

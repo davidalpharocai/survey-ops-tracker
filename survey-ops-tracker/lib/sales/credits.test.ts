@@ -68,7 +68,26 @@ describe('rollUp', () => {
 
   it('handles an empty set', () => {
     const c = rollUp([], 1000)
-    expect(c).toMatchObject({ used: 0, priced: 0, unpriced: 0, committed: 0, remaining: 1000, pct: 0, isFloor: false })
+    expect(c).toMatchObject({
+      used: 0, priced: 0, unpriced: 0, unpricedDrawn: 0, unpricedUndrawn: 0, committed: 0, remaining: 1000, pct: 0, isFloor: false,
+    })
+  })
+
+  it('is a floor only when an UNPRICED survey has DRAWN', () => {
+    // Two surveys still in design, unpriced, have drawn nothing — the figure is
+    // exact. The screen used to call it a floor while the PDF called it exact.
+    const c = rollUp([s('a', 100), unfielded('b', null), unfielded('c', null)], 1000)
+    expect(c.unpriced).toBe(2)
+    expect(c.unpricedDrawn).toBe(0)
+    expect(c.unpricedUndrawn).toBe(2)
+    expect(c.isFloor).toBe(false)
+  })
+
+  it('splits the unpriced into drawn and not drawn', () => {
+    const c = rollUp([s('a', 100), s('b', null), unfielded('c', null)], 1000)
+    expect(c.unpricedDrawn).toBe(1)
+    expect(c.unpricedUndrawn).toBe(1)
+    expect(c.isFloor).toBe(true)
   })
 })
 
@@ -97,10 +116,27 @@ describe('describeConsumption', () => {
       .toBe('350 of 1,000 credits used (35%), 650 remaining.')
   })
 
-  it('says the figure is a floor when something is unpriced', () => {
+  it('says the figure is a floor when an unpriced survey has fielded', () => {
     const t = describeConsumption(rollUp([s('a', 350), s('b', null)], 1000))
-    expect(t).toContain('floor')
-    expect(t).toContain('1 survey is not priced yet')
+    expect(t).toBe('350 of 1,000 credits used (35%), 650 remaining. 1 survey that has fielded is not priced yet, so the used figure is a floor.')
+  })
+
+  it('does NOT call it a floor for unpriced surveys that have not fielded, but names them', () => {
+    const t = describeConsumption(rollUp([s('a', 350), unfielded('b', null), unfielded('c', null)], 1000))
+    expect(t).not.toContain('floor')
+    expect(t).toBe('350 of 1,000 credits used (35%), 650 remaining. 2 surveys are not priced and have not fielded, so they have drawn nothing.')
+  })
+
+  it('counts the not-fielded ones as "more" when the floor sentence came first', () => {
+    const t = describeConsumption(rollUp([s('a', 350), s('b', null), unfielded('c', null)], 1000))
+    expect(t).toContain('1 survey that has fielded is not priced yet, so the used figure is a floor.')
+    expect(t).toContain(' 1 more is not priced and has not fielded, so it has drawn nothing.')
+  })
+
+  it('says "0 used" plainly when nothing at all has drawn', () => {
+    // Priced nothing, drawn nothing: 0 is the true answer, not "not recorded".
+    const t = describeConsumption(rollUp([unfielded('a', null)], 1000))
+    expect(t).toBe('0 of 1,000 credits used (0%), 1,000 remaining. 1 survey is not priced and has not fielded, so it has drawn nothing.')
   })
 
   it('distinguishes "nothing used" from "nothing recorded"', () => {
@@ -118,6 +154,11 @@ describe('describeConsumption', () => {
   it('says so when there is no allowance to measure against', () => {
     expect(describeConsumption(rollUp([s('a', 100)], null)))
       .toContain('No term allowance recorded')
+  })
+
+  it('with no allowance, counts only the unpriced surveys that fielded as the shortfall', () => {
+    expect(describeConsumption(rollUp([s('a', 100), s('b', null), unfielded('c', null)], null)))
+      .toBe('100 credits used across 1 survey, with 1 more that has fielded but is not yet priced. No term allowance recorded to measure it against. 1 more is not priced and has not fielded, so it has drawn nothing.')
   })
 
   it('handles the completely empty case without asserting anything false', () => {
@@ -225,6 +266,7 @@ describe('creditPosition — the three columns David asked for', () => {
     expect(p.committed).toBe(50)
     expect(p.untermed).toBe(1)
     expect(p.unpriced).toBe(1)
+    expect(p.unpricedDrawn).toBe(1)   // 'd' is delivered, so it makes the figures floors
   })
 
   it('leaves remaining NULL with no term, rather than calling it zero', () => {
@@ -243,5 +285,14 @@ describe('creditPosition — the three columns David asked for', () => {
     ], [TERM], '2026-09-22')
     expect(p.usedThisTerm).toBe(0)
     expect(p.usedAllTime).toBe(90)
+  })
+
+  it('counts the unpriced-and-drawn per scope, so an old survey cannot make this term a floor', () => {
+    const p = creditPosition([
+      { id: 'a', credits: 100, term_id: 't1', board_column: 'Delivery', n_collected: 5 },
+      { id: 'old', credits: null, term_id: 'expired', board_column: 'Delivery', n_collected: 5 },
+    ], [TERM], '2026-09-22')
+    expect(p.unpricedDrawn).toBe(1)          // qualifies the all-time figure
+    expect(p.unpricedDrawnThisTerm).toBe(0)  // the term's 100 used and 275 remaining are exact
   })
 })

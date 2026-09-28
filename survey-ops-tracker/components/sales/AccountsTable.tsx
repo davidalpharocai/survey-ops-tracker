@@ -60,8 +60,17 @@ export interface AccountRow {
   creditsAllTime: number
   /** Priced but not yet fielded. */
   creditsCommitted: number
-  /** Surveys with no credit figure at all, so the figures above are floors. */
+  /** Surveys with no credit figure at all. */
   unpriced: number
+  /** Of those, the ones that have DRAWN (fielded or delivered). Only these make
+   *  the figures above floors — the same rule as the account page and the PDF
+   *  (lib/sales/credits.ts rollUp). An unpriced survey still in design has
+   *  drawn nothing and leaves the figure exact. Account-wide: it qualifies
+   *  Credits (all time). */
+  unpricedDrawn: number
+  /** The same, inside the term in force only: it qualifies Credits (term) and
+   *  Remaining. */
+  unpricedDrawnTerm: number
   termName: string | null
 }
 
@@ -356,15 +365,33 @@ export function AccountsTable({ rows, offBook = 0 }: { rows: AccountRow[]; offBo
                   // — it reads as zero and footnotes itself.
                   const nothingPriced = isCredit && r.unpriced === r.total
                   const v = nothingPriced ? null : c.value(r)
+                  // Which unpriced-and-drawn count qualifies THIS column, and
+                  // in which direction. Surveys that drew credits with no price
+                  // make "drawn" a minimum and "remaining" a maximum; the
+                  // committed figure is exact either way. The term columns
+                  // count only the term's own surveys — an unpriced survey on
+                  // an older contract says nothing about this one.
+                  const qual = c.id === 'creditsTerm' ? { n: r.unpricedDrawnTerm, dir: 'floor' as const }
+                    : c.id === 'creditsAllTime' ? { n: r.unpricedDrawn, dir: 'floor' as const }
+                    : c.id === 'creditsRemaining' ? { n: r.unpricedDrawnTerm, dir: 'ceiling' as const }
+                    : null
+                  const surveysHave = (n: number) => `${n} ${n === 1 ? 'survey has' : 'surveys have'}`
+                  const scope = c.id === 'creditsAllTime' ? 'on this account' : `in the ${r.termName ?? 'current term'}`
+                  // Drawn 0 with an unpriced survey that HAS drawn is not a
+                  // measured 0 — nothing that drew has been counted. The PDF
+                  // prints "Not yet priced" there, never "at least 0".
+                  const unknown = qual?.dir === 'floor' && v === 0 && qual.n > 0
                   return (
                     <td key={c.id} className="px-3 py-2 text-right tabular-nums">
-                      {v == null ? (
+                      {v == null || unknown ? (
                         <span className="text-muted-foreground/40" title={
                           nothingPriced
                             ? `None of this account's ${r.total} surveys is priced in credits yet — which is not the same as none being used.`
-                            : c.id === 'creditsRemaining'
-                              ? 'No term allowance recorded, so there is nothing to have remaining.'
-                              : 'No term recorded for this account.'
+                            : unknown
+                              ? `${surveysHave(qual.n)} fielded ${scope} but none of what has drawn is priced yet, so the amount drawn is not known — which is not the same as none.`
+                              : c.id === 'creditsRemaining'
+                                ? 'No term allowance recorded, so there is nothing to have remaining.'
+                                : 'No term recorded for this account.'
                         }>—</span>
                       ) : v === 0 && !isCredit ? (
                         <span className="text-muted-foreground/40">—</span>
@@ -373,14 +400,17 @@ export function AccountsTable({ rows, offBook = 0 }: { rows: AccountRow[]; offBo
                       ) : (
                         fmtNum(v)
                       )}
-                      {/* A total drawn from a partly-priced set is a FLOOR, and
-                          saying so is the difference between a number and a
-                          misleading number. */}
-                      {isCredit && v != null && r.unpriced > 0 && (
+                      {/* A total drawn from a partly-priced set is a FLOOR ("+?":
+                          maybe more), and what remains is then a CEILING ("−?":
+                          maybe less). Saying which is the difference between a
+                          number and a misleading number. */}
+                      {qual && v != null && !unknown && qual.n > 0 && (
                         <span
                           className="ml-1 text-[10px] text-muted-foreground"
-                          title={`${r.unpriced} of ${r.total} surveys have no credit figure yet, so this is a floor.`}
-                        >+?</span>
+                          title={qual.dir === 'floor'
+                            ? `${surveysHave(qual.n)} fielded ${scope} with no credit figure yet, so at least this many credits have been drawn.`
+                            : `${surveysHave(qual.n)} fielded ${scope} with no credit figure yet, so at most this many credits remain.`}
+                        >{qual.dir === 'floor' ? '+?' : '−?'}</span>
                       )}
                     </td>
                   )
