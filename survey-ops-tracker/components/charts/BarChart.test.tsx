@@ -170,6 +170,41 @@ describe('BarChart', () => {
     expect(label.getAttribute('text-anchor')).toBe('end')
   })
 
+  it('gives every row a tick on the category axis', () => {
+    const { container } = render(<BarChart ariaLabel="Kept" data={groups} label={(d) => d.name} value={(d) => d.kept} />)
+    const ticks = container.querySelectorAll('[data-part="category-ticks"] [data-tick="row"]')
+    expect(ticks).toHaveLength(4)
+    // One per row, in row order, none overlapping its neighbour.
+    const ys = Array.from(ticks).map((t) => ({ y0: Number(t.getAttribute('y')), h: Number(t.getAttribute('height')) }))
+    ys.slice(1).forEach((r, i) => expect(r.y0).toBeGreaterThan(ys[i].y0 + ys[i].h))
+  })
+
+  it('draws a short group name but keeps the full one on hover and in the table', () => {
+    const long = [{ name: 'Sample Holdings Partners International Europe', kept: 300, pct: 0.3, n: 9 }, ...groups.slice(0, 1)]
+    const { container } = render(
+      <BarChart
+        ariaLabel="Kept"
+        width={640}
+        data={long}
+        label={(d) => d.name}
+        labelShort={(d) => d.name.split(' ')[0]}
+        labelHeader="Account"
+        value={(d) => d.kept}
+        onSelect={() => {}}
+      />,
+    )
+    const drawn = Array.from(container.querySelectorAll('text')).find((t) => t.textContent?.includes('Sample'))!
+    // Printed short, with the full name along for the ride.
+    expect(Array.from(drawn.childNodes).filter((n) => n.nodeName !== 'title').map((n) => n.textContent).join('')).toBe('Sample')
+    expect(drawn.querySelector('title')!.textContent).toBe('Sample Holdings Partners International Europe')
+    // Hover and the accessible name use the full form.
+    fireEvent.mouseEnter(screen.getByRole('button', { name: /^Sample Holdings Partners International Europe/ }))
+    const card = container.querySelector('[aria-hidden].z-20') as HTMLElement
+    expect(within(card).getByText('Sample Holdings Partners International Europe')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'View as table' }))
+    expect(within(screen.getByRole('table')).getByRole('rowheader', { name: 'Sample Holdings Partners International Europe' })).toBeInTheDocument()
+  })
+
   it('shows the empty state', () => {
     render(<BarChart ariaLabel="Kept" data={[] as Group[]} label={(d) => d.name} value={(d) => d.kept} />)
     expect(screen.getByText('No data in this view')).toBeInTheDocument()

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, within } from '@testing-library/react'
 import { DumbbellChart } from './DumbbellChart'
 import { FONT } from './primitives'
 import { textWidth } from './scale'
@@ -86,6 +86,34 @@ describe('DumbbellChart', () => {
     expect(onSelect).toHaveBeenCalledWith(routes[0])
     fireEvent.click(screen.getByRole('button', { name: 'View as table' }))
     expect(screen.getByRole('columnheader', { name: 'Route' })).toBeInTheDocument()
+  })
+
+  // The row rail exists to say which NAME owns which mark when the names sit
+  // in a column beside them. Here each name is printed on its own line
+  // directly above its own pair of dots, so there is nothing to disambiguate
+  // — and the rail's only home was x=0, a label column away from anything.
+  it('draws no row rail, because each name sits on its own line above its dots', () => {
+    const { container } = render(<DumbbellChart {...base} />)
+    expect(container.querySelectorAll('[data-tick="row"]')).toHaveLength(0)
+    const names = Array.from(container.querySelectorAll('text')).filter((t) => t.textContent?.startsWith('Route '))
+    expect(names).toHaveLength(2)
+    expect(Number(names[1].getAttribute('y'))).toBeGreaterThan(Number(names[0].getAttribute('y')))
+  })
+
+  it('draws a short route name but keeps the full one on hover and in the table', () => {
+    const { container } = render(
+      <DumbbellChart {...base} labelShort={(d) => d.route.replace('Route ', '')} labelHeader="Route" sublabel={() => '44 surveys'} onSelect={() => {}} />,
+    )
+    const drawn = Array.from(container.querySelectorAll('text')).find((t) => t.textContent?.includes('Route A'))!
+    expect(Array.from(drawn.childNodes).filter((n) => n.nodeName !== 'title').map((n) => n.textContent).join('')).toBe('A')
+    expect(drawn.querySelector('title')!.textContent).toBe('Route A')
+    fireEvent.mouseEnter(screen.getByRole('button', { name: /^Route A/ }))
+    const card = container.querySelector('[aria-hidden].z-20') as HTMLElement
+    expect(within(card).getByText('Route A')).toBeInTheDocument()
+    // Hover carries the line under the name too, not just the two values.
+    expect(within(card).getByText(/44 surveys/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'View as table' }))
+    expect(within(screen.getByRole('table')).getByRole('rowheader', { name: 'Route A' })).toBeInTheDocument()
   })
 
   it('shows the empty state when no row has a value', () => {

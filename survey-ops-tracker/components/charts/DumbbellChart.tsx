@@ -40,6 +40,10 @@ const LABEL_GAP = 4
 export interface DumbbellChartProps<D> extends ChartCommon<D> {
   data: D[]
   label: (d: D) => string
+  /** A NARROW form of the name for the drawn row label only. The tooltip,
+   *  the accessible summary and the table always use `label`, and the drawn
+   *  name carries the full form as its title=. */
+  labelShort?: (d: D) => string
   /** Table header for the name column (default "Group"). */
   labelHeader?: string
   start: (d: D) => number | null | undefined
@@ -64,6 +68,7 @@ export interface DumbbellChartProps<D> extends ChartCommon<D> {
 export function DumbbellChart<D>({
   data,
   label,
+  labelShort,
   labelHeader = 'Group',
   start,
   end,
@@ -93,6 +98,8 @@ export function DumbbellChart<D>({
   const fmtAxis = axisFormat ?? valueFormat
   const interactive = anyDrill(data, onSelect, href)
   const empty = data.length === 0 || data.every((d) => !isNum(start(d)) && !isNum(end(d)))
+  /** What the row PRINTS; `label` is what it says on hover and in the table. */
+  const shortOf = (d: D) => labelShort?.(d) ?? label(d)
 
   const valuesOf = (d: D) => {
     const b = box?.(d)
@@ -207,8 +214,10 @@ export function DumbbellChart<D>({
                 { key: 'e', label: endLabel, value: fmtOr(e, valueFormat), color: 'var(--chart-cost)' },
               ]
               if (b) rows.push({ key: 'b', label: 'Typical survey', value: `${valueFormat(b.low)}–${valueFormat(b.high)} (median ${valueFormat(b.median)})` })
-              const noteText = [c, note?.(d)].filter(Boolean).join(' · ') || undefined
-              const aria = [label(d), sub, ...rows.map((r) => `${r.label} ${r.value}`), noteText].filter(Boolean).join(', ')
+              // Hover carries everything the row shows, including the line
+              // under the name — a reader should never have to read both.
+              const noteText = [sub, c, note?.(d)].filter(Boolean).join(' · ') || undefined
+              const aria = [label(d), ...rows.map((r) => `${r.label} ${r.value}`), noteText].filter(Boolean).join(', ')
               const sText = fmtOr(s, valueFormat)
               const eText = fmtOr(e, valueFormat)
               const lab = placeValueLabels({ xs, xe, sText, eText, startLeft, W })
@@ -223,8 +232,8 @@ export function DumbbellChart<D>({
                   onShow={() => show({ x: xe ?? xs ?? W / 2, y: dotY - 10, title: label(d), rows, note: noteText })}
                   onHide={hide}
                 >
-                  <FitText text={label(d)} maxWidth={W - 8} fontSize={FONT.label} x={2} y={labelY} className="fill-foreground" weight={500} />
-                  {sub && <FitText text={sub} maxWidth={W - 8} fontSize={FONT.small} x={2} y={labelY + 13} />}
+                  <FitText text={shortOf(d)} full={label(d)} maxWidth={W - 12} fontSize={FONT.label} x={6} y={labelY} className="fill-foreground" weight={500} />
+                  {sub && <FitText text={sub} maxWidth={W - 12} fontSize={FONT.small} x={6} y={labelY + 13} />}
                   {/* typical-survey box around the end dot */}
                   {b && (
                     <g data-mark="box">

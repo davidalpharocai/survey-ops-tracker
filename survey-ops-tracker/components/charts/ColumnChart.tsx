@@ -22,8 +22,9 @@ import { useMemo, type ReactNode } from 'react'
 import { ChartFrame, type ChartTable } from './ChartFrame'
 import type { LegendItem } from './Legend'
 import { fmtCount, MISSING, type Formatter } from './format'
-import { labelStep, linear, niceDomain, roundedBar, textWidth } from './scale'
+import { edgeRoom, fitAxisLabels, linear, niceDomain, roundedBar, textWidth } from './scale'
 import {
+  CategoryTicks,
   ChartSvg,
   ChartTooltip,
   FitText,
@@ -67,6 +68,11 @@ export interface ColumnChartProps<D> extends ChartCommon<D> {
    *  `rules[].at` matches it, so a window longer than a year can tell one
    *  "Sep" from the next. (Not called `key`: React keeps that prop for itself.) */
   xKey?: (d: D) => string
+  /** A NARROW form of the category label for the axis only, e.g. "Sep 26"
+   *  for "September 2026". The tooltip, the accessible summary and the table
+   *  always use `x`, so nothing is lost by shortening; the axis text also
+   *  carries the long form as its title=. Omit it and the axis uses `x`. */
+  xShort?: (d: D) => string
   /** Table header for the category column (default "Category"). */
   xLabel?: string
   series: Series<D>[]
@@ -97,6 +103,10 @@ export interface ColumnChartProps<D> extends ChartCommon<D> {
 
 const BAR_MAX = 24
 const GAP = 2
+/** Length of a labelled category tick; the x labels clear it. */
+const TICK_LEN = 5
+/** Baseline to the middle of the x label: clear of the tick, not floating. */
+const TICK_GAP = 8
 /** The faintest a faded column gets: still findable against the card. */
 const MIN_OPACITY = 0.35
 
@@ -104,6 +114,7 @@ export function ColumnChart<D>({
   data,
   x,
   xKey: keyOf = x,
+  xShort,
   xLabel = 'Category',
   series,
   mode = 'grouped',
@@ -150,13 +161,16 @@ export function ColumnChart<D>({
     const tickFont = narrow ? FONT.small : FONT.tick
     const n = data.length
     const labels = data.map(x)
+    // What the axis prints. The long form stays on the tooltip and the table.
+    const axisLabels = xShort ? data.map(xShort) : labels
 
-    // ── vertical budget: rule labels, overlay strip, top labels, plot, x labels
+    // ── vertical budget: rule labels, overlay strip, top labels, plot,
+    //    category ticks, x labels
     const rulesH = rules.length * 14
     const overlayH = overlay ? 44 : 0
     const topH = topLabel ? 16 : 0
     const top = 6 + rulesH + overlayH + topH
-    const bottom = 18 + (subLabel ? 14 : 0) + 2
+    const bottom = TICK_LEN + TICK_GAP + 11 + (subLabel ? 14 : 0) + 2
     const plotH = Math.max(60, height - top - bottom)
     const H = top + plotH + bottom
 
@@ -195,7 +209,18 @@ export function ColumnChart<D>({
     // ── horizontal budget: y tick labels on the left
     const tickLabels = dom.ticks.map(fmtAxis)
     const left = Math.ceil(Math.max(...tickLabels.map((t) => textWidth(t, tickFont)), 12)) + 8
-    const right = 6
+    // The last category's label is centred on its band, so half of it hangs
+    // past the band's centre — and labelIndices pins that label, so it is
+    // always drawn. A flat 6px reserve is less than half of "21 Sep" on the
+    // 26-week logging strip, where the newest week (the week the card's own
+    // red alert is about) then lost its last glyphs to the viewBox, with no
+    // scaling to rescue it. So reserve what the label needs. Widening the
+    // margin narrows the band, which narrows the need, so it is SOLVED rather
+    // than iterated: right = lastW/2 − band/2 with band = (W − right − left)/n
+    // has one answer, and it lands on it exactly.
+    const lastW = textWidth(axisLabels[n - 1] ?? '', tickFont)
+    const want = (lastW / 2 - (W - left) / (2 * n)) / (1 - 1 / (2 * n))
+    const right = Math.min(Math.max(6, want), Math.max(6, W * 0.25))
     const plotL = left
     const plotR = Math.max(plotL + 40, W - right)
     const plotW = plotR - plotL
@@ -209,13 +234,17 @@ export function ColumnChart<D>({
     const groupW = nS * barW + (nS - 1) * GAP
 
     return {
-      narrow, tickFont, n, labels, rulesH, overlayH, topH, H, plotL, plotR, plotW, band,
+      narrow, tickFont, n, labels, axisLabels, rulesH, overlayH, topH, H, plotL, plotR, plotW, band,
       plotTop, plotBottom, y, dom, tickLabels, barW, groupW,
-      xStep: labelStep(labels, band, tickFont),
-      subStep: subLabel ? labelStep(data.map((d) => subLabel.text(d) ?? ''), band, FONT.small) : 1,
-      topStep: topLabel ? labelStep(data.map((d) => topLabel.text(d) ?? ''), band, tickFont) : 1,
+      // Which categories carry a label, and how much room each of them has
+      // once its neighbours have been thinned out. The period axis shrinks
+      // one step before it thins anything (fitAxisLabels), so the value axis
+      // keeps tickFont while the categories may draw at FONT.small.
+      xAxis: axisPicks(axisLabels, band, tickFont, { W, plotL, minFontSize: FONT.small }),
+      subAxis: axisPicks(subLabel ? data.map((d) => subLabel.text(d) ?? '') : null, band, FONT.small),
+      topAxis: axisPicks(topLabel ? data.map((d) => topLabel.text(d) ?? '') : null, band, tickFont),
     }
-  }, [empty, W, data, x, series, mode, rules.length, overlay, topLabel, subLabel, height, referenceLines, yDomain, fmtAxis])
+  }, [empty, W, data, x, xShort, series, mode, rules.length, overlay, topLabel, subLabel, height, referenceLines, yDomain, fmtAxis])
 
   const summary = useMemo(() => {
     if (empty) return ''
@@ -330,7 +359,7 @@ export function ColumnChart<D>({
     layout && topLabel
       ? data.flatMap((d, i) => {
           const t = topLabel.text(d)
-          if (!t || i % layout.topStep !== 0) return []
+          if (!t || !layout.topAxis.shows(i)) return []
           const cx = layout.plotL + layout.band * (i + 0.5)
           const w = textWidth(t, layout.tickFont)
           const base = topOf(d) - 5 // the label's alphabetic baseline
@@ -471,16 +500,13 @@ export function ColumnChart<D>({
               }))
               if (overlay) rows.push({ key: '__o', label: overlay.label, value: fmtVal(overlay.value(d), overlay.format), color: overlay.color ?? 'var(--chart-keep)' })
               const tText = topLabel?.text(d)
+              // The top label is thinned like any other axis text, so hover
+              // has to carry it or a thinned month's total is nowhere.
+              if (topLabel) rows.push({ key: '__t', label: topLabel.name, value: tText || MISSING })
               const sText = subLabel?.text(d)
               const noteText = [sText ? `${subLabel!.name}: ${sText}` : null, note?.(d)].filter(Boolean).join(' · ')
-              const aria = [
-                x(d),
-                ...rows.map((r) => `${r.label} ${r.value}`),
-                tText ? `${topLabel!.name} ${tText}` : null,
-                noteText || null,
-              ]
-                .filter(Boolean)
-                .join(', ')
+              // rows already carries the top label, so it is not repeated here.
+              const aria = [x(d), ...rows.map((r) => `${r.label} ${r.value}`), noteText || null].filter(Boolean).join(', ')
 
               return (
                 <Mark
@@ -494,7 +520,7 @@ export function ColumnChart<D>({
                   onHide={hide}
                 >
                   <g opacity={op}>{bars}</g>
-                  {topLabel && tText && i % layout.topStep === 0 && (
+                  {topLabel && tText && layout.topAxis.shows(i) && (
                     <text
                       x={cx}
                       y={topY - 5}
@@ -505,29 +531,39 @@ export function ColumnChart<D>({
                       {tText}
                     </text>
                   )}
-                  {i % layout.xStep === 0 && (
+                  {layout.xAxis.shows(i) && (
                     <FitText
-                      text={layout.labels[i]}
-                      maxWidth={layout.band * layout.xStep - 4}
-                      fontSize={layout.tickFont}
+                      text={layout.axisLabels[i]}
+                      full={layout.labels[i]}
+                      maxWidth={layout.xAxis.room(i)}
+                      fontSize={layout.xAxis.fontSize}
                       x={cx}
-                      y={layout.plotBottom + 11}
+                      y={layout.plotBottom + TICK_LEN + TICK_GAP}
                       anchor="middle"
                     />
                   )}
-                  {subLabel && sText && i % layout.subStep === 0 && (
+                  {subLabel && sText && layout.subAxis.shows(i) && (
                     <FitText
                       text={sText}
-                      maxWidth={layout.band * layout.subStep - 4}
+                      maxWidth={layout.subAxis.room(i)}
                       fontSize={FONT.small}
                       x={cx}
-                      y={layout.plotBottom + 25}
+                      y={layout.plotBottom + TICK_LEN + TICK_GAP + 14}
                       anchor="middle"
                     />
                   )}
                 </Mark>
               )
             })}
+
+            {/* a tick per category, so a thinned label still leaves a mark
+                where its column stands */}
+            <CategoryTicks
+              at={data.map((_, i) => layout.plotL + layout.band * (i + 0.5))}
+              base={layout.plotBottom}
+              labelled={(i) => layout.xAxis.shows(i)}
+              size={TICK_LEN}
+            />
 
             {/* zero line: the baseline every column grows from */}
             <line
@@ -588,6 +624,40 @@ export function ZeroNote({ x, y }: { x: number; y: number }) {
   )
 }
 
+/**
+ * Which labels of one row of axis text are drawn, and how wide each may be.
+ * `room` is the exact width the thinning left it, so it is passed to FitText
+ * as-is: shaving a few px off it would ellipsise a label that just fits.
+ * `shows(i)` is false for a thinned label — the category still gets a tick,
+ * and its words are still in the tooltip and the table.
+ */
+function axisPicks(
+  labels: string[] | null,
+  slot: number,
+  fontSize: number,
+  opts: { W?: number; plotL?: number; minFontSize?: number } = {},
+): { shows: (i: number) => boolean; room: (i: number) => number; fontSize: number } {
+  if (!labels) return { shows: () => false, room: () => slot, fontSize }
+  // minFontSize is for a PERIOD axis, where naming every period is worth a
+  // smaller font. The value labels above and below the columns are not: they
+  // are already secondary, and shrinking them to fit more of them is the
+  // wrong trade.
+  const fit = fitAxisLabels(labels, slot, fontSize, { minFontSize: opts.minFontSize })
+  const kept = new Set(fit.picks)
+  const { W, plotL } = opts
+  return {
+    fontSize: fit.fontSize,
+    shows: (i) => kept.has(i),
+    // Capped at twice the distance to each SVG edge, so a pinned end label
+    // ellipsises (and keeps its full form as a title) instead of being cut.
+    room: (i) => {
+      const base = fit.rooms[i] ?? slot
+      if (W == null || plotL == null) return base
+      return edgeRoom(base, plotL + slot * (i + 0.5), W)
+    },
+  }
+}
+
 function fmtVal(v: number | null | undefined, f: Formatter): string {
   return isNum(v) ? f(v) : MISSING
 }
@@ -632,7 +702,8 @@ function OverlayStrip<D>({ data, overlay, layout }: { data: D[]; overlay: Column
   const cx = (i: number) => layout.plotL + layout.band * (i + 0.5)
   const color = overlay.color ?? 'var(--chart-keep)'
   const texts = vals.map((v) => (isNum(v) ? overlay.format(v) : ''))
-  const step = labelStep(texts, layout.band, layout.tickFont)
+  // Same rule as the category axis: thin to fit, but always name the ends.
+  const picks = axisPicks(texts, layout.band, layout.tickFont)
   // Break the line at missing values: a gap says "no figure", a line through
   // it would invent one.
   const segs: string[] = []
@@ -661,7 +732,7 @@ function OverlayStrip<D>({ data, overlay, layout }: { data: D[]; overlay: Column
         isNum(v) ? (
           <g key={i}>
             <circle data-mark="overlay" cx={cx(i)} cy={y(v)} r={4} strokeWidth={2} style={{ fill: color, stroke: 'var(--chart-surface)' }} />
-            {i % step === 0 && (
+            {picks.shows(i) && (
               <text
                 x={cx(i)}
                 y={y(v) - 8}

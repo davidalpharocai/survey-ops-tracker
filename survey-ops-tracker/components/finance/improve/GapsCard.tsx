@@ -17,7 +17,7 @@ import { BarChart, Legend, fmtMoney, fmtMoneyCompact, type LegendItem } from '@/
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
 import { fmtNum } from '@/lib/utils/number'
 import { money, pctText } from '@/lib/finance/format'
-import { DOLLARS_KIND_LABEL, TOP_ACCOUNTS, type Gap, type ImproveModel, type PriceHeader } from '@/lib/finance/improve'
+import { DOLLARS_KIND_LABEL, TOP_ACCOUNTS, type Gap, type GapKey, type ImproveModel, type PriceHeader } from '@/lib/finance/improve'
 import type { FinanceTabProps } from '../tabs/types'
 import { FinanceCard, Figure, Note } from '../tabs/Card'
 
@@ -40,6 +40,39 @@ const KIND_COLOR: Record<Gap['dollarsKind'], string> = {
   price: 'var(--chart-price)',
   estimate: 'var(--chart-muted)',
   none: 'var(--chart-muted)',
+}
+
+/**
+ * The name each bar is DRAWN with.
+ *
+ * A gap's real title is a sentence ("Panel purchases missing on PureSpectrum
+ * surveys") because the ranked list below has to say what is missing without a
+ * tooltip. On the chart that sentence costs 38% of the width — the cap the bar
+ * chart puts on its label column — and below about 800px it is cut to an
+ * ellipsis anyway, which is how two different gaps end up drawn as "Panel
+ * purchases missing on Pur…" and "Phase still says Scoping on w…". So the axis
+ * prints the short name and the full title rides along as its title=, in the
+ * tooltip, in the accessible summary and on the row beneath the chart — which
+ * is where the sentence belongs. Typed as a total record so a new gap cannot
+ * ship without one.
+ */
+const GAP_SHORT: Record<GapKey, string> = {
+  'price': 'Price missing',
+  'sms-rate': 'SMS send rate',
+  'ps-rows': 'Panel rows (PS)',
+  'b2b-rows': 'Blast rows (B2B)',
+  'route-split': 'Route not split',
+  'post-qa-n': 'N actual (after QA)',
+  'no-date': 'No date',
+  'recoveries': 'Recoveries not booked',
+  'budgets': 'Budgets missing',
+  'priced-blocked': 'Priced, not counted',
+  'zero-price': '$0 prices',
+  'placeholder-flag': 'Placeholder flag',
+  'segments': 'Segments disagree',
+  'stale-phase': 'Scoping phase',
+  'empty-term': 'Terms empty',
+  'wave-target': 'Wave targets',
 }
 
 const KIND_HELP: Record<Gap['dollarsKind'], string> = {
@@ -100,6 +133,7 @@ function GapChart({ gaps, props }: { gaps: Gap[]; props: Props }) {
         ariaLabel="Dollars each open gap hides, largest first"
         data={sized}
         label={g => g.title}
+        labelShort={g => GAP_SHORT[g.key] ?? g.title}
         labelHeader="Gap"
         value={g => g.dollars}
         valueName="Dollars hidden"

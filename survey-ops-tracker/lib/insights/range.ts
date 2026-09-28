@@ -188,10 +188,20 @@ export function previousRange(choice: RangeChoice, today: string): DateRange | n
 /** '2026-09-27' → '2026-09'. */
 export const monthKey = (iso: string) => iso.slice(0, 7)
 
-/** '2026-09' → 'Sep', or 'Sep 2026' with the year. */
-export function monthShort(key: string, withYear = false): string {
+/**
+ * '2026-09' → 'Sep 26', or 'Sep' without the year — the NARROWEST form that
+ * still names both month and year, for a chart's x axis.
+ *
+ * A category axis thins labels that would collide, and what it thins away it
+ * cannot name. Measured with components/charts/scale.ts textWidth, at the
+ * 10px tick font a narrow panel uses: 'Sep 26' is 32px where 'Sep 2026' is
+ * 43px and 'September 2026' is 77px. The two-digit year is never worse, and
+ * on the narrowest screen (a ~320px chart, a 23px band) it keeps 6 of 12
+ * months named where the four-digit year keeps 4.
+ */
+export function monthNarrow(key: string, withYear = false): string {
   const [y, m] = key.split('-').map(Number)
-  return withYear ? `${MON[m - 1]} ${y}` : MON[m - 1]
+  return withYear ? `${MON[m - 1]} ${String(y).slice(-2)}` : MON[m - 1]
 }
 
 /** '2026-09' → 'September', or 'September 2026' with the year. */

@@ -241,6 +241,118 @@ describe('ColumnChart', () => {
     expect(screen.queryByRole('table')).not.toBeInTheDocument()
   })
 
+  // The Last-12-months window on /insights: every label carries a year, so
+  // the axis MUST thin them at the width the page renders at.
+  const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+  const year = ['2025-10', '2025-11', '2025-12', '2026-01', '2026-02', '2026-03', '2026-04', '2026-05', '2026-06', '2026-07', '2026-08', '2026-09'].map(
+    (k, i) => ({
+      k,
+      long: `${MON[Number(k.slice(5)) - 1]} ${k.slice(0, 4)}`,
+      short: `${MON[Number(k.slice(5)) - 1]} ${k.slice(2, 4)}`,
+      v: 3 + i,
+    }),
+  )
+  const twelve = {
+    ariaLabel: 'Delivered per month',
+    data: year,
+    width: 380,
+    x: (d: (typeof year)[number]) => d.long,
+    xKey: (d: (typeof year)[number]) => d.k,
+    series: [{ key: 'v', label: 'Delivered', value: (d: (typeof year)[number]) => d.v }],
+  }
+  /** What the axis PRINTS: a shortened label's <title> is part of textContent. */
+  const printed = (c: HTMLElement) =>
+    Array.from(c.querySelectorAll('text'))
+      .map((t) => Array.from(t.childNodes).filter((n) => n.nodeName !== 'title').map((n) => n.textContent).join(''))
+      .filter(Boolean)
+
+  it('gives every category a tick, even the ones whose label was thinned away', () => {
+    const { container } = render(<ColumnChart {...twelve} />)
+    const ticks = container.querySelectorAll('[data-part="category-ticks"] line')
+    expect(ticks).toHaveLength(12)
+    // The thinning is real at this width…
+    expect(container.querySelectorAll('[data-tick="plain"]').length).toBeGreaterThan(0)
+    // …and each tick stands under the centre of its own column band.
+    const xs = Array.from(ticks).map((t) => num(t, 'x1'))
+    const gaps = xs.slice(1).map((v, i) => v - xs[i])
+    for (const g of gaps) expect(g).toBeCloseTo(gaps[0], 5)
+  })
+
+  it('always names the first and last month of the window', () => {
+    const texts = printed(render(<ColumnChart {...twelve} />).container)
+    expect(texts).toContain('Oct 2025')
+    expect(texts).toContain('Sep 2026')
+  })
+
+  // Pinning the newest category is only worth anything if there is room to
+  // draw it. The flat 6px right margin was less than half a "21 Sep" on the
+  // finance Improve tab's 26-week logging strip (a third of the page, ~339px),
+  // so the newest week — the week the card's red alert is about — ran past the
+  // viewBox and lost its last glyphs, with no scaling to rescue it.
+  it('keeps the newest category inside the chart instead of cutting it off', () => {
+    const weeks = Array.from({ length: 26 }, (_, i) => ({
+      k: `w${i}`,
+      long: `${(i % 28) + 1} ${['Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep'][i % 7]} 2026`,
+      short: `${(i % 28) + 1} ${['Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep'][i % 7]}`,
+      v: 0.5 + (i % 5) / 10,
+    }))
+    for (const W of [339, 261]) {
+      const { container } = render(
+        <ColumnChart
+          ariaLabel="Logged within a week"
+          width={W}
+          data={weeks}
+          x={(d) => d.long}
+          xShort={(d) => d.short}
+          xKey={(d) => d.k}
+          series={[{ key: 's', label: 'Share', value: (d) => d.v }]}
+          valueFormat={(v) => `${Math.round(v * 100)}%`}
+          yDomain={[0, 1]}
+        />,
+      )
+      const last = weeks[25].short
+      const drawn = Array.from(container.querySelectorAll('svg text')).find(
+        (t) => Array.from(t.childNodes).filter((n) => n.nodeName !== 'title').map((n) => n.textContent).join('') === last,
+      )
+      expect(drawn, `newest week at ${W}px`).toBeTruthy()
+      // anchor="middle", so it needs half its own width on the right.
+      const font = Number((drawn!.getAttribute('style') ?? '').match(/font-size:\s*([\d.]+)/)?.[1] ?? FONT.tick)
+      expect(num(drawn!, 'x') + textWidth(last, font) / 2, `right edge at ${W}px`).toBeLessThanOrEqual(W)
+    }
+  })
+
+  it('shows a thinned month its full name, its value and its total on hover', () => {
+    const { container } = render(
+      <ColumnChart {...twelve} topLabel={{ name: 'Total', text: (d) => `${d.v}` }} onSelect={() => {}} />,
+    )
+    expect(printed(container)).not.toContain('Feb 2026')
+    fireEvent.mouseEnter(screen.getByRole('button', { name: /^Feb 2026/ }))
+    const card = screen.getByText('Feb 2026').closest('[aria-hidden]') as HTMLElement
+    expect(within(card).getByText('Delivered')).toBeInTheDocument()
+    // The top label is thinned like any other axis text, so hover carries it.
+    expect(within(card).getByText('Total')).toBeInTheDocument()
+  })
+
+  it('draws the short form on the axis and the long form in the tooltip and the table', () => {
+    const { container } = render(<ColumnChart {...twelve} xShort={(d) => d.short} xLabel="Month" onSelect={() => {}} />)
+    const texts = printed(container)
+    expect(texts).toContain('Sep 26')
+    expect(texts).not.toContain('Sep 2026')
+    // Hover: the full month, never the abbreviation.
+    fireEvent.mouseEnter(screen.getByRole('button', { name: /^Sep 2026/ }))
+    const card = container.querySelector('[aria-hidden].z-20') as HTMLElement
+    expect(within(card).getByText('Sep 2026')).toBeInTheDocument()
+    expect(within(card).queryByText('Sep 26')).not.toBeInTheDocument()
+    // Table: the full month too.
+    fireEvent.click(screen.getByRole('button', { name: 'View as table' }))
+    const table = screen.getByRole('table')
+    expect(within(table).getByRole('rowheader', { name: 'Sep 2026' })).toBeInTheDocument()
+    expect(within(table).getByRole('rowheader', { name: 'Feb 2026' })).toBeInTheDocument()
+    expect(within(table).queryByRole('rowheader', { name: 'Sep 26' })).not.toBeInTheDocument()
+    // …and the accessible summary names both ends in full.
+    expect(svgLabel(container)).toContain('12 categories, Oct 2025 to Sep 2026')
+  })
+
   it('shows the empty message for no rows or all-missing values', () => {
     const { rerender } = render(<ColumnChart ariaLabel="Price vs cost" data={[] as Month[]} x={(d) => d.m} series={series} />)
     expect(screen.getByText('No data in this view')).toBeInTheDocument()

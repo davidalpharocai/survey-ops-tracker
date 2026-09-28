@@ -130,6 +130,70 @@ describe('InsightsDashboard', () => {
     expect(within(panel).getAllByRole('link').filter(a => a.getAttribute('href')?.startsWith('/projects/'))).toHaveLength(1)
   })
 
+  /**
+   * David, 2026-09-28: "if im looking at last 12 months as a date range, then
+   * it needs to show the month-year in the chart. how else would i follow it".
+   * So: every drawn month label names its month AND its year, the full month
+   * is one hover away, and every month — labelled or thinned — has a tick.
+   */
+  describe('following a 12-month window', () => {
+    /**
+     * These render at DEFAULT_CHART_WIDTH: jsdom has no ResizeObserver, so
+     * useChartWidth never measures and every chart here is 640px wide — not a
+     * width the page renders at. The two trend charts actually get 534px (see
+     * LineChart.test.tsx, "names all twelve months at the width /insights
+     * renders it"), which is where the thinning used to bite; this file is
+     * about the WIRING — which label the page hands each chart, and that a
+     * thinned one is still recoverable — not about the geometry.
+     */
+    /** The axis labels that were shortened: what is drawn, and the full form
+     *  riding along as the <title> a hover shows. */
+    const axisMonths = (container: HTMLElement) =>
+      [...container.querySelectorAll('svg text > title')]
+        .filter(t => /^[A-Z][a-z]+ \d{4}$/.test(t.textContent ?? ''))
+        .map(t => ({ full: t.textContent, drawn: t.nextSibling?.textContent }))
+
+    it('draws a narrow month-and-year on every label, with the full month on hover', () => {
+      qs = 'range=last-12-months'
+      const { container } = render(<InsightsDashboard />)
+      const labels = axisMonths(container)
+      // Three month charts (delivered, on time, cycle time) of twelve months.
+      expect(labels).toHaveLength(36)
+      expect(labels.map(l => l.drawn)).toContain('Oct 25')
+      expect(labels.map(l => l.drawn)).toContain('Sep 26')
+      // Nothing is drawn that a reader could read as the wrong year…
+      expect(labels.every(l => /^[A-Z][a-z]{2} \d{2}$/.test(l.drawn ?? ''))).toBe(true)
+      // …and the axis never spends its width on the long form.
+      expect(labels.find(l => l.full === 'September 2026')?.drawn).toBe('Sep 26')
+    })
+
+    it('gives every month a tick, so a thinned label still leaves its place marked', () => {
+      qs = 'range=last-12-months'
+      const { container } = render(<InsightsDashboard />)
+      const ticks = [...container.querySelectorAll('[data-part="category-ticks"]')]
+      expect(ticks.length).toBeGreaterThanOrEqual(3)
+      expect(ticks[0].querySelectorAll('line')).toHaveLength(12)
+    })
+
+    it('a KPI sparkline has no axis, so it names its ends and its whole trend on hover', () => {
+      qs = 'range=last-12-months'
+      const { container } = render(<InsightsDashboard />)
+      const trend = container.querySelector('[title^="Surveys delivered per month."]') as HTMLElement
+      expect(trend).toBeTruthy()
+      expect(trend.getAttribute('title')).toMatch(/October 2025/)
+      expect(trend.getAttribute('title')).toMatch(/September 2026/)
+      expect(within(trend).getByText('Oct 25')).toBeInTheDocument()
+      expect(within(trend).getByText('Sep 26')).toBeInTheDocument()
+    })
+
+    it('a clicked month still opens under its full name', () => {
+      qs = 'range=last-12-months'
+      render(<InsightsDashboard />)
+      fireEvent.click(screen.getAllByRole('button', { name: /^September 2026/ })[0])
+      expect(screen.getByRole('dialog', { name: 'Delivered · September 2026' })).toBeInTheDocument()
+    })
+  })
+
   it('a failed child table is named, and the page still draws', () => {
     raw = { ...fixture(), rowCounts: null, blocked: [{ table: 'project_costs', message: 'timeout' }] }
     render(<InsightsDashboard />)

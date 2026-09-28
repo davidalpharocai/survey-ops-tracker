@@ -18,8 +18,9 @@ import { ChartFrame, type ChartTable } from './ChartFrame'
 import { Rules, ZeroNote } from './ColumnChart'
 import type { LegendItem } from './Legend'
 import { fmtCount, MISSING, type Formatter } from './format'
-import { labelStep, linear, niceDomain, textWidth } from './scale'
+import { edgeRoom, fitAxisLabels, linear, niceDomain, textWidth } from './scale'
 import {
+  CategoryTicks,
   ChartSvg,
   ChartTooltip,
   FitText,
@@ -37,6 +38,11 @@ import {
 import type { CategoryRule, ChartCommon, ReferenceLine, Series } from './types'
 import { useChartWidth } from './useChartWidth'
 
+/** Length of a labelled category tick; the x labels clear it. */
+const TICK_LEN = 5
+/** Baseline to the middle of the x label: clear of the tick, not floating. */
+const TICK_GAP = 8
+
 export interface LineChartProps<D> extends ChartCommon<D> {
   data: D[]
   x: (d: D) => string
@@ -44,6 +50,11 @@ export interface LineChartProps<D> extends ChartCommon<D> {
    *  matches it, so a window longer than a year can tell one "Sep" from the
    *  next. (Not called `key`: React keeps that prop for itself.) */
   xKey?: (d: D) => string
+  /** A NARROW form of the period label for the axis only, e.g. "Sep 26" for
+   *  "September 2026". The tooltip, the accessible summary and the table
+   *  always use `x`, so nothing is lost by shortening; the axis text also
+   *  carries the long form as its title=. Omit it and the axis uses `x`. */
+  xShort?: (d: D) => string
   /** Table header for the period column (default "Period"). */
   xLabel?: string
   series: Series<D>[]
@@ -67,6 +78,7 @@ export function LineChart<D>({
   data,
   x,
   xKey: keyOf = x,
+  xShort,
   xLabel = 'Period',
   series,
   valueFormat = fmtCount,
@@ -105,9 +117,11 @@ export function LineChart<D>({
     const tickFont = narrow ? FONT.small : FONT.tick
     const n = data.length
     const labels = data.map(x)
+    // What the axis prints. The long form stays on the tooltip and the table.
+    const axisLabels = xShort ? data.map(xShort) : labels
     const rulesH = rules.length * 14
     const top = 6 + rulesH + 8
-    const bottom = 20
+    const bottom = TICK_LEN + TICK_GAP + 13
     const plotH = Math.max(60, height - top - bottom)
     const H = top + plotH + bottom
 
@@ -143,6 +157,13 @@ export function LineChart<D>({
       }
       if (endLabel && endLabel.i === n - 1) right = Math.max(right, textWidth(endLabel.text, tickFont) + 10)
     }
+    // The newest period's label is centred on the last point, which sits at
+    // plotR — so half of it hangs past the plot. Reserve that room, or the
+    // month a reader looks at first (and the one labelIndices guarantees is
+    // drawn) runs off the SVG and is silently cut: ChartSvg's viewBox is the
+    // pixel box, so nothing scales it back in.
+    const endHalf = textWidth(axisLabels[n - 1] ?? '', tickFont) / 2
+    right = Math.min(Math.max(right, endHalf), Math.max(8, W * 0.25))
     const plotL = left
     const plotR = Math.max(plotL + 40, W - right)
     const plotW = plotR - plotL
@@ -152,12 +173,25 @@ export function LineChart<D>({
     const plotTop = top
     const plotBottom = top + plotH
     const y = linear([dom.min, dom.max], [plotBottom, plotTop])
+    const slot = n === 1 ? plotW : step
+    // One step smaller beats thinning (fitAxisLabels): twelve "Oct 25" labels
+    // fit the half-width Insights panel at 10px and collide by a hair at 11.
+    // The VALUE axis keeps tickFont either way — only the periods move.
+    const fit = fitAxisLabels(axisLabels, slot, tickFont, { minFontSize: FONT.small })
+    const kept = new Set(fit.picks)
     return {
-      narrow, tickFont, n, labels, rulesH, H, plotL, plotR, plotW, px, step, plotTop, plotBottom, y, dom, tickLabels, endLabel,
+      narrow, tickFont, n, labels, axisLabels, rulesH, H, plotL, plotR, plotW, px, step, plotTop, plotBottom, y, dom, tickLabels, endLabel,
       band: step,
-      xStep: labelStep(labels, n === 1 ? plotW : step, tickFont),
+      xFont: fit.fontSize,
+      // Which periods carry a label; the rest still get a tick, and their
+      // words are still in the tooltip and the table. `room` is the width the
+      // thinning left a label, capped at twice its distance to each edge so a
+      // pinned end label ellipsises (recoverable from its title) rather than
+      // being cut by the viewBox.
+      shows: (i: number) => kept.has(i),
+      room: (i: number) => edgeRoom(fit.rooms[i] ?? slot, px(i), W),
     }
-  }, [empty, W, data, x, series, rules.length, height, referenceLines, yDomain, includeZero, fmtAxis, valueFormat])
+  }, [empty, W, data, x, xShort, series, rules.length, height, referenceLines, yDomain, includeZero, fmtAxis, valueFormat])
 
   const summary = useMemo(() => {
     if (empty) return ''
@@ -392,19 +426,28 @@ export function LineChart<D>({
                     hide()
                   }}
                 >
-                  {i % layout.xStep === 0 && (
+                  {layout.shows(i) && (
                     <FitText
-                      text={layout.labels[i]}
-                      maxWidth={(layout.n === 1 ? layout.plotW : layout.step * layout.xStep) - 4}
-                      fontSize={layout.tickFont}
+                      text={layout.axisLabels[i]}
+                      full={layout.labels[i]}
+                      maxWidth={layout.room(i)}
+                      fontSize={layout.xFont}
                       x={cx}
-                      y={layout.plotBottom + 11}
+                      y={layout.plotBottom + TICK_LEN + TICK_GAP}
                       anchor="middle"
                     />
                   )}
                 </Mark>
               )
             })}
+            {/* a tick per period, so a thinned label still leaves a mark
+                where its point sits */}
+            <CategoryTicks
+              at={data.map((_, i) => layout.px(i))}
+              base={layout.plotBottom}
+              labelled={(i) => layout.shows(i)}
+              size={TICK_LEN}
+            />
           </ChartSvg>
           <ChartTooltip tip={tip} width={W} />
         </>

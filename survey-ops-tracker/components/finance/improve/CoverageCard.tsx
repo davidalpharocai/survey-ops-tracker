@@ -20,6 +20,7 @@ import { Heatmap, fmtPct } from '@/components/charts'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
 import { fmtNum } from '@/lib/utils/number'
 import { coverageCellDrill, type CoverageGrid, type CoverageHeatCell, type ImproveInput } from '@/lib/finance/improve'
+import { monthShort, spansYears } from '../periodAxis'
 import type { FinanceTabProps } from '../tabs/types'
 import { FinanceCard, Note } from '../tabs/Card'
 
@@ -42,6 +43,19 @@ export function CoverageCard({ grid, input, props }: {
     } : undefined)
   }
   const ignored = props.filter.range.preset === 'all' ? [] : ['Dates highlight months here; they do not remove any']
+  // Every month with delivered work is a column whatever dates are picked, so
+  // this axis nearly always runs across a year — and two columns reading "Jun"
+  // a year apart name nothing. When the columns cross a year they carry it:
+  // "Jun 25", "Jun 26". The full month stays on every cell's tooltip, on the
+  // drawn header's own title, and in the table twin.
+  //
+  // The wider label used to cost this grid its newest month: Heatmap thinned
+  // with `labelStep` and an `i % step` walk from the LEFT, so at 14 to 21
+  // columns it named every other month and the last one only when the count
+  // was odd. Heatmap now uses the same rule as the column charts (scale.ts
+  // fitAxisLabels: shrink a step before thinning, pin both ends, a tick over
+  // every column), so the newest month is named whatever the count.
+  const crossesYear = spansYears(grid.columns.map(c => c.key))
 
   return (
     <FinanceCard
@@ -59,7 +73,7 @@ export function CoverageCard({ grid, input, props }: {
           ariaLabel="Share of delivered surveys carrying each field, by delivery month"
           rows={grid.rows.map(r => ({ key: r.key, label: r.label, description: r.help }))}
           columns={grid.columns.map(c => ({
-            key: c.key, label: c.label, shortLabel: c.shortLabel,
+            key: c.key, label: c.label, shortLabel: monthShort(c.key, crossesYear),
             description: `${fmtNum(c.delivered)} delivered survey${c.delivered === 1 ? '' : 's'}${c.selected ? ' · in your dates' : ''}`,
           }))}
           cells={grid.cells}

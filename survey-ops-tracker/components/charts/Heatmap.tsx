@@ -34,9 +34,10 @@ import { ChartFrame, DRILL_CONTROL_CLASS, type ChartTable } from './ChartFrame'
 import { Rules } from './ColumnChart'
 import type { LegendItem } from './Legend'
 import { fmtCount, MISSING, type Formatter } from './format'
-import { clamp, labelStep, textWidth } from './scale'
+import { clamp, fitAxisLabels, labelStep, textWidth } from './scale'
 import { contrast, mixRgb, useResolvedColors } from './color'
 import {
+  CategoryTicks,
   ChartSvg,
   ChartTooltip,
   FitText,
@@ -257,13 +258,25 @@ export function Heatmap<C extends HeatCell>({
     const gridTop = 4 + rulesH + headerH
     const cellH = cellHeight ?? (narrow ? 26 : 30)
     const H = gridTop + rows.length * cellH + 4
-    // Full column labels if they fit, else the short ones, else thin them.
+    // Full column labels if they fit, else the short ones, else thin them —
+    // and the thinning pins BOTH ENDS and shrinks a step before it drops
+    // anything (fitAxisLabels), the same rule the column charts follow.
+    // Walking `i % step` from the left used to leave the NEWEST month unnamed
+    // whenever the column count was even, which on a grid that draws every
+    // month with delivered work is most of the time.
     const full = columns.map((c) => c.label)
     const short = columns.map((c) => c.shortLabel ?? c.label)
     const useShort = labelStep(full, cellW, font) > 1
     const headLabels = useShort ? short : full
-    const headStep = labelStep(headLabels, cellW, font)
-    return { narrow, font, rowLabelW, rulesH, gridTop, cellW, cellH, H, headLabels, headStep, showCellText, plotBottom: gridTop + rows.length * cellH, plotL: rowLabelW, band: cellW, tickFont: font }
+    const head = fitAxisLabels(headLabels, cellW, font, { minFontSize: FONT.small })
+    const headKept = new Set(head.picks)
+    return {
+      narrow, font, rowLabelW, rulesH, gridTop, cellW, cellH, H, headLabels, showCellText,
+      headFont: head.fontSize,
+      headShows: (ci: number) => headKept.has(ci),
+      headRoom: (ci: number) => head.rooms[ci] ?? cellW,
+      plotBottom: gridTop + rows.length * cellH, plotL: rowLabelW, band: cellW, tickFont: font,
+    }
   })()
 
   const summary = useMemo(() => {
@@ -440,15 +453,18 @@ export function Heatmap<C extends HeatCell>({
         <>
           <ChartSvg width={W} height={layout.H} label={ariaLabel} summary={summary} interactive={interactive}>
             <HatchDef id={hatchId} />
-            {/* column headers */}
+            {/* column headers. `full` is the long month, so a header the
+                grid had to shorten ("Oct 25") still hovers to "October 2025",
+                the way every other shortened label now does. */}
             {columns.map((c, ci) =>
-              ci % layout.headStep === 0 ? (
+              layout.headShows(ci) ? (
                 <FitText
                   key={c.key}
                   text={layout.headLabels[ci]}
-                  maxWidth={layout.cellW * layout.headStep - 2}
-                  fontSize={layout.font}
-                  x={layout.rowLabelW + layout.cellW * (ci + 0.5)}
+                  full={c.label}
+                  maxWidth={layout.headRoom(ci)}
+                  fontSize={layout.headFont}
+                  x={headX(layout.rowLabelW + layout.cellW * (ci + 0.5), textWidth(layout.headLabels[ci], layout.headFont), W)}
                   y={layout.gridTop - 9}
                   anchor="middle"
                   weight={highlight?.includes(c.key) ? 600 : undefined}
@@ -456,6 +472,14 @@ export function Heatmap<C extends HeatCell>({
                 />
               ) : null,
             )}
+            {/* a tick per column, so a month whose name had to be thinned
+                away still leaves a mark above its column of cells */}
+            <CategoryTicks
+              at={columns.map((_, ci) => layout.rowLabelW + layout.cellW * (ci + 0.5))}
+              base={layout.gridTop}
+              labelled={(ci) => layout.headShows(ci)}
+              size={-3}
+            />
             {/* row labels */}
             {rows.map((r, ri) => (
               <FitText
@@ -565,4 +589,19 @@ export function Heatmap<C extends HeatCell>({
       )}
     </ChartFrame>
   )
+}
+
+/**
+ * Where a column header is actually drawn: its column's centre, pulled inside
+ * the SVG when half the label would hang past an edge.
+ *
+ * The grid fills the full width, so the outermost headers are centred barely
+ * half a cell from the edge and the viewBox would cut them. A header nudged a
+ * few pixels still names its column (the tick row marks the true centre, and
+ * the cell's own tooltip repeats it); a cut one is a guess.
+ */
+function headX(centre: number, labelWidth: number, width: number): number {
+  const half = labelWidth / 2
+  if (labelWidth >= width) return centre
+  return Math.min(Math.max(centre, half), width - half)
 }

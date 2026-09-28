@@ -32,6 +32,10 @@ const MUTED_OPACITY = 0.4
 export interface RangeChartProps<D> extends ChartCommon<D> {
   data: D[]
   label: (d: D) => string
+  /** A NARROW form of the name for the drawn row label only. The tooltip,
+   *  the accessible summary and the table always use `label`, and the drawn
+   *  name carries the full form as its title=. */
+  labelShort?: (d: D) => string
   /** Table header for the name column (default "Lever"). */
   labelHeader?: string
   low: (d: D) => number | null | undefined
@@ -59,6 +63,7 @@ export interface RangeChartProps<D> extends ChartCommon<D> {
 export function RangeChart<D>({
   data,
   label,
+  labelShort,
   labelHeader = 'Lever',
   low,
   high,
@@ -92,6 +97,8 @@ export function RangeChart<D>({
   const colorOf = (d: D) => (typeof color === 'function' ? color(d) : color)
   const reasonOf = (d: D) => missingText?.(d) || 'No estimate'
   const tagOf = (d: D) => (muted?.(d) ? mutedNote : null)
+  /** What the row PRINTS; `label` is what it says on hover and in the table. */
+  const shortOf = (d: D) => labelShort?.(d) ?? label(d)
 
   const rangeText = (d: D) => {
     const lo = low(d)
@@ -214,8 +221,10 @@ export function RangeChart<D>({
               const labelX = place === 'after' ? barEnd + 6 : place === 'before' ? xa - 6 : barEnd - 6
               const rows: TipRow[] = [{ key: 'r', label: valueName, value: text, color: none ? undefined : fill }]
               if (c) rows.push({ key: 'c', label: 'Confidence', value: c })
-              const noteText = [tag ? `Faded: ${tag}` : null, note?.(d)].filter(Boolean).join(' · ') || undefined
-              const aria = [label(d), sub, `${valueName} ${text}`, c ? `confidence ${c}` : null, noteText].filter(Boolean).join(', ')
+              // Hover carries everything the row shows, including the line
+              // under the name — a reader should never have to read both.
+              const noteText = [sub, tag ? `Faded: ${tag}` : null, note?.(d)].filter(Boolean).join(' · ') || undefined
+              const aria = [label(d), `${valueName} ${text}`, c ? `confidence ${c}` : null, noteText].filter(Boolean).join(', ')
               return (
                 <Mark
                   key={i}
@@ -228,11 +237,12 @@ export function RangeChart<D>({
                   onHide={hide}
                 >
                   <TaggedText
-                    text={label(d)}
+                    text={shortOf(d)}
+                    full={label(d)}
                     tag={tag}
-                    maxWidth={W - cW - 10}
+                    maxWidth={W - cW - 14}
                     fontSize={FONT.label}
-                    x={2}
+                    x={6}
                     y={top + 9}
                     className={isMuted ? 'fill-muted-foreground' : 'fill-foreground'}
                     weight={500}
@@ -253,7 +263,7 @@ export function RangeChart<D>({
                       </text>
                     </g>
                   )}
-                  {sub && <FitText text={sub} maxWidth={W - 8} fontSize={FONT.small} x={2} y={top + 23} />}
+                  {sub && <FitText text={sub} maxWidth={W - 12} fontSize={FONT.small} x={6} y={top + 23} />}
                   {/* gridlines only through the bar strip, so they never cross the label text */}
                   {scale.dom.ticks.map((t, ti) => (
                     <line

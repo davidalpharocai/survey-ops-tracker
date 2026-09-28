@@ -83,6 +83,33 @@ describe('RangeChart', () => {
     expect(within(table).getAllByText('Faded: direction only').length).toBeGreaterThan(0)
   })
 
+  // As on the dumbbell: the name is printed on its own line above its bar,
+  // so a rail at the chart's left edge marks nothing a reader was confused
+  // about. The rail belongs only where a label COLUMN sits beside the marks.
+  it('draws no row rail, because each name sits on its own line above its bar', () => {
+    const { container } = render(<RangeChart {...base} />)
+    expect(container.querySelectorAll('[data-tick="row"]')).toHaveLength(0)
+    const names = Array.from(container.querySelectorAll('text')).filter((t) => t.textContent?.startsWith('Lever '))
+    expect(names).toHaveLength(3)
+    const ys = names.map((t) => Number(t.getAttribute('y')))
+    ys.slice(1).forEach((y, i) => expect(y).toBeGreaterThan(ys[i]))
+  })
+
+  it('draws a short lever name but keeps the full one on hover and in the table', () => {
+    const { container } = render(
+      <RangeChart {...base} labelShort={(d) => d.name.replace('Lever ', 'L')} sublabel={() => 'gives up speed'} onSelect={() => {}} />,
+    )
+    const drawn = Array.from(container.querySelectorAll('text')).find((t) => t.textContent?.includes('Lever two'))!
+    expect(Array.from(drawn.childNodes).filter((n) => n.nodeName !== 'title').map((n) => n.textContent).join('')).toBe('Ltwo')
+    expect(drawn.querySelector('title')!.textContent).toBe('Lever two')
+    fireEvent.mouseEnter(screen.getByRole('button', { name: /^Lever two/ }))
+    const card = container.querySelector('[aria-hidden].z-20') as HTMLElement
+    expect(within(card).getByText('Lever two')).toBeInTheDocument()
+    expect(within(card).getByText(/gives up speed/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'View as table' }))
+    expect(within(screen.getByRole('table')).getByRole('rowheader', { name: 'Lever two (gives up speed)' })).toBeInTheDocument()
+  })
+
   it('drills a lever and shows the empty state', () => {
     const onSelect = vi.fn()
     const { rerender } = render(<RangeChart {...base} onSelect={onSelect} />)

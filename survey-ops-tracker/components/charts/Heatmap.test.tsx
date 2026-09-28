@@ -186,6 +186,57 @@ describe('Heatmap', () => {
     }
   })
 
+  // The coverage grid draws EVERY month with delivered work, whatever dates
+  // the page is set to, so its header nearly always crosses a year and
+  // carries one ("Jun 25"). A wider label used to cost the grid its newest
+  // month: it thinned with `i % step` from the left, so at 14 to 21 columns
+  // it named every other month and the last one only when the count was odd.
+  describe('a month-by-month header', () => {
+    const many = (n: number) =>
+      Array.from({ length: n }, (_, i) => {
+        const yr = 2025 + Math.floor(i / 12)
+        const mon = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][i % 12]
+        return { key: `${yr}-${i % 12}`, label: `${mon} ${yr}`, shortLabel: `${mon} ${String(yr).slice(2)}` }
+      })
+    const grid = (n: number, width: number) => {
+      const cols = many(n)
+      return render(
+        <Heatmap
+          ariaLabel="Coverage"
+          width={width}
+          rows={rows}
+          columns={cols}
+          cells={cols.flatMap((c) => rows.map((r) => ({ row: r.key, col: c.key, value: 0.5 })))}
+          valueFormat={(v) => fmtPct(v)}
+        />,
+      )
+    }
+    const drawn = (c: HTMLElement) =>
+      [...c.querySelectorAll('svg text')]
+        .map((t) => [...t.childNodes].filter((n) => n.nodeName !== 'title').map((n) => n.textContent).join(''))
+        .filter((t) => /^[A-Z][a-z]{2} \d{2}$/.test(t))
+
+    it('names the newest month at every column count, not only the odd ones', () => {
+      for (const n of [12, 14, 16, 18, 20, 24, 26]) {
+        const { container } = grid(n, 728)
+        expect(drawn(container)).toContain(many(n)[n - 1].shortLabel)
+        expect(drawn(container)).toContain(many(n)[0].shortLabel)
+      }
+    })
+
+    it('leaves a tick over every column, including the months it had to thin', () => {
+      const { container } = grid(26, 728)
+      expect(container.querySelectorAll('[data-part="category-ticks"] line')).toHaveLength(26)
+      expect(container.querySelectorAll('[data-tick="plain"]').length).toBeGreaterThan(0)
+    })
+
+    it('hovers a shortened header back to its full month', () => {
+      const { container } = grid(14, 728)
+      const sep = [...container.querySelectorAll('svg text')].find((t) => t.textContent?.endsWith('Jan 25'))!
+      expect(sep.querySelector('title')?.textContent).toBe('Jan 2025')
+    })
+  })
+
   it('has a table twin and an empty state', () => {
     const { rerender } = render(<Heatmap ariaLabel="Coverage" rows={rows} columns={columns} cells={cells} valueFormat={(v) => fmtPct(v)} />)
     fireEvent.click(screen.getByRole('button', { name: 'View as table' }))

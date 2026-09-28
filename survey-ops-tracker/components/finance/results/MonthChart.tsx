@@ -16,6 +16,7 @@
 
 import { ColumnChart, fmtCount, fmtMoney, fmtMoneyCompact, fmtPct } from '@/components/charts'
 import { monthLabel } from '@/lib/finance/coverage'
+import { monthShort, spansYears } from '../periodAxis'
 import { goalKeptWords, type MonthBar } from '@/lib/finance/results'
 
 /** How far a month fades: greyed before costs were recorded, lighter when thin. */
@@ -29,13 +30,19 @@ export function MonthChart({ months, costReliableFrom, onSelect }: {
 }) {
   const anyBefore = months.some(m => m.beforeReliable)
   const firstReliable = months.find(m => !m.beforeReliable)
+  // The axis names every month it draws. "Sep 2026" is wide enough that a
+  // twelve-month view drops half its labels, so the axis prints "Sep 26" (or
+  // "Sep" inside a single year) and the full month rides along as the drawn
+  // label's title, the tooltip heading and the table row.
+  const crossesYear = spansYears(months.map(m => m.key))
   return (
     <ColumnChart
       ariaLabel="Client price against our cost by delivery month, on surveys with both"
       title="By delivery month"
       info="Client price (teal) and our cost (navy) on the same surveys: the ones with both a price and a recorded cost. The hatched bar is spend on delivered surveys with no client price. We keep % sits in the strip above; the count under each month is surveys with a price and a cost, out of all delivered. Click a month to see its surveys."
       data={months}
-      x={m => m.short}
+      x={m => m.label}
+      xShort={m => monthShort(m.key, crossesYear)}
       xKey={m => m.key}
       xLabel="Month"
       series={[

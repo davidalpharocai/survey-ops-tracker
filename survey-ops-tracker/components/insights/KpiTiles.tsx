@@ -2,10 +2,10 @@
 
 import type { ReactNode } from 'react'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
-import { Sparkline, fmtPct } from '@/components/charts'
+import { Sparkline, describeTrend, fmtCount, fmtPct, type Formatter } from '@/components/charts'
 import { fmtNum } from '@/lib/utils/number'
 import {
-  CYCLE_DAYS_GOAL, ON_TIME_GOAL, daysText, pctText, type Comparison, type InsightsModel,
+  CYCLE_DAYS_GOAL, ON_TIME_GOAL, daysText, pctText, type Comparison, type InsightsModel, type MonthRow,
 } from '@/lib/insights/model'
 import { filterSuffix, sideBucketRequest, type OpenDrill } from './drill'
 import { OpenCount } from './OpenCount'
@@ -57,9 +57,51 @@ function Kpi({
   )
 }
 
+/**
+ * A tile's sparkline, with its two ends named.
+ *
+ * The sparkline is 32px tall: no axis, no ticks, no tooltip, nowhere to put a
+ * label per month. On its own it says something rose without saying between
+ * when and when — the same complaint the chart axes just answered. So the
+ * first and last month are printed under it (the rule the axes follow: the
+ * ends are always named), and the hover text and the accessible summary —
+ * one string, describeTrend — name the first month, the last, the peak when
+ * it is neither, and the goal. Three months of twelve, not twelve.
+ *
+ * What it still will not do is name ONE point in the middle: there is no hit
+ * area per month at this size, and inventing one would put a tooltip over a
+ * 32px graphic. The month charts below the tiles are where a single month is
+ * read, and they carry the same months.
+ */
+function TileTrend({ ariaLabel, months, values, valueFormat = fmtCount, ...spark }: {
+  ariaLabel: string
+  months: MonthRow[]
+  values: (number | null)[]
+  valueFormat?: Formatter
+  color?: string
+  goal?: number
+  includeZero?: boolean
+}) {
+  const labels = months.map(x => x.long)
+  const first = months[0]
+  const last = months[months.length - 1]
+  return (
+    <div title={`${ariaLabel}. ${describeTrend(values, labels, valueFormat, spark.goal)}`}>
+      <Sparkline ariaLabel={ariaLabel} values={values} labels={labels} valueFormat={valueFormat} {...spark} />
+      {first && (
+        // The <svg> already spells the window out in its accessible name, so
+        // this repeat is for the eye only.
+        <div aria-hidden className="mt-0.5 flex justify-between text-[10px] leading-none text-muted-foreground">
+          <span>{first.short}</span>
+          {last.key !== first.key && <span>{last.short}</span>}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function KpiTiles({ model: m, open }: { model: InsightsModel; open: OpenDrill }) {
   const c = m.cur
-  const labels = m.months.map(x => x.label)
   const scope = m.scope
   const undated = m.undatedDelivered
   const allTime = m.range.from == null && m.range.to == null
@@ -122,7 +164,7 @@ export function KpiTiles({ model: m, open }: { model: InsightsModel; open: OpenD
         ]}
         compare={m.compare.delivered}
       >
-        <Sparkline ariaLabel="Surveys delivered per month" values={m.months.map(x => x.total)} labels={labels} />
+        <TileTrend ariaLabel="Surveys delivered per month" months={m.months} values={m.months.map(x => x.total)} />
       </Kpi>
 
       <Kpi
@@ -140,7 +182,12 @@ export function KpiTiles({ model: m, open }: { model: InsightsModel; open: OpenD
         ]}
         compare={m.compare.respondents}
       >
-        <Sparkline ariaLabel="Respondents delivered per month" values={m.months.map(x => (x.withN ? x.respondents : null))} labels={labels} color="var(--chart-cat-7)" />
+        <TileTrend
+          ariaLabel="Respondents delivered per month"
+          months={m.months}
+          values={m.months.map(x => (x.withN ? x.respondents : null))}
+          color="var(--chart-cat-7)"
+        />
       </Kpi>
 
       <Kpi
@@ -161,10 +208,10 @@ export function KpiTiles({ model: m, open }: { model: InsightsModel; open: OpenD
         ]}
         compare={m.compare.onTime}
       >
-        <Sparkline
+        <TileTrend
           ariaLabel="Share delivered on time per month"
+          months={m.months}
           values={m.months.map(x => x.onTimePct)}
-          labels={labels}
           goal={ON_TIME_GOAL}
           includeZero={false}
           valueFormat={v => fmtPct(v)}
@@ -190,10 +237,10 @@ export function KpiTiles({ model: m, open }: { model: InsightsModel; open: OpenD
         ]}
         compare={m.compare.cycle}
       >
-        <Sparkline
+        <TileTrend
           ariaLabel="Median days from submitted to delivered per month"
+          months={m.months}
           values={m.months.map(x => x.cycleMedian)}
-          labels={labels}
           goal={CYCLE_DAYS_GOAL}
           valueFormat={v => daysText(v)}
           color="var(--chart-cat-7)"
@@ -235,7 +282,7 @@ export function KpiTiles({ model: m, open }: { model: InsightsModel; open: OpenD
         lines={[c.delivered ? `${fmtNum(c.reruns)} of ${s(c.delivered, 'delivery', 'deliveries')} (${pctText(c.reruns / c.delivered)})` : 'No deliveries in these dates']}
         compare={m.compare.reruns}
       >
-        <Sparkline ariaLabel="Reruns delivered per month" values={m.months.map(x => x.reruns)} labels={labels} color="var(--chart-cat-3)" />
+        <TileTrend ariaLabel="Reruns delivered per month" months={m.months} values={m.months.map(x => x.reruns)} color="var(--chart-cat-3)" />
       </Kpi>
     </div>
   )

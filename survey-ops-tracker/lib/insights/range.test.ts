@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  addMonths, daysBetween, formatRange, inRange, isoOrNull, isWholeMonths, monthCoverage, monthsBetween, previousRange,
+  addMonths, daysBetween, formatRange, inRange, isoOrNull, isWholeMonths, monthCoverage, monthNarrow, monthsBetween, previousRange,
   rangeWords, resolveRange, shiftMonths, todayET, trendMonths, MAX_TREND_MONTHS, RANGE_PRESETS, type RangeChoice, type RangePreset,
 } from './range'
 
@@ -115,6 +115,16 @@ describe('months', () => {
   })
   it('all time starts at the first month with a delivery', () => {
     expect(trendMonths({ from: null, to: null }, TODAY, '2026-02')[0]).toBe('2026-02')
+  })
+  it('monthNarrow names the month, and the year in two digits when it is wanted', () => {
+    expect(monthNarrow('2026-09')).toBe('Sep')
+    expect(monthNarrow('2026-09', true)).toBe('Sep 26')
+    expect(monthNarrow('2025-12', true)).toBe('Dec 25')
+    // Every month of a crossing window carries a year, so no drawn label can
+    // be read as the wrong year (see monthRows in model.ts).
+    expect(monthsBetween('2025-10', '2026-09').map(k => monthNarrow(k, true)))
+      .toEqual(['Oct 25', 'Nov 25', 'Dec 25', 'Jan 26', 'Feb 26', 'Mar 26', 'Apr 26',
+        'May 26', 'Jun 26', 'Jul 26', 'Aug 26', 'Sep 26'])
   })
   it('knows which months are wholly, partly or not in the range', () => {
     const r = { from: '2026-08-15', to: '2026-09-27' }

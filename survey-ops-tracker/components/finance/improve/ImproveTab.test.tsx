@@ -28,9 +28,9 @@ const B = (project_id: string, bid = 10) => ({
   blast_at: '2026-08-05T15:00:00Z', created_at: '2026-08-06T15:00:00Z',
 })
 
-function propsOf(blocked: FinanceLoad['blocked'] = []) {
-  const projects = [P({ id: 'a1' }), P({ id: 'a2' }), P({ id: 'u1', deliver_date: null }), P({ id: 'q1', n_actual: null })]
-  const blasts = [B('a1'), B('a2', 50), B('u1', 3), B('q1', 2)]
+function propsOf(blocked: FinanceLoad['blocked'] = [], extra: FinProject[] = []) {
+  const projects = [P({ id: 'a1' }), P({ id: 'a2' }), P({ id: 'u1', deliver_date: null }), P({ id: 'q1', n_actual: null }), ...extra]
+  const blasts = [B('a1'), B('a2', 50), B('u1', 3), B('q1', 2), ...extra.map(e => B(e.id, 5))]
   const rates = new Map([['a1', 50]])
   const raw: FinanceRaw = {
     projects, blasts, suppliers: [], launches: [], costs: [],
@@ -71,6 +71,37 @@ describe('ImproveTab', () => {
     expect(first).toHaveTextContent('Client price missing on costed work')
     expect(first).toHaveTextContent('$520')
     expect(screen.getByText(/Client price covers 1 of 3 delivered surveys/)).toBeInTheDocument()
+  })
+
+  /**
+   * David, 2026-09-28: a chart over a run of months has to say WHICH month.
+   * This grid draws EVERY month with delivered work whatever dates are picked,
+   * so it nearly always runs across a year — and two columns reading "Jun" a
+   * year apart name nothing. Past about a year of columns the full "Jun 2026"
+   * no longer fits and the grid falls back to the short form, which is the one
+   * that used to be a bare "Jun".
+   */
+  it('names the year on the coverage grid once its months cross one', () => {
+    const months = ['2025-10', '2025-11', '2025-12', '2026-01', '2026-02', '2026-03',
+      '2026-04', '2026-05', '2026-06', '2026-07', '2026-08', '2026-09']
+    const extra = months.map(m => P({ id: `m${m}`, deliver_date: `${m}-15` }))
+    const { container } = render(<ImproveTab {...propsOf([], extra)} />)
+    const grid = container.querySelector('figure[aria-label^="Share of delivered surveys carrying each field"]')!
+    // A FitText carries its long form as a <title> child, which textContent
+    // would fold into the drawn words.
+    const drawn = [...grid.querySelectorAll('svg text')]
+      .map(t => [...t.childNodes].filter(n => n.nodeType === 3).map(n => n.textContent ?? '').join(''))
+    expect(drawn).toContain('Oct 25')
+    // Every month label it does print carries its year: a bare "Oct" here
+    // would be one of two Octobers the moment the book runs past twelve months.
+    const MONTH = /^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)( |$)/
+    const bare = drawn.filter(t => MONTH.test(t) && !/\d\d$/.test(t))
+    expect(bare).toEqual([])
+    // The heatmap thins column headers that would collide, and a thinned month
+    // is read from its cells instead — every one of which names its month in
+    // full, to a screen reader and in the table twin.
+    expect(grid.querySelector('[aria-label*="Oct 2025"]')).toBeTruthy()
+    expect(grid.querySelector('[aria-label*="Sep 2026"]')).toBeTruthy()
   })
 
   it('plots the ranked list, colours the bars by what the dollars are, and drills from a bar', () => {

@@ -1,8 +1,11 @@
 import { describe, it, expect } from 'vitest'
 import {
-  buildInsightsModel, compareFigures, drillRows, itemsOf, measure, median, medianBounds, undatedIn, CYCLE_DAYS_GOAL,
-  MIN_COMPARE_N, ON_TIME_GOAL, type InsightsInput,
+  buildInsightsModel, compareFigures, drillRows, itemsOf, measure, median, medianBounds, undatedIn,
+  CYCLE_DAYS_GOAL, MIN_COMPARE_N, ON_TIME_GOAL, type InsightsInput,
 } from './model'
+// The real label thinner the charts use, so the claims below about what the
+// axis can print are measured rather than asserted.
+import { fitAxisLabels, textWidth } from '@/components/charts/scale'
 import { mostSince, buildHeadline } from './headline'
 import { DEFAULT_FILTER, NO_CAPTAIN, type InsightsFilter } from './filters'
 import type { InsightsProject } from './load'
@@ -459,6 +462,82 @@ describe('undated deliveries: a period missing them is never compared as if comp
     expect(m.undated).toEqual({ inRange: 2, inPrev: 0, unplaced: 1 })
     expect(drillRows(m.items, m.filter, { kind: 'delivered', undated: 'all' }, TODAY, ACCOUNTS)).toHaveLength(m.undatedDelivered)
     expect(drillRows(m.items, m.filter, { kind: 'delivered', undated: 'range' }, TODAY, ACCOUNTS)).toHaveLength(m.undated.inRange)
+  })
+})
+
+describe('naming the x axis: what a reader can read off a month chart', () => {
+  const LAST_12 = F({ range: { preset: 'last-12-months', from: null, to: null } })
+  // The two trend charts sit in one half of a md:grid-cols-2 inside a
+  // max-w-6xl page, so their card is 534px wide at every viewport past about
+  // 1200px, and narrower below that. Both widths are measured here, because
+  // they answer different questions.
+  //
+  // WIDE (the common case): 1152 → halved with a 16px gap → 568 → less the
+  // card's border and px-4 → 534. A LineChart spends ~34px on its y tick
+  // labels and ~30px on the right, so eleven gaps share ~446px: a ~40px step.
+  const WIDE_STEP = (534 - 34 - 30 - 24) / 11
+  // NARROW (a 1024px laptop): a 446px card, the same reserves, a ~33px step.
+  const NARROW_STEP = (446 - 34 - 30 - 24) / 11
+  const FONT = 11
+  const SMALL = 10
+  const twelve = () => model([P({ deliver_date: '2026-09-02' })], { filter: LAST_12 }).months
+
+  it('draws a narrow month-and-year on the axis and keeps the full month for people', () => {
+    const ms = twelve()
+    expect(ms).toHaveLength(12)
+    expect(ms[0]).toMatchObject({ key: '2025-10', short: 'Oct 25', long: 'October 2025' })
+    expect(ms[11]).toMatchObject({ key: '2026-09', short: 'Sep 26', long: 'September 2026' })
+  })
+
+  it('a window inside one year drops the year: it is in the date range on every card', () => {
+    const ms = model([P({ deliver_date: '2026-09-02' })]).months
+    expect(ms.map(x => x.short)).toEqual(['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep'])
+    // …but the tooltip, the table and the drill heading still say which year.
+    expect(ms[5].long).toBe('September 2026')
+  })
+
+  it('the narrow form names every month on the wide panel, where the long form cannot', () => {
+    const ms = twelve()
+    expect(textWidth('Sep 26', FONT)).toBeLessThan(textWidth('Sep 2026', FONT))
+    expect(textWidth('Sep 2026', FONT)).toBeLessThan(textWidth('September 2026', FONT))
+    const drawn = fitAxisLabels(ms.map(x => x.short), WIDE_STEP, FONT, { minFontSize: SMALL })
+    const ifLong = fitAxisLabels(ms.map(x => x.long), WIDE_STEP, FONT, { minFontSize: SMALL })
+    // David's case, at the width his screen gives it: all twelve named.
+    expect(drawn.picks).toHaveLength(12)
+    // …where drawing "September 2026" on the axis would name a third of them.
+    expect(ifLong.picks.length).toBeLessThan(drawn.picks.length)
+  })
+
+  it('still names both ends and only whole months when the panel is narrower', () => {
+    const ms = twelve()
+    const drawn = fitAxisLabels(ms.map(x => x.short), NARROW_STEP, FONT, { minFontSize: SMALL })
+    expect(drawn.picks.length).toBeLessThan(12)
+    expect(drawn.picks[0]).toBe(0)
+    expect(drawn.picks[drawn.picks.length - 1]).toBe(11)
+    // Evenly spaced between the ends, so a reader can count the ticks between
+    // two names instead of re-learning the interval.
+    const gaps = drawn.picks.slice(1).map((p, i) => p - drawn.picks[i])
+    expect(new Set(gaps.slice(1)).size).toBe(1)
+  })
+
+  it('every drawn label carries the year, because a thinned axis drops the January one', () => {
+    const ms = twelve()
+    // What we do: the year on every label. Nothing the axis prints is
+    // ambiguous, whichever labels survive, at either width.
+    for (const step of [WIDE_STEP, NARROW_STEP]) {
+      for (const i of fitAxisLabels(ms.map(x => x.short), step, FONT, { minFontSize: SMALL }).picks) {
+        expect(ms[i].short).toMatch(/^[A-Z][a-z]{2} \d{2}$/)
+      }
+    }
+    // What we do NOT do: mark the year only where it changes. It is narrower,
+    // and on the wide panel it costs nothing — but as soon as the axis has to
+    // thin, "Jan 26" is no more likely to survive than any other month, and
+    // the labels that do survive around it say nothing about their year.
+    const atChange = ms.map((x, i) => (i === 0 || x.key.endsWith('-01') ? x.short : x.short.slice(0, 3)))
+    const kept = fitAxisLabels(atChange, NARROW_STEP, FONT, { minFontSize: SMALL }).picks
+    expect(kept.length).toBeLessThan(12)
+    const yearless = kept.filter(i => !/\d{2}$/.test(atChange[i]))
+    expect(yearless.length).toBeGreaterThan(0)
   })
 })
 

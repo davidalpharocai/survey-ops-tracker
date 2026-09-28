@@ -162,9 +162,151 @@ export function fitText(s: string, maxWidth: number, fontSize: number): { text: 
  * How many labels to skip so neighbours never collide: 1 = show every label,
  * 2 = every other one, and so on. Skipped labels stay in the tooltip and the
  * table view.
+ *
+ * Prefer `labelIndices` for a CATEGORY axis: this walks from the left, so
+ * the last category is labelled only by luck. It remains for label rows that
+ * have no ends worth naming (the overlay strip's own value labels).
  */
 export function labelStep(labels: string[], slotWidth: number, fontSize: number, gap = 6): number {
   if (labels.length === 0 || !(slotWidth > 0)) return 1
   const widest = Math.max(...labels.map((l) => textWidth(l, fontSize)))
   return Math.max(1, Math.ceil((widest + gap) / slotWidth))
+}
+
+/**
+ * WHICH categories get a label, as indices into `labels`.
+ *
+ * Three rules a reader depends on and a plain "every nth from the left"
+ * cannot give:
+ *   - THE ENDS ARE ALWAYS NAMED. A window the reader chose ("last 12 months")
+ *     is unreadable if its newest period is unlabelled, and walking i % step
+ *     from the left labels the last one only when (n-1) happens to divide.
+ *   - THE RHYTHM IS CONSTANT. The step comes from the WIDEST label, so the
+ *     labelled periods are evenly spaced and a reader can count ticks between
+ *     two names ("every third month") instead of re-learning the interval per
+ *     chart. Measuring each label on its own looked tighter and produced
+ *     intervals of 2, 2, 2, 2, 1, 2 on one axis — and a DIFFERENT set of
+ *     months on the chart beside it, over the same twelve months.
+ *   - THE NEWEST END ANCHORS IT. The step is walked right to left from the
+ *     last category, so the densest, most-read end of a trend keeps its
+ *     rhythm and only the oldest interval is ever short.
+ *
+ * Categories are evenly spaced, so two labels collide exactly when the slots
+ * between them are narrower than their two half-widths plus `gap`. Whatever
+ * is thinned away still gets a tick (see CategoryTicks), and still carries
+ * its full label in the tooltip and the table.
+ */
+export function labelIndices(labels: string[], slotWidth: number, fontSize: number, gap = 6): number[] {
+  const n = labels.length
+  if (n <= 1) return n === 1 ? [0] : []
+  // No width to measure against (a collapsed tab): name the ends only.
+  if (!(slotWidth > 0)) return [0, n - 1]
+  const w = labels.map((l) => textWidth(l, fontSize))
+  const widest = Math.max(...w)
+  const step = Math.max(1, Math.ceil((widest + gap) / slotWidth))
+  if (step === 1) return labels.map((_, i) => i)
+  // Right to left, so the recent end of a trend anchors the rhythm.
+  const keep: number[] = []
+  for (let i = n - 1; i >= 0; i -= step) keep.unshift(i)
+  // The first category is not negotiable: drop whatever it would run into.
+  // `> 1` keeps the last category through even the narrowest chart — both
+  // ends are named even if they have to touch.
+  if (keep[0] !== 0) {
+    if (keep.length > 1 && keep[0] * slotWidth < (w[0] + w[keep[0]]) / 2 + gap) keep.shift()
+    keep.unshift(0)
+  }
+  return keep
+}
+
+/**
+ * How much width each kept label may use — the room its thinned-away
+ * neighbours left it. Thinning the axis WIDENS the survivors, which is what
+ * lets "September 2026" print in full once "August 2026" beside it is gone.
+ *
+ * This is the exact inverse of the collision test in `labelIndices`: a label
+ * is centred, so it may spread half its width toward each neighbour, and the
+ * room is twice the nearer of those two gaps. That equality matters — a
+ * looser figure would ellipsise a label the axis had just decided fits.
+ * Indices with no label keep a single slot; nothing is drawn at them anyway.
+ *
+ * THE TWO ENDS ARE FLOORED AT THEIR OWN WIDTH. `labelIndices` promises to
+ * name them whatever happens, and on a collapsed or near-zero-width container
+ * the inward gap arithmetic can reach 0 — which would hand FitText a maxWidth
+ * of 0 and draw NOTHING, quietly undoing the one invariant the axis has. An
+ * end label is allowed to overhang instead of vanishing.
+ */
+export function labelRooms(picks: number[], labels: string[], slotWidth: number, fontSize: number, gap = 6): number[] {
+  const room = new Array<number>(labels.length).fill(slotWidth)
+  if (picks.length === 0) return room
+  const w = labels.map((l) => textWidth(l, fontSize))
+  if (picks.length === 1) {
+    room[picks[0]] = Math.max(slotWidth, labels.length * slotWidth, w[picks[0]])
+    return room
+  }
+  for (let k = 0; k < picks.length; k++) {
+    const i = picks[k]
+    // No neighbour on the outside of the first and last labels, so only the
+    // inward gap binds them.
+    const left = k > 0 ? (i - picks[k - 1]) * slotWidth - w[picks[k - 1]] / 2 - gap : Infinity
+    const right = k < picks.length - 1 ? (picks[k + 1] - i) * slotWidth - w[picks[k + 1]] / 2 - gap : Infinity
+    const fair = Math.max(0, 2 * Math.min(left, right))
+    const isEnd = k === 0 || k === picks.length - 1
+    room[i] = isEnd ? Math.max(fair, w[i]) : fair
+  }
+  return room
+}
+
+/**
+ * The font and the labels a CATEGORY AXIS draws: shrink one step before
+ * thinning anything away.
+ *
+ * David, on the Insights trend charts (2026-09-28): "it needs to show the
+ * month-year in the chart. how else would i follow it". Twelve months of
+ * "Oct 25" measure 425px of ink, and the two trend charts sit in half of a
+ * capped grid — 534px of card, about 470px of plot — so at the 11px axis size
+ * the labels collide by a hair and five or six months lose their name at
+ * EVERY desktop width. One step down to the house 10px floor fits all twelve
+ * with room to spare.
+ *
+ * So the rule is: try the normal size; if every category is named, keep it.
+ * Otherwise try `minFontSize`, and take it ONLY if it names every category —
+ * a smaller font that still thins is two costs for one benefit, and a chart
+ * that shrinks its axis for one extra label looks arbitrary beside its
+ * neighbour. Past that the axis thins, at the normal size, and every thinned
+ * period still gets a tick, a tooltip and a table row.
+ */
+/**
+ * Cap a CENTRED label's width so the SVG edge can never cut it.
+ *
+ * A category label is anchored at its band's centre, so it needs half its own
+ * width on each side; the outermost bands sit less than that from the edge on
+ * a tight chart, and ChartSvg's viewBox is the pixel box — nothing scales a
+ * clipped glyph back in. Capped here, an unavoidable case ellipsises instead,
+ * and FitText keeps the full text as its title.
+ *
+ * The 1px of slack is deliberate: `textWidth` is an estimate, and a chart that
+ * reserves exactly this much room lands on the cap to the last float, which
+ * would ellipsise the very label the reserve was for.
+ */
+export function edgeRoom(room: number, cx: number, width: number): number {
+  return Math.max(0, Math.min(room, 2 * cx + 1, 2 * (width - cx) + 1))
+}
+
+export function fitAxisLabels(
+  labels: string[],
+  slotWidth: number,
+  fontSize: number,
+  opts: { minFontSize?: number; gap?: number } = {},
+): { fontSize: number; picks: number[]; rooms: number[] } {
+  const gap = opts.gap ?? 6
+  const at = (f: number) => {
+    const picks = labelIndices(labels, slotWidth, f, gap)
+    return { fontSize: f, picks, rooms: labelRooms(picks, labels, slotWidth, f, gap) }
+  }
+  const first = at(fontSize)
+  if (first.picks.length >= labels.length) return first
+  const min = opts.minFontSize ?? fontSize
+  if (min >= fontSize) return first
+  const smaller = at(min)
+  return smaller.picks.length >= labels.length ? smaller : first
 }

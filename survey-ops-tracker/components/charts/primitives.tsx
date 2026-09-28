@@ -324,14 +324,112 @@ export function Mark({
   )
 }
 
+// ─── category ticks ──────────────────────────────────────────────────────────
+
+/**
+ * A tick per category on the category axis — INCLUDING the categories whose
+ * label had to be thinned away.
+ *
+ * Without this a thinned label leaves nothing at all behind it, and a reader
+ * cannot tell where one period starts and the next begins: they are counting
+ * columns between two named months. A labelled tick is longer; an unlabelled
+ * one is a shorter nub, drawn just as strongly, that still says "a period
+ * sits here, hover it for its name".
+ *
+ * `axis: 'x'` draws vertical nubs below `base` (a column or line chart's
+ * baseline); `axis: 'y'` draws horizontal nubs from `base` (a row chart's
+ * category axis). `size` may be negative to grow the other way.
+ */
+export function CategoryTicks({
+  at,
+  base,
+  labelled,
+  axis = 'x',
+  size = 5,
+}: {
+  /** Pixel position of each category's centre, in data order. */
+  at: number[]
+  /** Where the axis sits: y for an x axis, x for a y axis. */
+  base: number
+  /** Which indices got a label (the rest still get a tick, just a shorter one). */
+  labelled?: (i: number) => boolean
+  axis?: 'x' | 'y'
+  size?: number
+}) {
+  const dir = size < 0 ? -1 : 1
+  const full = Math.abs(size)
+  const stub = Math.max(2, full * 0.6)
+  return (
+    <g pointerEvents="none" aria-hidden data-part="category-ticks">
+      {at.map((p, i) => {
+        const named = labelled ? labelled(i) : true
+        const len = (named ? full : stub) * dir
+        return (
+          <line
+            key={i}
+            data-tick={named ? 'labelled' : 'plain'}
+            x1={axis === 'x' ? p : base}
+            x2={axis === 'x' ? p : base + len}
+            y1={axis === 'x' ? base : p}
+            y2={axis === 'x' ? base + len : p}
+            strokeWidth={1}
+            // LENGTH alone carries the difference, at FULL opacity for both.
+            // --chart-axis is 3.10:1 against the light card and 3.26:1
+            // against the dark one — only just over the 3:1 a non-text
+            // graphic needs (WCAG 1.4.11), so ANY fade drops the mark under
+            // it (0.8 measures 2.38:1 on white). Fading the unlabelled nub is
+            // fading the one mark that matters most: it is all a thinned
+            // period has, and invisible is exactly the blankness this row
+            // exists to prevent.
+            style={{ stroke: 'var(--chart-axis)' }}
+          />
+        )
+      })}
+    </g>
+  )
+}
+
+/**
+ * The category tick for a chart whose rows ARE the categories: a short rail
+ * marking how far one row reaches, so a long name and its bar cannot drift
+ * apart. Inset top and bottom, or adjacent rows would join into one
+ * continuous border.
+ *
+ * `x` is the BOUNDARY between the names and the marks — where the eye loses
+ * the row — not the chart's outer edge. Drawn at the outer edge it sits a
+ * label column away from the thing it disambiguates, and where the names are
+ * printed above their bars instead (phone width) the marks start at x=0 and
+ * the rail paints over them. Callers pass the boundary, and skip the rail
+ * entirely in that stacked layout.
+ */
+export function RowTicks({ rows, x = 0, width = 2, inset = 4 }: { rows: { y0: number; y1: number }[]; x?: number; width?: number; inset?: number }) {
+  return (
+    <g pointerEvents="none" aria-hidden data-part="category-ticks">
+      {rows.map((r, i) => {
+        const h = r.y1 - r.y0 - inset * 2
+        if (h <= 0) return null
+        // Axis ink at full strength, not the gridline grey and not a fade:
+        // --chart-axis only just clears the 3:1 a non-text graphic needs, so
+        // a rail drawn at 0.45 is under it in both themes.
+        return <rect key={i} data-tick="row" x={x} y={r.y0 + inset} width={width} height={h} rx={width / 2} style={{ fill: 'var(--chart-axis)' }} />
+      })}
+    </g>
+  )
+}
+
 // ─── text ────────────────────────────────────────────────────────────────────
 
 /**
  * A label that fits `maxWidth` or is cut with an ellipsis — and when it is
  * cut, the full text rides along as a <title> so it is never lost.
+ *
+ * `full` is for a label that was SHORTENED BY THE CALLER rather than by the
+ * fit ("Sep 26" for "September 2026"): pass the long form and it rides along
+ * as the <title> too, so the axis can be terse without losing anything.
  */
 export function FitText({
   text,
+  full,
   maxWidth,
   fontSize = FONT.tick,
   x,
@@ -343,6 +441,7 @@ export function FitText({
   halo = false,
 }: {
   text: string
+  full?: string
   maxWidth: number
   fontSize?: number
   x: number
@@ -356,6 +455,7 @@ export function FitText({
 }) {
   const fit = fitText(text, maxWidth, fontSize)
   if (!fit.text) return null
+  const title = full && full !== fit.text ? full : fit.truncated ? text : null
   return (
     <text
       x={x}
@@ -365,7 +465,7 @@ export function FitText({
       className={className}
       style={{ fontSize, fontWeight: weight, ...(halo ? HALO : null) }}
     >
-      {fit.truncated && <title>{text}</title>}
+      {title && <title>{title}</title>}
       {fit.text}
     </text>
   )
@@ -379,6 +479,7 @@ export function FitText({
  */
 export function TaggedText({
   text,
+  full,
   tag,
   maxWidth,
   fontSize = FONT.tick,
@@ -390,6 +491,8 @@ export function TaggedText({
   weight,
 }: {
   text: string
+  /** The caller's long form, when `text` is a short one it supplied. */
+  full?: string
   tag?: string | null
   maxWidth: number
   fontSize?: number
@@ -404,9 +507,10 @@ export function TaggedText({
   const tagFit = tag ? fitText(tagText, maxWidth, tagFontSize) : { text: '', truncated: false }
   const nameFit = fitText(text, Math.max(0, maxWidth - textWidth(tagFit.text, tagFontSize)), fontSize)
   if (!nameFit.text && !tagFit.text) return null
+  const shortened = !!full && full !== text
   return (
     <text x={x} y={y} textAnchor={anchor} dominantBaseline="central" className={className} style={{ fontSize, fontWeight: weight }}>
-      {(nameFit.truncated || tagFit.truncated) && <title>{text + tagText}</title>}
+      {(shortened || nameFit.truncated || tagFit.truncated) && <title>{(shortened ? full : text) + tagText}</title>}
       <tspan>{nameFit.text}</tspan>
       {tagFit.text && (
         <tspan data-part="tag" className="fill-muted-foreground" style={{ fontSize: tagFontSize, fontWeight: 400 }}>

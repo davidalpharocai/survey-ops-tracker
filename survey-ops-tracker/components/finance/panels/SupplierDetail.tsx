@@ -24,6 +24,7 @@ import {
   type PanelsModel, type WaveRow,
 } from '@/lib/finance/panels'
 import { money, money2 } from '@/lib/finance/format'
+import { monthShort, spansYears } from '../periodAxis'
 import { fmtNum } from '@/lib/utils/number'
 import { WAVE_COLUMNS as W, type ColumnWords } from './columns'
 
@@ -71,6 +72,10 @@ export function SupplierDetail(props: FinanceTabProps & {
   }
 
   const r = d.row
+  // A panel's price drift runs over launch months, and a panel bought in two
+  // Junes has two columns that must not read alike: the column names carry a
+  // two-digit year as soon as they cross one.
+  const crossesYear = spansYears(model.heatmap.columns.map(c => c.key))
   return (
     <FinanceCard
       id={DETAIL_ANCHOR}
@@ -89,7 +94,7 @@ export function SupplierDetail(props: FinanceTabProps & {
           title="Price by launch month"
           info={`${DRIFT_NOTE} Colour is the price per complete (the stronger the colour, the dearer); the line under each cell is how many completes stand behind that price. The panel you picked is on the top row, then the panels with the most spend. Click a row's cell to switch to that panel.`}
           rows={model.heatmap.rows}
-          columns={model.heatmap.columns}
+          columns={model.heatmap.columns.map(c => ({ ...c, shortLabel: monthShort(c.key, crossesYear) }))}
           cells={model.heatmap.cells}
           rowHeader="Panel"
           valueName="Price per complete"

@@ -99,7 +99,8 @@ export function DeliveredCharts({ model: m, open }: { model: InsightsModel; open
           ariaLabel="Surveys delivered per month, by type"
           mode="stacked"
           data={m.months}
-          x={d => d.label}
+          x={d => d.long}
+          xShort={d => d.short}
           xKey={d => d.key}
           xLabel="Month"
           series={series}
@@ -122,7 +123,8 @@ export function DeliveredCharts({ model: m, open }: { model: InsightsModel; open
           <LineChart
             ariaLabel="Share of deliveries on time, by month"
             data={m.months}
-            x={d => d.label}
+            x={d => d.long}
+            xShort={d => d.short}
             xKey={d => d.key}
             xLabel="Month"
             series={[{ key: 'ot', label: 'On time', value: d => d.onTimePct, color: 'var(--chart-keep)', description: 'Delivered on or before the due date, of those with a due date' }]}
@@ -144,7 +146,8 @@ export function DeliveredCharts({ model: m, open }: { model: InsightsModel; open
           <LineChart
             ariaLabel="Median days from submitted to delivered, by month"
             data={m.months}
-            x={d => d.label}
+            x={d => d.long}
+            xShort={d => d.short}
             xKey={d => d.key}
             xLabel="Month"
             series={[{ key: 'cy', label: 'Median days', value: d => d.cycleMedian, color: 'var(--chart-cat-7)', description: 'Calendar days from submitted to delivered, middle survey' }]}

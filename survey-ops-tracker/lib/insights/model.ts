@@ -36,7 +36,7 @@ import { fmtNum } from '@/lib/utils/number'
 import type { InsightsProject } from './load'
 import {
   addDays, daysBetween, formatRange, inRange, isBounded, monthCoverage, monthKey, monthLong,
-  monthShort, previousRange, resolveRange, runsToToday, trendMonths, type DateRange,
+  monthNarrow, previousRange, resolveRange, runsToToday, trendMonths, type DateRange,
 } from './range'
 import { NO_CAPTAIN, TYPE_HELP, TYPE_KEYS, TYPE_LABEL, type InsightsFilter } from './filters'
 import { buildHeadline } from './headline'
@@ -369,8 +369,12 @@ const plural = (n: number, one: string, many = one + 's') => `${fmtNum(n)} ${n =
 
 export interface MonthRow {
   key: string
-  /** Axis label: 'Sep', or 'Sep 2026' when the window crosses a year. */
-  label: string
+  /** What a chart's x AXIS prints: 'Sep', or 'Sep 26' when the window crosses
+   *  a year. Narrow on purpose — see THE YEAR ON THE AXIS below. */
+  short: string
+  /** What a person reads: 'September 2026'. The tooltip title, the accessible
+   *  summary, the data table and the drill heading all use this, so nothing
+   *  is lost by drawing the narrow form on the axis. */
   long: string
   coverage: 'in' | 'partial' | 'out'
   /** The current month, still under way. */
@@ -391,6 +395,29 @@ export interface MonthRow {
   undated: number
 }
 
+/**
+ * ── THE YEAR ON THE AXIS ────────────────────────────────────────────────────
+ * When the window crosses a year, EVERY month label carries the year, not
+ * just January.
+ *
+ * Marking only the year boundary is tempting — 'Oct 25, Nov, Dec, Jan 26,
+ * Feb, …' reads well and is narrower. It fails wherever the axis has to thin
+ * at all. Run the real thinner (components/charts/scale.ts fitAxisLabels)
+ * over that set at the widths /insights actually renders the two trend charts
+ * at, half of a md:grid-cols-2 in a max-w-6xl page: from a 318px panel (the
+ * md breakpoint) up to a 500px one it keeps 'Oct 25, Jan 26, Mar, May, Jul,
+ * Sep'. Three of the six drawn labels carry no year, and a reader asked to
+ * name the Mar column has to work out which side of the Jan 26 it fell.
+ * Above that the panel is capped at 534px and every month is named anyway,
+ * so the year costs nothing there.
+ *
+ * With the year on every label the answer cannot be thinned away, and the
+ * two-digit form keeps it affordable (monthNarrow in range.ts measures it) —
+ * twelve 'Oct 25' labels fit that 534px panel, which twelve 'Oct 2025' ones
+ * do not. A window inside one year drops the year altogether: every month in
+ * it is in the one year the page's date range already names, and 'Sep' is
+ * narrower still.
+ */
 function monthRows(dated: InsightsItem[], keys: string[], r: DateRange, today: string, undated: UndatedMonths): MonthRow[] {
   const by = new Map<string, InsightsItem[]>()
   for (const it of dated) {
@@ -407,7 +434,7 @@ function monthRows(dated: InsightsItem[], keys: string[], r: DateRange, today: s
     for (const it of set) byType[it.type] = (byType[it.type] ?? 0) + 1
     return {
       key,
-      label: monthShort(key, crossesYear),
+      short: monthNarrow(key, crossesYear),
       long: monthLong(key, true),
       coverage: monthCoverage(key, r),
       running: key === thisMonth,
@@ -428,6 +455,20 @@ function monthRows(dated: InsightsItem[], keys: string[], r: DateRange, today: s
 
 /* ── BREAKDOWNS ─────────────────────────────────────────────────────────── */
 
+/**
+ * A row in a breakdown chart.
+ *
+ * There is no short form of `label` here on purpose. The row charts on this
+ * page name people, accounts and types, and a person's or a firm's name has
+ * no shorter form that is still their name — "Alexandra W." and "Balyasny"
+ * are guesses about what the name means. The chart does not need one either:
+ * below 480px it prints the name on its own line above the bar, and above
+ * that its label column runs to 38% of the panel (203px of the 534px half of
+ * the Insights grid — max-w-6xl 1152, halved with a 16px gap, less the
+ * card's border and padding — where "Alexandra Whitfield" measures 115px).
+ * A name that does outgrow the column is cut with an ellipsis and carries
+ * the full form as its title, which loses nothing.
+ */
 export interface GroupRow { key: string; label: string; count: number; share: number; help?: string }
 
 function groupBy(set: InsightsItem[], key: (it: InsightsItem) => string, label: (it: InsightsItem) => string): GroupRow[] {

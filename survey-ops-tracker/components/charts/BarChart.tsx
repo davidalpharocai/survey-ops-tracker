@@ -28,6 +28,7 @@ import {
   ChartSvg,
   ChartTooltip,
   FitText,
+  RowTicks,
   FONT,
   HALO,
   Mark,
@@ -46,6 +47,11 @@ export interface BarChartProps<D> extends ChartCommon<D> {
   data: D[]
   /** The group name, e.g. an account. */
   label: (d: D) => string
+  /** A NARROW form of the group name for the chart's own label column only.
+   *  The tooltip, the accessible summary and the table always use `label`,
+   *  and the drawn name carries the full form as its title=. Omit it and the
+   *  chart draws `label`. */
+  labelShort?: (d: D) => string
   /** Table header for the group column (default "Group"). */
   labelHeader?: string
   value: (d: D) => number | null | undefined
@@ -80,6 +86,7 @@ const MUTED_OPACITY = 0.35
 export function BarChart<D>({
   data,
   label,
+  labelShort,
   labelHeader = 'Group',
   value,
   valueName = 'Value',
@@ -123,6 +130,8 @@ export function BarChart<D>({
     typeof color === 'function' ? color(d) : color ?? (diverging ? 'var(--chart-price)' : 'var(--chart-cat-1)')
   const negColor = (d: D) => negativeColor ?? (diverging ? 'var(--chart-loss)' : posColor(d))
   const tagOf = (d: D) => (muted?.(d) ? mutedNote : null)
+  /** What the chart PRINTS beside the bar; `label` is what it says on hover. */
+  const shortOf = (d: D) => labelShort?.(d) ?? label(d)
   const endText = (d: D) => {
     const v = value(d)
     const custom = valueLabel?.text(d)
@@ -159,7 +168,7 @@ export function BarChart<D>({
     // Label column (beside mode only), capped so the bars keep most of the
     // row. When a name is too long it is the NAME that gets cut, never the
     // "too few to judge" tag after it (TaggedText reserves the tag first).
-    const labelW = above ? 0 : Math.min(Math.max(...data.map((d) => taggedWidth(label(d), tagOf(d), FONT.label))) + 10, W * 0.38)
+    const labelW = above ? 0 : Math.min(Math.max(...data.map((d) => taggedWidth(shortOf(d), tagOf(d), FONT.label))) + 14, W * 0.38)
 
     // Room for the tip labels on each side of zero.
     let posReserve = 0
@@ -266,6 +275,19 @@ export function BarChart<D>({
       {layout && (
         <>
           <ChartSvg width={W} height={layout.H} label={ariaLabel} summary={summary} interactive={interactive}>
+            {/* A rail per row at the boundary between the names and the bars:
+                which name owns which bar, when the names are long and the
+                rows are tight. It is drawn BEFORE the marks, or it paints
+                over them; and only in `beside` mode, because at phone width
+                each name sits on its own line directly above its bar (there
+                is nothing to disambiguate) and the bars start at x=0, which
+                is where the rail would be. */}
+            {!layout.above && (
+              <RowTicks
+                x={Math.max(0, layout.labelW - 2)}
+                rows={data.map((_, i) => ({ y0: layout.top + i * layout.rowH, y1: layout.top + (i + 1) * layout.rowH }))}
+              />
+            )}
             {data.map((d, i) => {
               const raw = value(d)
               const v = drawnValue(d)
@@ -298,19 +320,21 @@ export function BarChart<D>({
                   {/* group label: beside the bar, or above it at phone width */}
                   {layout.above ? (
                     <TaggedText
-                      text={label(d)}
+                      text={shortOf(d)}
+                      full={label(d)}
                       tag={tag}
-                      maxWidth={W - 4}
+                      maxWidth={W - 10}
                       fontSize={FONT.tick}
-                      x={2}
+                      x={6}
                       y={rowY + 8}
                       className={isMuted ? 'fill-muted-foreground' : 'fill-foreground'}
                     />
                   ) : (
                     <TaggedText
-                      text={label(d)}
+                      text={shortOf(d)}
+                      full={label(d)}
                       tag={tag}
-                      maxWidth={layout.labelW - 10}
+                      maxWidth={layout.labelW - 14}
                       fontSize={FONT.label}
                       x={layout.labelW - 10}
                       y={rowY + layout.rowH / 2}

@@ -16,6 +16,7 @@
 
 import { ColumnChart, fmtPct } from '@/components/charts'
 import { fmtNum } from '@/lib/utils/number'
+import { dayLong, dayShort, spansYears } from '../periodAxis'
 import {
   LOG_ALERT_BELOW, LOG_WEEKS, LOG_WITHIN_DAYS, loggingWeekDrill,
   type ImproveInput, type LoggingStrip, type LogWeek,
@@ -32,6 +33,19 @@ export function LoggingCard({ strip, input, props }: {
   input: ImproveInput
   props: Pick<FinanceTabProps, 'load' | 'openDrill'>
 }) {
+  // 26 weeks in a third of the page: most week labels are thinned away, and a
+  // thinned one leaves only its tick. So the drawn label is as narrow as it can
+  // be while still naming its week — "7 Sep", or "7 Sep 25" once the strip runs
+  // back into the previous year — and the full date rides along in the tooltip,
+  // the title on the drawn label, and the table twin.
+  //
+  // NOT FIXED HERE, and it should be: the card's alert sentence above uses
+  // dayLong, but `LogWeek.label` is still the bare "7 Sep" (lib/finance/
+  // improve.ts:807), and two sentences built from it — the verdict this card
+  // renders (improve.ts:839) and the heading of the drill a column opens
+  // (improve.ts:919) — therefore name a week without its year on a strip that
+  // routinely crosses one. improve.ts is outside this change's ownership.
+  const crossesYear = spansYears(strip.weeks.map(w => w.key))
   return (
     <FinanceCard
       id="live-logging"
@@ -49,7 +63,8 @@ export function LoggingCard({ strip, input, props }: {
           <ColumnChart<LogWeek>
             ariaLabel={`Share of blast and panel rows written within ${LOG_WITHIN_DAYS} days of the work, by week`}
             data={strip.weeks}
-            x={w => w.label}
+            x={w => dayLong(w.key)}
+            xShort={w => dayShort(w.key, crossesYear)}
             xKey={w => w.key}
             xLabel="Week of"
             series={[{
@@ -73,7 +88,7 @@ export function LoggingCard({ strip, input, props }: {
       )}
       {strip.alert && strip.latestClosed && (
         <Note tone="neg">
-          Alert: the week of {strip.latestClosed.label} logged {fmtPct(strip.latestClosed.share)} of its rows on time, under the {fmtPct(LOG_ALERT_BELOW)} bar.
+          Alert: the week of {dayLong(strip.latestClosed.key)} logged {fmtPct(strip.latestClosed.share)} of its rows on time, under the {fmtPct(LOG_ALERT_BELOW)} bar.
         </Note>
       )}
       {strip.notes.length > 0 && <Note>{strip.notes.join(' ')}</Note>}
