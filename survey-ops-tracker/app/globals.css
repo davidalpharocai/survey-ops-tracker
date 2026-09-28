@@ -92,6 +92,47 @@
   --sidebar-accent-foreground: #0076af;
   --sidebar-border: #c2cad8;
   --sidebar-ring: #0076af;
+
+  /* Chart tokens (components/charts). Each colour means ONE thing on every
+     chart: price is always teal, our cost always navy, kept always green, a
+     loss always red, "no price / no data" always the grey hatch. A chart that
+     needs a colour for identity (survey type, captain) takes the categorical
+     slots IN ORDER.
+
+     The categorical order (2026-09-27): orange, violet, magenta, green, blue,
+     aqua, plum, red. Slots 1-3 sit clear of every money colour, so the
+     defaults (a one-series bar or line, a sparkline, slot 1) never read as
+     money. Slots 4-8 are near one (green ~ kept, blue ~ price, red ~ loss):
+     use them only on a chart that shows no money colour, such as the Insights
+     counts; past 3 series on a finance chart, fold the rest into "Other".
+     Every slot is at least 3:1 against the card in both modes (WCAG 1.4.11),
+     and the order passed the dataviz validator against --card in both modes:
+     worst adjacent colour-blind separation 15.3 light / 13.0 dark (target 8),
+     worst adjacent normal-vision 21.2 / 17.6 (floor 15). Re-run it before
+     changing a slot. The all-pairs gate (scatter plots, maps) holds for the
+     first two slots only; no chart here uses all-pairs today. */
+  --chart-surface: var(--card);
+  --chart-price: #0076af;         /* client price — brand teal */
+  --chart-cost: #010b40;          /* our cost — brand navy */
+  --chart-keep: #177a41;          /* what we keep (white text on it: 5.4:1) */
+  --chart-loss: #c9302c;          /* money lost */
+  --chart-goal: #a86f1c;          /* a goal or target line; 3:1 even on the teal price track */
+  --chart-budget: #0b0b0b;        /* the budget tick: a cost ceiling */
+  --chart-muted: #8a93a3;         /* muted marks + the "no data" hatch ink */
+  --chart-muted-bg: #eef1f5;      /* the hatch ground */
+  --chart-neutral: #eceef2;       /* diverging-scale midpoint ("nothing") */
+  --chart-grid: #e7ebf1;          /* gridlines: hairline, one step off the surface */
+  --chart-axis: #8a93a3;          /* baseline and zero line */
+  --chart-on-strong: #ffffff;     /* text set inside a strong fill */
+  --chart-hover: rgb(1 11 64 / 0.05);
+  --chart-cat-1: #eb6834;         /* orange */
+  --chart-cat-2: #4a3aa7;         /* violet */
+  --chart-cat-3: #d45f8f;         /* magenta */
+  --chart-cat-4: #008300;         /* green */
+  --chart-cat-5: #2a78d6;         /* blue */
+  --chart-cat-6: #14976a;         /* aqua */
+  --chart-cat-7: #9b3fb0;         /* plum */
+  --chart-cat-8: #e34948;         /* red */
 }
 
 .dark {
@@ -127,6 +168,31 @@
   --sidebar-accent-foreground: #7fc4ec;
   --sidebar-border: #33405f;
   --sidebar-ring: #3fa7d6;
+
+  /* Chart tokens, stepped for the dark card rather than flipped: navy would
+     vanish on a navy card, so our cost becomes a light periwinkle, and teal
+     steps darker than --primary so price and cost stay easy to tell apart. */
+  --chart-price: #2e97cb;
+  --chart-cost: #b3c0f5;
+  --chart-keep: #34a868;
+  --chart-loss: #e5605a;
+  --chart-goal: #e0a84a;
+  --chart-budget: #f4f6fa;
+  --chart-muted: #6b7690;
+  --chart-muted-bg: #17213f;
+  --chart-neutral: #26314f;
+  --chart-grid: #1f2a4a;
+  --chart-axis: #5b6b8c;
+  --chart-on-strong: #04122a;
+  --chart-hover: rgb(255 255 255 / 0.06);
+  --chart-cat-1: #d95926;
+  --chart-cat-2: #9085e9;
+  --chart-cat-3: #d55181;
+  --chart-cat-4: #008300;
+  --chart-cat-5: #3987e5;
+  --chart-cat-6: #199e70;
+  --chart-cat-7: #b565cc;
+  --chart-cat-8: #e66767;
 }
 
 @layer base {
