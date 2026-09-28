@@ -226,10 +226,21 @@ export default function AdminPage() {
 
       {/* Data health */}
       <div className={tile}>
-        <h3 className={heading}>
-          Data health
-          <InfoTooltip text="Open pipeline projects with gaps worth fixing. Click a name to open it." />
-        </h3>
+        <div className="flex items-center justify-between gap-2 mb-3">
+          <h3 className={`${heading} mb-0`}>
+            Data health
+            <InfoTooltip text="Open pipeline projects with gaps worth fixing. Click a name to open it. The full picture — 25 checks across the whole book, with CSV worksheets — is on the Data cleanup page." />
+          </h3>
+          {/* The deep version of this card. Two checks live here; twenty-five
+              live there, with the legacy-import scope and the exports. */}
+          <Link
+            href="/admin/cleanup"
+            title="Data cleanup — every structural gap in the survey book as tiles that should all read 0, with a CSV worksheet per tile."
+            className="text-xs border border-border rounded-lg px-3 py-1.5 hover:bg-accent transition-colors shrink-0"
+          >
+            Data cleanup →
+          </Link>
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-start">
           <HealthList label="No captain" items={health.noCaptain} empty="Every open project has a captain" />
           <HealthList label="No due date" items={health.noDue} empty="Every open project has a due date" />

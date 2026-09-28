@@ -48,6 +48,7 @@ import {
   type SurveyEvent, type SurveyType,
 } from '@/lib/mcp/reports'
 import * as health from '@/lib/mcp/health'
+import { dataCleanup, type CleanupArgs } from '@/lib/mcp/cleanup'
 import { financeResults, type FinanceResultsArgs } from '@/lib/mcp/financeResults'
 
 // Canonical prod origin for report download links surfaced to the connector user.
@@ -973,13 +974,28 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'data_health',
     description:
-      "Portfolio-wide anomaly scan — runs the reconcile_project checks over every project and returns the ones with real integrity issues (spend mismatch, segment totals off, survey-ID discrepancy, impossible date order, and N that its blasts and PureSpectrum launches cannot account for), with counts_by_check and separate advisory_counts. Defaults to the active operational set; pass active_only:false to scan all non-deleted projects — which is also how to pull the BACKFILL QUEUE, the projects carrying an N with no blast or supplier row at all to say how it was fielded (150 of them on 2026-09-17, all reporting $0 fielding spend). Use for “is our data healthy / anything drifting”, a spend audit, “which surveys have N we can't account for”, or a pre-report sanity pass.",
+      "Portfolio-wide anomaly scan — DO THE NUMBERS AGREE WITH EACH OTHER. Runs the reconcile_project checks over every project and returns the ones with real integrity issues (spend mismatch, segment totals off, survey-ID discrepancy, impossible date order, and N that its blasts and PureSpectrum launches cannot account for), with counts_by_check and separate advisory_counts. Defaults to the active operational set; pass active_only:false to scan all non-deleted projects — which is also how to pull the BACKFILL QUEUE, the projects carrying an N with no blast or supplier row at all to say how it was fielded (150 of them on 2026-09-17, all reporting $0 fielding spend). Use for “is our data healthy / anything drifting”, a spend audit, “which surveys have N we can't account for”, or a pre-report sanity pass. This is the ARITHMETIC checker and it reports money — for whether the FIELDS ARE FILLED IN (no salesperson, no captain, no due date, no type) use data_cleanup instead.",
     kind: 'read',
     schema: { active_only: z.boolean().optional(), limit: z.number().int().min(1).max(200).optional() },
     handler: async (rawArgs) => {
       const args = rawArgs as { active_only?: boolean; limit?: number }
       return health.dataHealth(args)
     },
+  },
+  {
+    name: 'data_cleanup',
+    description:
+      "The admin data-cleanup dashboard (/admin/cleanup) — ARE THE FIELDS FILLED IN. Runs 25 completeness checks over every live, non-cancelled survey and returns a tile per check: no salesperson, no captain, not linked to an account, no requested-by contact, no due date, no submitted date, no launch date where the survey provably launched, delivered with no delivery date or no final N, no survey type, no survey-tool ID past programming, a tool ID claimed by two surveys, no N target, fielding rows recorded while the card sits before Fielding, closed without ever being delivered, delivered before submitted, longitudinal flag contradicted, Occam delivered to a contact never invited, and more — grouped as ownership / dates / classification / measurement / consistency. The GOAL IS EVERY TILE AT ZERO; `clean`, `tiles_at_zero` and `surveys_needing_work` answer “how far off are we”. Pass `check` (an id like no_captain, or words from a tile's label) to drill in and get the failing surveys WITH THEIR PROJECT CODES and what each field holds today; add csv:true for the round-trippable worksheet David edits and hands back. Rerun waves are counted and listed SEPARATELY from the headline (`wave_count` / `rerun_waves`, include_waves:true to list them), so the headline is the work a person would pick up and nothing is hidden. Scope defaults to surveys created AFTER the 2026-06-10 legacy sheet import; include_legacy_import:true adds those older rows. Carries NO money — this is about completeness, not value; for whether the NUMBERS AGREE (spend reconciliation, segment totals, N vs what the panels collected) use data_health instead. If a table did not load, the affected checks come back `measured:false` with `surveys:null` and `clean` false — report those as unmeasured, NEVER as a count of 0, because a failed read is not a clean database.",
+    kind: 'read',
+    schema: {
+      check: z.string().optional(),
+      group: z.enum(['ownership', 'dates', 'classification', 'measurement', 'consistency']).optional(),
+      include_legacy_import: z.boolean().optional(),
+      include_waves: z.boolean().optional(),
+      csv: z.boolean().optional(),
+      limit: z.number().int().min(1).max(200).optional(),
+    },
+    handler: async (rawArgs) => dataCleanup(rawArgs as CleanupArgs),
   },
   {
     name: 'pipeline_throughput',

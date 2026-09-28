@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { z } from 'zod'
 import { TOOLS } from './registry'
+import { GROUP_ORDER } from '@/lib/admin/cleanup'
 
 /**
  * Guards the shared tool registry (lib/mcp/registry.ts) — the single source of
@@ -43,7 +44,7 @@ describe('TOOLS registry shape', () => {
       'search_projects', 'get_project', 'pipeline_summary', 'survey_stats', 'survey_report',
       'rerun_radar', 'search_reruns', 'get_rerun_series', 'rerun_calendar',
       'ops_metrics', 'whats_at_risk', 'get_change_history', 'reconcile_project',
-      'data_health', 'pipeline_throughput', 'get_me',
+      'data_health', 'data_cleanup', 'pipeline_throughput', 'get_me',
       'get_client_history', 'get_project_history', 'search_clients', 'get_client',
       'list_activity', 'get_email', 'decode_survey_id', 'list_reminders', 'list_launches',
       'finance_results',
@@ -156,6 +157,53 @@ describe('TOOLS registry shape', () => {
       expect(new Set((inner as { options: string[] }).options), `${name} channel enum`)
         .toEqual(new Set(['email', 'sms']))
     }
+  })
+
+  it('keeps data_health and data_cleanup telling the model which is which', () => {
+    // Two portfolio-wide scanners whose names both start with "data". One asks
+    // whether the NUMBERS AGREE (spend reconciliation, segment totals, N vs
+    // what the panels collected); the other asks whether the FIELDS ARE FILLED
+    // (no salesperson, no captain, no due date). A model that picks the wrong
+    // one answers "your data is healthy" to "what still needs cleaning up",
+    // which is a confident wrong answer rather than a visible failure — so each
+    // description must name the other and say what it is for.
+    const health = TOOLS.find(t => t.name === 'data_health')!
+    const cleanup = TOOLS.find(t => t.name === 'data_cleanup')!
+    expect(health.kind).toBe('read')
+    expect(cleanup.kind).toBe('read')
+    expect(health.description).toContain('data_cleanup')
+    expect(cleanup.description).toContain('data_health')
+    // Each says what IT is, and what the other one is.
+    expect(health.description).toMatch(/NUMBERS AGREE/)
+    expect(health.description).toMatch(/FIELDS ARE FILLED/)
+    expect(cleanup.description).toMatch(/FIELDS FILLED IN/)
+    expect(cleanup.description).toMatch(/NUMBERS AGREE/)
+  })
+
+  it('data_cleanup can drill into one check, widen the scope, and carries no money parameter', () => {
+    const t = TOOLS.find(x => x.name === 'data_cleanup')!
+    // The two the spec names: one check id to drill into, one flag to include
+    // the legacy sheet import. Without `check` the tool can only ever say how
+    // many — never WHICH surveys — which is the half David acts on.
+    expect('check' in t.schema).toBe(true)
+    expect('include_legacy_import' in t.schema).toBe(true)
+    // Pinned so a money filter cannot be added to a dashboard that is about
+    // completeness and not value.
+    expect(Object.keys(t.schema).sort()).toEqual(
+      ['check', 'csv', 'group', 'include_legacy_import', 'include_waves', 'limit']
+    )
+  })
+
+  it('data_cleanup groups are the model’s groups, not a second list', () => {
+    // The tiles, the CSV and this tool all read lib/admin/cleanup's CHECKS. The
+    // group enum is the one place the tool restates something the model owns,
+    // so it is asserted against the model rather than trusted.
+    const shape = TOOLS.find(x => x.name === 'data_cleanup')!.schema as Record<string, z.ZodTypeAny>
+    let inner: unknown = shape.group
+    while ((inner as { _def?: { innerType?: unknown } })?._def?.innerType) {
+      inner = (inner as { _def: { innerType: unknown } })._def.innerType
+    }
+    expect(new Set((inner as { options: string[] }).options)).toEqual(new Set(GROUP_ORDER))
   })
 
   it('both segment tools can set a segment note', () => {
