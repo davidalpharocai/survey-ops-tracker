@@ -633,11 +633,19 @@ export function RerunSeriesRecord({ seriesId }: { seriesId: string }) {
         </div>
       )}
 
-      {/* Next-wave callout */}
+      {/* Next-wave callout.
+
+          It used to read "Wave N · auto-creates no date computed yet" for every
+          series without a due date, which is two claims and both can be wrong:
+          a MANUAL series auto-creates nothing at all, and "no date computed"
+          does not say WHY - out of service, paused, or simply no cadence set.
+          David hit the honest version of this confusion on the Bioprocessing
+          series. The reason is now named, because a person can act on a reason
+          and cannot act on "not computed". */}
       <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 flex items-start justify-between gap-3 flex-wrap">
         <div className="min-w-0">
           <p className="text-sm font-medium text-foreground">
-            Wave {series.next_wave_no} · auto-creates {series.effective_next ? formatDate(series.effective_next) : 'no date computed yet'}
+            Wave {series.next_wave_no} · {nextWaveLine(series)}
             {defaultsSummary && <span className="text-muted-foreground font-normal"> · {defaultsSummary}</span>}
           </p>
           {!series.auto_armed && (
@@ -724,6 +732,33 @@ export function RerunSeriesRecord({ seriesId }: { seriesId: string }) {
 // Series details — editable via the `update` action.
 // ---------------------------------------------------------------------------
 
+/** What the next-wave callout says, and WHY when there is no date.
+ *
+ *  Each branch is a different thing for the reader to do: an out-of-service
+ *  series needs reactivating, a paused one resuming, a cadence-less one either
+ *  a cadence or a hand-set due date (migration 125). Collapsing all three into
+ *  "no date computed yet" is what made the callout unreadable. */
+export function nextWaveLine(series: {
+  effective_next: string | null
+  service_mode: string
+  in_service: boolean
+  paused: boolean
+  cadence_months: number | null
+  next_due_override?: string | null
+}): string {
+  const verb = series.service_mode === 'manual' ? 'create by hand' : 'auto-creates'
+  if (series.effective_next) {
+    const how = series.next_due_override ? ' (date set by hand)' : ''
+    return `${verb} ${formatDate(series.effective_next)}${how}`
+  }
+  if (!series.in_service) return 'the series is ended — reactivate it to schedule another wave'
+  if (series.paused) return 'paused — resume the series to schedule another wave'
+  if (series.cadence_months == null) {
+    return 'no date yet — set a cadence, or a next due date by hand, in Series details'
+  }
+  return 'no date yet — no wave has a date to count from; set the fielding start in Series details'
+}
+
 function SeriesDetailsSection({
   series,
   onSave,
@@ -747,6 +782,10 @@ function SeriesDetailsSection({
   const [baseType, setBaseType] = useState(series.base_type ?? '')
   const [surveyName, setSurveyName] = useState(series.survey_name)
   const [notes, setNotes] = useState(series.notes ?? '')
+  const [anchorDate, setAnchorDate] = useState(series.anchor_date ?? '')
+  const [nextDue, setNextDue] = useState(series.next_due_override ?? '')
+  const [nextWaveNo, setNextWaveNo] = useState(String(series.next_wave_no ?? 1))
+  const [dataQaNote, setDataQaNote] = useState(series.data_qa_note ?? '')
 
   function openEdit() {
     setCadence(series.cadence_months != null ? String(series.cadence_months) : '')
@@ -757,6 +796,10 @@ function SeriesDetailsSection({
     setBaseType(series.base_type ?? '')
     setSurveyName(series.survey_name)
     setNotes(series.notes ?? '')
+    setAnchorDate(series.anchor_date ?? '')
+    setNextDue(series.next_due_override ?? '')
+    setNextWaveNo(String(series.next_wave_no ?? 1))
+    setDataQaNote(series.data_qa_note ?? '')
     setEditing(true)
   }
 
@@ -788,7 +831,15 @@ function SeriesDetailsSection({
           <Field label="Source template" value={series.template_id ?? '—'} tip="The survey template the original wave was built from. Later waves can use different survey IDs — see the Waves table." />
           <Field label="Owner" value={series.owner_email ?? '—'} tip="Who owns this rerun series — receives the weekly rerun digest and is the go-to person for it." />
           <Field label="Fielding start (anchor)" value={formatDate(series.anchor_date)} tip="Fallback due-date anchor for a seeded/fresh series with no wave dates yet." />
-          <Field label="Next due" value={series.effective_next ? formatDate(series.effective_next) : '—'} tip="When the next wave is due to field — computed from the last wave’s date plus the cadence." />
+          <Field
+            label={series.next_due_override ? 'Next due (set by hand)' : 'Next due'}
+            value={series.effective_next ? formatDate(series.effective_next) : '—'}
+            tip={
+              series.next_due_override
+                ? 'Set by hand on this series, overriding the cadence. It stops applying by itself once a wave lands on or after it.'
+                : 'When the next wave is due to field — computed from the last wave’s date plus the cadence. Edit the series to set a date by hand instead.'
+            }
+          />
           <Field label="In service" value={!series.in_service ? 'Ended' : series.paused ? 'Paused' : 'Yes'} tip="Whether the series is actively running. Ended = no more waves; Paused = temporarily stopped; Yes = live." />
           <Field label="Mode" value={series.service_mode === 'auto' ? 'Auto' : 'Manual'} tip="Auto = waves are created automatically before they’re due. Manual = you create each wave by hand." />
         </div>
@@ -851,9 +902,40 @@ function SeriesDetailsSection({
               />
             </label>
           </div>
+          <div className="flex flex-wrap gap-x-3 gap-y-2 items-center">
+            <label className="flex items-center gap-1 text-[12px] text-muted-foreground">
+              Fielding start (anchor)
+              <input type="date" value={anchorDate} onChange={(e) => setAnchorDate(e.target.value)} className={inputCls} />
+              <InfoTooltip text="Fallback anchor for the cadence when the series has no wave dates yet. Leave empty to fall back to the last wave's date." />
+            </label>
+            <label className="flex items-center gap-1 text-[12px] text-muted-foreground">
+              Next due (by hand)
+              <input type="date" value={nextDue} onChange={(e) => setNextDue(e.target.value)} className={inputCls} />
+              <InfoTooltip text="An explicit date for the next wave, overriding the cadence. Works even with no cadence set. It expires by itself once a wave lands on or after it — you never have to come back and clear it. Empty = compute it from the cadence." />
+            </label>
+            <label className="flex items-center gap-1 text-[12px] text-muted-foreground">
+              Next wave #
+              <input
+                type="number"
+                min={1}
+                step={1}
+                value={nextWaveNo}
+                onChange={(e) => setNextWaveNo(e.target.value)}
+                className={`${inputCls} w-20`}
+              />
+              <InfoTooltip text="The number the next spawned wave takes. Worth correcting on a series whose waves were linked in by hand, where the count can end up ahead of the waves that actually exist." />
+            </label>
+          </div>
           <label className="flex flex-col gap-1">
             <span className="text-[12px] text-muted-foreground">Notes</span>
             <textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} className={`${inputCls} resize-none`} />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-[12px] text-muted-foreground flex items-center">
+              Data / QA note
+              <InfoTooltip text="Anything the next person running a wave of this study needs to know about its data — a known quirk, a question that always needs recoding, a segment that under-fills." />
+            </span>
+            <textarea rows={2} value={dataQaNote} onChange={(e) => setDataQaNote(e.target.value)} className={`${inputCls} resize-none`} />
           </label>
           <div className="flex items-center gap-3">
             <button
@@ -870,6 +952,13 @@ function SeriesDetailsSection({
                   template_id: templateId.trim() || null,
                   owner_email: ownerEmail.trim() || null,
                   notes: notes.trim() || null,
+                  data_qa_note: dataQaNote.trim() || null,
+                  // '' is what an emptied <input type="date"> gives, and a date
+                  // column rejects it — pickSeriesUpdatePatch normalises it to
+                  // null, so clearing the field genuinely clears it.
+                  anchor_date: anchorDate || null,
+                  next_due_override: nextDue || null,
+                  next_wave_no: Number(nextWaveNo) || series.next_wave_no,
                 })
               }
               className="text-[12px] px-2.5 py-1 rounded-lg bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-40"

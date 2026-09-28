@@ -47,7 +47,7 @@ describe('TOOLS registry shape', () => {
       'data_health', 'data_cleanup', 'pipeline_throughput', 'get_me',
       'get_client_history', 'get_project_history', 'search_clients', 'get_client',
       'list_activity', 'get_email', 'decode_survey_id', 'list_reminders', 'list_launches',
-      'finance_results',
+      'finance_results', 'list_related_surveys',
     ])
     for (const t of TOOLS) {
       expect(t.kind, `${t.name}`).toBe(READ.has(t.name) ? 'read' : 'write')
@@ -132,6 +132,32 @@ describe('TOOLS registry shape', () => {
       expect(t!.kind, `${name} must be a write`).toBe('write')
       expect('confirm' in t!.schema, `${name} must accept confirm`).toBe(true)
     }
+  })
+
+  it('the related-survey tools exist, and the writes ask before they write', () => {
+    // These are the non-rerun link (migration 126). They matter to keep distinct
+    // from the series tools above: link_surveys must never renumber anything,
+    // and add_survey_to_series must never be reached for something that is not
+    // a wave. The descriptions are what steer that choice, so assert they name
+    // each other.
+    for (const name of ['link_surveys', 'unlink_surveys']) {
+      const t = TOOLS.find(x => x.name === name)
+      expect(t, `registry is missing ${name}`).toBeDefined()
+      expect(t!.kind, `${name} must be a write`).toBe('write')
+      expect('confirm' in t!.schema, `${name} must accept confirm`).toBe(true)
+      expect('project' in t!.schema && 'other' in t!.schema, `${name} takes two surveys`).toBe(true)
+    }
+    const read = TOOLS.find(x => x.name === 'list_related_surveys')
+    expect(read, 'registry is missing list_related_surveys').toBeDefined()
+    expect(read!.kind).toBe('read')
+    expect('confirm' in read!.schema, 'a read must not be confirmable').toBe(false)
+
+    // The one thing that stops a related survey being filed as a rerun wave is
+    // the model knowing which tool is which.
+    const link = TOOLS.find(x => x.name === 'link_surveys')!
+    expect(link.description).toMatch(/not the rerun tool/i)
+    expect(link.description).toMatch(/add_survey_to_series/)
+    expect(TOOLS.find(x => x.name === 'unlink_surveys')!.description).toMatch(/remove_survey_from_series/)
   })
 
   it('every tool that writes a blast can set its channel', () => {

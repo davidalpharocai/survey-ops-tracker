@@ -28,6 +28,7 @@ function series(overrides: Partial<SeriesListRow> = {}): SeriesListRow {
     resume_anchor: null,
     notes: null,
     data_qa_note: null,
+    next_due_override: null,
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-01-01T00:00:00Z',
     updated_by: null,

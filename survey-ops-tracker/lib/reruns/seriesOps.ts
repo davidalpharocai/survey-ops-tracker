@@ -63,6 +63,11 @@ export const UPDATE_FIELD_WHITELIST = [
   'notes',
   'data_qa_note',
   'anchor_date',
+  // Added 2026-09-28 so the series record can edit every field it displays,
+  // rather than showing four of them read-only and sending people to SQL.
+  'resume_anchor',
+  'next_due_override',
+  'next_wave_no',
 ] as const
 
 /** Every live wave belonging to a series, ordered by wave number — the shape
@@ -516,6 +521,29 @@ export function pickSeriesUpdatePatch(
   if ('base_type' in patch && patch.base_type != null && patch.base_type !== 'B2B' && patch.base_type !== 'PS') {
     return { error: "base_type must be 'B2B', 'PS', or null." }
   }
+  // next_wave_no is `integer not null` (073) and is what the next spawned wave
+  // is NUMBERED. Zero or a negative would collide with the parked-negative
+  // numbers attachProjectToSeries uses while it renumbers, and a fraction is a
+  // 500 from Postgres rather than a message anyone can act on.
+  if ('next_wave_no' in patch) {
+    const n = patch.next_wave_no
+    if (n == null || typeof n !== 'number' || !Number.isInteger(n) || n < 1) {
+      return { error: 'Next wave number must be a whole number of 1 or more.' }
+    }
+  }
+  // Dates arrive from a <input type="date"> as YYYY-MM-DD, or as '' when the
+  // field is cleared - which Postgres rejects for a date column. Normalise the
+  // empty string to null here so clearing the field means clearing it.
+  for (const key of ['anchor_date', 'resume_anchor', 'next_due_override'] as const) {
+    if (key in patch) {
+      const v = (patch as Record<string, unknown>)[key]
+      if (v === '' || v == null) {
+        ;(patch as Record<string, unknown>)[key] = null
+      } else if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v)) {
+        return { error: `${key.replace(/_/g, ' ')} must be a date, or empty.` }
+      }
+    }
+  }
   return { patch }
 }
 
@@ -528,6 +556,26 @@ export async function updateSeriesFields(
   const picked = pickSeriesUpdatePatch(fields)
   if ('error' in picked) throw new SeriesOpError(picked.error, 400)
   const patch = picked.patch
+  // A next wave number a live wave already holds is rejected by migration 073's
+  // partial unique index on (series_id, rerun_number) - but not until the wave
+  // is SPAWNED, which is days later, by the cron, with nobody watching. Catch it
+  // at the edit, where there is a person to tell.
+  if (patch.next_wave_no != null) {
+    const { data: clash, error: clashErr } = await admin
+      .from('survey_projects')
+      .select('project_code')
+      .eq('series_id', seriesId)
+      .eq('rerun_number', patch.next_wave_no)
+      .is('deleted_at', null)
+      .maybeSingle()
+    if (clashErr) throw new Error(clashErr.message)
+    if (clash) {
+      throw new SeriesOpError(
+        `Wave ${patch.next_wave_no} already exists in this series (${clash.project_code ?? 'unnamed'}). Pick a number no wave is using.`,
+        409
+      )
+    }
+  }
   patch.updated_by = actor
   patch.updated_at = new Date().toISOString()
   const { data, error } = await admin.from('rerun_series').update(patch).eq('id', seriesId).select('*').single()

@@ -1898,6 +1898,39 @@ export type Database = {
         }
         Relationships: []
       }
+      /** Symmetric "these two surveys are related" links that are NOT rerun
+       *  waves (migration 126) - a soft launch and its full launch, the B2B and
+       *  consumer halves of one study, a replacement for a cancelled survey.
+       *  ONE ROW PER PAIR, stored with a_id < b_id and enforced by a check
+       *  constraint, so a lookup must match EITHER column. Rerun lineage is a
+       *  different thing and lives on survey_projects. */
+      project_links: {
+        Row: {
+          id: string
+          a_id: string
+          b_id: string
+          note: string | null
+          created_at: string
+          created_by: string | null
+        }
+        Insert: {
+          id?: string
+          a_id: string
+          b_id: string
+          note?: string | null
+          created_at?: string
+          created_by?: string | null
+        }
+        Update: {
+          id?: string
+          a_id?: string
+          b_id?: string
+          note?: string | null
+          created_at?: string
+          created_by?: string | null
+        }
+        Relationships: []
+      }
       rerun_series: {
         Row: {
           id: string
@@ -1921,6 +1954,7 @@ export type Database = {
           resume_anchor: string | null
           notes: string | null
           data_qa_note: string | null
+          next_due_override: string | null
           created_at: string
           updated_at: string
           updated_by: string | null
@@ -1947,6 +1981,7 @@ export type Database = {
           resume_anchor?: string | null
           notes?: string | null
           data_qa_note?: string | null
+          next_due_override?: string | null
           created_at?: string
           updated_at?: string
           updated_by?: string | null
@@ -1973,6 +2008,7 @@ export type Database = {
           resume_anchor?: string | null
           notes?: string | null
           data_qa_note?: string | null
+          next_due_override?: string | null
           created_at?: string
           updated_at?: string
           updated_by?: string | null
@@ -2169,6 +2205,7 @@ export type Database = {
           resume_anchor: string | null
           notes: string | null
           data_qa_note: string | null
+          next_due_override: string | null
           created_at: string
           updated_at: string
           updated_by: string | null

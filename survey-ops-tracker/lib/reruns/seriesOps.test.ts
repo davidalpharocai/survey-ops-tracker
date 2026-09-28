@@ -32,17 +32,61 @@ describe('pickSeriesUpdatePatch', () => {
     const res = pickSeriesUpdatePatch({
       cadence_months: 3,
       owner_email: 'sree@alpharoc.ai',
-      // not on the whitelist — must be dropped:
+      // not on the whitelist — must be dropped. in_service and paused are the
+      // lifecycle, which only pause/end/resume/reactivate may move, because each
+      // carries consequences (cancelling pending waves, re-anchoring the
+      // cadence) that a field edit would skip.
       in_service: false,
-      next_wave_no: 99,
+      paused: true,
       id: 'hax',
     })
     expect('error' in res).toBe(false)
     if ('error' in res) return
     expect(res.patch).toEqual({ cadence_months: 3, owner_email: 'sree@alpharoc.ai' })
     expect('in_service' in res.patch).toBe(false)
-    expect('next_wave_no' in res.patch).toBe(false)
+    expect('paused' in res.patch).toBe(false)
     expect('id' in res.patch).toBe(false)
+  })
+
+  it('accepts next_wave_no, which the series record now edits', () => {
+    const res = pickSeriesUpdatePatch({ next_wave_no: 4 })
+    expect('error' in res).toBe(false)
+    if ('error' in res) return
+    expect(res.patch.next_wave_no).toBe(4)
+  })
+
+  it('rejects a next wave number that is not a whole number of 1 or more', () => {
+    for (const bad of [0, -1, 2.5, null, 'three']) {
+      expect('error' in pickSeriesUpdatePatch({ next_wave_no: bad })).toBe(true)
+    }
+  })
+
+  it('turns a cleared date field into null rather than passing the empty string on', () => {
+    // An emptied <input type="date"> sends ''. A date column rejects it, so
+    // without this the only way to clear an anchor would be SQL.
+    for (const key of ['anchor_date', 'resume_anchor', 'next_due_override']) {
+      const res = pickSeriesUpdatePatch({ [key]: '' })
+      expect('error' in res).toBe(false)
+      if ('error' in res) return
+      expect((res.patch as Record<string, unknown>)[key]).toBeNull()
+    }
+  })
+
+  it('rejects a date that is not a date', () => {
+    expect('error' in pickSeriesUpdatePatch({ next_due_override: '15 October' })).toBe(true)
+    expect('error' in pickSeriesUpdatePatch({ anchor_date: '2026-13-45x' })).toBe(true)
+  })
+
+  it('accepts a real date for each of the three date fields', () => {
+    const res = pickSeriesUpdatePatch({
+      anchor_date: '2026-05-01',
+      resume_anchor: '2026-06-01',
+      next_due_override: '2026-10-15',
+    })
+    expect('error' in res).toBe(false)
+    if ('error' in res) return
+    expect(res.patch.next_due_override).toBe('2026-10-15')
+    expect(res.patch.anchor_date).toBe('2026-05-01')
   })
 
   it('accepts a valid base_type', () => {

@@ -10,6 +10,7 @@ import { useTeamMembers, assignableMembers, type TeamMember } from '@/lib/hooks/
 import { PipelineSpine } from '@/components/project/PipelineSpine'
 import { ScopingSpine } from '@/components/project/ScopingSpine'
 import { WaveHistory } from '@/components/project/WaveHistory'
+import { RelatedSurveys } from '@/components/project/RelatedSurveys'
 import { CloneProjectModal } from '@/components/project/CloneProjectModal'
 import { PutIntoRerunServiceModal } from '@/components/project/PutIntoRerunServiceModal'
 import { OverviewFieldGrid } from '@/components/project/OverviewFieldGrid'
@@ -737,6 +738,15 @@ export default function ProjectDetailPage() {
 
             <SidebarCard title="Rerun history" dense collapsible defaultCollapsed>
               <WaveHistory project={project} />
+            </SidebarCard>
+
+            {/* Separate card, not a section of the one above, because the two
+                relationships are genuinely different: a rerun wave has a number
+                and a place in a series, a related survey has neither. Putting
+                them in one card is how people end up recording a soft launch as
+                wave 2. */}
+            <SidebarCard title="Related surveys" dense collapsible defaultCollapsed>
+              <RelatedSurveys project={project} />
             </SidebarCard>
           </div>
         </div>

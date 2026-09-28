@@ -132,6 +132,14 @@ export type RerunSeriesFieldsPatch = Partial<{
   notes: string | null
   data_qa_note: string | null
   anchor_date: string | null
+  resume_anchor: string | null
+  /** An explicit next-wave due date that overrides the cadence arithmetic
+   *  (migration 125). Applies only while it is later than the newest wave, so
+   *  it expires by itself. Null = compute it from the cadence as before. */
+  next_due_override: string | null
+  /** The number the NEXT spawned wave takes. Editable because a backfilled or
+   *  hand-built series can end up with a count that does not match its waves. */
+  next_wave_no: number
 }>
 
 export type RerunSeriesActionInput =

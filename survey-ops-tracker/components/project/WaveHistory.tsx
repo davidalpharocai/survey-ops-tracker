@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
 import Link from 'next/link'
-import { useRerunSeries, useRerunCandidates, useLinkRerun } from '@/lib/hooks/useRerunLineage'
+import { useRerunSeries, useRerunCandidates, useSurveySearch, useLinkRerun } from '@/lib/hooks/useRerunLineage'
 import {
   useRerunSeriesRecord,
   useRerunSeriesList,
@@ -87,8 +87,21 @@ function FirstClassWaveHistory({ project, seriesId }: { project: P; seriesId: st
  *  happen to be looking at, so both exist. */
 function AddWaveToSeries({ seriesId, client }: { seriesId: string; client: string }) {
   const [picking, setPicking] = useState(false)
-  const { data: candidates = [], isLoading } = useSeriesAddCandidates(client, picking)
+  const [q, setQ] = useState('')
+  const { data: all = [], isLoading } = useSeriesAddCandidates(client, picking)
   const act = useRerunSeriesActions()
+  // Filtered in the browser, not re-queried: the list is already capped at 200
+  // surveys for this one firm, and it stays deliberately firm-scoped because
+  // attachProjectToSeries REFUSES a wave from another client. Searching wider
+  // here would only offer choices the server is going to turn down.
+  const needle = q.trim().toLowerCase()
+  const candidates = needle
+    ? all.filter(
+        (c) =>
+          (c.project_code ?? '').toLowerCase().includes(needle) ||
+          c.project_name.toLowerCase().includes(needle)
+      )
+    : all
 
   function add(projectId: string, label: string) {
     act.mutate(
@@ -124,11 +137,23 @@ function AddWaveToSeries({ seriesId, client }: { seriesId: string; client: strin
         Pick a {firm} survey to add as a wave. Anything linked to it as a rerun comes too, and the
         series is renumbered by date afterwards.
       </p>
+      {all.length > 8 && (
+        <input
+          type="search"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Filter by keyword or PR number…"
+          aria-label="Filter surveys to add as a wave"
+          className="w-full rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:ring-1 focus:ring-primary/40"
+        />
+      )}
       {isLoading ? (
         <p className="text-xs text-muted-foreground/50">Loading…</p>
       ) : candidates.length === 0 ? (
         <p className="text-xs text-muted-foreground/60">
-          No unassigned {firm} surveys to add — every one is already in a series.
+          {needle
+            ? `No unassigned ${firm} survey matches “${q.trim()}”.`
+            : `No unassigned ${firm} surveys to add — every one is already in a series.`}
         </p>
       ) : (
         <div className="max-h-[12rem] overflow-y-auto flex flex-col thin-scroll">
@@ -306,19 +331,43 @@ function ParentPicker({
   onCancel: () => void
   busy: boolean
 }) {
-  const { data: candidates = [], isLoading } = useRerunCandidates(project, true)
+  const [q, setQ] = useState('')
+  const searching = q.trim().length >= 2
+  const root = project.rerun_series_id ?? project.id
+  const { data: candidates = [], isLoading: loadingCandidates } = useRerunCandidates(project, !searching)
+  const { data: hits = [], isLoading: loadingSearch } = useSurveySearch(q)
+  // Filtered here, not in the query — see useSurveySearch.
+  const found = hits.filter((r) => r.id !== project.id && r.id !== root)
   const firm = project.client.split(' - ')[0].trim()
 
+  const rows = searching ? found : candidates
+  const isLoading = searching ? loadingSearch : loadingCandidates
+
   return (
-    <div className="rounded-lg border border-border bg-muted/40 p-2 flex flex-col gap-1">
-      <p className="text-[12px] text-muted-foreground">Pick any prior wave to link this into its full history:</p>
+    <div className="rounded-lg border border-border bg-muted/40 p-2 flex flex-col gap-1.5">
+      <input
+        type="search"
+        autoFocus
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        placeholder="Search every survey by keyword or PR number…"
+        aria-label="Search surveys to link"
+        className="w-full rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:ring-1 focus:ring-primary/40"
+      />
+      <p className="text-[12px] text-muted-foreground">
+        {searching
+          ? 'Searching every survey — any client.'
+          : `Nearest ${firm} surveys. Type to search all of them, by name or PR number.`}
+      </p>
       {isLoading ? (
         <p className="text-xs text-muted-foreground/50">Loading…</p>
-      ) : candidates.length === 0 ? (
-        <p className="text-xs text-muted-foreground/60">No other {firm} surveys found to link to.</p>
+      ) : rows.length === 0 ? (
+        <p className="text-xs text-muted-foreground/60">
+          {searching ? `Nothing matches “${q.trim()}”.` : `No other ${firm} surveys found to link to.`}
+        </p>
       ) : (
         <div className="max-h-[12rem] overflow-y-auto flex flex-col thin-scroll">
-          {candidates.map((c) => (
+          {rows.map((c) => (
             <button
               key={c.id}
               disabled={busy}

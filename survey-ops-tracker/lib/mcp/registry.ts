@@ -49,6 +49,11 @@ import {
 } from '@/lib/mcp/reports'
 import * as health from '@/lib/mcp/health'
 import { dataCleanup, type CleanupArgs } from '@/lib/mcp/cleanup'
+import {
+  addProjectLink,
+  listProjectLinks,
+  removeProjectLinkByPair,
+} from '@/lib/projects/links'
 import { financeResults, type FinanceResultsArgs } from '@/lib/mcp/financeResults'
 
 // Canonical prod origin for report download links surfaced to the connector user.
@@ -605,6 +610,128 @@ export const TOOLS: AssistantTool[] = [
           }
         }
       )
+    },
+  },
+  {
+    name: 'link_surveys',
+    description:
+      "Record that two surveys are RELATED without either being a repeat wave of the other — a soft launch and its full launch, the B2B and consumer halves of one study, a survey that replaced a cancelled one. This is NOT the rerun tool: it adds no wave number, no series membership and no auto-spawn, and is the right answer whenever add_survey_to_series would mean calling something a wave that is not one. The link is symmetric, so it shows on both surveys. Optional note says HOW they are related. Linking an already-linked pair just updates the note. Identify each survey by PR code or name. Preview first; confirm to apply.",
+    kind: 'write',
+    schema: {
+      project: z.string(),
+      other: z.string(),
+      note: z.string().optional(),
+      confirm: z.boolean().optional(),
+    },
+    handler: async (rawArgs, ctx, meta) => {
+      const args = rawArgs as { project: string; other: string; note?: string; confirm?: boolean }
+      const { userEmail } = ctx
+      const a = await resolveProjectWritable(args.project)
+      if (!a) return { error: 'Project not found.' }
+      if ('error' in a) return a
+      if ('ambiguous' in a) return a
+      const b = await resolveProjectWritable(args.other)
+      if (!b) return { error: `No survey found matching "${args.other}".` }
+      if ('error' in b) return b
+      if ('ambiguous' in b) return b
+      meta.project_id = a.id as string
+      if (a.id === b.id) return { error: 'A survey cannot be linked to itself.' }
+
+      const aLabel = (a.project_code as string | null) ?? (a.project_name as string)
+      const bLabel = (b.project_code as string | null) ?? (b.project_name as string)
+
+      return confirmable(
+        args,
+        async () => ({
+          summary: `Link ${aLabel} and ${bLabel} as related surveys`,
+          note:
+            'A related link is not a rerun wave: no wave number, no series, no auto-spawn. ' +
+            'It shows on both surveys and can be removed with unlink_surveys.',
+          related_as: args.note?.trim() || '(no note)',
+        }),
+        async () => {
+          const res = await addProjectLink(
+            createAdminClient(),
+            a.id as string,
+            b.id as string,
+            args.note?.trim() || null,
+            `${userEmail} via Claude`
+          )
+          meta.detail = { action: 'link_surveys', project: a.project_code, other: b.project_code }
+          return {
+            ok: true,
+            link_id: res.link_id,
+            // false means the pair was already linked and only the note moved.
+            // Saying "linked" there would claim something the call did not do.
+            created: res.created,
+            linked: [aLabel, bLabel],
+          }
+        }
+      )
+    },
+  },
+  {
+    name: 'unlink_surveys',
+    description:
+      'Remove the related-survey link between two surveys. Does not touch rerun lineage or wave numbers — for that, use remove_survey_from_series. Identify each survey by PR code or name. Preview first; confirm to apply.',
+    kind: 'write',
+    schema: {
+      project: z.string(),
+      other: z.string(),
+      confirm: z.boolean().optional(),
+    },
+    handler: async (rawArgs, ctx, meta) => {
+      const args = rawArgs as { project: string; other: string; confirm?: boolean }
+      const a = await resolveProjectWritable(args.project)
+      if (!a) return { error: 'Project not found.' }
+      if ('error' in a) return a
+      if ('ambiguous' in a) return a
+      const b = await resolveProjectWritable(args.other)
+      if (!b) return { error: `No survey found matching "${args.other}".` }
+      if ('error' in b) return b
+      if ('ambiguous' in b) return b
+      meta.project_id = a.id as string
+
+      const aLabel = (a.project_code as string | null) ?? (a.project_name as string)
+      const bLabel = (b.project_code as string | null) ?? (b.project_name as string)
+
+      return confirmable(
+        args,
+        async () => ({ summary: `Unlink ${aLabel} from ${bLabel}` }),
+        async () => {
+          await removeProjectLinkByPair(createAdminClient(), a.id as string, b.id as string)
+          meta.detail = { action: 'unlink_surveys', project: a.project_code, other: b.project_code }
+          return { ok: true, unlinked: [aLabel, bLabel] }
+        }
+      )
+    },
+  },
+  {
+    name: 'list_related_surveys',
+    description:
+      'List the surveys linked to one survey as RELATED — the non-rerun links made by link_surveys. Rerun waves are not included; get_rerun_series covers those. Identify the survey by PR code or name.',
+    kind: 'read',
+    schema: { project: z.string() },
+    handler: async (rawArgs) => {
+      const args = rawArgs as { project: string }
+      const p = await resolveProjectWritable(args.project)
+      if (!p) return { error: 'Project not found.' }
+      if ('error' in p) return p
+      if ('ambiguous' in p) return p
+      const links = await listProjectLinks(createAdminClient(), p.id as string)
+      return {
+        project: p.project_code ?? p.project_name,
+        count: links.length,
+        related: links.map((l) => ({
+          project_code: l.project_code,
+          name: l.project_name,
+          client: l.client,
+          status: l.status,
+          stage: l.board_column,
+          related_as: l.note,
+          linked_by: l.linked_by,
+        })),
+      }
     },
   },
   {

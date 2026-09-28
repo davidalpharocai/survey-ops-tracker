@@ -89,6 +89,60 @@ export function useRerunCandidates(
   })
 }
 
+/** Search EVERY survey by PR code, name or client.
+ *
+ * The picker's other query (useRerunCandidates) ranks same-firm surveys by
+ * name-word overlap, which is the right default when you have not typed
+ * anything: the previous wave of the study you are standing on is almost always
+ * at the top. It is the wrong thing when you know what you want, because it
+ * cannot see outside the current client and cannot match a PR number at all —
+ * "PR00463" shares no words with anything.
+ *
+ * So: empty box keeps the ranked same-firm list, typing searches the whole
+ * table. A survey can legitimately be linked across clients (the same tracker
+ * run for two firms, a study that moved account), and refusing to show those
+ * was a restriction nobody asked for.
+ *
+ * `q` is matched against project_code, project_name and client. Two characters
+ * minimum, because one character matches most of the table and the result is
+ * not a search, it is a page of noise.
+ */
+export function useSurveySearch(q: string) {
+  const supabase = createClient()
+  const query = q.trim()
+  return useQuery({
+    queryKey: ['survey-search', query],
+    enabled: query.length >= 2,
+    queryFn: async (): Promise<Wave[]> => {
+      // PostgREST parses `or=` as a comma-separated list inside parentheses, so a
+      // comma, a dot or a bracket in the term silently changes the FILTER rather
+      // than the search. Strip them to spaces; then escape the LIKE wildcards so
+      // a literal % is a literal %. Order matters — escaping first would let the
+      // strip eat the backslashes.
+      const safe = esc(query.replace(/[,.()]/g, ' ').trim())
+      if (!safe) return []
+      const { data, error } = await supabase
+        .from('survey_projects')
+        .select(WAVE_COLS)
+        .or(`project_code.ilike.*${safe}*,project_name.ilike.*${safe}*,client.ilike.*${safe}*`)
+        .is('deleted_at', null)
+        .limit(50)
+      if (error) throw error
+      // Exclusions are deliberately NOT applied here. The cache key is the query
+      // text alone, so a result filtered against the caller's list at fetch time
+      // would keep that list forever - link a survey and it would stay missing
+      // from a later search for the same words. Callers filter what they render.
+      const rows = (data ?? []) as Wave[]
+      // A PR code match is what someone typing "463" means, so float those over
+      // a name that happens to contain the digits.
+      const needle = query.toLowerCase()
+      const isCode = (r: Wave) => (r.project_code ?? '').toLowerCase().includes(needle)
+      return rows.sort((a, b) => Number(isCode(b)) - Number(isCode(a)))
+    },
+    staleTime: 30_000,
+  })
+}
+
 export type RerunSeriesGroup = {
   rootId: string
   /** Client of the series' root/original wave. */
