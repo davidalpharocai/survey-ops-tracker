@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { ThemeToggle } from '@/components/shared/ThemeToggle'
 import { NavSearch } from '@/components/shared/NavSearch'
 import { hasUnreadChanges } from '@/lib/changelog/seen'
+import { useCanViewFinancials } from '@/lib/hooks/useCapabilities'
 
 const HANDOVER_URL =
   'https://docs.google.com/document/d/1rkT0KYApcvYU1BlK-TO_lfiXyhL0FuGIPz9UjduSJgk/edit'
@@ -27,25 +28,46 @@ interface Tab {
 // built in this same order. Users can drag any tab to reorder; their order is
 // remembered per-browser (NAV_ORDER_KEY) and "Reset ribbon order" in More
 // restores this default. Keep this list in sync with the `tabs` array's order.
-const DEFAULT_TAB_ORDER = ['/reruns', '/calendar', '/review', '/admin'] as const
-const NAV_ORDER_KEY = 'socc.nav.order.v1'
+//
+// '/finance' is in the ORDER for everyone but in the TABS only for finance
+// holders (David, 2026-09-24: Finance moves into the ribbon, shown only to the
+// people who may open it). Keeping it in the order means a holder's saved
+// order behaves like any other tab's; leaving it out of the tabs means a
+// non-holder can never see it, whatever order their browser has saved. The
+// page itself is gated on the server as well (app/(app)/finance/layout.tsx) —
+// hiding a link is not a permission check.
+export const DEFAULT_TAB_ORDER = ['/reruns', '/calendar', '/finance', '/review', '/admin'] as const
+export const NAV_ORDER_KEY = 'socc.nav.order.v1'
 
-/** Hydrate a persisted ribbon order from localStorage. Mirrors the List view's
- *  column-order pattern: keep only hrefs that still exist (drops a tab removed
- *  from the registry), and APPEND any known tab missing from the stored list —
- *  so a tab added after a user saved their order shows up (at the end) instead
- *  of vanishing until they reset. Returns null (→ caller keeps the default)
- *  when nothing valid survives or storage is unreadable. */
+/**
+ * A saved ribbon order, reconciled with today's tabs. Keeps only hrefs that
+ * still exist (drops a tab removed from the registry, and duplicates), and
+ * INSERTS any known tab missing from the saved list right after the nearest
+ * tab that precedes it in the default order — so a tab added after someone
+ * saved their order (Finance, 2026-09-28) appears where it belongs, after
+ * Calendar, instead of vanishing until they reset or landing at the far end.
+ * Returns null (→ caller keeps the default) when nothing valid survives.
+ */
+export function mergeNavOrder(stored: unknown, defaults: readonly string[]): string[] | null {
+  if (!Array.isArray(stored)) return null
+  const out = [...new Set(stored.filter((h): h is string => typeof h === 'string' && defaults.includes(h)))]
+  if (out.length === 0) return null
+  defaults.forEach((h, i) => {
+    if (out.includes(h)) return
+    let at = -1
+    for (let j = i - 1; j >= 0 && at < 0; j--) at = out.indexOf(defaults[j])
+    out.splice(at + 1, 0, h)
+  })
+  return out
+}
+
+/** Hydrate a persisted ribbon order from localStorage (mergeNavOrder does the
+ *  reconciling). Null when nothing is stored or storage is unreadable. */
 function loadNavOrder(validHrefs: readonly string[]): string[] | null {
   try {
     const raw = localStorage.getItem(NAV_ORDER_KEY)
     if (!raw) return null
-    const parsed: unknown = JSON.parse(raw)
-    if (!Array.isArray(parsed)) return null
-    const valid = parsed.filter((h): h is string => typeof h === 'string' && validHrefs.includes(h))
-    if (valid.length === 0) return null
-    const missing = validHrefs.filter((h) => !valid.includes(h))
-    return [...valid, ...missing]
+    return mergeNavOrder(JSON.parse(raw), validHrefs)
   } catch {
     return null
   }
@@ -65,6 +87,24 @@ const menuItemClass =
 export function TopNav() {
   const pathname = usePathname()
   const [moreOpen, setMoreOpen] = useState(false)
+  // False while the check loads and on any error, so Finance appears only once
+  // we KNOW the reader holds the permission — never a flash of it for others.
+  const canFinance = useCanViewFinancials()
+
+  // Publish the nav's height as --topnav-h, so a page's own sticky bar (the
+  // finance filter bar) can sit just under it. The nav wraps to two or three
+  // lines on a narrow screen, so a fixed offset would slide that bar under it.
+  const navRef = useRef<HTMLElement>(null)
+  useEffect(() => {
+    const el = navRef.current
+    if (!el) return
+    const publish = () => document.documentElement.style.setProperty('--topnav-h', `${el.offsetHeight}px`)
+    publish()
+    if (typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(publish)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
 
   // Whether there is a changelog entry this browser hasn't seen. Starts FALSE
   // and is filled in after mount on purpose: localStorage doesn't exist during
@@ -145,12 +185,20 @@ export function TopNav() {
   const tabs: Tab[] = [
     { href: '/reruns', label: 'Reruns', icon: '🔁', title: 'Reruns — recurring surveys on a calendar / list / series view; badge = overdue', badge: rerunOverdue },
     { href: '/calendar', label: 'Calendar', icon: '📅', title: 'Calendar — every dated event on a month grid, filterable by captain, type, client, and more' },
+    // Finance holders only (see DEFAULT_TAB_ORDER). Absent from this list for
+    // everyone else, so no saved order can bring it back for them.
+    ...(canFinance
+      ? [{ href: '/finance', label: 'Finance', icon: '💵', title: 'Finance — what we charged, what fielding cost and what we kept; the money still moving this week; the cost of one respondent; and which records to fill in. Finance team only.' }]
+      : []),
     // Combined Deliverables + Email review — rendered specially below (two icons,
     // two counts). Kept in the tabs array so it can be reordered like the rest.
     { href: '/review', label: 'Review', icon: '📦', title: 'Review — emailed deliverables we couldn’t auto-file, and client emails we couldn’t tie to a project, in two columns to file or dismiss' },
     { href: '/admin', label: 'Admin', icon: '⚙️', title: 'Admin — system links, client ids, roster, recently deleted, and data health' },
   ]
   const tabsByHref = new Map(tabs.map((t) => [t.href, t]))
+  // The default order in words, as this reader sees it (no Finance for a
+  // non-holder), for the Reset button's tooltip.
+  const defaultOrderWords = DEFAULT_TAB_ORDER.map((h) => tabsByHref.get(h)?.label).filter(Boolean).join(' · ')
 
   // Personal-to-browser ribbon order. SSR + first client paint use the default
   // (deterministic, so no hydration mismatch); a mount-only effect then applies
@@ -250,7 +298,7 @@ export function TopNav() {
   }
 
   return (
-    <nav className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b border-border px-6 py-1.5 flex items-center gap-2 flex-wrap">
+    <nav ref={navRef} className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b border-border px-6 py-1.5 flex items-center gap-2 flex-wrap">
       <Link
         href="/"
         title="Board — the kanban home"
@@ -343,16 +391,11 @@ export function TopNav() {
           </button>
           {moreOpen && (
             <div className="absolute left-0 top-full mt-2 z-50 w-60 bg-popover border border-border rounded-xl shadow-xl p-1.5 flex flex-col">
-              <Link href="/insights" className={menuItemClass} title="Insights — pipeline rollup, deadlines, on-time delivery, workload, budget">
+              <Link href="/insights" className={menuItemClass} title="Insights — what the team delivered, on time, cycle time, and open work right now">
                 <span>📊</span> Insights
               </Link>
-              {/* Open to analysts, because the cost half of this page is what
-                  the fielding team needs. The revenue, margin and rate bands are
-                  gated inside the page on VIEW_FINANCIALS, and project_financials
-                  is restricted at the database layer besides (migration 086). */}
-              <Link href="/finance" className={menuItemClass} title="Finance — what our fielding costs and, for finance, what it earns: margin on the priced book, money lost vs revenue foregone, cost per complete by route, spend by account">
-                <span>💵</span> Finance
-              </Link>
+              {/* Finance is no longer here: it is a ribbon tab, shown only to
+                  finance holders (see DEFAULT_TAB_ORDER). */}
               <Link href="/internal" className={menuItemClass} title="Internal Projects — AlphaROC's own work on a sprint-based board">
                 <span>🧰</span> Internal Projects
               </Link>
@@ -382,7 +425,7 @@ export function TopNav() {
                 <span aria-hidden="true">⠿</span> Drag ribbon tabs to reorder
               </div>
               {isCustomized && (
-                <button onClick={resetNavOrder} className={menuItemClass} title="Restore the ribbon to its default order (Reruns · Calendar · Review · Admin)">
+                <button onClick={resetNavOrder} className={menuItemClass} title={`Restore the ribbon to its default order (${defaultOrderWords})`}>
                   <span>↺</span> Reset ribbon order
                 </button>
               )}

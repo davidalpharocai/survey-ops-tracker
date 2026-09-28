@@ -46,6 +46,7 @@ describe('TOOLS registry shape', () => {
       'data_health', 'pipeline_throughput', 'get_me',
       'get_client_history', 'get_project_history', 'search_clients', 'get_client',
       'list_activity', 'get_email', 'decode_survey_id', 'list_reminders', 'list_launches',
+      'finance_results',
     ])
     for (const t of TOOLS) {
       expect(t.kind, `${t.name}`).toBe(READ.has(t.name) ? 'read' : 'write')

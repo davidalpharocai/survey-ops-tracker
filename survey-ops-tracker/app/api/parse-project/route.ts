@@ -3,6 +3,9 @@ import { createClient } from '@/lib/supabase/server'
 import { canViewFinancials } from '@/lib/auth/capabilities'
 import { isAllowedEmail } from '@/lib/utils/allowedDomain'
 import { RESTRICTED_FIELDS } from '@/lib/utils/quickFields'
+// Lives in its own module because a route file may export nothing but its
+// handlers and config - exporting it from here fails the PRODUCTION build.
+import { sanitizeFields } from './sanitize'
 import { getAiBudget, logAiUsage } from '@/lib/server/observability'
 import { NextRequest } from 'next/server'
 
@@ -58,45 +61,26 @@ const FIELDS_SCHEMA = {
     },
     scoping_stage: {
       type: 'string',
-      enum: ['New Inquiry', 'Proposal Sent', 'Pricing Discussion', 'Awaiting Approval', 'Closed'],
+      // No 'Closed' here, though the database enum still carries it from the
+      // first schema (002). It is not one of the scoping lane's columns, so a
+      // deal given that stage would sit in a column that does not exist. A
+      // finished deal is a STATUS change (Archived), not a stage.
+      enum: ['New Inquiry', 'Proposal Sent', 'Pricing Discussion', 'Awaiting Approval'],
     },
-    status: { type: 'string', enum: ['Open', 'Closed', 'Hold'] },
+    status: {
+      type: 'string',
+      // 'Archived' is the only word the app shows for the stored 'Closed'
+      // (project-status model), so it is what a person types. Both are accepted
+      // and both mean the same thing; sanitizeFields stores 'Closed'.
+      enum: ['Open', 'Archived', 'Closed', 'Hold'],
+      description: 'Archived and Closed are the same status: finished or historical work, kept for the record. The app says Archived.',
+    },
     note: {
       type: 'string',
       description: 'Any free-text status update or next step the user mentioned, to append to the project log',
     },
   },
   additionalProperties: false as const,
-}
-
-// Belt-and-suspenders validation of the model output before it reaches the UI
-// (the schema already constrains it, but never trust generated data near the DB).
-const ENUMS: Record<string, string[]> = {
-  project_type: ['PS', 'B2B', 'Rerun'],
-  status: ['Open', 'Closed', 'Hold'],
-  board_column: ['Submitted', 'Doc Programming', 'Survey Programming', 'EdWin QA', 'Fielding', 'Data QA', 'Delivery'],
-  scoping_stage: ['New Inquiry', 'Proposal Sent', 'Pricing Discussion', 'Awaiting Approval', 'Closed'],
-}
-const NON_NEGATIVE = ['n_target', 'n_target_max', 'n_collected', 'n_actual', 'audience_size', 'budget', 'actual_spend']
-
-function sanitizeFields(
-  fields: Record<string, unknown>,
-  canSeeMoney: boolean
-): Record<string, unknown> {
-  const out: Record<string, unknown> = {}
-  for (const [k, v] of Object.entries(fields)) {
-    if (v == null) continue
-    // Second line of defence behind schemaFor(): the schema already omits these
-    // for a non-holder, but a restricted field must never leave this route for
-    // someone who may not set it, whatever the model returned.
-    if (!canSeeMoney && RESTRICTED_FIELDS.has(k)) continue
-    if (k in ENUMS && !ENUMS[k].includes(String(v))) continue // drop invalid enum values
-    if (NON_NEGATIVE.includes(k) && typeof v === 'number' && v < 0) continue // drop negatives
-    out[k] = v
-  }
-  // A project is either in the scoping funnel or on the pipeline — never both
-  if (out.scoping_stage && out.board_column) delete out.board_column
-  return out
 }
 
 // The finance gate reaches the MODEL, not just the screen. `budget` is a cost
@@ -172,6 +156,7 @@ Rules:
 - N target is a RANGE: n_target is the MINIMUM N we commit to collecting, n_target_max the top of it. A single N ("N of 2500") sets BOTH to that number; "1000 to 1200" sets n_target 1000 and n_target_max 1200. Only move one end when the user changed only that end.
 - captain_name must exactly match one of the team member names; if the mentioned person doesn't match anyone, omit it.
 - If the user describes a status update or next step in prose, put it in "note".
+- "Archived" and "closed" mean the same status: finished or historical work, kept for the record. Either word sets status "Archived". A cancelled project is a different status, and this tool cannot set it.
 ${mode === 'edit'
     ? `- This EDITS an existing project. Current values (JSON): ${JSON.stringify(scrubCurrent(current, canSeeMoney) ?? {})}\n- Return only the fields that should CHANGE.`
     : '- This CREATES a new project. Extract everything mentioned.'}`

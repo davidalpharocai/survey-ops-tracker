@@ -24,8 +24,11 @@ export async function ImpersonationBanner() {
   if (!imp) return null
 
   return (
+    // data-print="hide": an admin printing a statement while viewing as a
+    // salesperson must not send the client an amber "Viewing as" bar.
     <div
       role="status"
+      data-print="hide"
       className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-amber-500/40 bg-amber-500/15 px-4 py-2 text-[13px] text-amber-900 dark:text-amber-200"
     >
       <span aria-hidden className="text-base leading-none">👁</span>

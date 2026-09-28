@@ -80,6 +80,8 @@ export const DUE_DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 
 export const CLIENT_WRITE_FIELDS = [
   'compliance_before_fielding', 'compliance_after_fielding', 'compliance_contact', 'compliance_notes', 'code',
+  // Migration 122. update_client refuses it with a clear message until 122 is applied.
+  'display_name',
 ] as const
 
 export const CONTACT_WRITE_FIELDS = ['first_name', 'last_name', 'email', 'title', 'phone'] as const

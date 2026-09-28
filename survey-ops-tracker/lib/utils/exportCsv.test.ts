@@ -1,8 +1,9 @@
-import { describe, it, expect } from 'vitest'
+import { afterEach, describe, it, expect, vi } from 'vitest'
 import {
   csvColumnsFor,
   csvIncludedRestricted,
   buildProjectsCsv,
+  logExport,
 } from './exportCsv'
 import type { SurveyProject } from '@/lib/hooks/useProjects'
 
@@ -79,5 +80,76 @@ describe('buildProjectsCsv', () => {
 
   it('writes a header-only file for no projects', () => {
     expect(buildProjectsCsv([], csvColumnsFor(false)).split('\r\n')).toHaveLength(1)
+  })
+})
+
+// The guard that stops a CSV becoming a script. It lives in csvCell, which
+// every exporter shares, so the board and list files get it as well as the
+// finance ones — a project name is typed by people, and a spreadsheet runs a
+// cell that starts with =, +, - or @ the moment the file is opened.
+describe('the spreadsheet formula guard', () => {
+  it('defuses a name and a client a spreadsheet would run', () => {
+    const evil = { ...project, project_name: '=SUM(A1:A9)', client: '@holocene' } as unknown as SurveyProject
+    const row = buildProjectsCsv([evil], csvColumnsFor(false)).split('\r\n')[1]
+    // Behind an apostrophe, so the cell reads as the text somebody typed.
+    expect(row).toContain("'=SUM(A1:A9)")
+    expect(row).toContain("'@holocene")
+  })
+
+  it('leaves a real number alone, so the spreadsheet can still add it up', () => {
+    const row = buildProjectsCsv([project], csvColumnsFor(true)).split('\r\n')[1]
+    expect(row.split(',')).toContain('9100')
+  })
+})
+
+// The audit note. For weeks the route was never deployed and production
+// answered 404 to every export; nothing noticed, because nothing read the
+// response. These pin the three things that fix: the answer is read, a failure
+// is reported (console + returned status) and never thrown, and every filter —
+// scoping included — travels in the payload.
+describe('logExport', () => {
+  const entry = {
+    route: 'finance-results',
+    rowCount: 41,
+    filters: { tab: 'results', range: 'since-jun-1', account: 'bam', scoping_included: false },
+    includedRestricted: true,
+  }
+  const answer = (status: number, body: unknown) =>
+    vi.fn(async () => new Response(body == null ? '' : JSON.stringify(body), { status }))
+
+  afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks() })
+
+  it('returns the logged row id when the server wrote it', async () => {
+    vi.stubGlobal('fetch', answer(200, { ok: true, id: 'abc123' }))
+    await expect(logExport(entry)).resolves.toEqual({ ok: true, status: 200, id: 'abc123', error: null })
+  })
+
+  it('sends every filter, scoping included, to the audit route', async () => {
+    const f = answer(200, { ok: true, id: 'x' })
+    vi.stubGlobal('fetch', f)
+    await logExport(entry)
+    const [url, init] = (f.mock.calls[0] as unknown as [string, RequestInit])
+    expect(url).toBe('/api/exports/log')
+    expect(JSON.parse(String(init.body))).toEqual(entry)
+  })
+
+  it('reports a missing route (404) instead of treating it as logged', async () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.stubGlobal('fetch', answer(404, null))
+    const r = await logExport(entry)
+    expect(r).toMatchObject({ ok: false, status: 404, id: null })
+    expect(err).toHaveBeenCalled()
+  })
+
+  it('reports a server that answered but could not write the row', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.stubGlobal('fetch', answer(500, { ok: false, error: 'The export was not logged' }))
+    await expect(logExport(entry)).resolves.toMatchObject({ ok: false, status: 500, error: 'The export was not logged' })
+  })
+
+  it('never throws when the request itself fails — the download already happened', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('Failed to fetch') }))
+    await expect(logExport(entry)).resolves.toMatchObject({ ok: false, status: 0, error: 'Failed to fetch' })
   })
 })

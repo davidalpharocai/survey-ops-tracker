@@ -48,6 +48,7 @@ import {
   type SurveyEvent, type SurveyType,
 } from '@/lib/mcp/reports'
 import * as health from '@/lib/mcp/health'
+import { financeResults, type FinanceResultsArgs } from '@/lib/mcp/financeResults'
 
 // Canonical prod origin for report download links surfaced to the connector user.
 const REPORT_BASE = 'https://survey-ops-tracker.vercel.app'
@@ -117,6 +118,29 @@ function renderLaunch(l: LaunchView): string {
   const foot = `  actual ${money(actualCost(lines))} (${fmtNum(totalCollected(lines))} collected)` +
     (est ? ` · est ${money(est.low)}–${money(est.high)}` : '')
   return [head, ...rows, foot].join('\n')
+}
+
+// ---- clients.display_name (migration 122) — "Name as printed on client documents" ----
+// 122 is applied by hand, and nothing may assume it has landed. A write that
+// reaches a database without the column must fail with THIS sentence, before
+// anything is changed — not with PostgREST's schema-cache error and not
+// silently.
+const DISPLAY_NAME_NOT_MIGRATED =
+  'display_name ("Name as printed on client documents") needs database migration 122, which has not been applied yet. Nothing was changed.'
+
+/** PostgREST (PGRST204) or Postgres (42703) saying a column does not exist. */
+function isMissingColumn(err: { code?: string; message?: string } | null | undefined, column: string): boolean {
+  return !!err && (err.code === 'PGRST204' || err.code === '42703') && (err.message ?? '').includes(column)
+}
+
+/** Blank clears it (null prints the internal name); anything else is trimmed
+ *  and held to the 1–200 characters 122's check constraint allows. */
+function normDisplayName(v: unknown): { value: string | null } | { error: string } {
+  if (v === null || v === undefined) return { value: null }
+  if (typeof v !== 'string') return { error: 'display_name must be text, or null to clear it.' }
+  const t = v.trim()
+  if (t.length > 200) return { error: 'display_name must be 200 characters or fewer.' }
+  return { value: t || null }
 }
 
 export const TOOLS: AssistantTool[] = [
@@ -806,6 +830,21 @@ export const TOOLS: AssistantTool[] = [
         (m.prior ? ` · prior ${m.prior.count} delivered, on-time ${m.prior.on_time_pct ?? '—'}%` : '')
       return { ok: true, event, type: args.type ?? 'all', period, metrics: m, summary }
     },
+  },
+  {
+    name: 'finance_results',
+    description:
+      "FINANCE-ONLY (view_financials). The finance page's Results tab, same numbers: on DELIVERED surveys in a date range, what clients pay vs what we spent — client price (price per N × billed N, never above the N sold), our cost, what we keep ($ and %, plus the % on paid work without surveys given away at $0), and the median budget per $1 of price — all on the margin set (delivered, priced incl. $0, with a delivered N and target, and a recorded cost). Also: the coverage line (the margin set's share of delivered spend, and the spend with no client price), the spend split by line (panel, blast rewards gross, rewards recovered, SMS sends, other), spend on cancelled / archived work not in the figures, the months (price vs cost vs kept %), the verdict sentence, and Tile 2 rows grouped by account (default), route, month, contact, type, survey (the three-way ledger with budget, spend ÷ budget, spend ÷ price and LOST MONEY / OVER BUDGET / GIVEN AWAY $0 / NO PRICE tags), or panel (panel spend by supplier, with price per complete and what each panel paid above the cheapest in the same wave — panel spend only, no client price or margin, because clients pay per survey and not per panel). Range: a preset (default since-jun-1) or from/to. Account: a name, Cl code or client id. Route is measured from each survey's rows. Refuses callers without finance access — then say you cannot show these figures. Use for “did we make money in August”, “margin by account”, “which surveys lost money”.",
+    kind: 'read',
+    schema: {
+      range: z.enum(['since-jun-1', 'this-month', 'last-month', 'this-quarter', 'all']).optional(),
+      from: z.string().optional(),
+      to: z.string().optional(),
+      account: z.string().optional(),
+      route: z.enum(['all', 'blast', 'panel', 'both', 'none']).optional(),
+      group_by: z.enum(['account', 'route', 'month', 'contact', 'type', 'survey', 'panel']).optional(),
+    },
+    handler: async (rawArgs, ctx) => financeResults(rawArgs as FinanceResultsArgs, ctx),
   },
   {
     name: 'whats_at_risk',
@@ -3055,7 +3094,7 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'update_client',
     description:
-      "Update a client's compliance settings, or assign/fix its Cl##### code on a code-less client (preview first; confirm to apply). Use rename_client to change the name.",
+      "Update a client's compliance settings, its display_name (the name printed on client documents such as the Survey Activity Statement, e.g. \"The D. E. Shaw Group\"; null clears it so the internal name prints), or assign/fix its Cl##### code on a code-less client (preview first; confirm to apply). Use rename_client to change the internal name.",
     kind: 'write',
     schema: { client: z.string(), fields: z.record(z.unknown()), confirm: z.boolean().optional() },
     handler: async (rawArgs, _ctx, meta) => {
@@ -3091,6 +3130,16 @@ export const TOOLS: AssistantTool[] = [
         patch.code = code
       }
 
+      // display_name (122). resolveClient reads select('*'), so the row carries
+      // the key exactly when the column exists — refuse at PREVIEW, before a
+      // confirm is ever asked for, if it does not.
+      if ('display_name' in patch) {
+        if (!Object.prototype.hasOwnProperty.call(c, 'display_name')) return { error: DISPLAY_NAME_NOT_MIGRATED }
+        const dn = normDisplayName(patch.display_name)
+        if ('error' in dn) return { error: dn.error }
+        patch.display_name = dn.value
+      }
+
       const changed = diffSummary(c, patch)
 
       return confirmable(
@@ -3101,6 +3150,8 @@ export const TOOLS: AssistantTool[] = [
           const { data: row, error } = await supabase.from('clients')
             .update(patch as Database['public']['Tables']['clients']['Update'])
             .eq('id', c.id as string).select().single()
+          // Belt and braces: the column vanished between preview and confirm.
+          if ('display_name' in patch && isMissingColumn(error, 'display_name')) return { error: DISPLAY_NAME_NOT_MIGRATED }
           if (error) throw error
           meta.detail = { changed }
           return { ok: true, client: { id: row.id, name: row.name }, changed }
@@ -3148,7 +3199,7 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'create_client',
     description:
-      'Create a new client (preview first; confirm to apply). If a client with that name already exists, returns it instead of creating a duplicate.',
+      'Create a new client (preview first; confirm to apply). Optional display_name is the name printed on client documents. If a client with that name already exists, returns it instead of creating a duplicate.',
     kind: 'write',
     schema: {
       name: z.string().min(1),
@@ -3156,42 +3207,73 @@ export const TOOLS: AssistantTool[] = [
       compliance_after_fielding: z.boolean().optional(),
       compliance_contact: z.string().optional(),
       compliance_notes: z.string().optional(),
+      /** The name printed on client documents (migration 122). */
+      display_name: z.string().optional(),
       confirm: z.boolean().optional(),
     },
     handler: async (rawArgs, _ctx, meta) => {
       const args = rawArgs as {
         name: string; compliance_before_fielding?: boolean; compliance_after_fielding?: boolean
-        compliance_contact?: string; compliance_notes?: string; confirm?: boolean
+        compliance_contact?: string; compliance_notes?: string; display_name?: string; confirm?: boolean
       }
       const firmName = firmNameFrom(args.name)
       if (!firmName) return { error: 'name is required.' }
 
       const supabase = createAdminClient()
+
+      // display_name needs 122. Probe for the column before previewing, so a
+      // create that would fail on it is refused up front with the reason, not
+      // half-way through with a schema-cache error.
+      let displayName: string | null = null
+      if (args.display_name !== undefined) {
+        const dn = normDisplayName(args.display_name)
+        if ('error' in dn) return { error: dn.error }
+        displayName = dn.value
+        const probe = await supabase.from('clients').select('display_name').limit(1)
+        if (isMissingColumn(probe.error, 'display_name')) return { error: DISPLAY_NAME_NOT_MIGRATED }
+        if (probe.error) throw probe.error
+      }
+
       const { data: existing, error: exErr } = await supabase.from('clients')
         .select('*').eq('name', firmName).maybeSingle()
       if (exErr) throw exErr
       if (existing) meta.client_id = existing.id as string
 
+      // Returning the existing client is right; dropping the display_name the
+      // caller asked for WITHOUT A WORD is not. Both the preview and the
+      // confirm said only "already exists", so Claude and the user came away
+      // believing the printed name was saved, and the next statement printed
+      // the internal name. Say it was not applied, and how to apply it.
+      const dnNote = existing && args.display_name !== undefined
+        ? ' display_name was not applied: use update_client to set it on the existing client.'
+        : ''
+
       return confirmable(
         args,
         async () => existing
           ? {
-              summary: `A client named "${firmName}" already exists — no new client will be created.`,
+              summary: `A client named "${firmName}" already exists — no new client will be created.${dnNote}`,
               existing: true, client: { id: existing.id, code: existing.code, name: existing.name },
+              ...(dnNote ? { display_name_applied: false } : {}),
             }
-          : { summary: `Create client "${firmName}"`, existing: false, name: firmName },
+          : { summary: `Create client "${firmName}"${displayName ? ` (printed on client documents as "${displayName}")` : ''}`, existing: false, name: firmName, display_name: displayName },
         async () => {
           if (existing) {
-            return { ok: true, existing: true, client: { id: existing.id, code: existing.code, name: existing.name } }
+            return {
+              ok: true, existing: true, client: { id: existing.id, code: existing.code, name: existing.name },
+              ...(dnNote ? { display_name_applied: false, note: dnNote.trim() } : {}),
+            }
           }
           const insert: Record<string, unknown> = { name: firmName }
           if (args.compliance_before_fielding !== undefined) insert.compliance_before_fielding = args.compliance_before_fielding
           if (args.compliance_after_fielding !== undefined) insert.compliance_after_fielding = args.compliance_after_fielding
           if (args.compliance_contact !== undefined) insert.compliance_contact = args.compliance_contact
           if (args.compliance_notes !== undefined) insert.compliance_notes = args.compliance_notes
+          if (displayName != null) insert.display_name = displayName
           const { data: row, error } = await supabase.from('clients')
             .insert(insert as Database['public']['Tables']['clients']['Insert'])
             .select().single()
+          if (displayName != null && isMissingColumn(error, 'display_name')) return { error: DISPLAY_NAME_NOT_MIGRATED }
           if (error) throw error
           meta.client_id = row.id as string
           meta.detail = { created: { id: row.id, name: row.name } }

@@ -20,12 +20,17 @@ export function Providers({ children }: { children: React.ReactNode }) {
   // leaks into portal pages' dark: variants.
   const pathname = usePathname()
   const isPortal = pathname?.startsWith('/portal')
+  // The printable client documents (/sales/accounts/[id]/print,
+  // /sales/surveys/print) are paper. The default theme is dark, and under
+  // print-color-adjust: exact the shell's bg-background would print as a navy
+  // page around a white sheet. Forced light, so screen and PDF match.
+  const isPrint = pathname?.endsWith('/print')
   return (
     <ThemeProvider
       attribute="class"
       defaultTheme="dark"
       enableSystem
-      forcedTheme={isPortal ? 'light' : undefined}
+      forcedTheme={isPortal || isPrint ? 'light' : undefined}
     >
       <QueryClientProvider client={queryClient}>
         {children}

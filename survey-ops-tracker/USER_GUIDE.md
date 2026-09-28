@@ -1,6 +1,6 @@
 # Survey Ops Command Center — User Guide
 
-*Last updated: August 7, 2026. The team's tracker for survey projects from first inquiry through delivery.*
+*Last updated: September 28, 2026. The team's tracker for survey projects from first inquiry through delivery.*
 
 **Finding this guide later:** the top navigation bar's **More** menu links straight here, along with the Systems & Handover doc.
 
@@ -23,11 +23,15 @@ The board shows every active project as a card moving left-to-right through the 
 
 ### Views
 - **Operations** (default): open, active projects only — the daily working view.
-- **Full View**: adds the **Scoping** board (pre-sale deals), the **Closed** section (finished projects, collapsed at the bottom), and on-hold context. Drag a scoping card down into the pipeline to approve it.
+- **Full View**: adds the **Scoping** board (pre-sale deals) and on-hold context. Drag a scoping card down into the pipeline to approve it.
+- The **Archived** section — historical work: finished and cancelled projects — sits collapsed at the bottom of **both** views, with its own "Delivered in the last …" window.
+- If a project ever ends up in a state the board doesn't recognise (an unknown status, or a scoping deal parked on a stage that has no column), an **amber notice above the lanes lists it by name and links to it**, and it is written to the CSV. Nothing is ever dropped silently — open it and fix whatever the notice names.
+- **⬇ Export CSV** on the board writes every project in the sections the view holds: Full View writes Scoping, the pipeline and Archived; Operations writes the pipeline. The pipeline filters (captain, search and the rest) and the Delivered window do not narrow the file; hover the button for the exact count. For a file that follows your filters, export from the **List** page.
 
 ### Card colors (the key at the top explains them in-app)
 - **Red border** = due today or overdue · **Orange** = due tomorrow · **Amber** = due in 2 days
-- **Grey, faded, ⏸ corner badge** = on hold
+- **Grey, faded, ⏸ On hold corner badge** = on hold. A deal put on hold while still in Scoping stays in its scoping column, sorted to the bottom. The Scoping header counts them in their own ⏸ chip, not in the open-deal number. Hover the (i) for how to resume or cancel it.
+- **Amber "Has field activity — move it out of Scoping?"** = a deal still marked Scoping that already has blasts, panel suppliers, send fees or responses on record. The (i) says what was found; if it is being fielded, drag it down into the pipeline.
 - **Green border + NEW!** = a project someone just assigned to you (opens it to dismiss)
 - **⚑ / ‼ chips** = high/urgent priority (those cards float to the top of their column)
 - **💤 Stale?** = no dates and no updates in 30+ days — worth reviewing
@@ -127,6 +131,80 @@ Open the **Calendar** tab in the top nav to see everything dated on one **month 
 
 **Filters** (remembered per person): **Captain**, **Type** (PS / B2B / Rerun — so Sree can isolate reruns), **Just mine**, **Client**, **Priority**, and **Status** — by default it shows **only open, active projects**; tick to also include On-Hold, Closed, or Scoping. On a phone it switches to a chronological agenda list.
 
+## 4c. Finance (finance team only)
+
+**Who can open it.** **Finance** is a tab in the top navigation ribbon, straight after Calendar, and only the finance team — David, Shanu and Vineet — sees it. It is no longer in the **More** menu for anyone. If someone else opens the address directly they get a plain page: *"Finance is limited to the finance team: David, Shanu and Vineet"*, with links back to the board and to Insights. The decision is made on the server, so none of the page's figures are even read. If the permission check itself can't run, the page says *"We could not check your access just now"* and offers **Reload** — it never dresses a failed check up as a refusal.
+
+### The four tabs, and the question each one answers
+
+- **Results** — what we charged, what it cost and what we kept on **delivered** work. Four cards: *What clients pay vs what we spent*, *Where the delivered spend went* (a waterfall, with recovered rewards as their own line rather than folded into "Other"), *By delivery month*, and *Where it was made and lost* — which you can **Group by** Account, Route, Month, Contact, Type as filed, Survey, or Panel supplier (the panel grouping opens the PureSpectrum supplier view, and a supplier opens its own wave-by-wave drilldown).
+- **This week** — live work only. *Decisions this week* groups every open survey under the one thing to do about it — **FREEZE THE BID · CONFIRM FINAL N · STOP BUYING · CAP THE WAVE · SET A BUDGET · PRICE IT · TOP UP THE CONTRACT · CONVERT THE TRIAL · CHECK THE SERIES** — each row saying what is at stake. **On hold** is its own bucket and is never counted inside a live total. *Credit pools* shows contracts drawn past their allowance. One survey can need two or three decisions, so the group totals overlap; a line under them says so and names the count.
+- **Per respondent** — *What one respondent costs*, by route, against the quote floor; *Where more margin could come from*, a ranked list of levers, each opening the surveys it was measured on; and *Rules tested and rejected*, so a rule that didn't survive the data isn't proposed again.
+- **Improve** — *What to record next*: the gaps ranked by how many dollars each one hides, as a chart and a list, each row saying **who** records it, **when** and **where**. Plus *What each month's records carry*, *Logged within a week*, and *Blocked: needs data SOCC does not capture* (measures we can't compute at all yet, and what would have to be recorded first).
+
+Old bookmarks still work: `?tab=now`, `unit`, `book` and `save` land on the tab that now answers the same question, and the address is rewritten once so the link you copy from then on is the one the page reads.
+
+### Filters, and the "Since 1 Jun 2026" default
+
+The sticky bar under the tabs carries three filters, and **every view is a URL** — the tab, the dates, the account and the route are all in the address, so any view can be bookmarked, shared or refreshed, and the tabs, chips and **Clear** are real links you can middle-click.
+
+1. **Date** — **Since 1 Jun 2026** is the default on every tab, with **This month**, **Last month**, **This quarter**, **Custom** (which reveals a **From** and a **To**) and **All time** one click away. On **This week** the date control is greyed and reads *"Live work — all dates"*, because live work is judged by what it is doing now, not by when it was delivered; the date you picked elsewhere is kept for the other tabs.
+2. **Account** — one client account, old name variants rolled together. Each name shows how many surveys it has **under the other filters**; an account with none is greyed out rather than removed, so you can see it is empty instead of wondering where it went.
+3. **Route** — how a survey was **actually** fielded, read from its own cost records rather than how it was filed: **All routes**, **Blast only**, **Panel only**, **Both**, or **No field rows**.
+
+Whatever is in force shows as removable chips under the bar, with **Clear** to drop them all.
+
+### The banner, and why its dates move on their own
+
+Under the filters, a banner says how far back the numbers can be trusted — *"Costs are reliable from …"* — plus what the surveys **in your view** actually carry. **Nothing in it is typed in.** Each date is the first month from which that field's coverage stays above its bar, computed from the records themselves, so as prices are backfilled toward June the line moves back by itself and the "prices are still thin" sentence disappears by itself when the last thin month clears. While months are still thin the banner names them and links to **the Improve tab** to see which surveys need a price. The banner turns **amber** when your view reaches back before costs were reliable (or into surveys with no date at all) — such a view mixes two eras and reads worse than the business did — and offers **Back to since 1 Jun 2026**.
+
+**The integrity line** under it is the receipt: what the page read from the database and the time it read it. It turns **red and names the table** when a read failed, a count disagreed, or the spend the page recomputed doesn't match the stored figure. Anywhere on these tabs, **a failed read is never shown as $0** — you get **Blocked**, naming the table that did not load, or a dash with the reason.
+
+### Looking behind a figure
+
+Click any figure, chart mark or table row and a panel opens listing the surveys behind it. Each survey code is a real link to its project page. At the top, a strip says whether the rows **add back** to the figure; when they don't it goes red, names the missing and extra surveys, and says *"Do not rely on either number until this is explained."* **Esc** closes the panel and puts you back on the control you opened it from; on a phone it fills the screen. **Download these rows** saves just that list.
+
+### Export what you see
+
+1. Set the tab and filters you want.
+2. Click **⭳ Export what you see** (top right of the filter bar). It writes **exactly** the rows behind that tab's main card — never a different cut — with the as-of time and every filter written at the top of the file.
+3. The download starts straight away. A moment later the line beside the button says **"Logged as export #…"**, or says the export was not logged and why. A lost audit record never holds up your file.
+
+A name typed as a spreadsheet formula is written out as plain text, in these files and in the board and list exports alike, so a CSV can't be turned into a script.
+
+### "How to read this" — the glossary
+
+The link at the top right of the page opens a drawer with the only ten words the finance page is allowed to use (**Esc** closes it). The same ten, one sentence each:
+
+- **Client price** — the client's price per respondent times the respondents we delivered, never more than the N they bought — what the contract implies, not cash received, because there is no invoice record yet.
+- **Our cost** — the field cost we recorded: blast rewards (bid × completes), text-message sends (cost per send × people; email is free), panel purchases (price per complete × completes) and vendor lines, minus rewards that went unclaimed and came back.
+- **We keep** — what is left after field cost, before salaries and overhead: client price minus our cost.
+- **Budget** — the most we planned to spend on a survey — a cost ceiling with a starting goal of about half the price, and never revenue.
+- **Complete** — a respondent we paid for, counted before the quality checks (QA).
+- **Qualified respondent** — a respondent the client received, after QA.
+- **Scrub** — completes that QA removed: we paid for them, and the client never received them.
+- **CPQR** — cost per qualified respondent: our cost divided by the respondents the client received.
+- **Billed N** — the respondents we can bill: the N delivered after QA, never more than the N sold (the top of the range, when a range was sold).
+- **Route** — how a survey was actually fielded, read from its cost records rather than how it was filed: blast (B2B email or text), panel (PureSpectrum), or both.
+
+**50% is a goal, not a rule.** Keeping half of the client price, and budgeting about 50¢ per $1 of price, is drawn as a goal line and used to colour figures — it never blocks anything and never turns intake amber.
+
+## 4d. Insights — the team dashboard
+
+**More → Insights** is the dashboard for everyone. It answers "what has the team actually delivered", and it **shows no money at all** — no budget, spend, price or margin. (It doesn't even ask the database for those columns.)
+
+It opens with a sentence that states the headline in words, then:
+
+- **Six tiles, each with a sparkline**: **Surveys delivered** · **Respondents delivered** (post-QA N) · **On time** · **Median cycle time** · **In flight now** · **Reruns delivered**. Each compares against the period before — but **only when both periods have at least 10 surveys**, and only when deliveries missing a deliver date couldn't change the answer. Otherwise the tile says so rather than quoting a move it can't stand behind.
+- **Charts**: delivered per month by type (months outside your dates are faded, for context), on time and median cycle time by month against their goal lines, and delivered by captain, by type and by account — plus a **Biggest deliveries** table.
+- **Right now**: the pipeline by stage with collection progress, overdue / due this week / behind target, work **on hold** and **still scoping** counted separately, and workload by captain.
+
+**Filters** (all in the address, so a view can be shared): **date range** — This month (the default), Last month, This quarter, Since 1 Jun 2026, Last 12 months, Custom, All time — plus **Type**, **Captain** and **Account**. "Right now" follows the type, captain and account filters and ignores the dates, because it describes today.
+
+Every tile, column, bar and count opens a list of exactly the surveys behind it, each a real link to its project, with a check that the list's count matches the figure. Where the List page can show the same thing, the panel offers **"Open these in the List"** and says how the two may differ.
+
+A few rules worth knowing: a survey is placed by its **deliver date** (the day the client had it); **on time** means delivered on or before the due date; **cycle time** is calendar days from submitted to delivered, using the median so one outlier can't drag it; empty rerun placeholders and demo accounts are left out, and the footer says how many. A read that fails shows as **Blocked**, never as zero.
+
 ## 5. The AI Assistant
 
 ![The ✦ Assistant panel](/guide-img/assistant-panel.png)
@@ -156,12 +234,12 @@ The **✦ Assistant** is now a full working assistant — it can both **answer q
 
 - Every project has a permanent **Project ID** like `PR00042` — shown next to the project title and in the list view, included in CSV exports, and assigned automatically to new projects. It never changes, so use it when referencing a project in email or Slack. Clients have matching `Cl#####` ids.
 - **Merging duplicates**: if the same project (or client) got entered twice, open either copy and click **Merge…** in the header, search for the duplicate, and you'll get a preview. Pick which record **survives**, resolve any **fields that differ** (dates, N, budget, etc. — matching fields are hidden), and everything else — bids, blasts, next steps, deliverables, contacts, notes, activity and audit history — **combines** onto the survivor. The other record is **soft-deleted** to Recently Deleted (recoverable). Analyst-only. Two caveats: a project whose N is **split into segments** must be un-split first; and merging two **clients** doesn't auto-merge their duplicate *projects* — merge those separately.
-- The **More → Insights** page (top nav) — every tile and bar is clickable and opens the matching, pre-filtered List (overdue, a stage, a captain's projects, the unassigned pile). It rolls up the whole pipeline: active/scoping/closed counts, overdue and due-this-week (overdue means the due date has passed; a project due today counts as due this week, and the list, the board, the client and contact pages and the morning digest all use that same rule), on-time delivery %, average cycle time, stage distribution, per-captain workload, budget vs spend, and top clients — all derived live from your projects.
+- The **More → Insights** page (top nav) is the team dashboard — what was delivered, on time, cycle time, and what's open right now, all clickable through to the surveys behind it. See §4d. It carries **no money figures at all**; budget, spend, price and margin live on the Finance page (§4c), which only the finance team can open. The overdue rule it uses is the one everything else uses: overdue means the due date has **passed**, and a project due today counts as due this week — the list, the board, the client and contact pages and the morning digest all agree.
 - The **☰ menu → Internal Projects** page is a separate home for AlphaROC's own work (product, ops, hiring, tooling), kept entirely apart from survey projects. It's a sprint-based **Backlog → In Progress → Review → Done** board: "+ New internal project" defaults the client to AlphaROC, each project has an Owner, Category, Objective, a Sprint (a 2-week window — set the cadence in **Admin → Sprint cadence**), and a Next Steps checklist instead of survey N tracking. No survey fields, and internal projects never appear on the survey board, list, insights, or digest.
 - The **☰ menu → Admin** page is organized into tabs — **Overview** (systems links, system status, AI usage, data health), **Accounts & Team**, **Operations** (sprint cadence, recently deleted), and **Audit Log** — and has: links to every system behind the tracker (including Supabase Users for password resets), a **System status** panel (shows whether the automated backend jobs — the nightly Slack digest and the survey-ID sync — ran cleanly, with any failures listed; the same failures also show up in the daily Slack digest), an **AI usage** panel (what the assistant chat and AI project entry have cost this month, with an editable monthly budget and an optional "hard stop" that pauses AI features when the budget is reached; a **Breakdown** shows spend **by person** and **by feature** over This month / last 30 / last 90 days / all time), **Recently Deleted** (restore a project you deleted by mistake, or delete it permanently), a **master audit log** (every field change across all projects — who, when, old → new, including deletes and restores, with the project linked), the client list with their ids, the team roster (with **+ Add member** to put a new teammate on the roster so they're selectable as a project captain, and ✎ to fix a name/initials), and a data-health checklist (open projects missing a captain or due date).
 - **View as** (Admin → Access → 👁 View as, admins only): see exactly what a salesperson or compliance reviewer sees, through their own permissions. It is read-only and logged, and it does not touch their account. It won't start while they have an unused sign-in link waiting (it would cancel it) or before they have signed in for the first time (it would use up their invitation). **Stop viewing** and **Sign out** end only your viewing session, never theirs.
 - **Adding a salesperson**: a new salesperson must be **pre-registered at the sales tier before they are invited** — an unregistered @alpharoc.ai address signs up as a full analyst and sees every budget and price. A salesperson can also be pointed at **another salesperson's book** (their row in the salespeople table names whose book they work): they sign in with their own login and see exactly that person's accounts and surveys, with the page header saying whose book it is. John Farrall works Alex Pinsky's book this way until he has accounts of his own. When he does, clear the pointer and add him to the project salesperson list.
-- **Client pages**: click any client on the Admin page — or the client name on a project page — to see that client's full picture: client since, open/closed project counts, average spend per project, how often they come back, a **Contacts** roster you can add to and edit (the people who request this client's surveys — pick one as a project's "Requested by"; deleting archives a contact so it leaves the picker but stays on past projects), a **Notes** log (free-text notes about the client — each a dated, attributed bullet, newest first), every project (click one to open it), and a **Compliance** card to set that client's review requirements.
+- **Client pages**: click any client on the Admin page — or the client name on a project page — to see that client's full picture: client since, open/closed project counts, average spend per project, how often they come back, a **Contacts** roster you can add to and edit (the people who request this client's surveys — pick one as a project's "Requested by"; deleting archives a contact so it leaves the picker but stays on past projects), a **Notes** log (free-text notes about the client — each a dated, attributed bullet, newest first), every project (click one to open it), a **Compliance** card to set that client's review requirements, and **Name as printed on client documents** — the name a salesperson's statement and survey list print after "Prepared for" and in every page footer. Leave it blank and the documents print the internal name; set it when the client's own name is different from the one we file them under (see §7d).
 
 ## 7b. Compliance guardrails
 
@@ -178,6 +256,37 @@ Clients view their data in Occam, so a new contact needs their Occam welcome ema
 - **When it fires**: as you mark a project **Delivered** (checkbox row or the command-bar dots), if that project's Requested-by contact hasn't been confirmed as invited to Occam yet, a prompt asks whether the invite was sent. Choose **"Yes, invite sent — deliver"** (records it) or **"Deliver anyway…"** (needs a reason, recorded on the project). It only asks **once per contact** — after that, every future project for them delivers without the prompt. Projects with no Requested-by contact aren't gated. This is independent of the compliance gate; a first delivery for a compliance client will show both prompts in turn.
 - **Pre-mark people already onboarded**: on a client page, each contact row has an **"Occam ✓"** chip and a **"Mark Occam invited" / "Unmark Occam"** toggle — use it to flag contacts who already have their Occam account so their next delivery skips the prompt.
 - **Via Claude**: the connector's delivery tool enforces the same check — it will ask you to confirm the invite before it marks a first delivery.
+
+## 7d. Client documents — the statement and the survey list
+
+Salespeople send clients two printed documents, both produced by the app and both designed to be saved as a PDF from the browser's own print dialog:
+
+- **Survey Activity Statement** — one account, opened with **Export PDF** on that account's page.
+- **Survey List** — whatever the sales surveys list is showing (same group, filters and search), opened with **⎙ Export** above the list.
+
+**What the statement carries:** a masthead with the account name, the statement date, the period covered, the contract in force and the client's AlphaROC contact; a **contract summary** (credits drawn, and the balance against the allowance); an **activity summary** (surveys delivered, final responses); the **survey ledger** — Ref., survey and audience, Requested by, Status, Target, Final, Collected and Credits, with group subtotals and a total; and the **notes** that explain any mark in the table. Every page carries a footer: *AlphaROC · Confidential · Prepared for the account name* on the left, the document name, the date and *Page n of N* on the right. A list covering more than one account is an **internal** document: it prints marked Internal, never says "Prepared for", and is not for sending to a client.
+
+**No dollar figure reaches either document.** Credits are counts; what a credit is worth, what we spend, what we charge and our internal targets stay inside the analyst and finance pages.
+
+### Choosing what prints
+
+By default **everything prints**. To change it for one print:
+
+1. Open the document (**Export PDF** on an account, or **⎙ Export** on the surveys list). It opens in a new tab with a **pre-send panel** at the top — that panel is on screen only and never prints.
+2. In the panel's **What prints** box, untick any **column** (Requested by, Status, Target, Final, Collected, Credits — plus Account on a multi-account internal list) or any **section** (Contract summary, Activity summary, Notes). The page below changes at once, so you are always looking at what will come out.
+3. **Ref.** and **Survey and audience** are shown ticked and greyed out: they always print, because a row without them matches nothing the client holds.
+4. Click **Save as my default** to make the current ticks your starting point for that kind of document, or **Reset to system default** to turn everything back on and forget the saved one. A line in the box always says which is in effect — *using your saved default*, *the system default*, *the choice in this link*, or *changed for this print only*.
+5. Print or save as PDF. The print dialog opens by itself once the **"Check before sending"** list at the top is empty; while something is still on that list, read it first and print by hand.
+
+**Things worth knowing:**
+
+- Your saved default lives **in your browser** (so it doesn't follow you to another machine), and **statements and survey lists keep separate defaults**. If the browser refuses to save it — a private window, or blocked site data — the panel says so and the print still uses your choice.
+- The **address bar carries your choice**, so a copied link reproduces the same print. An older export link still prints what it always did.
+- **Totals follow the columns.** Turn off Target and no target or percentage is stated anywhere, including the summary; turn off Credits and the credit total goes with it. A subtotal that would hold no figure is left out rather than printed empty, and the "Responses" banner only appears when it has more than one column to group.
+- **Notes and their marks follow too** — a note prints only while something on the page still needs it, so the numbering never points at a figure that isn't there.
+- A **note, never a block**, appears if you print Final without Target: the client then has no way to check the final count against what they bought.
+- The **column picker on the screen behind it does not carry over** to the PDF. The printed document has its own "What prints" box; both screens' tooltips say so.
+- The name printed after "Prepared for" and in the footer comes from the client page's **Name as printed on client documents** (§7). A salesperson can also type one for a single print, in the pre-send panel.
 
 ## 8. Tips
 

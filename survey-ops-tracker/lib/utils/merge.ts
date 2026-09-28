@@ -43,8 +43,13 @@ export const PROJECT_MERGE_FIELDS: MergeField[] = [
   { key: 'row_level_data', label: 'Row-level data' },
 ]
 
+// display_name (migration 122) is safe to list before 122 is applied: both
+// records are read with select('*'), so without the column neither row has the
+// key, conflicts() sees undefined = undefined, and the field is never offered
+// or written. Leaving it out would soft-delete a printed name set on the loser.
 export const CLIENT_MERGE_FIELDS: MergeField[] = [
   { key: 'name', label: 'Client name' },
+  { key: 'display_name', label: 'Name as printed' },
   { key: 'code', label: 'Client ID' },
   { key: 'compliance_before_fielding', label: 'Compliance before fielding' },
   { key: 'compliance_after_fielding', label: 'Compliance after fielding' },

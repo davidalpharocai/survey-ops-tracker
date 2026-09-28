@@ -80,6 +80,115 @@ export function changelogFor(audience: ChangeAudience): ChangelogEntry[] {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    date: '2026-09-28',
+    changes: [
+      // ── The finance hub. Every bullet here is about money, so none of them
+      //    is 'all'. Nor are the board and Insights ones below: the sales tier
+      //    cannot open either page, and a bullet about a page you cannot open
+      //    is at best confusing.
+      {
+        kind: 'NEW',
+        text: 'Finance is now four tabs, each answering one question: what we charged, what fielding cost and what we kept on delivered work; what is still moving this week; what one respondent costs; and which records to fill in first.',
+      },
+      {
+        kind: 'NEW',
+        text: 'Finance has moved into the top bar, next to Calendar, and only the finance team sees it there. Anyone else who opens the address gets a plain page saying who it is for, with a way back — and the check is made before the page is built, so none of the figures are even read.',
+      },
+      {
+        kind: 'NEW',
+        text: 'Every finance view is now a web address. The tab, the dates, the account and the route all travel in the link, so a view can be bookmarked, shared and reopened exactly as it was, and an old finance bookmark lands on the tab that now answers the same question.',
+      },
+      {
+        kind: 'NEW',
+        text: 'A banner says how far back the numbers can be trusted, and works that out from the records themselves rather than from a date somebody typed. As earlier months have their prices filled in, the line moves back on its own, and the banner says which months are still thin.',
+      },
+      {
+        kind: 'NEW',
+        text: 'Click any figure on the finance page and the surveys behind it open in a panel. It states whether those rows add back to the figure, and names the missing or extra ones when they do not, so a number that cannot be explained says so instead of looking solid.',
+      },
+      {
+        kind: 'NEW',
+        text: 'One "Export what you see" button writes exactly the rows behind the card on screen, with the time and every filter written at the top of the file. Every export is recorded, and recording it never holds up the download.',
+      },
+      {
+        kind: 'NEW',
+        text: '"How to read this" opens the ten words the finance page uses, one sentence each, beside the figure you were puzzling over.',
+      },
+      {
+        kind: 'NEW',
+        text: 'This week puts every live survey under the one decision to make about it — freeze the bid, confirm the final N, stop buying, cap the wave, set a budget, price it, top up the contract — and says what is at stake on each row. Work on hold is its own bucket and is never counted inside a live total.',
+      },
+      {
+        kind: 'NEW',
+        text: 'A new Improve tab ranks what is missing from our records by how much money each gap hides, and for each one says who records it, when, and where.',
+      },
+      {
+        kind: 'NEW',
+        text: 'Panel suppliers can now be read on their own: what each supplier was paid, how that compares with the cheapest in the same wave, and a drilldown for one supplier wave by wave.',
+      },
+      {
+        kind: 'NEW',
+        text: 'Insights is now the dashboard for the whole team: surveys delivered, respondents, on time, median cycle time, in flight now and reruns, each with its own trend, filtered by date, type, captain and account, and clickable through to the surveys behind any figure. It carries no money at all, so everyone can use it.',
+      },
+      {
+        kind: 'IMPROVED',
+        text: 'Insights compares a period with the one before only when both have enough surveys to mean anything, and only when deliveries missing a delivery date could not change the answer. Otherwise it says why it is not comparing, rather than quoting a rise or fall it cannot stand behind.',
+      },
+      {
+        kind: 'FIXED',
+        text: 'A table that fails to load is never shown as zero on the finance page. It says which one did not load, and so does every figure that needed it.',
+      },
+      {
+        kind: 'FIXED',
+        text: 'A value typed as a spreadsheet formula now leaves every export as plain text, so a downloaded file cannot be turned into a script.',
+      },
+      {
+        kind: 'FIXED',
+        text: 'Deals put on hold while still being scoped had disappeared from the board altogether. They show in the scoping lane again, greyed and at the bottom, with an On hold badge that explains how to resume or cancel — eight deals, and the board export had been missing them too.',
+      },
+      {
+        kind: 'FIXED',
+        text: 'A deal archived while still in scoping vanished from every section; it now lands under Archived, as the button promises. And if a survey is ever left in a state the board does not recognise, it is listed by name above the lanes and written to the export rather than dropped silently.',
+      },
+      {
+        kind: 'FIXED',
+        text: 'Exporting the board could fail with no message at all on a long list. It now downloads in full, says so when a read fails, and its tooltip states exactly what the file holds instead of promising the projects on screen.',
+      },
+      // ── The client documents. These are the sales tier's own work, and there
+      //    is no money on either page — credits are counts.
+      {
+        kind: 'NEW',
+        audience: 'all',
+        text: 'The account statement and the survey list have been redesigned as proper client documents: a heading with the period covered and the contract in force, a summary of what was delivered, the surveys listed with their responses and credits, notes explaining every mark, and a confidential footer on every page.',
+      },
+      {
+        kind: 'NEW',
+        audience: 'all',
+        text: 'You can now choose what prints. Untick any column or section in the "What prints" box and the page below changes at once; everything prints unless you turn it off. Save the ticks as your own default, or reset to the system default to put them all back.',
+      },
+      {
+        kind: 'IMPROVED',
+        audience: 'all',
+        text: 'Statements and survey lists keep their own separate defaults, and the link in the address bar carries whatever you chose, so a copied link prints the same document again.',
+      },
+      {
+        kind: 'NEW',
+        audience: 'all',
+        text: 'An account can carry the name it should be called on client documents, so a statement is headed the way the client writes it rather than the way we file them. You can also type a name for one print.',
+      },
+      {
+        kind: 'FIXED',
+        audience: 'all',
+        text: 'Turning a column off left its figures in the summary above the table: a statement printed without the Target column still quoted the target and the percentage of it. Every summary figure now follows its column, and a note warns you when the final count prints with nothing to check it against.',
+      },
+      {
+        kind: 'FIXED',
+        audience: 'all',
+        text: 'A printed list with only one response column drew a "Responses" banner wider than the column it labelled, which pushed the table past the edge of the paper.',
+      },
+    ],
+  },
+  {
     date: '2026-09-24',
     changes: [
       {

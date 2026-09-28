@@ -10,10 +10,27 @@
 // n_target_max the maximum. Every revenue figure is therefore a range too —
 // sold at the floor vs sold at the cap — and a single "contract value" number
 // would be a fiction, so nothing here returns one.
+//
+// WHAT THE CLIENT IS BILLED is not computed here. It is computed ONCE, in
+// lib/finance/revenue.ts, and `billedFor` below hands it the SURVEY — so the
+// project page and the finance hub state the same revenue for the same survey
+// to the cent. Before that, this file capped at the top of the range and fell
+// back to the raw collected count when the post-QA count was missing, and the
+// hub did neither: $96,480 apart on the delivered book.
+//
+// THE BILL IS THE SURVEY'S, NOT ITS SEGMENTS' (David, 2026-09-27): "when we
+// bill its just the n actual. we dont break it out usually on the invoice by
+// segment." One rate, the survey's N actual, the survey's cap. The per-segment
+// PriceLines below still describe the PRICE LIST — the blended rate and the
+// contract value at both ends of the range — but nothing here bills a line.
+
+import {
+  overDeliveredOf, revenueDetail, type Revenue, type RevenueSubject,
+} from '@/lib/finance/revenue'
 
 /** Which end of the N range to roll up at. `collected` is the actual N banked so
  *  far, used for the invoice-at-what-we-delivered view. */
-export type RangeEnd = 'min' | 'max' | 'collected' | 'billable'
+export type RangeEnd = 'min' | 'max' | 'collected'
 
 export interface PriceLine {
   /** Effective $ per completed response — the segment's own rate, or the project
@@ -25,9 +42,8 @@ export interface PriceLine {
   nMax: number | null
   /** N banked so far — the RAW count, before cleaning. */
   nCollected?: number | null
-  /** The CLEANED final N. This, not nCollected, is what the client is billed on
-   *  (David 2026-09-10). Falls back to nCollected while a study is still in the
-   *  field and no cleaned figure exists yet. */
+  /** The CLEANED final N on this line. Carried for display; the bill reads the
+   *  SURVEY's N actual (billedFor), never a line's. */
   nActual?: number | null
 }
 
@@ -56,37 +72,7 @@ export function isInherited(segmentRate: number | null | undefined): boolean {
  *  that backfill. */
 function nAt(line: PriceLine, end: RangeEnd): number {
   if (end === 'collected') return line.nCollected ?? 0
-  if (end === 'billable') return billableNOf(line)
   return (end === 'max' ? (line.nMax ?? line.nMin) : line.nMin) ?? 0
-}
-
-/**
- * The N this line can actually be INVOICED for.
- *
- *   billable = min(cleaned N delivered, the target the client asked for)
- *
- * TWO RULES, BOTH FROM DAVID 2026-09-10, AND THE CODE HONOURED NEITHER:
- *
- *   1. CAP AT TARGET. "any N delivered above the target is not charged to the
- *      client." Over-delivery is work we paid for and cannot bill.
- *   2. BILL THE CLEANED N. "The N actual is then what we bill the client."
- *      n_collected is the raw count; n_actual is what survives cleaning.
- *
- * Measured on the twenty projects whose rate was recovered from email, invoicing
- * at raw uncapped n_collected overstated revenue by $44,326 against these rules —
- * 36% high. PR00371 is the extreme: 1,114 collected, 533 actual, 500 target, so
- * the old figure billed 1,114 N and the true billable is 500.
- *
- * The cap is the TOP of the target range (nMax), not the bottom: a range means
- * the client asked for up to that many, so delivering inside the range is
- * billable and only delivery ABOVE the range is the give-away. Only 12 of 395
- * live projects carry a range at all, so this choice moves little today — but it
- * is the reading of "the target is what the client asked for".
- */
-function billableNOf(line: PriceLine): number {
-  const delivered = line.nActual ?? line.nCollected ?? 0
-  const cap = line.nMax ?? line.nMin
-  return cap == null ? delivered : Math.min(delivered, cap)
 }
 
 export interface RateRollup {
@@ -155,33 +141,64 @@ export function invoicedAtCollected(lines: PriceLine[]): number | null {
   return r.pricedN > 0 ? r.revenue : null
 }
 
-/** What the client is ACTUALLY invoiced: Σ(rate × min(n_actual, target)).
- *  null until something priced has been delivered. */
-export function invoicedBillable(lines: PriceLine[]): number | null {
-  const r = rollup(lines, 'billable')
-  return r.pricedN > 0 ? r.revenue : null
+/**
+ * What the client is billed, with the reason when it cannot be known yet —
+ * lib/finance/revenue.ts `revenueDetail` on the survey, the same call the
+ * finance hub makes, so the two agree to the cent (and the invoice seam, once
+ * filled, reaches this page too).
+ *
+ *   billed = the survey's rate × min(the survey's N actual, top of its range)
+ *
+ * TWO RULES FROM DAVID, AND THE CODE ONCE HONOURED NEITHER:
+ *
+ *   1. CAP AT THE SOLD N. "any N delivered above the target is not charged to
+ *      the client." Over-delivery is a courtesy we paid for and never bill.
+ *   2. BILL THE CLEANED N. "The N actual is then what we bill the client."
+ *      n_collected is the raw count; n_actual is what survives cleaning, and a
+ *      survey without one has nothing billable yet — never the raw count.
+ *
+ * And a third (2026-09-27): the SURVEY is billed, not its segments. A segment
+ * over its own target while another is under does not change the bill when
+ * the survey delivered what it sold, and a segment's own price does not
+ * change the rate.
+ *
+ * `survey` carries the survey's own N fields and its segments (each with its
+ * price override, if any, for the notes); `projectRate` is the survey's price
+ * per N. The widget reads `reason` to say WHY there is no figure
+ * ('no-n-actual', 'no-cap', 'no-price') instead of printing a dash.
+ */
+export function billedFor(survey: RevenueSubject, projectRate: number | null | undefined): Revenue {
+  return revenueDetail(survey, projectRate)
+}
+
+/** What the client is ACTUALLY invoiced: the survey's rate × min(its N actual,
+ *  the top of its range). null — never 0 — until the survey has a price, a
+ *  cleaned N and a target; the SAME number the finance hub shows. */
+export function invoicedBillable(survey: RevenueSubject, projectRate: number | null | undefined): number | null {
+  return billedFor(survey, projectRate).revenue
 }
 
 /**
- * N delivered above the target, and what it would have been worth.
+ * N delivered above the top of the survey's sold range, and what it would have
+ * been worth at the survey's rate.
  *
- * This is the margin leak nothing in SOCC showed before: work we paid to collect
- * and cannot invoice. Returns zeroes rather than null when there is no overage,
- * because "none" is a real and reassuring answer that deserves rendering.
+ * Work we paid to deliver and never bill — a courtesy, sometimes a deliberate
+ * one (new clients are over-delivered the first time). Measured on the CLEANED
+ * N only: a study still in the field routinely collects past target to cover QA
+ * loss, and calling that "given away" before QA would be wrong. Returns zeroes
+ * rather than null when there is no overage, because "none" is a real and
+ * reassuring answer that deserves rendering. An unpriced survey reports its N
+ * and $0, never a guessed price.
+ *
+ * The N comes from lib/finance/revenue.ts `overDeliveredOf`, the same rule the
+ * finance hub's over-delivery figure, its drill and its export read — so the
+ * project page and the hub state the same over-delivery for the same survey,
+ * and billed N + this N = delivered N.
  */
-export function overage(lines: PriceLine[]): { n: number; dollars: number } {
-  let n = 0
-  let dollars = 0
-  for (const line of lines) {
-    const delivered = line.nActual ?? line.nCollected ?? 0
-    const cap = line.nMax ?? line.nMin
-    if (cap == null) continue
-    const extra = Math.max(0, delivered - cap)
-    if (extra === 0) continue
-    n += extra
-    if (line.rate != null) dollars += line.rate * extra
-  }
-  return { n, dollars }
+export function overage(survey: RevenueSubject, projectRate: number | null | undefined): { n: number; dollars: number } {
+  const n = overDeliveredOf(survey) ?? 0
+  const rate = billedFor(survey, projectRate).rate
+  return { n, dollars: rate != null ? rate * n : 0 }
 }
 
 /**

@@ -58,5 +58,11 @@ scripts/project-id-mapping.csv
 # unreadable, which is how a real modified file gets missed in the noise.
 scripts/_*
 
+# Dumps those probes write. 60 files on 2026-09-28, 38 of them carrying client
+# prices, spend and account names in plain JSON — none of it belongs in a public
+# repo. They were untracked but NOT ignored, so one `git add -A` in any session
+# would have published them.
+scripts/out/
+
 # PureSpectrum import state (scripts/ps-import.mjs) — a local run marker, not data.
 scripts/.ps-import-state.json

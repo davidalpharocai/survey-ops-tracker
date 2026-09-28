@@ -48,10 +48,40 @@ export {
  *  Never throws. An empty set means "no permissions", including when the tables
  *  don't exist yet or the session can't be read. */
 export async function getMyCapabilities(userId?: string): Promise<Set<Capability>> {
+  return (await readAccess(userId)).capabilities
+}
+
+/** What `readAccess` found, plus whether it could actually SEE the answer.
+ *
+ *  `readFailed` is true when any read that could have supplied a permission
+ *  did not answer — a thrown client, an unreadable session, or an error from
+ *  any of the three queries. It is the difference between "this person holds
+ *  nothing" and "we could not tell", which every caller that shows the reader
+ *  a REASON needs and which a boolean cannot carry. */
+interface AccessRead {
+  capabilities: Set<Capability>
+  readFailed: boolean
+}
+
+/** The three queries, once, with their failures kept rather than swallowed.
+ *
+ *  Everything about the queries themselves is unchanged (see the header: each
+ *  is allowed to fail on its own, and the result degrades to fewer permissions,
+ *  never to an error and never to more). The only addition is that the caller
+ *  can now find out that something failed. */
+async function readAccess(userId?: string): Promise<AccessRead> {
+  const none = (readFailed: boolean): AccessRead => ({ capabilities: new Set(), readFailed })
   try {
     const supabase = await createClient()
-    const uid = userId ?? (await supabase.auth.getUser()).data.user?.id
-    if (!uid) return new Set()
+    let uid = userId
+    if (!uid) {
+      const got = await supabase.auth.getUser()
+      uid = got.data.user?.id
+      // No user id and an error from the session read is "we could not look",
+      // not "nobody is signed in": a signed-out visitor never reaches a gated
+      // page, because app/(app)/layout.tsx sends them to /login first.
+      if (!uid) return none(got.error != null)
+    }
 
     // Three flat queries rather than one embedded select — see the matching
     // comment in lib/hooks/useCapabilities.ts: an embed needs the foreign key
@@ -71,10 +101,13 @@ export async function getMyCapabilities(userId?: string): Promise<Set<Capability
 
     // The union itself lives in resolvePermissions.ts, shared with the browser
     // hook and tested directly — see that file for why it is not inlined here.
-    return resolveAccess({ direct: direct.data, roles: mine.data, bundles: bundles.data })
-      .capabilities
+    return {
+      capabilities: resolveAccess({ direct: direct.data, roles: mine.data, bundles: bundles.data })
+        .capabilities,
+      readFailed: direct.error != null || mine.error != null || bundles.error != null,
+    }
   } catch {
-    return new Set()
+    return none(true)
   }
 }
 
@@ -98,6 +131,33 @@ export async function getMyRoles(userId?: string): Promise<Set<RoleName>> {
  *  failure — the money stays hidden, the page still renders. */
 export async function canViewFinancials(userId?: string): Promise<boolean> {
   return (await getMyCapabilities(userId)).has(VIEW_FINANCIALS)
+}
+
+/** A permission question with the third answer a page needs before it puts
+ *  words on the screen: 'yes', a definite 'no', or 'unknown' — we could not
+ *  look.
+ *
+ *  `canViewFinancials()` answers a plain false for "the tables 404 while a
+ *  migration is pending", "RLS refused", "the network dropped" and "this person
+ *  really is not in finance" alike. That is the right answer for a GATE: money
+ *  stays hidden either way. It is the wrong thing to SAY: /finance told a
+ *  finance holder whose read hiccuped that finance is limited to three people,
+ *  naming them, with no reason and nothing to try. This is the house rule —
+ *  a failed read is not $0 and not "none" — applied to the gate itself.
+ *
+ *  A found permission wins over any failure: a positive is a positive whatever
+ *  else did not answer. Otherwise a failed read is 'unknown', because a
+ *  permission this person holds may live in exactly the query that did not come
+ *  back. Between a deploy and David running a migration by hand, the two role
+ *  queries 404 and a non-holder reads 'unknown' rather than a flat no — which
+ *  is the truthful answer in that window, and changes no access: only 'yes'
+ *  opens anything. */
+export type AccessAnswer = 'yes' | 'no' | 'unknown'
+
+export async function financeAccess(userId?: string): Promise<AccessAnswer> {
+  const { capabilities, readFailed } = await readAccess(userId)
+  if (capabilities.has(VIEW_FINANCIALS)) return 'yes'
+  return readFailed ? 'unknown' : 'no'
 }
 
 /** True when the signed-in user may change other people's access.

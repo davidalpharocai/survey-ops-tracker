@@ -145,20 +145,40 @@ export function useProject(id: string) {
 }
 
 /**
+ * Ids per request in fetchFullProjects. Every id rides in the URL of one GET
+ * (`.in('id', …)`), and a probe on 27 Sep got HTTP 400 Bad Request at 800 ids
+ * (a 31k-character URL), while the board's Full View export was already at 424.
+ * 200 keeps each URL near 8k characters and each answer far inside PostgREST's
+ * 1,000-row cap (which a single request would also have hit, truncating quietly).
+ */
+export const FULL_FETCH_CHUNK = 200
+
+/**
  * One-off fetch of full rows (all columns) for the given project ids,
  * returned in the same order as `ids`. Used by the CSV export buttons so the
  * list views can stay on the slim select.
+ *
+ * All or nothing: if any chunk fails, this throws, so a caller never writes a
+ * file with a hole in it. A row that is simply gone (deleted since the caller
+ * loaded it) is left out; the caller can compare lengths.
  */
 export async function fetchFullProjects(ids: string[]): Promise<SurveyProject[]> {
   if (ids.length === 0) return []
   const supabase = createClient()
-  const { data, error } = await supabase
-    .from('survey_projects')
-    .select(FULL_SELECT)
-    .in('id', ids)
-    .is('deleted_at', null)
-  if (error) throw error
-  const byId = new Map((data as unknown as SurveyProject[]).map(p => [p.id, p]))
+  const chunks: string[][] = []
+  for (let i = 0; i < ids.length; i += FULL_FETCH_CHUNK) chunks.push(ids.slice(i, i + FULL_FETCH_CHUNK))
+  const pages = await Promise.all(
+    chunks.map(async chunk => {
+      const { data, error } = await supabase
+        .from('survey_projects')
+        .select(FULL_SELECT)
+        .in('id', chunk)
+        .is('deleted_at', null)
+      if (error) throw error
+      return (data ?? []) as unknown as SurveyProject[]
+    })
+  )
+  const byId = new Map(pages.flat().map(p => [p.id, p]))
   return ids
     .map(id => byId.get(id))
     .filter((p): p is SurveyProject => p !== undefined)

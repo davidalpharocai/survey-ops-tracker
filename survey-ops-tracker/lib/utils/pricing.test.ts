@@ -7,6 +7,7 @@ import {
   contractRange,
   invoicedAtCollected,
   invoicedBillable,
+  billedFor,
   overage,
   hasRecordedCost,
   margin,
@@ -15,6 +16,7 @@ import {
   ceilingOvershoot,
   type PriceLine,
 } from './pricing'
+import type { RevenueSubject } from '@/lib/finance/revenue'
 
 describe('effectiveRate / isInherited', () => {
   it('a segment override wins over the project default', () => {
@@ -209,67 +211,119 @@ describe('ceilingOvershoot', () => {
   })
 })
 
-/* BILLABLE N — the two rules David stated on 2026-09-10, each of which the
-   shipped code broke:
+/* BILLABLE N — the rules David stated, each of which the shipped code once broke:
      1. bill min(delivered, target); over-delivery is not chargeable
      2. bill the CLEANED n_actual, not the raw n_collected
-   Measured cost of getting these wrong across the twenty projects whose rate was
-   recovered from email: $44,326 of revenue shown that no client would ever pay. */
-describe('invoicedBillable / overage', () => {
+     3. (2026-09-27) bill the SURVEY, not its segments: one rate, its N actual
+   Measured cost of getting 1 and 2 wrong across the twenty projects whose rate
+   was recovered from email: $44,326 of revenue shown that no client would ever
+   pay. Getting 3 wrong billed segmented surveys segment by segment, which is
+   not how the invoice is written. */
+const SV = (o: Partial<RevenueSubject> = {}): RevenueSubject => ({
+  n_target: null, n_target_max: null, n_actual: null, ...o,
+})
+
+describe('billedFor / invoicedBillable / overage — the survey as the invoice sees it', () => {
   it("caps at target — his own example: 50 target, 48 delivered, $100/N", () => {
-    const l = [{ rate: 100, nMin: 50, nMax: 50, nCollected: 48, nActual: 48 }]
-    expect(invoicedBillable(l)).toBe(4800)
-    expect(overage(l)).toEqual({ n: 0, dollars: 0 })
+    const s = SV({ n_target: 50, n_target_max: 50, n_actual: 48 })
+    expect(invoicedBillable(s, 100)).toBe(4800)
+    expect(overage(s, 100)).toEqual({ n: 0, dollars: 0 })
   })
 
   it('does NOT bill delivery above target, and reports it as overage', () => {
-    const l = [{ rate: 100, nMin: 50, nMax: 50, nCollected: 60, nActual: 57 }]
-    expect(invoicedBillable(l)).toBe(5000)      // 50 x $100, not 57
-    expect(invoicedAtCollected(l)).toBe(6000)   // what the page used to show
-    expect(overage(l)).toEqual({ n: 7, dollars: 700 })
+    const s = SV({ n_target: 50, n_target_max: 50, n_actual: 57 })
+    expect(invoicedBillable(s, 100)).toBe(5000)      // 50 x $100, not 57
+    // what the page used to show, off the raw collected count
+    expect(invoicedAtCollected([{ rate: 100, nMin: 50, nMax: 50, nCollected: 60 }])).toBe(6000)
+    expect(overage(s, 100)).toEqual({ n: 7, dollars: 700 })
   })
 
   it('bills the CLEANED n_actual, not the raw n_collected (PR00371 shape)', () => {
     // 1,114 collected, 533 survived cleaning, 500 target, $12/N.
-    const l = [{ rate: 12, nMin: 500, nMax: 500, nCollected: 1114, nActual: 533 }]
-    expect(invoicedBillable(l)).toBe(6000)
-    expect(invoicedAtCollected(l)).toBe(13368)  // the old figure: 2.2x too high
-    expect(overage(l)).toEqual({ n: 33, dollars: 396 })
+    const s = SV({ n_target: 500, n_target_max: 500, n_actual: 533 })
+    expect(invoicedBillable(s, 12)).toBe(6000)
+    expect(invoicedAtCollected([{ rate: 12, nMin: 500, nMax: 500, nCollected: 1114 }])).toBe(13368)  // the old figure: 2.2x too high
+    expect(overage(s, 12)).toEqual({ n: 33, dollars: 396 })
   })
 
-  it('falls back to n_collected while a study is still in the field', () => {
-    // No cleaned figure yet; under target, so nothing is capped away.
-    expect(invoicedBillable([{ rate: 50, nMin: 100, nMax: 100, nCollected: 40, nActual: null }])).toBe(2000)
+  it('bills NOTHING until the cleaned N exists — never the raw collected count', () => {
+    // David, 2026-09-24: "generally its only the N actual that can be billed".
+    // 40 collected and no cleaned figure is no revenue yet, not $2,000.
+    const s = SV({ n_target: 100, n_target_max: 100, n_actual: null })
+    expect(invoicedBillable(s, 50)).toBeNull()
+    expect(billedFor(s, 50).reason).toBe('no-n-actual')
+    // ...and a raw count past target is not "given away" before QA has run.
+    expect(overage(s, 50)).toEqual({ n: 0, dollars: 0 })
   })
 
   it('caps at the TOP of a target range, so delivery inside the range still bills', () => {
-    const inside = [{ rate: 100, nMin: 50, nMax: 70, nCollected: 65, nActual: 65 }]
-    expect(invoicedBillable(inside)).toBe(6500)
-    expect(overage(inside)).toEqual({ n: 0, dollars: 0 })
-    const above = [{ rate: 100, nMin: 50, nMax: 70, nCollected: 80, nActual: 80 }]
-    expect(invoicedBillable(above)).toBe(7000)
-    expect(overage(above)).toEqual({ n: 10, dollars: 1000 })
+    const inside = SV({ n_target: 50, n_target_max: 70, n_actual: 65 })
+    expect(invoicedBillable(inside, 100)).toBe(6500)
+    expect(overage(inside, 100)).toEqual({ n: 0, dollars: 0 })
+    const above = SV({ n_target: 50, n_target_max: 70, n_actual: 80 })
+    expect(invoicedBillable(above, 100)).toBe(7000)
+    expect(overage(above, 100)).toEqual({ n: 10, dollars: 1000 })
   })
 
-  it('caps each SEGMENT separately — one segment over cannot subsidise one under', () => {
-    const l = [
-      { rate: 100, nMin: 50, nMax: 50, nCollected: 60, nActual: 60 },  // 10 over
-      { rate: 100, nMin: 50, nMax: 50, nCollected: 30, nActual: 30 },  // 20 under
-    ]
-    // NOT 90 x $100: the surplus on one segment is not billable against the shortfall on the other.
-    expect(invoicedBillable(l)).toBe(8000)
-    expect(overage(l)).toEqual({ n: 10, dollars: 1000 })
+  it('bills the survey as a whole — segments never split, cap or block the bill', () => {
+    // Buyers 120 of 100, Sellers 80 of 100, survey 200 of 200 at $20: billed
+    // 200, nothing over. Segment by segment it read 180 billed and 20 over.
+    const s = SV({
+      n_target: 200, n_actual: 200,
+      segments: [
+        { n_target: 100, n_actual: 120 },
+        { n_target: 100, n_actual: 80 },
+      ],
+    })
+    expect(billedFor(s, 20)).toMatchObject({ revenue: 4000, billedN: 200, reason: 'ok' })
+    expect(overage(s, 20)).toEqual({ n: 0, dollars: 0 })
   })
 
-  it('an unpriced line contributes overage N but no overage dollars', () => {
-    const l = [{ rate: null, nMin: 50, nMax: 50, nCollected: 70, nActual: 70 }]
-    expect(invoicedBillable(l)).toBeNull()
-    expect(overage(l)).toEqual({ n: 20, dollars: 0 })
+  it('bills at the survey rate even when a segment carries its own price', () => {
+    // The invoice uses one rate. The segment's $8 is a note (revenue.ts
+    // segmentPriceDiffers), not a price.
+    const s = SV({
+      n_target: 300, n_actual: 300,
+      segments: [
+        { n_target: 100, n_actual: 100, price_per_n: 8 },
+        { n_target: 200, n_actual: 200, price_per_n: null },
+      ],
+    })
+    expect(invoicedBillable(s, 5)).toBe(1500)
+    expect(billedFor(s, 5).rate).toBe(5)
   })
 
-  it('a line with no target at all is uncapped — there is nothing to cap against', () => {
-    const l = [{ rate: 10, nMin: null, nMax: null, nCollected: 500, nActual: 480 }]
-    expect(invoicedBillable(l)).toBe(4800)
-    expect(overage(l)).toEqual({ n: 0, dollars: 0 })
+  it('bills the survey N actual when a segment is still uncounted (the PR00231 shape)', () => {
+    // It used to bill nothing at all. The survey's N actual is what is invoiced.
+    const s = SV({
+      n_target: 5000, n_actual: 342,
+      segments: [
+        { n_target: 400, n_actual: 342 },
+        { n_target: 4600, n_actual: null },
+      ],
+    })
+    expect(invoicedBillable(s, 5)).toBe(1710)
+    expect(billedFor(s, 5).reason).toBe('ok')
+  })
+
+  it('an unpriced survey reports its overage N but no overage dollars', () => {
+    const s = SV({ n_target: 50, n_target_max: 50, n_actual: 70 })
+    expect(invoicedBillable(s, null)).toBeNull()
+    expect(overage(s, null)).toEqual({ n: 20, dollars: 0 })
+  })
+
+  it('a survey with no target cannot be billed yet — the cap is missing, so it says so', () => {
+    // Revenue is null, not uncapped: billing 480 against no recorded sale would
+    // be a guess, and revenue.ts reports it as 'no-cap' for someone to fix.
+    const s = SV({ n_target: null, n_target_max: null, n_actual: 480 })
+    expect(invoicedBillable(s, 10)).toBeNull()
+    expect(billedFor(s, 10).reason).toBe('no-cap')
+    expect(overage(s, 10)).toEqual({ n: 0, dollars: 0 })
+  })
+
+  it('a $0 survey bills $0 — a real price, not a missing one', () => {
+    const s = SV({ n_target: 1000, n_target_max: 1000, n_actual: 1000 })
+    expect(invoicedBillable(s, 0)).toBe(0)
+    expect(billedFor(s, 0)).toMatchObject({ free: true, ratioEligible: false })
   })
 })
