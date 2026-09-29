@@ -116,7 +116,7 @@ export function AccountPrint({
 
   const meta: MetaRow[] = [
     { label: 'Statement date', value: `${fmtDayLong(today)}, ${time}`, strong: true },
-    { label: 'Period', value: rangeText ?? 'All surveys to date' },
+    { label: 'Period', value: rangeText ?? 'All studies to date' },
     {
       label: 'Contract in force',
       value: F.term ? `${F.term.name}${F.term.starts_on ? `, from ${fmtDay(F.term.starts_on)}` : ''}` : 'None recorded',
@@ -154,8 +154,8 @@ export function AccountPrint({
         choiceNotes={cNotes}
       />
 
-      <article className={`st st-sheet ${serif.variable} ${sans.variable}`} aria-label="Survey Activity Statement">
-        <Masthead docTitle="Survey Activity Statement" preparedFor={name} internalAccounts={null} meta={meta} />
+      <article className={`st st-sheet ${serif.variable} ${sans.variable}`} aria-label="Study Activity Statement">
+        <Masthead docTitle="Study Activity Statement" preparedFor={name} internalAccounts={null} meta={meta} />
 
         {(prints.contract || prints.activity) && (
           <section className={`st-summary${prints.contract && prints.activity ? '' : ' st-summary-one'}`} aria-label="Summary">
@@ -163,7 +163,7 @@ export function AccountPrint({
             {prints.activity && (
               <ActivityCluster
                 A={A}
-                scope={`${rangeText ?? 'All time'} · ${n0(rows.length)} ${rows.length === 1 ? 'survey' : 'surveys'}`}
+                scope={`${rangeText ?? 'All time'} · ${n0(rows.length)} ${rows.length === 1 ? 'study' : 'studies'}`}
                 ranged={ranged}
                 fnFinal={fn.final}
                 glyphs={glyphs}
@@ -176,9 +176,9 @@ export function AccountPrint({
           </section>
         )}
 
-        <section aria-label="Surveys">
+        <section aria-label="Studies">
           <div className="st-sec">
-            <h2>Surveys</h2><span className="st-sec-rule" />
+            <h2>Studies</h2><span className="st-sec-rule" />
             <span className={`st-sec-aside${ranged ? ' st-wrap' : ''}`}>{aside}</span>
           </div>
           <Ledger
@@ -188,7 +188,7 @@ export function AccountPrint({
             currentTermId={termId}
             neverRecorded={never}
             totalLabel={(n, credits) =>
-              `Total${credits ? ' credits drawn' : ''} · ${ranged ? '' : 'all '}${n0(n)} ${n === 1 ? 'survey' : 'surveys'} listed`}
+              `Total${credits ? ' credits drawn' : ''} · ${ranged ? '' : 'all '}${n0(n)} ${n === 1 ? 'study' : 'studies'} listed`}
             fn={fn}
             columns={ledgerColumns(prints)}
           />

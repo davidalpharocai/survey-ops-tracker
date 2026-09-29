@@ -101,7 +101,7 @@ describe('the ledger, all columns (the system default)', () => {
   // the header rows and the body agree on the width.
   it('prints every column under a two-column Responses spanner', () => {
     expect(t.cols).toBe(7)
-    expect(t.head1).toEqual(['Ref.', 'Survey and audience', 'Requested by', 'Status', 'Responses', 'Credits'])
+    expect(t.head1).toEqual(['Ref.', 'Study and audience', 'Requested by', 'Status', 'Responses', 'Credits'])
     expect(t.head2).toEqual(['Target', 'Final'])
     expect(t.spanner?.getAttribute('colspan')).toBe('2')
     expect(t.headWidths).toEqual([7, 7])
@@ -124,7 +124,7 @@ describe('the ledger, all columns (the system default)', () => {
     expect(cells).toHaveLength(4)
     expect(cells.slice(1, 3)).toEqual([n0(d.target), n0(d.final)])
     expect(cells).not.toContain('')
-    expect(cells[0]).toContain('Target and Final: the 10 surveys with both.')
+    expect(cells[0]).toContain('Target and Final: the 10 studies with both.')
     expect(t.text(t.total as Element)).toContain('Total credits drawn')
   })
 })
@@ -132,10 +132,10 @@ describe('the ledger, all columns (the system default)', () => {
 describe('the ledger, every optional column off', () => {
   const t = render([])
 
-  it('is the reference and the survey, in one header row, with no spanner', () => {
+  it('is the reference and the study, in one header row, with no spanner', () => {
     expect(t.cols).toBe(2)
     expect(t.headRows).toBe(1)
-    expect(t.head1).toEqual(['Ref.', 'Survey and audience'])
+    expect(t.head1).toEqual(['Ref.', 'Study and audience'])
     expect(t.spanner).toBeNull()
     expect(new Set(t.bodyWidths)).toEqual(new Set([2]))
   })
@@ -165,7 +165,7 @@ describe('the ledger, Target off', () => {
     expect(t.spanner).toBeNull()
     expect(t.headRows).toBe(1)
     expect(t.head2).toBeNull()
-    expect(t.head1).toEqual(['Ref.', 'Survey and audience', 'Requested by', 'Status', 'Final', 'Credits'])
+    expect(t.head1).toEqual(['Ref.', 'Study and audience', 'Requested by', 'Status', 'Final', 'Credits'])
     expect(t.html).not.toContain('Responses')
     expect(t.headWidths).toEqual([6])
     expect(new Set(t.bodyWidths)).toEqual(new Set([6]))
@@ -179,7 +179,7 @@ describe('the ledger, Target off', () => {
     expect(cells).toHaveLength(3)
     expect(cells[1]).toBe(n0(d.final))
     expect(cells).not.toContain(n0(d.target))
-    expect(cells[0]).toContain('Final: the 10 surveys with both a target and a final count.')
+    expect(cells[0]).toContain('Final: the 10 studies with both a target and a final count.')
     expect(cells[0]).not.toContain('Target and Final')
     const progress = [...(t.sub('Total in progress') as Element).children].map(t.text)
     expect(progress).toHaveLength(3)
@@ -251,7 +251,7 @@ describe('the ledger, every subset of columns', () => {
         expect(t.spanner ? Number(t.spanner.getAttribute('colspan')) : 0, where).toBe(responses.length > 1 ? responses.length : 0)
         for (const id of responses) expect(t.head1.concat(t.head2 ?? []), where).toContain(HEAD[id])
         if (!shown.includes('credits')) expect(t.html, where).not.toContain('credits drawn')
-        if (!shown.includes('target') && !shown.includes('final')) expect(t.html, where).not.toContain('surveys with both')
+        if (!shown.includes('target') && !shown.includes('final')) expect(t.html, where).not.toContain('studies with both')
         // 2026-09-29: not one of the 128 documents this loop renders says the
         // word, whatever is ticked. This is the cheapest place to catch the
         // column growing back, because it covers every combination there is.
@@ -355,7 +355,7 @@ describe('Collected cannot come back', () => {
     const forced = render(['collected'] as unknown as PrintColumnId[])
     expect(forced.cols).toBe(2)
     expect(forced.headRows).toBe(1)
-    expect(forced.head1).toEqual(['Ref.', 'Survey and audience'])
+    expect(forced.head1).toEqual(['Ref.', 'Study and audience'])
     expect(forced.html).not.toMatch(/collected/i)
     // Smuggled in beside the real columns, it changes nothing at all.
     const smuggled = render([...ALL, 'collected'] as unknown as PrintColumnId[])

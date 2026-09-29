@@ -6,6 +6,7 @@ import {
   splitTitle, statementFigures, statusWhen, timeET, todayET,
   type StatementRow,
 } from './statement'
+import { STAGE_ORDER } from '@/lib/utils/stage'
 import { currentTerm, rollUp, type Term } from './credits'
 import {
   ledgerColumns, parseStoredChoice, parseUrlChoice, PRINTS_ALL, printsOf, resolveChoice,
@@ -47,7 +48,7 @@ describe('the fixture account, end to end', () => {
     expect(Math.round(F.elapsedPct as number)).toBe(49)
     expect(F.captions.aside).toBe('Renews 29 Mar 2027 · day 179 of 364')
     expect(F.captions.pct).toBe('At least 109% of the 375 allowed.')
-    expect(F.captions.unpriced).toBe(`2${NBSP}delivered surveys are not yet priced`)
+    expect(F.captions.unpriced).toBe(`2${NBSP}delivered studies are not yet priced`)
     expect(F.balance).toEqual({
       label: 'Balance', qualifier: null, figure: '(35)', caption: 'At least 35 credits beyond the allowance.',
     })
@@ -56,7 +57,7 @@ describe('the fixture account, end to end', () => {
     expect(F.meter!.usedPos).toBeCloseTo(100 / 1.1, 5)
   })
 
-  it('delivered: 928 final against 895 targeted, over the 10 surveys with both; 8 met, 2 short', () => {
+  it('delivered: 928 final against 895 targeted, over the 10 studies with both; 8 met, 2 short', () => {
     const t = ledgerTotals(rows)
     expect(t.pairedN).toBe(10)
     expect(t.final).toBe(928)
@@ -85,7 +86,7 @@ describe('the fixture account, end to end', () => {
     const A = activityFigures(r.rows, rangeFor('qtd', TODAY))
     expect(A.t.used).toBe(316)
     expect(A.t.isFloor).toBe(true)
-    expect(A.periodLine).toBe('At least 316 credits drawn by the surveys listed below. 2 of them are not yet priced.')
+    expect(A.periodLine).toBe('At least 316 credits drawn by the studies listed below. 2 of them are not yet priced.')
     expect(describeRangeForClient('delivered', rangeFor('qtd', TODAY))).toBe('Delivered 1 Jul – 24 Sep 2026')
   })
 
@@ -167,9 +168,9 @@ describe('the fixture account, end to end', () => {
     expect(creditCell(byCode('PR00466'), 'term-other')).toEqual({ kind: 'drawn', credits: 66, offTerm: true })
   })
 
-  it('names the unpriced surveys that make the figure a minimum by where they are', () => {
-    expect(drawnUnpricedPhrase(rows)).toBe(`2${NBSP}delivered surveys`)
-    expect(drawnUnpricedPhrase([{ ...byCode('PR00466'), credits: null }])).toBe(`1${NBSP}survey already in field`)
+  it('names the unpriced studies that make the figure a minimum by where they are', () => {
+    expect(drawnUnpricedPhrase(rows)).toBe(`2${NBSP}delivered studies`)
+    expect(drawnUnpricedPhrase([{ ...byCode('PR00466'), credits: null }])).toBe(`1${NBSP}study already in field`)
   })
 
   /**
@@ -205,7 +206,7 @@ describe('the fixture account, end to end', () => {
     expect(A.periodLine).toBeNull()
   })
 
-  it('the survey list for this quarter has 3 items to settle', () => {
+  it('the study list for this quarter has 3 items to settle', () => {
     const r = filterByRange(rows, 'delivered', rangeFor('qtd', TODAY))
     const term = currentTerm(FIXTURE_TERMS, TODAY)
     const checks = preSendChecks({
@@ -241,6 +242,31 @@ describe('client stage names', () => {
     expect(clientStageName('EdWin QA')).toBe('In testing')
     expect(clientStageName('Archived')).toBe('Closed')
     expect(clientStageName('Awaiting Approval')).toBe('Being scoped')
+  })
+
+  /**
+   * THE BUG ADDING A STAGE CAUSED, AND THE GUARD SO THE NEXT ONE CANNOT.
+   *
+   * 'Study Questions Review' went into STAGE_ORDER on 2026-09-29 and had no
+   * entry in PIPELINE, so it fell through two different ways at once: a row's
+   * Status printed the same words as the group heading above it, and
+   * clientStageName returned 'Being scoped' — putting "Stages: Being scoped" on
+   * a client document about work that client had already commissioned.
+   */
+  it('names the questions stage for a client, and never as pre-sale', () => {
+    expect(at('Study Questions Review')).toEqual({ label: 'Questions in review', glyph: 'open', group: 'progress' })
+    expect(clientStageName('Study Questions Review')).toBe('Questions in review')
+    expect(clientStageName('Study Questions Review')).not.toBe('Being scoped')
+  })
+
+  it('every pipeline stage has a client name — no stage may fall through', () => {
+    // The real guard: this fails the DAY a column is added to STAGE_ORDER
+    // without a client word, rather than the day a client reads the document.
+    for (const stage of STAGE_ORDER) {
+      const name = clientStageName(stage)
+      expect(name).not.toBe('Being scoped')
+      expect(name).not.toMatch(/EdWin|Doc Programming|Survey Programming|Data QA/)
+    }
   })
 })
 
@@ -314,14 +340,14 @@ describe('statementFigures, every branch', () => {
     expect(F.balance?.qualifier).toBe('at most')
   })
 
-  it('carries the committed clause for priced surveys that have not fielded', () => {
+  it('carries the committed clause for priced studies that have not fielded', () => {
     const F = statementFigures({
       rows: [row({}), row({ board_column: 'Doc Programming', status: 'Open', credits: 60, n_collected: 0, n_actual: null })],
       terms: [TERM], today: TODAY,
     })
     expect(F.c.used).toBe(10)
     expect(F.c.committed).toBe(60)
-    expect(F.captions.committed).toBe('A further 60 credits are priced on 1 survey that has not fielded yet, so it is committed but not drawn.')
+    expect(F.captions.committed).toBe('A further 60 credits are priced on 1 study that has not fielded yet, so it is committed but not drawn.')
   })
 
   it('a term with no renewal date has a day count but no elapsed track', () => {
@@ -344,7 +370,7 @@ describe('the estimate cell', () => {
     expect(finalText(c.final)).toBe(`≈${NBSP}76`)
   })
 
-  it('never estimates a survey with no target, or one still in field', () => {
+  it('never estimates a study with no target, or one still in field', () => {
     expect(responseCells(inQA({ n_target: null }), false).final.kind).toBe('none')
     expect(responseCells(inQA({ board_column: 'Fielding' }), false).final.kind).toBe('none')
   })
@@ -363,7 +389,7 @@ describe('the page footer and the filename', () => {
   it('says Confidential and the client name in client mode', () => {
     expect(footerText({ doc: 'statement', mode: 'client', name: 'Fixture Capital', accounts: 1, today: TODAY })).toEqual({
       left: 'AlphaROC  ·  Confidential  ·  Prepared for Fixture Capital',
-      right: 'Survey Activity Statement  ·  24 September 2026  ·  Page ',
+      right: 'Study Activity Statement  ·  24 September 2026  ·  Page ',
     })
   })
 
@@ -371,9 +397,9 @@ describe('the page footer and the filename', () => {
     const f = footerText({ doc: 'list', mode: 'internal', name: 'Fixture Capital', accounts: 3, today: TODAY })
     expect(f.left).toBe('AlphaROC  ·  Internal  ·  covers 3 accounts, not for sending to a client')
     expect(f.left).not.toContain('Prepared for')
-    expect(documentTitle({ doc: 'list', mode: 'internal', name: 'x', today: TODAY })).toBe('Survey List - Internal - 2026-09-24')
+    expect(documentTitle({ doc: 'list', mode: 'internal', name: 'x', today: TODAY })).toBe('Study List - Internal - 2026-09-24')
     expect(documentTitle({ doc: 'statement', mode: 'client', name: 'Fixture Capital', today: TODAY }))
-      .toBe('Fixture Capital - Survey Activity Statement - 2026-09-24')
+      .toBe('Fixture Capital - Study Activity Statement - 2026-09-24')
   })
 
   it('escapes a typed name before it goes into a CSS string', () => {
@@ -459,7 +485,7 @@ describe('Collected and Final never print a default as a count', () => {
     expect(responseCells(p, false)).not.toHaveProperty('collected')
   })
 
-  it('a delivered survey with no final count keeps its recorded collection off the page, not off the record', () => {
+  it('a delivered study with no final count keeps its recorded collection off the page, not off the record', () => {
     const p = del({ n_actual: null, n_collected: 481 })
     // Was `...collected).toBe(481)`. The row still carries the 481 — nothing
     // was deleted from the data on 2026-09-29, only from the documents — and
@@ -516,7 +542,7 @@ describe('pre-send checks for the response counts', () => {
     expect(c.find(x => x.id === 'qa-no-collection-q')!.text).toContain('is in quality review with no responses collected on record')
   })
 
-  it('stays quiet on a healthy delivered survey', () => {
+  it('stays quiet on a healthy delivered study', () => {
     expect(run([base({ id: 'a', n_collected: 23, n_actual: 20 })]).filter(x => x.id.startsWith('collected-below'))).toEqual([])
   })
 })
@@ -548,10 +574,10 @@ describe('drawn credits: exact, at least, or not yet priced — never "at least 
     expect(t.used).toBe(0)
     expect(t.isFloor).toBe(true)
     const line = drawnLine(t)
-    expect(line.head).toBe('The credits drawn by the surveys listed below are not known yet:')
+    expect(line.head).toBe('The credits drawn by the studies listed below are not known yet:')
     expect(line.unpriced).toBe('2 of them have drawn credits and are not yet priced')
     const A = activityFigures(active, { from: '2026-07-01', to: '2026-09-30' })
-    expect(A.periodLine).toBe('The credits drawn by the surveys listed below are not known yet: 2 of them have drawn credits and are not yet priced.')
+    expect(A.periodLine).toBe('The credits drawn by the studies listed below are not known yet: 2 of them have drawn credits and are not yet priced.')
     expect(A.periodLine).not.toMatch(/at least 0/i)
   })
 
@@ -667,7 +693,7 @@ describe('the checklist quotes only what this print carries', () => {
  * and every dash is counted. The narrower count would under-report the very
  * thing the note exists to disclose.
  */
-describe('how many surveys print no response figure', () => {
+describe('how many studies print no response figure', () => {
   it('counts every dash on the fixture account: 4, where the old offer counted 2', () => {
     expect(noResponseFigureCount(rows, never)).toBe(4)
     const dashes = rows.filter(p => responseCells(p, never.has(p.id)).final.kind === 'none')
@@ -680,7 +706,7 @@ describe('how many surveys print no response figure', () => {
       .toEqual(['PR00478', 'PR00479'])
   })
 
-  it('a delivered survey with no final count is not a dash — it says "not recorded"', () => {
+  it('a delivered study with no final count is not a dash — it says "not recorded"', () => {
     const p = byCode('PR00151')
     expect(responseCells(p, never.has(p.id)).final.kind).toBe('not-recorded')
     expect(noResponseFigureCount([p], never)).toBe(0)

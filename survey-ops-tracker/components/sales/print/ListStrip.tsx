@@ -1,5 +1,5 @@
-import { drawnFigure, drawnLine, listNames, n0, NBSP, NOT_YET_PRICED, type ActivityFigures } from '@/lib/sales/statement'
-import { BelowMark, Fn } from './StatusGlyph'
+import { drawnFigure, drawnLine, listNames, n0, NOT_YET_PRICED, type ActivityFigures } from '@/lib/sales/statement'
+import { Fn } from './StatusGlyph'
 
 /**
  * The survey list's one-row summary: how many are listed, what came back, and
@@ -46,6 +46,8 @@ export function ListStrip({
   const { t } = A
   const listed = A.total
   const pct = target && t.target > 0 ? Math.round((t.final / t.target) * 100) : null
+  // Same phrase as ActivityCluster's, so the two documents name the set identically.
+  const paired = `the ${n0(t.pairedN)} delivered ${t.pairedN === 1 ? 'study' : 'studies'} with both a target and a final count`
   const is = (k: number) => (k === 1 ? 'is' : 'are')
   // One rule for the figure and its sentence (statement.ts drawnFigure): the
   // headline can never say "at least 0" while the caption says something else.
@@ -76,7 +78,7 @@ export function ListStrip({
   return (
     <section className={`st-strip${tiles < 3 ? ` st-strip-${tiles}` : ''}`} aria-label="Summary">
       <div>
-        <div className="st-fig-label">{delivered ? 'Surveys delivered' : 'Surveys listed'}</div>
+        <div className="st-fig-label">{delivered ? 'Studies delivered' : 'Studies listed'}</div>
         <div className="st-fig-num">{n0(listed)}</div>
         <div className="st-fig-cap">{first}</div>
       </div>
@@ -86,15 +88,21 @@ export function ListStrip({
           {t.pairedN === 0 ? (
             <>
               <div className="st-fig-num"><span className="st-dash">—</span></div>
-              <div className="st-fig-cap">A final count arrives on delivery; none of these surveys has both a target and a final count yet.</div>
+              <div className="st-fig-cap">A final count arrives on delivery; none of these studies has both a target and a final count yet.</div>
             </>
           ) : (
             <>
               <div className="st-fig-num">{n0(t.final)}{fnFinal != null && <Fn n={fnFinal} />}</div>
               <div className="st-fig-cap">
-                {pct != null && <><b>{pct}% of the {n0(t.target)} targeted.</b>{' '}</>}
-                {n0(t.met)}{NBSP}met or beat target
-                {t.below > 0 && <>; {n0(t.below)}{NBSP}fell short{NBSP}<span className="st-nw">(<BelowMark inline />)</span></>}.
+                {/* The met/short tally came off both documents together; they
+                    share every other rule by design. Deleting it outright would
+                    have left this caption EMPTY whenever the target column is
+                    off (pct null), because the tally was then its only text - so
+                    it falls back to naming the set, the same words the statement
+                    and the ledger subtotal use. */}
+                {pct != null
+                  ? <><b>{pct}% of the {n0(t.target)} targeted</b>, across {paired}.</>
+                  : <>Across {paired}.</>}
               </div>
             </>
           )}

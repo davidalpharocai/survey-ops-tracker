@@ -128,7 +128,7 @@ const FEEDBACK: Record<Exclude<PrintChoiceControls['feedback'], 'none'>, string>
 
 /** The column and section checkboxes, and the default buttons. */
 function WhatPrints({ c }: { c: PrintChoiceControls }) {
-  const docWord = c.doc === 'statement' ? 'statement' : 'survey list'
+  const docWord = c.doc === 'statement' ? 'statement' : 'study list'
   const box = (key: string, label: string, help: string, on: boolean, toggle: () => void) => (
     <label key={key} className="inline-flex items-center text-[13px] text-foreground">
       <input
@@ -155,12 +155,12 @@ function WhatPrints({ c }: { c: PrintChoiceControls }) {
       <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1.5">
         <span className="flex items-center text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
           Columns
-          <InfoTooltip text="The columns of the survey table. Totals follow them: a column that does not print has no total either." />
+          <InfoTooltip text="The columns of the study table. Totals follow them: a column that does not print has no total either." />
         </span>
         <span className="inline-flex items-center text-[13px] text-muted-foreground">
           <input type="checkbox" checked disabled aria-label={`${ALWAYS_PRINTED.join(' and ')}, always printed`} className="mr-1.5 h-3.5 w-3.5" />
           {ALWAYS_PRINTED.join(', ')}
-          <InfoTooltip text="Always printed. A row without its reference and survey name matches nothing the client holds." />
+          <InfoTooltip text="Always printed. A row without its reference and study name matches nothing the client holds." />
         </span>
         {c.columns.map(({ def, on }) => box(def.id, def.label, def.help, on, () => c.toggleColumn(def.id)))}
       </div>
@@ -185,7 +185,7 @@ function WhatPrints({ c }: { c: PrintChoiceControls }) {
         <span className="text-xs text-muted-foreground" aria-live="polite">
           {c.feedback !== 'none'
             ? FEEDBACK[c.feedback]
-            : `Saved in this browser only. Statements and survey lists each keep their own.`}
+            : `Saved in this browser only. Statements and study lists each keep their own.`}
         </span>
       </div>
     </div>

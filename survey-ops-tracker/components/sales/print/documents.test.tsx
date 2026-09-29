@@ -163,7 +163,7 @@ describe('the printed documents', () => {
   it('prints the statement figures', () => {
     const h = docs.statement
     expect(h).toContain('The Fixture Group')
-    expect(h).toContain('Survey Activity Statement')
+    expect(h).toContain('Study Activity Statement')
     expect(h).toContain('>at least</span>410')
     expect(h).toContain('(35)')
     expect(h).toContain('At least 35 credits beyond the allowance.')
@@ -185,13 +185,13 @@ describe('the printed documents', () => {
     expect(docs.internal).toContain('>Account</th>')
   })
 
-  it('never prints "at least 0": a list whose only drawn surveys are unpriced says "Not yet priced"', () => {
+  it('never prints "at least 0": a list whose only drawn studies are unpriced says "Not yet priced"', () => {
     const h = unpricedActiveList()
     // The strip headline, the ledger total, the strip caption and note 1.
     expect(h).not.toMatch(/at least<\/span>0\b/)
     expect(h).not.toMatch(/at least 0\b/i)
     expect(h).toContain('>Not yet priced<')
-    expect(h).toContain('The credits drawn by the surveys listed below are not known yet:')
+    expect(h).toContain('The credits drawn by the studies listed below are not known yet:')
     expect(h).toContain('so the credits drawn by this list are not known yet.')
     expect(h).toContain('Not known yet: 2')
   })
@@ -216,9 +216,9 @@ describe('the printed documents', () => {
     fs.mkdirSync(dir, { recursive: true })
     const cssFile = process.env.STATEMENT_APP_CSS
     const appCss = cssFile && fs.existsSync(cssFile) ? fs.readFileSync(cssFile, 'utf8') : ''
-    const ST = 'The Fixture Group - Survey Activity Statement - 2026-09-24'
-    const LI = 'The Fixture Group - Survey List - 2026-09-24'
-    const IN = 'Survey List - Internal - 2026-09-24'
+    const ST = 'The Fixture Group - Study Activity Statement - 2026-09-24'
+    const LI = 'The Fixture Group - Study List - 2026-09-24'
+    const IN = 'Study List - Internal - 2026-09-24'
     fs.writeFileSync(path.join(dir, 'statement.html'), page(ST, docs.statement, appCss))
     fs.writeFileSync(path.join(dir, 'list.html'), page(LI, docs.list, appCss))
     fs.writeFileSync(path.join(dir, 'list-internal.html'), page(IN, docs.internal, appCss))
@@ -277,7 +277,7 @@ describe('what prints (David, 2026-09-27)', () => {
 
   it('prints everything it has by default, and has nothing called Collected', () => {
     for (const h of [all, quarterList('client')]) {
-      for (const head of ['Ref.', 'Survey and audience', 'Requested by', 'Status', 'Responses', 'Target', 'Final', 'Credits']) {
+      for (const head of ['Ref.', 'Study and audience', 'Requested by', 'Status', 'Responses', 'Target', 'Final', 'Credits']) {
         expect(h).toContain(`>${head}</th>`)
       }
       // WAS: "Still tickable — see printColumns." On 2026-09-28 the column was
@@ -316,10 +316,10 @@ describe('what prints (David, 2026-09-27)', () => {
   // action, and cannot be silenced by ticking anything. A note that names an
   // impossible fix is worse than a bare fact, because the reader hunts the
   // panel for a tick that is not there.
-  it('tells the sender which surveys print no response figure, and offers no fix that does not exist', () => {
+  it('tells the sender which studies print no response figure, and offers no fix that does not exist', () => {
     // The COUNT is what makes this a warning rather than a caption, so match
     // the counted phrasing rather than the bare sentence.
-    const warning = /(One survey|[0-9]+ surveys) prints? no response figure/
+    const warning = /(One study|[0-9]+ studies) prints? no response figure/
     expect(all).toMatch(warning)
     expect(all).toContain('They show a dash.')
     expect(all).not.toContain('Tick Collected')
@@ -447,7 +447,7 @@ describe('what prints (David, 2026-09-27)', () => {
   it('keeps the file name and the footer', () => {
     const h = statement({ printChoice: REDUCED.statement })
     expect(h).toContain('content:"AlphaROC  ·  Confidential  ·  Prepared for The Fixture Group"')
-    expect(h).toContain('content:"Survey Activity Statement  ·  24 September 2026  ·  Page " counter(page)')
+    expect(h).toContain('content:"Study Activity Statement  ·  24 September 2026  ·  Page " counter(page)')
   })
 })
 
@@ -483,10 +483,15 @@ describe('a figure follows its own column, summary included', () => {
 
   it('keeps the final count, and says what it is measured over, with Target off', () => {
     const h = statement({ printChoice: { colsOff: ['target'] } })
-    expect(h).toContain('Across the 10 delivered surveys with both a target and a final count.')
-    // "met or beat it" has no "it" left to point at.
-    expect(h).toContain('met or beat target')
-    expect(h).not.toContain('met or beat it')
+    expect(h).toContain('Across the 10 delivered studies with both a target and a final count.')
+    // The tally this used to assert is gone from both documents — David,
+    // 2026-09-29: "this way we only highlight positives." What the test was
+    // really guarding survives and is asserted instead: with Target off, the
+    // caption still NAMES the set the figure is measured over rather than
+    // going blank, which is the failure deleting the clause would have caused
+    // on the Survey List, where the tally was the caption's only text.
+    expect(h).not.toContain('met or beat')
+    expect(h).not.toContain('fell short')
   })
 
   it('drops the final-responses figure entirely once Final is off', () => {
@@ -503,9 +508,9 @@ describe('a figure follows its own column, summary included', () => {
   it('counts the stages out only while the Status column prints', () => {
     const off = statement({ printChoice: { colsOff: ['status'] } })
     expect(statement()).toContain('; 2 in field and 2 in design')
-    expect(statement()).toMatch(/surveys · 2 in field, 2 in design/)
+    expect(statement()).toMatch(/studies · 2 in field, 2 in design/)
     expect(off).not.toContain('; 2 in field and 2 in design')
-    expect(off).not.toMatch(/surveys · \d+ in field/)
+    expect(off).not.toMatch(/studies · \d+ in field/)
     // The group heading itself stays: it is the table's own structure.
     expect(off).toContain('<b>In progress</b>')
   })

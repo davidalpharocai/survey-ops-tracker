@@ -146,8 +146,8 @@ export function SurveyListPrint({
         ? 'no single account is selected'
         : `${n0(selectedCount)} accounts are selected`}. Filter the list to exactly one account to print it as a client document.</>
     : <><b className="text-foreground">Prints as a client document</b> because exactly one account is selected ({internalName}).
-        {account && !account.own && <> It is not one of your own accounts, so the list covers only the surveys on it that you can
-          see, and the name comes from those survey records.</>}
+        {account && !account.own && <> It is not one of your own accounts, so the list covers only the studies on it that you can
+          see, and the name comes from those study records.</>}
         {' '}With no account, or more than one, it prints marked Internal with an Account column.</>
 
   return (
@@ -166,15 +166,15 @@ export function SurveyListPrint({
         choiceNotes={cNotes}
       />
 
-      <article className={`st st-sheet ${serif.variable} ${sans.variable}`} aria-label="Survey List">
-        <Masthead docTitle="Survey List" preparedFor={name} internalAccounts={internal ? accounts : null} meta={meta} />
+      <article className={`st st-sheet ${serif.variable} ${sans.variable}`} aria-label="Study List">
+        <Masthead docTitle="Study List" preparedFor={name} internalAccounts={internal ? accounts : null} meta={meta} />
 
         {prints.activity && <ListStrip
           A={A}
           delivered={bucket === 'delivered'}
           ranged={ranged}
           groupTotal={totalBeforeDates}
-          groupNoun={bucket === 'all' ? 'surveys' : showingLabel(bucket).toLowerCase()}
+          groupNoun={bucket === 'all' ? 'studies' : showingLabel(bucket).toLowerCase()}
           undated={undated}
           notDelivered={notDelivered}
           basisWord={BASIS_WORD[basis]}
@@ -186,9 +186,9 @@ export function SurveyListPrint({
           credits={prints.credits}
         />}
 
-        <section aria-label="Surveys">
+        <section aria-label="Studies">
           <div className="st-sec">
-            <h2>Surveys</h2><span className="st-sec-rule" />
+            <h2>Studies</h2><span className="st-sec-rule" />
             <span className="st-sec-aside">
               {allDelivered ? 'Most recent delivery first' : 'In progress by due date, then delivered, most recent first'}
             </span>
@@ -201,7 +201,7 @@ export function SurveyListPrint({
             today={today}
             currentTermId={null}
             neverRecorded={never}
-            totalLabel={n => `Total · ${n0(n)} ${n === 1 ? 'survey' : 'surveys'} listed`}
+            totalLabel={n => `Total · ${n0(n)} ${n === 1 ? 'study' : 'studies'} listed`}
             fn={fn}
             columns={ledgerColumns(prints)}
           />

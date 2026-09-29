@@ -138,16 +138,16 @@ function finalNote(rows: StatementRow[], neverRecorded: Set<string>, prints: Pri
         The final count is the number of responses delivered after quality review.
         {/* A dash the client cannot account for is what makes a document look
             incomplete rather than current, so the blank is named. */}
-        {anyLive && ' A survey still in progress has no final count yet, and its response figures are left blank until it is delivered.'}
+        {anyLive && ' A study still in progress has no final count yet, and its response figures are left blank until it is delivered.'}
         {/* The ▼ and the ≈ are printed only in the Final column. */}
         {anyBelow && prints.final && <> <BelowMark inline />{NBSP}marks a final count below target.</>}
         {prints.final && estimates.some(e => e.kind === 'estimate' && e.basis === 'at-or-over-target') && (
-          <> ≈ marks an estimate for a survey still in quality review: across {n0(over.n)} past surveys that collected at
+          <> ≈ marks an estimate for a study still in quality review: across {n0(over.n)} past studies that collected at
             or above target, the final count came in at a median {over.median.toFixed(2)}× target
             ({over.p25.toFixed(2)}–{over.p75.toFixed(2)}×).</>
         )}
         {prints.final && estimates.some(e => e.kind === 'estimate' && e.basis === 'short-of-target') && (
-          <> ≈ on a survey that finished short of target is an estimate: across {n0(under.n)} past surveys where review
+          <> ≈ on a study that finished short of target is an estimate: across {n0(under.n)} past studies where review
             removed responses, the final count came in at a median {under.median.toFixed(2)}× what was collected.</>
         )}
         {noFinal.length > 0 && (
@@ -199,7 +199,7 @@ export function statementNotes({ rows, F, neverRecorded, currentTermId, time, to
       title: 'Not yet priced.',
       body: (
         <>
-          A survey with no credit figure has not been priced yet; it is not a zero.
+          A study with no credit figure has not been priced yet; it is not a zero.
           {drawnU.length > 0 && (
             <> {listNames(drawnU.map(title))} {drawnU.length === 1
               ? (allDelivered ? 'was delivered' : 'has gone into field')
@@ -222,8 +222,8 @@ export function statementNotes({ rows, F, neverRecorded, currentTermId, time, to
       title: 'When credits are drawn.',
       body: (
         <>
-          A survey draws its credits when it goes into field; one not yet in field has drawn nothing.
-          {anyCommitted && ' A survey priced before it fields shows its credits as committed, and they are not counted as drawn.'}
+          A study draws its credits when it goes into field; one not yet in field has drawn nothing.
+          {anyCommitted && ' A study priced before it fields shows its credits as committed, and they are not counted as drawn.'}
           {term
             ? anyOffTerm
               // The † is printed only in the Credits column. Without it the
@@ -244,9 +244,9 @@ export function statementNotes({ rows, F, neverRecorded, currentTermId, time, to
     title: prints.status ? 'Status and dates.' : 'Dates.',
     body: (
       <>
-        Dates are US Eastern Time.{prints.status && ' A delivered survey shows the day it was delivered; one in progress shows its scheduled due date.'}
+        Dates are US Eastern Time.{prints.status && ' A delivered study shows the day it was delivered; one in progress shows its scheduled due date.'}
         {' '}A dash means not recorded, or not applicable at that stage. Figures are as recorded
-        at {time} on {fmtDayLong(today)} and will change as surveys finish review and are priced.
+        at {time} on {fmtDayLong(today)} and will change as studies finish review and are priced.
       </>
     ),
   })
@@ -283,7 +283,7 @@ export function listNotes({ rows, neverRecorded, internalAccounts, time, today, 
       title: 'Not yet priced.',
       body: (
         <>
-          A survey with no credit figure has not been priced yet; it is not a zero.
+          A study with no credit figure has not been priced yet; it is not a zero.
           {drawnU.length > 0 && (
             <> {listNames(drawnU.map(title))} {is(drawnU)} not yet priced, so the credits drawn by this list {atLeast}.</>
           )}
@@ -297,9 +297,9 @@ export function listNotes({ rows, neverRecorded, internalAccounts, time, today, 
     key: 'list',
     title: 'What this list is.',
     body: internalAccounts != null
-      ? `It lists the surveys that match the selection above, across ${n0(internalAccounts)} ${
+      ? `It lists the studies that match the selection above, across ${n0(internalAccounts)} ${
           internalAccounts === 1 ? 'account' : 'accounts'}. It is an internal document and is not a statement of any client’s contract position.`
-      : 'It lists the surveys that match the selection above. It is not a statement of your contract position; the Survey Activity Statement shows that.',
+      : 'It lists the studies that match the selection above. It is not a statement of your contract position; the Study Activity Statement shows that.',
   })
   const anyLive = rows.some(p => clientStage(p).group !== 'delivered')
   notes.push({
@@ -307,8 +307,8 @@ export function listNotes({ rows, neverRecorded, internalAccounts, time, today, 
     title: 'Dates.',
     // The per-survey dates are in the Status column; without it, only the clock.
     body: `Dates are US Eastern Time${!prints.status ? '' : anyLive
-      ? '; a delivered survey shows the day it was delivered, and one in progress its scheduled due date'
-      : '; each survey shows the day it was delivered'}. Figures are as recorded at ${time} on ${fmtDayLong(today)}.`,
+      ? '; a delivered study shows the day it was delivered, and one in progress its scheduled due date'
+      : '; each study shows the day it was delivered'}. Figures are as recorded at ${time} on ${fmtDayLong(today)}.`,
   })
   return notes
 }

@@ -32,6 +32,11 @@
  * code is wrong.
  */
 import { bucketOf } from './buckets'
+// Only to ask "is this string one of OUR pipeline columns" in clientStageName.
+// The internal names never reach a client document; PIPELINE above renames
+// every one of them, and this import is what makes a MISSING rename degrade
+// safely instead of claiming the work has not been sold.
+import { STAGE_ORDER } from '@/lib/utils/stage'
 import { hasDrawn, rollUp, currentTerm, consumptionFor, type Consumption, type Term } from './credits'
 import { deliveredN, DELIVERY_STATS } from './deliveredN'
 import { DATE_BASES, etDate, todayET, type DateBasis, type Range } from './dateRange'
@@ -154,6 +159,7 @@ export const GROUP_LABEL: Record<StageGroup, string> = {
  *  a fund. Filled mark = delivered, half = collecting or in review, open = not
  *  yet in field. */
 const PIPELINE: Record<string, [string, Glyph]> = {
+  'Study Questions Review': ['Questions in review', 'open'],
   'Submitted': ['Received', 'open'],
   'Doc Programming': ['In design', 'open'],
   'Survey Programming': ['In programming', 'open'],
@@ -192,19 +198,29 @@ export function clientStageName(internal: string): string {
   if (internal === 'Delivered' || internal === 'Delivery') return 'Delivered'
   if (internal === 'Archived') return 'Closed'
   if (internal === 'On hold' || internal === 'Cancelled') return internal
+  // A PIPELINE COLUMN WITH NO ENTRY ABOVE IS A GAP, NOT A SCOPING DEAL.
+  //
+  // This fell straight through to 'Being scoped', which is how adding
+  // 'Study Questions Review' to STAGE_ORDER put a lie on a client document: a
+  // salesperson filtering to that stage printed "Stages: Being scoped" about
+  // work the client had already commissioned and paid for. Of the two wrong
+  // answers available to an unmapped stage, understating it to "not bought yet"
+  // is far the worse, so a known board column degrades to the group heading and
+  // only genuinely pre-sale stages keep the scoping wording.
+  if ((STAGE_ORDER as readonly string[]).includes(internal)) return GROUP_LABEL.progress
   return 'Being scoped'
 }
 
 /** "Delivered surveys", for the list's Showing line. */
 export function showingLabel(bucket: string): string {
   switch (bucket) {
-    case 'active': return 'Active surveys'
-    case 'delivered': return 'Delivered surveys'
-    case 'scoping': return 'Surveys being scoped'
-    case 'hold': return 'Surveys on hold'
-    case 'cancelled': return 'Cancelled surveys'
-    case 'archived': return 'Closed surveys'
-    default: return 'All surveys'
+    case 'active': return 'Active studies'
+    case 'delivered': return 'Delivered studies'
+    case 'scoping': return 'Studies being scoped'
+    case 'hold': return 'Studies on hold'
+    case 'cancelled': return 'Cancelled studies'
+    case 'archived': return 'Closed studies'
+    default: return 'All studies'
   }
 }
 
@@ -448,12 +464,12 @@ export function drawnLine(c: Pick<Consumption, 'used' | 'isFloor' | 'unpricedDra
   const k = c.unpricedDrawn
   if (f.kind === 'unknown') {
     return {
-      head: 'The credits drawn by the surveys listed below are not known yet:',
+      head: 'The credits drawn by the studies listed below are not known yet:',
       unpriced: `${n0(k)} of them ${k === 1 ? 'has' : 'have'} drawn credits and ${k === 1 ? 'is' : 'are'} not yet priced`,
     }
   }
   return {
-    head: `${f.kind === 'floor' ? 'At least ' : ''}${n0(c.used)} ${c.used === 1 ? 'credit' : 'credits'} drawn by the surveys listed below.`,
+    head: `${f.kind === 'floor' ? 'At least ' : ''}${n0(c.used)} ${c.used === 1 ? 'credit' : 'credits'} drawn by the studies listed below.`,
     unpriced: k ? `${n0(k)} of them ${k === 1 ? 'is' : 'are'} not yet priced` : null,
   }
 }
@@ -493,7 +509,7 @@ export function drawnUnpricedPhrase(rows: StatementRow[]): string {
   const allDel = u.every(isDelivered), noneDel = !u.some(isDelivered)
   const where = allDel ? 'delivered ' : ''
   const tail = allDel ? '' : noneDel ? ' already in field' : ' in field or delivered'
-  return `${u.length}${NBSP}${where}${u.length === 1 ? 'survey' : 'surveys'}${tail}`
+  return `${u.length}${NBSP}${where}${u.length === 1 ? 'study' : 'studies'}${tail}`
 }
 
 /** "the two Market Study studies (Parts A and B)" for a Part A/Part B pair,
@@ -580,7 +596,7 @@ export function statementFigures({ rows, terms, today }: {
 
   const committed = c.committed > 0
     ? `A further ${n0(c.committed)} ${c.committed === 1 ? 'credit is' : 'credits are'} priced on ${
-        plural(c.committedCount, 'survey', 'surveys')} that ${c.committedCount === 1 ? 'has' : 'have'} not fielded yet, so ${
+        plural(c.committedCount, 'study', 'studies')} that ${c.committedCount === 1 ? 'has' : 'have'} not fielded yet, so ${
         c.committedCount === 1 ? 'it is' : 'they are'} committed but not drawn.`
     : null
   const unpriced = c.isFloor
@@ -593,7 +609,7 @@ export function statementFigures({ rows, terms, today }: {
     return {
       ...base, meter: null, balance: null,
       captions: {
-        heading: 'No contract in force', aside: 'All surveys on the account',
+        heading: 'No contract in force', aside: 'All studies on the account',
         pct: null, unpriced, committed,
         noBalance: 'No contract covers today’s date, so there is no allowance or balance to show.',
       },
@@ -693,7 +709,7 @@ export type DocKind = 'statement' | 'list'
 export type DocMode = 'client' | 'internal'
 
 export const DOC_TITLE: Record<DocKind, string> = {
-  statement: 'Survey Activity Statement', list: 'Survey List',
+  statement: 'Study Activity Statement', list: 'Study List',
 }
 
 /** The words in the printed page footer, left and right. The right one is
@@ -804,7 +820,7 @@ export function preSendChecks({
   // summary, and a list through the Credits column alone.
   const showsCredits = doc === 'statement' ? shows('credits') || shows('contract') : shows('credits')
   const one = <T>(xs: unknown[], a: T, b: T) => (xs.length === 1 ? a : b)
-  const code = (p: StatementRow) => p.project_code ?? 'a survey with no code'
+  const code = (p: StatementRow) => p.project_code ?? 'a study with no code'
   const ref = (p: StatementRow) => `${splitTitle(p.project_name)[0]} (${code(p)})`
   const inTerm = term ? rows.filter(p => p.term_id === term.id) : []
 

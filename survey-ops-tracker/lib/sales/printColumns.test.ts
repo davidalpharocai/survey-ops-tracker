@@ -108,10 +108,10 @@ describe('the system default', () => {
     expect(Object.keys(printsOf(SYSTEM_DEFAULT, 'statement'))).not.toContain('collected')
   })
 
-  it('never offers the reference or the survey name, and offers Account only on a list that spans accounts', () => {
+  it('never offers the reference or the study name, and offers Account only on a list that spans accounts', () => {
     const ids = PRINT_COLUMNS.map(c => c.id) as string[]
     expect(ids).not.toContain('ref')
-    expect(ids).not.toContain('survey')
+    expect(ids).not.toContain('study')
     expect(offeredColumns('statement').map(c => c.id)).not.toContain('account')
     expect(offeredColumns('list').map(c => c.id)).not.toContain('account')
     expect(offeredColumns('list', { internal: true }).map(c => c.id)).toContain('account')
@@ -188,7 +188,7 @@ describe('the link', () => {
     // column was deleted on 2026-09-29 is deliberate — it is what stops an old
     // link silently losing the Final column — and it is safe precisely because
     // the target of the mapping is `final`.
-    const a = parseUrlChoice('statement', 'code,survey,requested,stage,collected,credits,deliver', null)
+    const a = parseUrlChoice('statement', 'code,study,requested,stage,collected,credits,deliver', null)
     expect(a.legacy).toBe(true)
     expect(a.colsOff).toEqual(['target'])
     const p = printsOf(resolveChoice(a, null), 'statement')
@@ -403,15 +403,15 @@ describe('notes about the choice', () => {
   // What is still protected, unchanged: a statement sent mid-engagement can
   // show a client targets and dashes, and the last screen before it goes out
   // says the number out loud.
-  it('says how many surveys print no response figure at all, and no longer offers a tick that is gone', () => {
+  it('says how many studies print no response figure at all, and no longer offers a tick that is gone', () => {
     const p = printsOf(SYSTEM_DEFAULT, 'statement')
     const one = choiceNotes(p, { noResponseFigure: 1 })
     expect(one.map(n => n.id)).toEqual(['no-response-figure'])
     expect(one[0].text).toBe(
-      'One survey prints no response figure: it has not reached quality review, so there is no final count yet. ' +
+      'One study prints no response figure: it has not reached quality review, so there is no final count yet. ' +
       'It shows a dash.')
     const four = choiceNotes(p, { noResponseFigure: 4 })[0]
-    expect(four.text).toContain('4 surveys print no response figure')
+    expect(four.text).toContain('4 studies print no response figure')
     expect(four.text).toContain('They show a dash.')
     // No note anywhere near this panel points at a column that no longer exists.
     for (const t of [one[0].text, four.text]) expect(t).not.toMatch(/collect/i)

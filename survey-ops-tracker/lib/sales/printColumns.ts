@@ -77,15 +77,15 @@ export interface PrintSectionDef {
 export const PRINT_COLUMNS: PrintColumnDef[] = [
   {
     id: 'account', label: 'Account', docs: ['list'], internalOnly: true,
-    help: 'Which account each survey belongs to. Offered only on a list that covers more than one account, which prints marked Internal.',
+    help: 'Which account each study belongs to. Offered only on a list that covers more than one account, which prints marked Internal.',
   },
   {
     id: 'requested', label: 'Requested by', docs: ['statement', 'list'],
-    help: 'The person at the client who asked for each survey.',
+    help: 'The person at the client who asked for each study.',
   },
   {
     id: 'status', label: 'Status', docs: ['statement', 'list'],
-    help: 'Where each survey is (Received, In field, Delivered and so on), its status mark, and the day it was delivered or is due. Untick it and the key to the marks, and the stages counted out in the table’s group headings and the summary, are left off too.',
+    help: 'Where each study is (Received, In field, Delivered and so on), its status mark, and the day it was delivered or is due. Untick it and the key to the marks, and the stages counted out in the table’s group headings and the summary, are left off too.',
   },
   {
     id: 'target', label: 'Target', docs: ['statement', 'list'], response: true,
@@ -93,7 +93,7 @@ export const PRINT_COLUMNS: PrintColumnDef[] = [
   },
   {
     id: 'final', label: 'Final', docs: ['statement', 'list'], response: true,
-    help: 'Responses delivered after quality review. Only a delivered survey has one; a survey still in quality review can show an estimate. Untick it and the summary’s final-responses figure goes with it.',
+    help: 'Responses delivered after quality review. Only a delivered study has one; a study still in quality review can show an estimate. Untick it and the summary’s final-responses figure goes with it.',
   },
   // NO 'collected' COLUMN. It was off by default from 2026-09-28 and removed
   // outright on 2026-09-29 — David: "lets actually remove 'collected' from all
@@ -109,7 +109,7 @@ export const PRINT_COLUMNS: PrintColumnDef[] = [
   // document any more.
   {
     id: 'credits', label: 'Credits', docs: ['statement', 'list'],
-    help: 'The credits each survey draws, “Not yet priced”, or “committed” for a survey priced but not yet in field. The total row adds up the credits drawn, and the summary’s credit figure follows this tick. On a statement the contract summary keeps its own credits-drawn figure until that is unticked too.',
+    help: 'The credits each study draws, “Not yet priced”, or “committed” for a study priced but not yet in field. The total row adds up the credits drawn, and the summary’s credit figure follows this tick. On a statement the contract summary keeps its own credits-drawn figure until that is unticked too.',
   },
 ]
 
@@ -125,7 +125,7 @@ export const PRINT_SECTIONS: PrintSectionDef[] = [
     id: 'activity', label: 'Activity summary', docs: ['statement', 'list'],
     help: {
       statement: 'The panel that counts what was delivered and compares final responses with target. Each figure in it follows its own column, so unticking Target or Final takes that figure out of the panel too. It also holds the key to the status marks while the Status column prints.',
-      list: 'The strip across the top: how many surveys are listed, the final responses against target, and the credits drawn. Each figure follows its own column, so unticking Target, Final or Credits takes it out of the strip too.',
+      list: 'The strip across the top: how many studies are listed, the final responses against target, and the credits drawn. Each figure follows its own column, so unticking Target, Final or Credits takes it out of the strip too.',
     },
   },
   {
@@ -138,7 +138,7 @@ export const PRINT_SECTIONS: PrintSectionDef[] = [
 ]
 
 /** Printed on every row, whatever is ticked. */
-export const ALWAYS_PRINTED = ['Ref.', 'Survey and audience'] as const
+export const ALWAYS_PRINTED = ['Ref.', 'Study and audience'] as const
 
 /** What is turned OFF. Everything not listed prints. */
 export interface PrintChoice {
@@ -537,7 +537,7 @@ export function choiceNotes(
     const one = noResponseFigure === 1
     out.push({
       id: 'no-response-figure',
-      text: `${one ? 'One survey' : `${noResponseFigure} surveys`} print${one ? 's' : ''} no response figure: ${
+      text: `${one ? 'One study' : `${noResponseFigure} studies`} print${one ? 's' : ''} no response figure: ${
         one ? 'it has' : 'they have'} not reached quality review, so there is no final count yet. ${
         one ? 'It shows' : 'They show'} a dash.`,
     })

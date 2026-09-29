@@ -62,7 +62,7 @@ function creditSubnotes(t: LedgerTotals, rows: StatementRow[]): string[] {
   if (t.unpricedDrawn) out.push(`${drawnUnpricedPhrase(rows)} ${is(t.unpricedDrawn)} not yet priced`)
   if (t.committed) {
     out.push(`a further ${n0(t.committed)} ${is(t.committed)} committed on ${n0(t.committedCount)} ${
-      t.committedCount === 1 ? 'survey' : 'surveys'} not yet in field, and not counted as drawn`)
+      t.committedCount === 1 ? 'study' : 'studies'} not yet in field, and not counted as drawn`)
   }
   if (t.unpricedUndrawn) {
     out.push(`the ${n0(t.unpricedUndrawn)} not yet priced ${is(t.unpricedUndrawn)} not yet in field, so ${
@@ -74,9 +74,9 @@ function creditSubnotes(t: LedgerTotals, rows: StatementRow[]): string[] {
 /** Which surveys the Target and Final totals are over, naming only the
  *  columns that print. Null when neither prints. */
 function pairedNote(n: number, target: boolean, final: boolean): string | null {
-  if (target && final) return `Target and Final: the ${n0(n)} surveys with both.`
-  if (target) return `Target: the ${n0(n)} surveys with both a target and a final count.`
-  if (final) return `Final: the ${n0(n)} surveys with both a target and a final count.`
+  if (target && final) return `Target and Final: the ${n0(n)} studies with both.`
+  if (target) return `Target: the ${n0(n)} studies with both a target and a final count.`
+  if (final) return `Final: the ${n0(n)} studies with both a target and a final count.`
   return null
 }
 
@@ -116,7 +116,7 @@ export function Ledger({
   columns?: PrintColumnId[]
 }) {
   if (rows.length === 0) {
-    return <p className="st-empty">No surveys match this selection.</p>
+    return <p className="st-empty">No studies match this selection.</p>
   }
 
   const shown = ALL_COLUMNS.filter(id => columns.includes(id) && (id !== 'account' || accountCol))
@@ -222,7 +222,7 @@ export function Ledger({
         <thead>
           <tr>
             <th rowSpan={headRows} scope="col">Ref.</th>
-            <th rowSpan={headRows} scope="col">Survey and audience</th>
+            <th rowSpan={headRows} scope="col">Study and audience</th>
             {shown.filter(id => !RESPONSE.includes(id) && id !== 'credits').map(id => (
               <th key={id} rowSpan={headRows} scope="col">{COL[id].head}</th>
             ))}
@@ -284,7 +284,7 @@ export function Ledger({
                 <tr className="st-grp">
                   <td colSpan={cols}>
                     <b>{label}</b>
-                    <span>{n0(g.rows.length)} {g.rows.length === 1 ? 'survey' : 'surveys'}{detail}</span>
+                    <span>{n0(g.rows.length)} {g.rows.length === 1 ? 'study' : 'studies'}{detail}</span>
                   </td>
                 </tr>
               )}

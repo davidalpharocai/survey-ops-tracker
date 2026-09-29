@@ -1,5 +1,5 @@
-import { listNames, n0, NBSP, type ActivityFigures, type Glyph } from '@/lib/sales/statement'
-import { BelowMark, Fn, StatusGlyph } from './StatusGlyph'
+import { listNames, n0, type ActivityFigures, type Glyph } from '@/lib/sales/statement'
+import { Fn, StatusGlyph } from './StatusGlyph'
 
 const KEY: [Glyph, string][] = [
   ['full', 'Delivered'],
@@ -51,7 +51,7 @@ export function ActivityCluster({
   const pct = target && t.target > 0 ? Math.round((t.final / t.target) * 100) : null
   // The set both figures are over, named without naming the target figure —
   // the same words the ledger's own subtotal note uses.
-  const paired = `the ${n0(t.pairedN)} delivered ${t.pairedN === 1 ? 'survey' : 'surveys'} with both a target and a final count`
+  const paired = `the ${n0(t.pairedN)} delivered ${t.pairedN === 1 ? 'study' : 'studies'} with both a target and a final count`
   return (
     <div className="st-cluster">
       <div className="st-cluster-head"><b>Activity</b><span>{scope}</span></div>
@@ -62,7 +62,7 @@ export function ActivityCluster({
           <div className="st-fig-cap">
             {ranged
               ? 'in the period.'
-              : `of ${n0(A.total)} ${A.total === 1 ? 'survey' : 'surveys'}${
+              : `of ${n0(A.total)} ${A.total === 1 ? 'study' : 'studies'}${
                   status && A.others.length ? `; ${listNames(A.others)}` : ''}.`}
           </div>
         </div>
@@ -72,17 +72,22 @@ export function ActivityCluster({
             {t.pairedN === 0 ? (
               <>
                 <div className="st-fig-num"><span className="st-dash">—</span></div>
-                <div className="st-fig-cap">No survey here has been delivered with both a target and a final count yet.</div>
+                <div className="st-fig-cap">No study here has been delivered with both a target and a final count yet.</div>
               </>
             ) : (
               <>
                 <div className="st-fig-num">{n0(t.final)}{fnFinal != null && <Fn n={fnFinal} />}</div>
                 <div className="st-fig-cap">
+                  {/* David, 2026-09-29: "remove ... this way we only highlight
+                      positives." The met/short tally that stood here counted the
+                      same delivered set twice over, once as a win and once as a
+                      shortfall, on a document whose job is to report the period.
+                      The per-row below-target mark in the Final column is
+                      untouched - a reader auditing a single study still sees it;
+                      it is only the summary that stops totting up misses. */}
                   {pct != null
                     ? <><b>{pct}% of the {n0(t.target)} targeted</b>, across {paired}.</>
                     : <>Across {paired}.</>}
-                  {' '}{n0(t.met)}{NBSP}met or beat {pct != null ? 'it' : 'target'}
-                  {t.below > 0 && <>; {n0(t.below)}{NBSP}fell short{NBSP}<span className="st-nw">(<BelowMark inline />)</span></>}.
                 </div>
               </>
             )}
