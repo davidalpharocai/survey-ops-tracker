@@ -27,12 +27,20 @@ import { drawnFigure, finalText, responseCells, sortForStatement } from '@/lib/s
  * (David, 2026-09-27; lib/sales/printColumns), everything unless turned off.
  * The picker below shapes this table only.
  *
- * THE CELLS ARE THE PDF'S CELLS. Target, Final and Collected come from
- * responseCells and the row order from sortForStatement — the functions the
- * statement prints with. This screen used to show `n_actual ?? n_collected`
- * under "Collected", so a count typed in mid-field read 1,171 here and 1,350 on
- * the PDF under the same word (PR00481, 2026-09-27), and the rows came out in
- * a different order from the document the client reads.
+ * THE CELLS ARE THE PDF'S CELLS. Target and Final come from responseCells and
+ * the row order from sortForStatement — the functions the statement prints
+ * with. This screen used to show `n_actual ?? n_collected` under "Collected",
+ * so a count typed in mid-field read 1,171 here and 1,350 on the PDF under the
+ * same word (PR00481, 2026-09-27), and the rows came out in a different order
+ * from the document the client reads.
+ *
+ * COLLECTED IS NOT ON THIS SCREEN. David, 2026-09-28: "remove Collected and
+ * only keep the Final (ie Delivered) and Target … we show a delivery estimate
+ * vs target on the home page too". The pre-QA field count is an operations
+ * number, and a salesperson reading it beside Final has two response counts and
+ * no rule for which to quote. The STATEMENT still offers Collected — that is a
+ * separate surface with its own column box, and the tooltip on Export PDF
+ * already says the two do not share a choice.
  */
 
 export interface AccountProject {
@@ -70,7 +78,11 @@ export interface AccountContact {
   phone: string | null
 }
 
-type ColId = 'code' | 'survey' | 'requested' | 'stage' | 'target' | 'final' | 'collected' | 'credits' | 'submitted' | 'deliver'
+type ColId = 'code' | 'survey' | 'requested' | 'stage' | 'target' | 'final' | 'credits' | 'submitted' | 'deliver'
+
+/** Columns this table has offered and no longer does. Read by savedCols, which
+ *  is the only place a stored id can still name one. */
+const RETIRED_COLS = ['collected'] as const
 
 // `hint` is each header's explainer (shown as its tooltip).
 export const ACCOUNT_COLS: { id: ColId; label: string; hint: string; numeric?: boolean }[] = [
@@ -80,42 +92,67 @@ export const ACCOUNT_COLS: { id: ColId; label: string; hint: string; numeric?: b
   { id: 'stage', label: 'Stage', hint: 'Where the survey is in the pipeline today.' },
   { id: 'target', label: 'Target', numeric: true, hint: 'Responses agreed with the client. A range sold shows as lowest–highest.' },
   { id: 'final', label: 'Final', numeric: true, hint: 'Responses delivered after quality review, as the PDF prints them. Only a delivered survey has a final count; “≈ … est.” is an estimate while a survey is in quality review, and a dash means none yet.' },
-  { id: 'collected', label: 'Collected', numeric: true, hint: 'Responses gathered in field, before quality review, as the PDF prints them. A dash means no count is on record, or the survey has not reached field yet.' },
   { id: 'credits', label: 'Credits', numeric: true, hint: 'Credits the survey is priced at. A dash means not priced yet, which is not the same as zero.' },
   { id: 'submitted', label: 'Submitted', hint: 'The day the request came in.' },
   { id: 'deliver', label: 'Delivered', hint: 'The day a delivered survey went out, in US Eastern Time. A survey not yet delivered shows its due date, marked “due”.' },
 ]
 
-const DEFAULT_COLS: ColId[] = ['code', 'survey', 'requested', 'stage', 'final', 'collected', 'credits', 'deliver']
-// v2: Final became its own column. A choice saved under the old key (v1) is
-// carried over with Final added beside Collected, because v1's Collected
-// showed the final count on delivered surveys — dropping it silently would
-// take the delivered figure off a table the reader had set up to show it.
+// Target takes the slot Collected had. David asked for "the Final (ie
+// Delivered) and Target", and Final without Target is a count with nothing to
+// check it against — the same reason the statement's pre-send panel warns when
+// those two ticks disagree (printColumns.choiceNotes).
+const DEFAULT_COLS: ColId[] = ['code', 'survey', 'requested', 'stage', 'target', 'final', 'credits', 'deliver']
 const STORE_KEY = 'socc-sales-account-columns-v2'
 const STORE_KEY_V1 = 'socc-sales-account-columns'
 
-/** A saved column choice, or null. v1 choices gain Final beside Collected. */
+/**
+ * A saved column choice, or null.
+ *
+ * TWO REMOVALS, ONE RULE: a stored id that named Collected is replaced by
+ * Final, never just dropped. Dropping it would take the response count off a
+ * table its reader had deliberately set up to show one — and under v1
+ * "collected" WAS the final figure on a delivered survey, while under v2 a
+ * reader could perfectly well tick Collected and untick Final. Final is the
+ * count that survives, and the one the client's own statement leads with.
+ *
+ * Target is NOT forced on by this: it is a different question ("what did they
+ * buy"), it was never what Collected meant, and inventing a tick the reader
+ * never made is not a migration. It is in DEFAULT_COLS instead, so everybody
+ * who has not opened the picker gets it.
+ *
+ * NO NEW STORAGE KEY for the removal. The retired id is its own version
+ * marker — a choice written since the column went cannot contain it — so the
+ * substitution is idempotent, fires at most once per stored value, and the
+ * first save afterwards writes the id away for good.
+ */
 function savedCols(): ColId[] | null {
-  const valid = (xs: unknown): ColId[] | null => {
+  const migrate = (xs: unknown): ColId[] | null => {
     if (!Array.isArray(xs)) return null
-    const v = xs.filter((c): c is ColId => ACCOUNT_COLS.some(x => x.id === c))
+    // Before the ids are checked against ACCOUNT_COLS, not after: `collected`
+    // is no longer a known id, so a test made downstream of that filter could
+    // never fire.
+    const ticked = new Set(xs.filter((c): c is string => typeof c === 'string'))
+    if (RETIRED_COLS.some(c => ticked.has(c))) ticked.add('final')
+    // In the order the table renders, so two choices meaning the same thing
+    // are the same array.
+    const v = ACCOUNT_COLS.map(c => c.id).filter(id => ticked.has(id))
     return v.length ? v : null
   }
   const v2 = localStorage.getItem(STORE_KEY)
-  if (v2) return valid(JSON.parse(v2))
+  if (v2) return migrate(JSON.parse(v2))
   const v1 = localStorage.getItem(STORE_KEY_V1)
-  const old = v1 ? valid(JSON.parse(v1)) : null
-  if (!old) return null
-  return old.includes('collected') && !old.includes('final')
-    ? ACCOUNT_COLS.map(c => c.id).filter(c => old.includes(c) || c === 'final')
-    : old
+  return v1 ? migrate(JSON.parse(v1)) : null
 }
 
 /**
  * One cell's text. `neverRecorded` is true when the survey's N collected has
- * never been entered (no row in the freshness view, migration 111), which is
- * what lets Collected print a dash instead of the column default 0 — the same
- * argument, meaning the same thing, as on the PDF.
+ * never been entered (no row in the freshness view, migration 111).
+ *
+ * It is still passed although no column on this table reads it today: it was
+ * Collected's argument, and responseCells is the STATEMENT's function, shared.
+ * Handing it the truthful value keeps this screen's cells identical to the
+ * printed ones, so if the never-recorded rule ever reaches Target or Final the
+ * table inherits it instead of quietly disagreeing with the PDF again.
  */
 export function cellFor(p: AccountProject, id: ColId, neverRecorded = false): string {
   switch (id) {
@@ -127,10 +164,6 @@ export function cellFor(p: AccountProject, id: ColId, neverRecorded = false): st
     case 'final': {
       const f = responseCells(p, neverRecorded).final
       return f.kind === 'estimate' ? `${finalText(f)} est.` : finalText(f)
-    }
-    case 'collected': {
-      const v = responseCells(p, neverRecorded).collected
-      return v == null ? '—' : fmtNum(v)
     }
     // Blank, never 0. A survey with no credit figure is unpriced, and printing
     // "0" on a page the client reads asserts it was free.

@@ -9,10 +9,16 @@
  *    everything is default ... but one can save their preset as their new
  *    default and can always revert back to system default."
  *
- * So the model is DESELECTION. The system default is everything: every ledger
- * column and every section. A choice records only what was turned OFF, which
- * is what makes a column added later print for someone whose saved default is
- * older than it — they never turned it off, so it is on.
+ * So the model is DESELECTION. A choice records only what was turned OFF,
+ * which is what makes a column added later print for someone whose saved
+ * default is older than it — they never turned it off, so it is on.
+ *
+ * The system default started as literally everything. It is now everything
+ * except COLLECTED, which David turned off on 2026-09-28 (SYSTEM_DEFAULT says
+ * why). That is the model's one soft spot and it is worth naming: a list of
+ * what is OFF cannot record that somebody wants an off-by-default column ON,
+ * so the storage key was versioned rather than reinterpreted. Turning a second
+ * column off by default would need the same treatment.
  *
  * ALWAYS PRINTED, never offered: the survey reference and the survey name. A
  * row without them matches nothing the client holds.
@@ -29,7 +35,7 @@
  *
  *   1. The link — `cols=` and `sections=` — so a link reproduces a choice.
  *   2. This person's saved default for THIS document, in this browser.
- *   3. The system default: everything.
+ *   3. The system default: everything except Collected.
  *
  * The saved default is browser storage, not the database, like the accounts
  * table's saved views: it is a personal starting point, and nothing else reads
@@ -91,7 +97,7 @@ export const PRINT_COLUMNS: PrintColumnDef[] = [
   },
   {
     id: 'collected', label: 'Collected', docs: ['statement', 'list'], response: true,
-    help: 'Responses gathered in field, before quality review. Usually above the final count, because review removes responses that fail its checks.',
+    help: 'Responses gathered in field, before quality review. Usually above the final count, because review removes responses that fail its checks. OFF by default — the sales screens stopped showing it on 28 September and a document that prints two response counts leaves the reader to pick one. Tick it for a client who wants to see progress on a survey still in field, which otherwise prints no response figure at all.',
   },
   {
     id: 'credits', label: 'Credits', docs: ['statement', 'list'],
@@ -117,8 +123,8 @@ export const PRINT_SECTIONS: PrintSectionDef[] = [
   {
     id: 'notes', label: 'Notes', docs: ['statement', 'list'],
     help: {
-      statement: 'The numbered notes that explain “Not yet priced”, final against collected, when credits are drawn, and the dates. Untick it and the small note numbers that point to them are left off too. The sign-off still prints.',
-      list: 'The numbered notes that explain “Not yet priced”, final against collected, what the list is, and the dates. Untick it and the small note numbers that point to them are left off too. The sign-off still prints.',
+      statement: 'The numbered notes that explain “Not yet priced”, what the final count is and what the marks beside it mean, when credits are drawn, and the dates. Untick it and the small note numbers that point to them are left off too. The sign-off still prints.',
+      list: 'The numbered notes that explain “Not yet priced”, what the final count is and what the marks beside it mean, what the list is, and the dates. Untick it and the small note numbers that point to them are left off too. The sign-off still prints.',
     },
   },
 ]
@@ -132,8 +138,30 @@ export interface PrintChoice {
   sectionsOff: PrintSectionId[]
 }
 
-/** Everything prints. */
-export const SYSTEM_DEFAULT: PrintChoice = Object.freeze({ colsOff: [], sectionsOff: [] }) as PrintChoice
+/**
+ * What prints when nobody has chosen anything: everything except Collected.
+ *
+ * ── WHY ONE COLUMN IS OFF AND THE REST ARE ON ───────────────────────────────
+ * David, 2026-09-28: “for surveys in sales view … remove “Collected” and only
+ * keep the Final (ie Delivered) and Target … i think it’s unnecessary for them
+ * to see that, since we show a delivery estimate vs target on the home page
+ * too”, and then, asked whether the document should follow the screens:
+ * “yes update the PDF too”.
+ *
+ * TURNED OFF RATHER THAN DELETED. A pre-QA field count is still the only
+ * honest answer to “how is my survey going” for a client whose survey has not
+ * finished — responseCells prints Final as a dash for everything before Data
+ * QA — so the column stays available and one tick brings it back. Deleting it
+ * would have made that a code change.
+ *
+ * THIS IS THE ONE PLACE THE DEFAULT LIVES. resolveChoice falls back to these
+ * lists, not to empty ones; before this change it fell back to `[]` and a
+ * second, invisible copy of “everything prints” lived there.
+ */
+export const SYSTEM_DEFAULT: PrintChoice = Object.freeze({
+  colsOff: ['collected'],
+  sectionsOff: [],
+}) as PrintChoice
 
 export const columnsFor = (doc: PrintDoc, defs: PrintColumnDef[] = PRINT_COLUMNS) => defs.filter(c => c.docs.includes(doc))
 export const sectionsFor = (doc: PrintDoc, defs: PrintSectionDef[] = PRINT_SECTIONS) => defs.filter(s => s.docs.includes(doc))
@@ -190,8 +218,11 @@ export interface UrlChoice {
  * bookmarked export still prints what it printed:
  *
  *   requested → Requested by      target  → Target
- *   collected → Final and Collected (the old single "Collected" column showed
- *               the final count once a survey was delivered)
+ *   collected → Final (the old single "Collected" column showed the final count
+ *               once a survey was delivered, so Final is what it meant; it
+ *               mapped to both until 2026-09-28, and honouring the literal
+ *               word now would let a year-old bookmark put a column back on a
+ *               client document that the system default keeps off)
  *   credits   → Credits           submitted, and the always-shown code, survey,
  *                                 stage and deliver → nothing to switch
  *
@@ -203,7 +234,7 @@ export interface UrlChoice {
 const LEGACY = new Map<string, PrintColumnId[]>([
   ['requested', ['requested']],
   ['target', ['target']],
-  ['collected', ['final', 'collected']],
+  ['collected', ['final']],
   ['credits', ['credits']],
   ['submitted', []], ['code', []], ['survey', []], ['stage', []], ['deliver', []], ['client', []],
 ])
@@ -274,11 +305,17 @@ export function withChoiceInSearch(search: string, c: PrintChoice, doc: PrintDoc
 
 // ── Precedence ─────────────────────────────────────────────────────────────
 
-/** The link, then the saved default, then everything — per part. */
+/** The link, then the saved default, then the system default — per part. */
 export function resolveChoice(url: UrlChoice, saved: PrintChoice | null): PrintChoice {
   return {
-    colsOff: url.colsOff ?? saved?.colsOff ?? [],
-    sectionsOff: url.sectionsOff ?? saved?.sectionsOff ?? [],
+    // `?? [...SYSTEM_DEFAULT.colsOff]`, never `?? []`: an empty list means
+    // “nothing is turned off”, which is a CHOICE, and using it as the fallback
+    // puts a second copy of the system default here that stops matching the
+    // real one the moment it changes. It did: Collected went off by default on
+    // 2026-09-28 and this line would have kept printing it for every reader
+    // who had never opened the picker.
+    colsOff: url.colsOff ?? saved?.colsOff ?? [...SYSTEM_DEFAULT.colsOff],
+    sectionsOff: url.sectionsOff ?? saved?.sectionsOff ?? [...SYSTEM_DEFAULT.sectionsOff],
   }
 }
 
@@ -300,18 +337,32 @@ export function choiceSource({ choice, saved, url, touched, doc }: {
 
 export const CHOICE_SOURCE_TEXT: Record<ChoiceSource, string> = {
   saved: 'Using your saved default.',
-  system: 'Using the system default: everything prints.',
+  system: 'Using the system default: everything prints except Collected.',
   link: 'Using the choice in this link.',
   custom: 'Changed for this print only.',
 }
 
 // ── The saved default ──────────────────────────────────────────────────────
 
-/** One saved default per document. Versioned: a change to the stored shape
- *  gets a new key, and the old value is simply never read again. */
+/**
+ * One saved default per document. Versioned: a change to the stored shape gets
+ * a new key, and the old value is simply never read again.
+ *
+ * ── v2, 2026-09-28: WHY THE DEFAULT CHANGING FORCED A NEW KEY ───────────────
+ * A stored value is a list of what is turned OFF, so it can say “I do not want
+ * Collected” and cannot say “I do want it”. Every v1 value was written while
+ * Collected printed by default, so a v1 list that does not name it means “I
+ * never thought about Collected” — indistinguishable, under the new default,
+ * from “I deliberately ticked it on”. Reading them would have quietly put
+ * Collected back on a client document for the one reader most likely to have
+ * saved a default.
+ *
+ * The cost is one day of saved preferences: the picker shipped 2026-09-27.
+ * Everyone falls back to the system default and can save again.
+ */
 export const PRINT_CHOICE_KEY: Record<PrintDoc, string> = {
-  statement: 'socc-sales-print-statement-v1',
-  list: 'socc-sales-print-list-v1',
+  statement: 'socc-sales-print-statement-v2',
+  list: 'socc-sales-print-list-v2',
 }
 
 /** The storage calls this module makes — a real Storage, or a fake in tests. */
@@ -448,9 +499,28 @@ function joinPhrases(xs: string[]): string {
  */
 export function choiceNotes(
   p: Prints,
-  { unexplained = [] }: { unexplained?: UnexplainedMark[] } = {},
+  { unexplained = [], noResponseFigure = 0 }: {
+    unexplained?: UnexplainedMark[]
+    /** Rows that would print no response figure at all: Final is a dash
+     *  (responseCells gives one to everything before quality review) and
+     *  Collected is off. */
+    noResponseFigure?: number
+  } = {},
 ): ChoiceNote[] {
   const out: ChoiceNote[] = []
+  // Collected is off by default now, and the client's own surveys in field are
+  // exactly the rows that lose their only figure when it is. Said here rather
+  // than left to be noticed on the printed page, because this panel is the
+  // last screen before the document goes out.
+  if (!p.collected && noResponseFigure > 0 && (p.final || p.target)) {
+    const one = noResponseFigure === 1
+    out.push({
+      id: 'no-response-figure',
+      text: `${one ? 'One survey' : `${noResponseFigure} surveys`} print${one ? 's' : ''} no response figure: ${
+        one ? 'it has' : 'they have'} not reached quality review, so there is no final count yet. Tick Collected to show what ${
+        one ? 'it has' : 'they have'} gathered in field so far.`,
+    })
+  }
   if (p.final && !p.target) {
     out.push({
       id: 'final-without-target',

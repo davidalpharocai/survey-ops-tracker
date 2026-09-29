@@ -5,6 +5,10 @@ import { rangeFor, filterByRange, todayET, type DateBasis, type PresetId, type R
 import type { AccountProject } from '@/components/sales/AccountDetail'
 import type { Term } from '@/lib/sales/credits'
 import { parseUrlChoice } from '@/lib/sales/printColumns'
+// The column allowlist is shared with the analyst-side statement
+// (app/(app)/clients/[id]/statement) so the two routes cannot select
+// different columns and print different documents.
+import { STATEMENT_PROJECT_COLS as PROJECT_COLS } from '@/lib/sales/statementData'
 
 export const dynamic = 'force-dynamic'
 
@@ -39,8 +43,6 @@ export const dynamic = 'force-dynamic'
  * prints nothing, because a statement with a silently missing contract reads
  * "No contract in force" to a client who has one.
  */
-const PROJECT_COLS =
-  'id, project_code, project_name, board_column, status, phase, scoping_stage, n_target, n_target_max, n_collected, n_actual, credits, term_id, submitted_date, launch_date, deliver_date, delivered_at, requested_by_name, longitudinal, rerun_number'
 
 function Blocked({ what }: { what: string }) {
   return (

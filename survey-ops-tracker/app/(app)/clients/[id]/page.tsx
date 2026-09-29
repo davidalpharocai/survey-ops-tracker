@@ -570,6 +570,17 @@ export default function ClientPage() {
         )}
         <span className="ml-auto flex items-center gap-3">
           <MergeButton kind="client" record={c} />
+          {/* The same Survey Activity Statement the sales tier exports, built
+              from analyst reads so it needs no "view as" (David, 2026-09-28).
+              Opens the printable page with its pre-send panel; nothing is sent
+              from here. */}
+          <Link
+            href={`/clients/${c.id}/statement`}
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            title="The client-facing Survey Activity Statement for this account — choose what prints, then save it as a PDF. Nothing is sent to the client from here."
+          >
+            Client statement →
+          </Link>
           <Link
             href="/admin"
             className="text-sm text-muted-foreground hover:text-foreground transition-colors"

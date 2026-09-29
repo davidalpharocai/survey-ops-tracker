@@ -87,8 +87,16 @@ export interface DeliveryInput {
  * survey at 9% of target might be nearly finished and badly short, or might have
  * started yesterday, and nothing in the N fields distinguishes those. The board
  * column does.
+ *
+ * EXPORTED because a caller that LABELS the figure needs the same answer this
+ * file uses to compute it. SalesPipeline marks an unrecorded count "so far",
+ * which is a claim that more is coming, and it was deriving that claim from
+ * what deliveredN returned rather than from this predicate — so a finished
+ * survey whose figure could not be projected (a ranged target, or no target at
+ * all) got the mark anyway. A second copy of the rule is how the number and
+ * the words about it drift apart; there is one rule, and this is it.
  */
-function stillCollecting(p: DeliveryInput): boolean {
+export function stillCollecting(p: DeliveryInput): boolean {
   // Absent stage information, behave as before. A caller that does not pass the
   // column gets the old projection rather than a silently different number.
   if (p.board_column == null) return false

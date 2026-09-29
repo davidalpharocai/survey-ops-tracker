@@ -5,7 +5,7 @@ import type { Term } from '@/lib/sales/credits'
 import type { DateBasis, Range } from '@/lib/sales/dateRange'
 import {
   activityFigures, clientStage, describeRangeForClient, documentTitle, fmtDay, fmtDayLong, footerText, n0, nb,
-  preSendChecks, printedName, statementFigures, timeET, type Glyph,
+  noResponseFigureCount, preSendChecks, printedName, statementFigures, timeET, type Glyph,
 } from '@/lib/sales/statement'
 import { choiceNotes, ledgerColumns, type UrlChoice } from '@/lib/sales/printColumns'
 import type { AccountProject } from './AccountDetail'
@@ -97,6 +97,7 @@ export function AccountPrint({
   // only the notes account for.
   const cNotes = choiceNotes(prints, {
     unexplained: unexplainedMarks({ rows, neverRecorded: never, prints, notes: allNotes }),
+    noResponseFigure: noResponseFigureCount(rows, never),
   })
 
   const checks = preSendChecks({

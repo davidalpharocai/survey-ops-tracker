@@ -78,6 +78,10 @@ export function AssistantPanel() {
     void send(text, readContext())
   }
 
+  // `no-print` on BOTH shapes below. The analyst shell mounts this on every
+  // page, now including the client statement, and a floating ✦ button is
+  // chrome rather than document. The print stylesheet hides .no-print
+  // (components/sales/print/statementCss).
   if (!open) {
     return (
       <button
@@ -85,7 +89,7 @@ export function AssistantPanel() {
           setOpen(true)
           requestAnimationFrame(() => inputRef.current?.focus())
         }}
-        className="fixed bottom-5 right-5 z-50 flex items-center gap-2 rounded-full bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium pl-3 pr-4 py-2.5 shadow-lg transition-colors"
+        className="no-print fixed bottom-5 right-5 z-50 flex items-center gap-2 rounded-full bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium pl-3 pr-4 py-2.5 shadow-lg transition-colors"
         aria-label="Open assistant"
         aria-keyshortcuts="Control+K Meta+K"
       >
@@ -96,7 +100,7 @@ export function AssistantPanel() {
 
   return (
     <div
-      className="fixed bottom-5 right-5 z-50 flex flex-col w-[380px] max-w-[calc(100vw-2.5rem)] h-[520px] max-h-[calc(100vh-5rem)] bg-card border border-border rounded-2xl shadow-2xl overflow-hidden"
+      className="no-print fixed bottom-5 right-5 z-50 flex flex-col w-[380px] max-w-[calc(100vw-2.5rem)] h-[520px] max-h-[calc(100vh-5rem)] bg-card border border-border rounded-2xl shadow-2xl overflow-hidden"
       role="dialog"
       aria-label="Survey Ops Assistant"
     >

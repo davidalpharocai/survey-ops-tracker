@@ -110,7 +110,16 @@ function idleSentence(u: StatementRow[], also: boolean): string {
     one ? 's' : ''} nothing until ${one ? 'it goes' : 'they go'} into field.`
 }
 
-/** Note: Final and collected — shared by both documents. */
+/**
+ * Note: the final count — shared by both documents.
+ *
+ * Its TITLE and its first sentence follow the Collected column, which has been
+ * off by default since 2026-09-28. A note headed “Final and collected” that
+ * then defines a column the reader cannot find is worse than no note: it tells
+ * a client to go looking for a number that is not on the page. What the note
+ * must keep either way is the ≈ and the ▼, which are printed in the Final
+ * column and explained nowhere else.
+ */
 function finalNote(rows: StatementRow[], neverRecorded: Set<string>, prints: Prints): Note {
   const anyLive = rows.some(p => clientStage(p).group !== 'delivered')
   const cells = rows.map(p => responseCells(p, neverRecorded.has(p.id)))
@@ -120,13 +129,20 @@ function finalNote(rows: StatementRow[], neverRecorded: Set<string>, prints: Pri
   const over = ESTIMATE_BANDS.overTargetRatio, under = ESTIMATE_BANDS.underTargetRatio
   return {
     key: 'final',
-    title: 'Final and collected.',
+    title: prints.collected ? 'Final and collected.' : 'The final count.',
     body: (
       <>
-        The final count is the number of responses delivered after quality review; the collected count is the
-        number gathered in field before it. Collection usually runs above target because review removes responses
-        that fail its checks.
-        {anyLive && ' A survey in progress shows its collection so far and has no final count until delivery.'}
+        The final count is the number of responses delivered after quality review
+        {prints.collected
+          ? <>; the collected count is the number gathered in field before it. Collection usually runs above target
+              because review removes responses that fail its checks.</>
+          : '.'}
+        {anyLive && (prints.collected
+          ? ' A survey in progress shows its collection so far and has no final count until delivery.'
+          // Without the collected column there is no figure at all on those
+          // rows, and a dash the client cannot account for is what makes a
+          // document look incomplete rather than current.
+          : ' A survey still in progress has no final count yet, and its response figures are left blank until it is delivered.')}
         {/* The ▼ and the ≈ are printed only in the Final column. */}
         {anyBelow && prints.final && <> <BelowMark inline />{NBSP}marks a final count below target.</>}
         {prints.final && estimates.some(e => e.kind === 'estimate' && e.basis === 'at-or-over-target') && (

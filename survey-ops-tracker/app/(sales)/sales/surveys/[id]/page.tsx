@@ -38,14 +38,24 @@ export const dynamic = 'force-dynamic'
  * "Final count", "Launched", "Due" and "Delivery" for six fields that already
  * had names.
  *
- * ── THE THREE OPTIONAL READS ────────────────────────────────────────────────
- * Captain, N-collected freshness and deliverables each come from a SEPARATE
- * query that is allowed to fail, rather than from extra columns on the main
- * select. Migrations here are applied by hand, and PostgREST rejects the WHOLE
- * select when one named column does not exist yet — so folding `captain_name`
- * into the main select would turn "118 not applied yet" into a 404 on every
- * survey page. This way the page renders and the three lines are simply absent
- * until the migration lands.
+ * ── NO COLLECTED FIGURE ─────────────────────────────────────────────────────
+ * David, 2026-09-28: "remove Collected and only keep the Final (ie Delivered)
+ * and Target … we show a delivery estimate vs target on the home page too".
+ * The pre-QA field count is an operations number; what sales quotes is N Target
+ * and N Actual. `n_collected` stays in the select because deliveredN needs it
+ * to project the anticipated figure below — it is an input here, not a cell.
+ *
+ * ── THE TWO OPTIONAL READS ──────────────────────────────────────────────────
+ * Captain and deliverables each come from a SEPARATE query that is allowed to
+ * fail, rather than from extra columns on the main select. Migrations here are
+ * applied by hand, and PostgREST rejects the WHOLE select when one named column
+ * does not exist yet — so folding `captain_name` into the main select would
+ * turn "118 not applied yet" into a 404 on every survey page. This way the page
+ * renders and the two lines are simply absent until the migration lands.
+ *
+ * There were three: the N-collected freshness stamp went with the field it
+ * dated. The sales HOME screen still carries its own (that one sits under a
+ * figure it can date).
  */
 
 const dash = (v: unknown) =>
@@ -122,10 +132,8 @@ export default async function SalesSurveyPage({ params }: { params: Promise<{ id
   }
   const ok = <T,>(r: { data: T; error: unknown }) => (r.error ? null : r.data)
 
-  const [captain, freshness, deliverables] = await Promise.all([
+  const [captain, deliverables] = await Promise.all([
     Promise.resolve(loose.from('sales_projects').select('captain_name, captain_initials, captain_former').eq('id', id).maybeSingle())
-      .then(ok, () => null),
-    Promise.resolve(loose.from('sales_n_collected_freshness').select('last_updated').eq('project_id', id).maybeSingle())
       .then(ok, () => null),
     Promise.resolve(loose.from('sales_deliverables')
       .select('id, file_name, kind, mime_type, size_bytes, source_url, drive_file_id, filed_at')
@@ -170,19 +178,10 @@ export default async function SalesSurveyPage({ params }: { params: Promise<{ id
         <Card title="Responses">
           <dl className="grid grid-cols-2 gap-x-4 gap-y-3">
             {/* n_target is the client-facing commitment. The internal target is
-                not in this view and must never be added to it. */}
+                not in this view and must never be added to it. n_actual is the
+                delivered figure; no collected count sits between them — see the
+                header. */}
             <Field label="N Target">{formatNRange(p.n_target, p.n_target_max) || dash(null)}</Field>
-            <Field label="N Collected">
-              {p.n_collected != null ? fmtNum(p.n_collected) : dash(null)}
-              {/* David: "N Collected should have a last updated date under it."
-                  A MISSING row means it has never been updated, which is not the
-                  same as zero — so the two cases read differently. */}
-              <span className="mt-0.5 block text-[11px] font-normal text-muted-foreground">
-                {freshness?.last_updated
-                  ? `updated ${String(freshness.last_updated).slice(0, 10)}`
-                  : 'never updated'}
-              </span>
-            </Field>
             <Field label="N Actual">{p.n_actual != null ? fmtNum(p.n_actual) : dash(null)}</Field>
             <Field label="Credits">{p.credits != null ? fmtNum(p.credits) : dash(null)}</Field>
           </dl>
@@ -193,7 +192,14 @@ export default async function SalesSurveyPage({ params }: { params: Promise<{ id
               <span className="font-medium text-foreground">
                 {/* A survey still in field has not anticipated anything yet --
                     calling its running total "Anticipated N Actual" is what
-                    made a 7 look like a 6 one line further down. */}
+                    made a 7 look like a 6 one line further down.
+
+                    THIS LINE IS THE ONE PLACE A COLLECTED FIGURE SURVIVES, and
+                    deliberately: it is the delivery estimate David kept, the
+                    sales home screen prints the same number from the same
+                    estimator, and for a survey still in field it is the only
+                    honest answer to "how is it going". It is labelled as a
+                    running total, not as a count of anything delivered. */}
                 {dn.basis === 'still-collecting'
                   ? `Collected so far: ${fmtNum(dn.value)}`
                   : `Anticipated N Actual ≈ ${fmtNum(dn.value)}`}

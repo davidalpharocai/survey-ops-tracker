@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { fmtNum } from '@/lib/utils/number'
 import { stageOf, stageTone } from '@/lib/sales/stage'
-import { deliveredN } from '@/lib/sales/deliveredN'
+import { deliveredN, stillCollecting } from '@/lib/sales/deliveredN'
 import { useUrlSearch } from '@/lib/hooks/useUrlSearch'
 import { BUCKETS, bucketOf, countBuckets, migrateBucketId, type BucketId } from '@/lib/sales/buckets'
 import { accountOptions, inAccounts } from '@/lib/sales/accountIndex'
@@ -42,8 +42,12 @@ export interface SalesRow {
 }
 
 type ColId =
-  | 'client' | 'requested' | 'stage' | 'target' | 'collected'
+  | 'client' | 'requested' | 'stage' | 'target' | 'final'
   | 'credits' | 'submitted' | 'deliver'
+
+/** Columns this table has offered and no longer does. Read by savedCols and by
+ *  the ?s= sort, the only two places a retired id can still reach the page. */
+const RETIRED_COLS = ['collected'] as const
 
 interface Col {
   id: ColId
@@ -60,14 +64,52 @@ const COLS: Col[] = [
   { id: 'requested', label: 'Requested by', title: 'The client contact who asked for it.', sort: r => r.requested_by_name ?? null },
   { id: 'stage', label: 'Stage', title: 'Where it is: its pipeline position while it is running, or how it ended — Delivered, On hold, Cancelled, Archived.', sort: r => stageOf(r) },
   { id: 'target', label: 'Target', title: 'The agreed number of responses, as a range where one was agreed. The same N field the product team sees.', numeric: true, sort: r => r.n_target ?? null },
-  { id: 'collected', label: 'Collected', title: 'Responses in so far, and how that compares with the target. Once delivered this shows the final cleaned figure.', numeric: true, sort: r => r.n_actual ?? r.n_collected },
+  { id: 'final', label: 'Final', title: 'Responses delivered after quality review, and how that compares with the target. Only an unmarked figure is a final one: “so far” is a count still coming in, “~ … est.” is projected while a survey is in quality review, and “not final” is a field count on a survey whose delivered figure was never recorded.', numeric: true, sort: r => r.n_actual ?? r.n_collected },
   { id: 'credits', label: 'Credits', title: 'What this survey costs the client in credits. Blank means it has not been priced yet — not that it is free.', numeric: true, sort: r => r.credits ?? null },
   { id: 'submitted', label: 'Submitted', title: 'When the request came in.', sort: r => r.submitted_date ?? null },
   { id: 'deliver', label: 'Deliver', title: 'The delivery date — the promised one, or the actual one once delivered.', sort: r => r.deliver_date ?? null },
 ]
 
-const DEFAULT_COLS: ColId[] = ['client', 'requested', 'stage', 'target', 'collected', 'credits', 'deliver']
+// Target keeps the slot to Final's left. David asked for "the Final (ie
+// Delivered) and Target", and Final without Target is a count with nothing to
+// check it against.
+const DEFAULT_COLS: ColId[] = ['client', 'requested', 'stage', 'target', 'final', 'credits', 'deliver']
 const STORE_KEY = 'socc-sales-columns'
+
+/**
+ * A saved column choice, or null.
+ *
+ * A stored id that named Collected is REPLACED by Final, never just dropped.
+ * Dropping it would take the response count off a table its reader had
+ * deliberately set up to show one — and on this screen "collected" was already
+ * the delivered figure on a delivered survey (it has always routed through
+ * deliveredN), so Final is the same cell under the name that describes it.
+ *
+ * Target is NOT forced on by this: it answers a different question ("what did
+ * they buy"), and inventing a tick the reader never made is not a migration.
+ * It is in DEFAULT_COLS instead, so everybody who has not opened the picker
+ * gets it.
+ *
+ * NO NEW STORAGE KEY. The retired id is its own version marker — a choice
+ * written since the rename cannot contain it — so the substitution is
+ * idempotent, fires at most once per stored value, and the first save
+ * afterwards writes the id away for good. Same rule, same order of operations
+ * as AccountDetail.savedCols, so the two sales tables behave alike.
+ */
+function savedCols(raw: string | null): ColId[] | null {
+  if (!raw) return null
+  const xs: unknown = JSON.parse(raw)
+  if (!Array.isArray(xs)) return null
+  // Before the ids are checked against COLS, not after: `collected` is no
+  // longer a known id, so a substitution made downstream of that filter could
+  // never fire.
+  const ticked = new Set(xs.filter((c): c is string => typeof c === 'string'))
+  if (RETIRED_COLS.some(c => ticked.has(c))) ticked.add('final')
+  // In the order the table renders, so two choices meaning the same thing are
+  // the same array.
+  const v = COLS.map(c => c.id).filter(id => ticked.has(id))
+  return v.length ? v : null
+}
 
 /** "100 – 500", "100", or "—". The range is one cell because the two numbers are
  *  one fact; splitting them invites reading the floor as the target. */
@@ -140,7 +182,13 @@ export function SalesPipeline(
   // Local while typing; the URL catches up on a pause. A replace() per
   // keystroke was a full server round trip per letter on this page.
   const [q, setQ] = useUrlSearch('q')
-  const sortBy = (params.get('s') ?? 'deliver') as ColId
+  // Through the same substitution as the stored choice: ?s=collected is in
+  // bookmarks, in pasted links and in saved views captured before the rename,
+  // and an unrecognised id falls back to COLS[0] — so the list would quietly
+  // reorder itself by Client. The bucket id has been migrated on read for the
+  // same reason since ?g=closed.
+  const sortRaw = params.get('s') ?? 'deliver'
+  const sortBy = ((RETIRED_COLS as readonly string[]).includes(sortRaw) ? 'final' : sortRaw) as ColId
   const asc = params.get('d') !== 'desc'
   const clients = params.getAll('c')
   const stages = params.getAll('st')
@@ -172,11 +220,8 @@ export function SalesPipeline(
   // data) rather than merely returning null.
   useEffect(() => {
     try {
-      const raw = localStorage.getItem(STORE_KEY)
-      if (raw) {
-        const known = (JSON.parse(raw) as ColId[]).filter(c => COLS.some(k => k.id === c))
-        if (known.length) setVisible(known)
-      }
+      const saved = savedCols(localStorage.getItem(STORE_KEY))
+      if (saved) setVisible(saved)
       setDense(localStorage.getItem('socc-sales-dense') === '1')
       const v = localStorage.getItem(VIEWS_KEY)
       if (v) setViews(JSON.parse(v) as SavedView[])
@@ -548,7 +593,7 @@ function cell(id: ColId, r: SalesRow) {
       )
     case 'target':
       return targetText(r.n_target, r.n_target_max)
-    case 'collected': {
+    case 'final': {
       // A count nobody has ever recorded is not a measurement of zero. When the
       // freshness read succeeded and there is no audit row, the 0 here is the
       // column default and nothing else; printing it as "0 · 0%" in amber calls
@@ -571,13 +616,44 @@ function cell(id: ColId, r: SalesRow) {
       // 141%, both in green, one click from a page saying ~101%.
       //
       // A RANGED target keeps progressOf's "in range / to floor" wording — that is
-      // not a percentage and was never the complaint. A survey still in field
-      // shows what is in hand, unmarked: "7 so far" is a count, not an estimate.
+      // not a percentage and was never the complaint.
       const raw = r.n_actual ?? r.n_collected
       const ranged = r.n_target != null && r.n_target_max != null && r.n_target_max !== r.n_target
       const d = ranged ? null : deliveredN(r)
       const shownN = d?.value ?? raw
-      const est = d != null && d.estimated && d.basis !== 'still-collecting'
+      // THREE READINGS OF ONE CELL, and only the first is a final figure. The
+      // column used to say "Collected", under which a bare running count was
+      // self-explanatory; under "Final" it is a claim that the survey delivered
+      // that number. So everything that is not a recorded post-QA count now
+      // carries its own mark — "~ … est." for a projection, "so far" for a
+      // collection still coming in — and the number is unchanged in all three.
+      const recorded = d ? d.basis === 'recorded' : r.n_actual != null
+      // Only the two branches that are MEASUREMENTS of past surveys are an
+      // estimate. deliveredN's no-target branch hands back the raw collection
+      // with estimated=true, and a "~" on a number nothing was done to is a
+      // guess wearing a measurement's clothes — statement.ts refuses it on the
+      // same grounds, by never calling deliveredN without a target.
+      const est = d != null && d.estimated && r.n_target != null && r.n_target > 0 &&
+        (d.basis === 'at-or-over-target' || d.basis === 'short-of-target')
+      // "so far" says MORE IS COMING. That is a claim about the survey, not
+      // about the arithmetic, so it is read off the same predicate deliveredN
+      // projects with rather than inferred from what deliveredN returned.
+      //
+      // Inferring it was wrong on 60 live rows (measured 2026-09-28, 433 live
+      // surveys). Two shapes reach `!recorded && !est` while the survey is
+      // finished: a RANGED target forces `d` to null above, and a survey with
+      // NO target takes deliveredN's no-target branch, which this cell
+      // deliberately refuses to mark "~ est.". PR00393 — Delivery, Closed,
+      // 1,418 collected against a 200–300 range — read "1,418 so far" two
+      // columns right of a Stage cell reading "Delivered", under a tooltip
+      // saying the survey had not delivered.
+      const collecting = stillCollecting(r)
+      const soFar = !recorded && !est && collecting
+      // Finished, and the figure is still not the final one: no post-QA count
+      // was ever recorded, and nothing could be projected from what is there.
+      // A bare number here would be the whole point of the rename undone — the
+      // column says Final, so an unmarked figure in it claims to BE final.
+      const notFinal = !recorded && !est && !collecting
       const prog = progressOf(shownN, r.n_target, r.n_target_max)
       const tone =
         prog == null ? ''
@@ -591,6 +667,26 @@ function cell(id: ColId, r: SalesRow) {
       return (
         <>
           {est && <span className="text-muted-foreground/70">~</span>}{fmtNum(shownN)}
+          {soFar && (
+            <span
+              className="ml-1 text-xs text-muted-foreground/70"
+              title={d?.note || 'Responses in hand. This survey is still in field, so it has no final figure yet.'}
+            >
+              so far
+            </span>
+          )}
+          {notFinal && (
+            <span
+              className="ml-1 text-xs text-muted-foreground/70"
+              title={
+                d?.note ||
+                'Responses gathered in field. No count has been recorded since quality review, ' +
+                  'and this survey sold a range rather than a single target, so nothing is projected from it.'
+              }
+            >
+              not final
+            </span>
+          )}
           {prog != null && (
             <span className={`ml-1.5 whitespace-nowrap text-xs ${tone}`} title={est ? d?.note : undefined}>
               {prog.kind === 'pct' ? `${prog.pct}%${est ? ' est.' : ''}` : prog.label}

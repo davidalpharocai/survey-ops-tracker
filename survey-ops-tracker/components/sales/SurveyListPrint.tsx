@@ -5,7 +5,7 @@ import { currentTerm, type Term } from '@/lib/sales/credits'
 import type { DateBasis, Range } from '@/lib/sales/dateRange'
 import {
   activityFigures, clientStage, describeRangeForClient, documentTitle, fmtDayLong, fmtDay, footerText, listNames,
-  n0, nb, preSendChecks, printedName, showingLabel, timeET, type StatementRow,
+  n0, nb, noResponseFigureCount, preSendChecks, printedName, showingLabel, timeET, type StatementRow,
 } from '@/lib/sales/statement'
 import { serif, sans } from './print/fonts'
 import { statementCss } from './print/statementCss'
@@ -104,6 +104,7 @@ export function SurveyListPrint({
   // only the notes account for.
   const cNotes = choiceNotes(prints, {
     unexplained: unexplainedMarks({ rows, neverRecorded: never, prints, notes: allNotes }),
+    noResponseFigure: noResponseFigureCount(rows, never),
   })
 
   const term = internal ? null : currentTerm(terms, today)

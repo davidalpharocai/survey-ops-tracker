@@ -354,6 +354,29 @@ export function responseCells(p: StatementRow, neverRecorded: boolean): Response
   return { target, final, collected }
 }
 
+/**
+ * How many of these rows would print no response figure at all once the
+ * Collected column is off.
+ *
+ * Final is a dash for everything before quality review — see responseCells:
+ * an estimate needs Data QA, a positive target and something collected — so a
+ * statement sent mid-engagement can show a client nothing but targets. That is
+ * a reasonable document and it is also a surprising one, so the pre-send panel
+ * says the number out loud and offers the tick that fills it in
+ * (printColumns.choiceNotes).
+ *
+ * Counted from responseCells rather than from the stage, so it cannot disagree
+ * with what the ledger actually draws.
+ */
+export function noResponseFigureCount(rows: StatementRow[], neverRecorded: Set<string>): number {
+  return rows.reduce((n, p) => {
+    const c = responseCells(p, neverRecorded.has(p.id))
+    // `collected` is what the column WOULD print; a row with nothing there
+    // gains nothing from ticking it on, so it is not part of the offer.
+    return n + (c.final.kind === 'none' && c.collected != null ? 1 : 0)
+  }, 0)
+}
+
 /** The printed text of a Final cell, for tests and for anywhere a plain string
  *  is wanted. The components render the same kinds with their marks. */
 export function finalText(c: FinalCell): string {

@@ -5,7 +5,8 @@ import { fmtNum } from '@/lib/utils/number'
 import { deliveredN, type DeliveryInput } from '@/lib/sales/deliveredN'
 import { salesHome, daysBetween, waveLabel, type HomeRow, type Judged, type Kind } from '@/lib/sales/home'
 import { HomeSearch, type HomeSearchRow } from '@/components/sales/HomeSearch'
-import { etDate, etTime, todayET } from '@/lib/sales/dateRange'
+import { todayET } from '@/lib/sales/dateRange'
+import { freshness } from '@/lib/sales/freshness'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,7 +19,7 @@ export const dynamic = 'force-dynamic'
  */
 
 // Today in EASTERN time, as every other sales page and the PDF count it. The
-// server's clock is UTC, a day ahead after 8pm ET, which put "N updated today"
+// server's clock is UTC, a day ahead after 8pm ET, which put "counted today"
 // and every "due in N days" a day off each evening.
 const TODAY = () => todayET()
 
@@ -26,40 +27,6 @@ const KIND_STYLE: Record<Exclude<Kind, 'ok'>, { label: string; className: string
   late: { label: 'Late', className: 'bg-red-500/12 text-red-700 dark:text-red-400 border-red-500/30' },
   due: { label: 'Due soon', className: 'bg-amber-500/12 text-amber-700 dark:text-amber-400 border-amber-500/30' },
   over: { label: 'Over', className: 'bg-muted text-muted-foreground border-border' },
-}
-
-/**
- * When N collected was last touched — the STAMP, and then how old it is.
- *
- * Alex via David, 2026-09-28: "he should be able to see the last updated for N
- * collected on the home screen vs having to click in. it should show the date
- * and time." It used to say only "N updated 2 days ago", with the date hidden
- * in a title attribute that a tooltip shows and a phone does not. The exact
- * time earns its space: on 28 Sep four of his studies (PR00383, PR00392,
- * PR00427, PR00461) were all last changed within the same minute at 8:24 AM,
- * and "updated today" cannot tell that from an edit made at nine at night.
- *
- * ET, not the server's zone — the same correction as everywhere else on this
- * page. Slicing the UTC timestamp dated a 9pm ET edit to the next day.
- *
- * THE CASE THAT MATTERS IS STILL "never". Of Alex's 25 live surveys on 28 Sep,
- * 8 have no recorded n_collected change at all. A survey showing 0 of 3,000
- * with no history is not behind, it is UNMEASURED, and those are opposite
- * things to tell a salesperson. Returns null when we could not read freshness
- * at all, because "we don't know" must not be rendered as "never".
- */
-function freshness(last: string | undefined, today: string, available: boolean) {
-  if (!available) return null
-  if (!last) return { text: 'N never updated', stale: true, title: 'No change to N collected has ever been recorded for this survey, so this figure is not a measurement — it is the value the row was created with.' }
-  const day = etDate(last) ?? last.slice(0, 10)
-  const clock = etTime(last)
-  const d = daysBetween(today, day)
-  const ago = d <= 0 ? 'today' : d === 1 ? 'yesterday' : `${d} days ago`
-  return {
-    text: `N updated ${day}${clock ? `, ${clock} ET` : ''} · ${ago}`,
-    stale: d > 7,
-    title: `N collected last changed ${day}${clock ? ` at ${clock} Eastern` : ''}.`,
-  }
 }
 
 function Card({ title, aside, children }: { title: string; aside?: string; children: React.ReactNode }) {
@@ -165,7 +132,7 @@ export default async function SalesHomePage() {
 
      `haveFreshness` is the important part, not the map. If this read fails —
      because the migration has not been applied yet, or the view is denied — an
-     absent row would otherwise render as "N never updated", which is a claim
+     absent row would otherwise render as "responses never counted", which is a claim
      about the data rather than about our access to it. Those are different
      statements and only one of them is true, so a failed read must say nothing
      at all. Same NULL-vs-0 discipline as everywhere else. */

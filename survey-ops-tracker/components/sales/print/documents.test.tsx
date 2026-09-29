@@ -268,16 +268,42 @@ describe('what prints (David, 2026-09-27)', () => {
   const all = statement()
   const noTarget = statement({ printChoice: { colsOff: ['target'] } })
 
-  it('prints everything by default', () => {
+  it('prints everything except Collected by default', () => {
     for (const h of [all, quarterList('client')]) {
-      for (const head of ['Ref.', 'Survey and audience', 'Requested by', 'Status', 'Responses', 'Target', 'Final', 'Collected', 'Credits']) {
+      for (const head of ['Ref.', 'Survey and audience', 'Requested by', 'Status', 'Responses', 'Target', 'Final', 'Credits']) {
         expect(h).toContain(`>${head}</th>`)
       }
+      // David, 2026-09-28: the document follows the sales screens, which
+      // dropped it the same day. Still tickable — see printColumns.
+      expect(h).not.toContain('>Collected</th>')
     }
     expect(all).toContain('aria-label="Notes"')
     expect(all).toContain('>Contract summary')
-    expect(all).toContain('Using the system default: everything prints.')
+    expect(all).toContain('Using the system default: everything prints except Collected.')
     expect(quarterList('internal')).toContain('>Account</th>')
+  })
+
+  it('heads the note “The final count”, and does not define a column it is not printing', () => {
+    expect(all).toContain('The final count.')
+    expect(all).not.toContain('Final and collected.')
+    // The sentence that sent the reader looking for a figure that is not there.
+    expect(all).not.toContain('shows its collection so far')
+  })
+
+  // The cost of the new default, said on the last screen before the document
+  // goes out. Every survey before quality review prints a dash in Final, so a
+  // statement sent mid-engagement can carry nothing but targets, and the tick
+  // that fills those rows in is one line away.
+  it('tells the sender which surveys print no response figure, and offers the tick', () => {
+    // The COUNT is what makes this a warning rather than a caption, so match
+    // the counted phrasing. A looser pattern matches the Collected checkbox's
+    // own tooltip, which says the same thing about the column in general.
+    const warning = /(One survey|[0-9]+ surveys) prints? no response figure/
+    expect(all).toMatch(warning)
+    expect(all).toContain('Tick Collected to show what')
+    expect(all).toContain('Note, does not stop printing:')
+    // Gone once Collected is on: those rows now carry a figure.
+    expect(statement({ printChoice: { colsOff: [] } })).not.toMatch(warning)
   })
 
   it('warns when Final prints without Target, without adding an item to check', () => {
