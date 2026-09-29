@@ -66,17 +66,43 @@ export function useCreateClientTerm(clientId: string) {
   })
 }
 
+/**
+ * A WRITE THAT CHANGED NOTHING IS A FAILURE, AND HAS TO SAY SO.
+ *
+ * PostgREST answers a write that RLS refuses with zero rows and `error: null` —
+ * a missing GRANT fails loud (42501), a missing POLICY fails silent. Both
+ * writes below used to check only `error`, so a refused edit closed the form,
+ * refetched the OLD values and said nothing; the refused DELETE was worse,
+ * because it still toasted "Contract removed" over a row that is still there.
+ *
+ * `.select()` makes the server return what it actually touched, so an empty
+ * array is the refusal, stated. David reported not being able to edit contract
+ * records on 2026-09-29; this is the shape that reports fails as successes, and
+ * whether or not it is the cause, a write nobody can verify is not one to keep.
+ */
+function assertChanged(rows: unknown[] | null, what: string): void {
+  if (rows && rows.length > 0) return
+  throw new Error(
+    `the database accepted the request and changed no row, which is what a missing ${what} ` +
+    `permission looks like rather than a network problem (see migration 119). Nothing was saved.`,
+  )
+}
+
 export function useUpdateClientTerm(clientId: string) {
   const supabase = createClient()
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: TermUpdate }) => {
-      const { error } = await supabase.from('client_terms').update(updates).eq('id', id)
+      const { data, error } = await supabase.from('client_terms').update(updates).eq('id', id).select()
       if (error) throw error
+      assertChanged(data, 'update')
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['client-terms', clientId] })
       qc.invalidateQueries({ queryKey: ['term-dollars'] })
+      // The add path has always confirmed itself; this one never did, so a
+      // successful edit and a silently refused one looked identical.
+      toast('Contract saved')
     },
     onError: e => toast(`Couldn't save: ${(e as Error).message}`),
   })
@@ -90,11 +116,13 @@ export function useDeleteClientTerm(clientId: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('client_terms')
         .update({ deleted_at: new Date().toISOString() })
         .eq('id', id)
+        .select()
       if (error) throw error
+      assertChanged(data, 'update')
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['client-terms', clientId] })

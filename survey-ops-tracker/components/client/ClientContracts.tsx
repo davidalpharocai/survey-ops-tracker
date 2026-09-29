@@ -331,12 +331,26 @@ function ContractRow({
   return (
     <div className="rounded-lg border border-border bg-background/60 p-2.5">
       <div className="mb-1 flex items-baseline justify-between gap-2">
-        <button onClick={onEdit} className="text-left text-sm font-medium hover:underline">
+        {/* The name has always opened the editor, but nothing said so: no
+            title, no icon, just an underline on hover — while REMOVE sat beside
+            it as a visible ✕ with its own tooltip. Editing was the harder of
+            the two actions to discover and the safer of the two to offer, which
+            is backwards. It now carries a title, and a pencil matching the ✕ so
+            the two affordances read as a pair. */}
+        <button onClick={onEdit} title="Edit this contract" className="text-left text-sm font-medium hover:underline">
           {term.name}
         </button>
         <span className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
           {term.credits_total != null && <span className="tabular-nums">{fmtNum(term.credits_total)} credits</span>}
           {canFinance && dollars != null && <span className="tabular-nums">${fmtNum(dollars)}</span>}
+          <button
+            onClick={onEdit}
+            title="Edit this contract"
+            aria-label={`Edit ${term.name}`}
+            className="text-muted-foreground/50 hover:text-foreground"
+          >
+            ✎
+          </button>
           <button
             onClick={() => (confirming ? onRemove() : setConfirming(true))}
             onBlur={() => setConfirming(false)}
