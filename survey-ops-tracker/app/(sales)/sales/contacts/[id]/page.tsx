@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { requireSalesUser } from '@/lib/sales-auth'
 import { fmtNum } from '@/lib/utils/number'
 import { stageOf, stageTone } from '@/lib/sales/stage'
+import { finalCell } from '@/lib/sales/finalCell'
 import { countBuckets } from '@/lib/sales/buckets'
 
 export const dynamic = 'force-dynamic'
@@ -49,7 +50,7 @@ export default async function SalesContactPage({ params }: { params: Promise<{ i
     // Reavie" across different accounts.
     supabase
       .from('sales_projects')
-      .select('id, project_code, project_name, board_column, status, phase, scoping_stage, n_target, n_collected, n_actual, credits, submitted_date, deliver_date, delivered_at')
+      .select('id, project_code, project_name, board_column, status, phase, scoping_stage, n_target, n_target_max, n_collected, n_actual, credits, submitted_date, deliver_date, delivered_at')
       .eq('requested_by_contact_id', id)
       .order('deliver_date', { ascending: false, nullsFirst: false }),
   ])
@@ -131,7 +132,12 @@ export default async function SalesContactPage({ params }: { params: Promise<{ i
                 <th className="px-3 py-2 font-medium">Survey</th>
                 <th className="px-3 py-2 font-medium">Stage</th>
                 <th className="px-3 py-2 text-right font-medium">N Target</th>
-                <th className="px-3 py-2 text-right font-medium">N Collected</th>
+                <th
+                  className="px-3 py-2 text-right font-medium"
+                  title="Responses delivered after quality review. Only an unmarked figure is a final one: “so far” is a count still coming in, “~ … est.” is projected while a survey is in quality review, and “not final” is a field count on a survey whose delivered figure was never recorded."
+                >
+                  Final
+                </th>
                 <th className="px-3 py-2 font-medium">Delivered</th>
               </tr>
             </thead>
@@ -154,8 +160,27 @@ export default async function SalesContactPage({ params }: { params: Promise<{ i
                   <td className="px-3 py-2 text-right tabular-nums">
                     {p.n_target == null ? <span className="text-muted-foreground/40">—</span> : fmtNum(p.n_target)}
                   </td>
+                  {/* Through finalCell, the same rule the surveys list reads.
+                      This cell used to print `n_actual ?? n_collected` under
+                      the words "N Collected": on a survey still in field that
+                      is a running total shown as though it were delivered
+                      (the PR00481 pattern), and it carried no thousands
+                      separator either. */}
                   <td className="px-3 py-2 text-right tabular-nums">
-                    {p.n_actual ?? p.n_collected ?? <span className="text-muted-foreground/40">—</span>}
+                    {(() => {
+                      const f = finalCell(p)
+                      if (f.value == null) {
+                        return <span className="text-muted-foreground/40" title={f.note}>—</span>
+                      }
+                      return (
+                        <span title={f.note}>
+                          {f.reading === 'estimate' && <span className="text-muted-foreground/70">~</span>}
+                          {fmtNum(f.value)}
+                          {f.reading === 'estimate' && <span className="ml-1 text-xs text-muted-foreground/70">est.</span>}
+                          {f.mark && <span className="ml-1 text-xs text-muted-foreground/70">{f.mark}</span>}
+                        </span>
+                      )
+                    })()}
                   </td>
                   <td className="px-3 py-2 text-muted-foreground">
                     {(p.delivered_at ?? '').slice(0, 10) || p.deliver_date || '—'}

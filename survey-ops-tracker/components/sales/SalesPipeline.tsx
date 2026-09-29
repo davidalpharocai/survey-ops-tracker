@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { fmtNum } from '@/lib/utils/number'
 import { stageOf, stageTone } from '@/lib/sales/stage'
-import { deliveredN, stillCollecting } from '@/lib/sales/deliveredN'
+import { finalCell } from '@/lib/sales/finalCell'
 import { useUrlSearch } from '@/lib/hooks/useUrlSearch'
 import { BUCKETS, bucketOf, countBuckets, migrateBucketId, type BucketId } from '@/lib/sales/buckets'
 import { accountOptions, inAccounts } from '@/lib/sales/accountIndex'
@@ -594,66 +594,26 @@ function cell(id: ColId, r: SalesRow) {
     case 'target':
       return targetText(r.n_target, r.n_target_max)
     case 'final': {
-      // A count nobody has ever recorded is not a measurement of zero. When the
-      // freshness read succeeded and there is no audit row, the 0 here is the
-      // column default and nothing else; printing it as "0 · 0%" in amber calls
-      // it a result. Alex's list, 2026-09-23: PR00482, Submitted, target 1,000,
-      // shown exactly that way. Strict null: undefined means we could not tell.
-      if (r.n_actual == null && r.n_collected === 0 && r.n_collected_updated_at === null) {
+      // ONE RULE, IN lib/sales/finalCell.ts. It used to be worked out here,
+      // and the sales contacts page — which did not — printed
+      // `n_actual ?? n_collected` under the words "N Collected". Everything
+      // this cell knows about what a response figure MEANS now lives in that
+      // module and is shared; what stays here is how this table draws it.
+      //
+      // The estimator is the same one /sales/home and the survey page use, so
+      // this column cannot read 162% while they read 101%. Measured on Alex's
+      // own list 2026-09-23: 404/250 rendered as 162% and 352/250 as 141%,
+      // both in green, one click from a page saying ~101%.
+      const f = finalCell(r)
+      if (f.value == null) {
         return (
-          <span className="text-muted-foreground/70" title="No count has been recorded for this survey yet.">
+          <span className="text-muted-foreground/70" title={f.note}>
             not recorded
           </span>
         )
       }
-      // Routed through deliveredN — the estimator /sales/home and the survey page
-      // already use — so this column cannot read 162% while they read 101%. A
-      // study that over-collects delivers roughly what it sold, and the raw ratio
-      // was the exact number David asked to stop seeing (2026-09-17: "if the
-      // target is 1000 and we collected 2000, it shouldnt be 2000/1000"). The
-      // estimator shipped to two of three surfaces and skipped this one; measured
-      // on Alex's own list on 2026-09-23, 404/250 rendered as 162% and 352/250 as
-      // 141%, both in green, one click from a page saying ~101%.
-      //
-      // A RANGED target keeps progressOf's "in range / to floor" wording — that is
-      // not a percentage and was never the complaint.
-      const raw = r.n_actual ?? r.n_collected
-      const ranged = r.n_target != null && r.n_target_max != null && r.n_target_max !== r.n_target
-      const d = ranged ? null : deliveredN(r)
-      const shownN = d?.value ?? raw
-      // THREE READINGS OF ONE CELL, and only the first is a final figure. The
-      // column used to say "Collected", under which a bare running count was
-      // self-explanatory; under "Final" it is a claim that the survey delivered
-      // that number. So everything that is not a recorded post-QA count now
-      // carries its own mark — "~ … est." for a projection, "so far" for a
-      // collection still coming in — and the number is unchanged in all three.
-      const recorded = d ? d.basis === 'recorded' : r.n_actual != null
-      // Only the two branches that are MEASUREMENTS of past surveys are an
-      // estimate. deliveredN's no-target branch hands back the raw collection
-      // with estimated=true, and a "~" on a number nothing was done to is a
-      // guess wearing a measurement's clothes — statement.ts refuses it on the
-      // same grounds, by never calling deliveredN without a target.
-      const est = d != null && d.estimated && r.n_target != null && r.n_target > 0 &&
-        (d.basis === 'at-or-over-target' || d.basis === 'short-of-target')
-      // "so far" says MORE IS COMING. That is a claim about the survey, not
-      // about the arithmetic, so it is read off the same predicate deliveredN
-      // projects with rather than inferred from what deliveredN returned.
-      //
-      // Inferring it was wrong on 60 live rows (measured 2026-09-28, 433 live
-      // surveys). Two shapes reach `!recorded && !est` while the survey is
-      // finished: a RANGED target forces `d` to null above, and a survey with
-      // NO target takes deliveredN's no-target branch, which this cell
-      // deliberately refuses to mark "~ est.". PR00393 — Delivery, Closed,
-      // 1,418 collected against a 200–300 range — read "1,418 so far" two
-      // columns right of a Stage cell reading "Delivered", under a tooltip
-      // saying the survey had not delivered.
-      const collecting = stillCollecting(r)
-      const soFar = !recorded && !est && collecting
-      // Finished, and the figure is still not the final one: no post-QA count
-      // was ever recorded, and nothing could be projected from what is there.
-      // A bare number here would be the whole point of the rename undone — the
-      // column says Final, so an unmarked figure in it claims to BE final.
-      const notFinal = !recorded && !est && !collecting
+      const shownN = f.value
+      const est = f.reading === 'estimate'
       const prog = progressOf(shownN, r.n_target, r.n_target_max)
       const tone =
         prog == null ? ''
@@ -667,28 +627,13 @@ function cell(id: ColId, r: SalesRow) {
       return (
         <>
           {est && <span className="text-muted-foreground/70">~</span>}{fmtNum(shownN)}
-          {soFar && (
-            <span
-              className="ml-1 text-xs text-muted-foreground/70"
-              title={d?.note || 'Responses in hand. This survey is still in field, so it has no final figure yet.'}
-            >
-              so far
-            </span>
-          )}
-          {notFinal && (
-            <span
-              className="ml-1 text-xs text-muted-foreground/70"
-              title={
-                d?.note ||
-                'Responses gathered in field. No count has been recorded since quality review, ' +
-                  'and this survey sold a range rather than a single target, so nothing is projected from it.'
-              }
-            >
-              not final
+          {f.mark && (
+            <span className="ml-1 text-xs text-muted-foreground/70" title={f.note}>
+              {f.mark}
             </span>
           )}
           {prog != null && (
-            <span className={`ml-1.5 whitespace-nowrap text-xs ${tone}`} title={est ? d?.note : undefined}>
+            <span className={`ml-1.5 whitespace-nowrap text-xs ${tone}`} title={est ? f.note : undefined}>
               {prog.kind === 'pct' ? `${prog.pct}%${est ? ' est.' : ''}` : prog.label}
             </span>
           )}
