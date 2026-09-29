@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { ThemeToggle } from '@/components/shared/ThemeToggle'
 import { NavSearch } from '@/components/shared/NavSearch'
+import { UserMenu } from '@/components/shared/UserMenu'
 import { hasUnreadChanges } from '@/lib/changelog/seen'
 import { useCanViewFinancials } from '@/lib/hooks/useCapabilities'
 
@@ -36,7 +37,18 @@ interface Tab {
 // non-holder can never see it, whatever order their browser has saved. The
 // page itself is gated on the server as well (app/(app)/finance/layout.tsx) —
 // hiding a link is not a permission check.
-export const DEFAULT_TAB_ORDER = ['/reruns', '/calendar', '/finance', '/review', '/admin'] as const
+//
+// '/insights' leads, and '/admin' has left for the account menu (David,
+// 2026-09-29: "lets move insights to the main nav bar so analysts see it").
+// Insights had been sitting in the "More" menu, which is where this app puts
+// things people are not expected to open — the opposite of the intent.
+//
+// NO STORAGE KEY BUMP IS NEEDED for that swap. mergeNavOrder drops a saved
+// href that is no longer a default (so '/admin' falls out of an order saved
+// last week) and inserts a default that is missing from the saved list after
+// the nearest tab preceding it (so '/insights', first in this list, lands at
+// the front). The reconciling this needs is the reconciling it already does.
+export const DEFAULT_TAB_ORDER = ['/insights', '/reruns', '/calendar', '/finance', '/review'] as const
 export const NAV_ORDER_KEY = 'socc.nav.order.v1'
 
 /**
@@ -183,6 +195,7 @@ export function TopNav() {
   }, [moreOpen])
 
   const tabs: Tab[] = [
+    { href: '/insights', label: 'Insights', icon: '📊', title: 'Insights — what the team delivered, on time, cycle time, and open work right now, over a date range you choose' },
     { href: '/reruns', label: 'Reruns', icon: '🔁', title: 'Reruns — recurring surveys on a calendar / list / series view; badge = overdue', badge: rerunOverdue },
     { href: '/calendar', label: 'Calendar', icon: '📅', title: 'Calendar — every dated event on a month grid, filterable by captain, type, client, and more' },
     // Finance holders only (see DEFAULT_TAB_ORDER). Absent from this list for
@@ -193,7 +206,9 @@ export function TopNav() {
     // Combined Deliverables + Email review — rendered specially below (two icons,
     // two counts). Kept in the tabs array so it can be reordered like the rest.
     { href: '/review', label: 'Review', icon: '📦', title: 'Review — emailed deliverables we couldn’t auto-file, and client emails we couldn’t tie to a project, in two columns to file or dismiss' },
-    { href: '/admin', label: 'Admin', icon: '⚙️', title: 'Admin — system links, client ids, roster, recently deleted, and data health' },
+    // Admin is no longer a ribbon tab: it lives in the account menu (UserMenu),
+    // with Sign out, because it is something you do to the system rather than a
+    // place you work.
   ]
   const tabsByHref = new Map(tabs.map((t) => [t.href, t]))
   // The default order in words, as this reader sees it (no Finance for a
@@ -381,7 +396,7 @@ export function TopNav() {
           <button
             onClick={() => setMoreOpen(o => !o)}
             aria-expanded={moreOpen}
-            title="More — Insights, Internal Projects, Connect your Claude, and the docs"
+            title="More — Internal Projects, Connect your Claude, and the docs"
             className="inline-flex items-center gap-1.5 text-sm px-2.5 py-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
           >
             <span aria-hidden="true">⋯</span> More
@@ -391,11 +406,9 @@ export function TopNav() {
           </button>
           {moreOpen && (
             <div className="absolute left-0 top-full mt-2 z-50 w-60 bg-popover border border-border rounded-xl shadow-xl p-1.5 flex flex-col">
-              <Link href="/insights" className={menuItemClass} title="Insights — what the team delivered, on time, cycle time, and open work right now">
-                <span>📊</span> Insights
-              </Link>
-              {/* Finance is no longer here: it is a ribbon tab, shown only to
-                  finance holders (see DEFAULT_TAB_ORDER). */}
+              {/* Insights is no longer here either: it is a ribbon tab now
+                  (2026-09-29). Finance left earlier, shown only to finance
+                  holders (see DEFAULT_TAB_ORDER). */}
               <Link href="/internal" className={menuItemClass} title="Internal Projects — AlphaROC's own work on a sprint-based board">
                 <span>🧰</span> Internal Projects
               </Link>
@@ -429,13 +442,10 @@ export function TopNav() {
                   <span>↺</span> Reset ribbon order
                 </button>
               )}
-              <div className="border-t border-border my-1.5" />
-              {/* The app went its whole life without one of these. The only code
-                  that ended a session was the login page's two error branches,
-                  so signing out meant provoking an error or clearing cookies. */}
-              <Link href="/signout" className={menuItemClass} title="Sign out — ends your session, and clears the 'viewing as' cookie if one is set">
-                <span>🚪</span> Sign out
-              </Link>
+              {/* Sign out moved to the account menu (UserMenu), beside Admin —
+                  it was the last line under a ribbon-reordering tip, which is
+                  not where anyone looks for it. /signout stays typeable and
+                  reachable from every tier, which is the part that matters. */}
             </div>
           )}
         </div>
@@ -451,6 +461,7 @@ export function TopNav() {
           ✦ Ctrl+K
         </span>
         <ThemeToggle />
+        <UserMenu />
       </div>
     </nav>
   )
