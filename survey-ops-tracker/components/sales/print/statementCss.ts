@@ -149,7 +149,6 @@ export function statementCss({ footerLeft, footerRight, footerFont }: {
 .st-ledger col.c-status{width:26mm}
 .st-ledger col.c-tgt{width:12.5mm}
 .st-ledger col.c-fin{width:12mm}
-.st-ledger col.c-coll{width:13.5mm}
 .st-ledger col.c-cr{width:18mm}
 .st-ledger th,.st-ledger td{padding:.95mm 1.3mm;vertical-align:top;text-align:left}
 .st-ledger th:first-child,.st-ledger td:first-child{padding-left:0}
@@ -168,7 +167,6 @@ export function statementCss({ footerLeft, footerRight, footerFont }: {
 .st-dot{position:absolute;left:0;top:.28em;width:5.6pt;height:5.6pt;overflow:visible}
 .st-when{display:block;font-size:7pt;color:var(--st-ink-3);margin-top:.2mm;white-space:nowrap}
 .st-final{font-weight:600}
-.st-coll{color:var(--st-ink-3)}
 .st-dash{color:var(--st-ink-4)}
 .st-na{font-style:italic;font-size:6.9pt;color:var(--st-ink-3);line-height:1.2;white-space:normal}
 .st-committed{font-style:italic;font-size:6.9pt;color:var(--st-ink-3);white-space:normal}

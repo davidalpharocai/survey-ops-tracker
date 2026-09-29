@@ -28,14 +28,16 @@ import { BelowMark, Fn, StatusGlyph } from './StatusGlyph'
  *     survey column takes whatever is left, so any subset fills the page width
  *     and none can push past it.
  *
- * Structure: a head with the spanner over Target | Final | Collected; one
+ * Structure: a head with the spanner over Target | Final; one
  * <tbody> per group (in progress, delivered, paused or stopped); a subtotal per
  * group only when there is more than one; and the grand total INSIDE the last
  * tbody, where `break-before: avoid` can bind it, so it is never stranded alone
  * at the top of a page.
  *
- * No Collected subtotal: collection mixes surveys that are finished with
- * surveys that are not, and a sum of the two is a number about nothing.
+ * There is no Collected column to subtotal any more (removed 2026-09-29). The
+ * reason it never had one still stands as the rule for any future response
+ * column: collection mixes surveys that are finished with surveys that are
+ * not, and a sum of the two is a number about nothing.
  */
 const GROUPS: StageGroup[] = ['progress', 'delivered', 'stopped']
 
@@ -49,11 +51,10 @@ const COL: Record<PrintColumnId, { cls: string; head: string }> = {
   status: { cls: 'c-status', head: 'Status' },
   target: { cls: 'c-tgt', head: 'Target' },
   final: { cls: 'c-fin', head: 'Final' },
-  collected: { cls: 'c-coll', head: 'Collected' },
   credits: { cls: 'c-cr', head: 'Credits' },
 }
-const RESPONSE: PrintColumnId[] = ['target', 'final', 'collected']
-const NUMERIC: PrintColumnId[] = ['target', 'final', 'collected', 'credits']
+const RESPONSE: PrintColumnId[] = ['target', 'final']
+const NUMERIC: PrintColumnId[] = ['target', 'final', 'credits']
 
 function creditSubnotes(t: LedgerTotals, rows: StatementRow[]): string[] {
   const out: string[] = []
@@ -192,9 +193,6 @@ export function Ledger({
             {r.final.kind === 'none' && <Dash />}
           </td>
         )}
-        {has('collected') && (
-          <td className="r">{r.collected == null ? <Dash /> : <span className="st-coll">{n0(r.collected)}</span>}</td>
-        )}
         {has('credits') && (
           <td className="r">
             {cr.kind === 'unpriced' && <span className={`st-na${unpricedFn ? '' : ' st-edge'}`}>Not yet priced{unpricedFn}</span>}
@@ -208,7 +206,9 @@ export function Ledger({
 
   /** One figure cell per numeric column that prints, in order. */
   function figures(cells: Partial<Record<PrintColumnId, ReactNode>>) {
-    return numeric.map(id => <td key={id} className={id === 'collected' ? undefined : 'r'}>{cells[id] ?? null}</td>)
+    // Every numeric column is right-aligned. The ternary this replaced existed
+    // only to left-align Collected, which is no longer a column.
+    return numeric.map(id => <td key={id} className="r">{cells[id] ?? null}</td>)
   }
 
   return (

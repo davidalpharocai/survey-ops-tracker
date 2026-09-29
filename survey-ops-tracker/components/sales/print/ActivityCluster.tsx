@@ -34,7 +34,7 @@ export function ActivityCluster({
   /** "All time · 15 surveys" or "Delivered 1 Jul – 24 Sep 2026 · 10 surveys". */
   scope: string
   ranged: boolean
-  /** The note that explains Final and Collected; null when it does not print. */
+  /** The note that explains the final count; null when it does not print. */
   fnFinal: number | null
   /** Which status marks the table uses, so the key explains only those. */
   glyphs: Set<Glyph>

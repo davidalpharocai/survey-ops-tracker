@@ -38,9 +38,10 @@ import { drawnFigure, finalText, responseCells, sortForStatement } from '@/lib/s
  * only keep the Final (ie Delivered) and Target … we show a delivery estimate
  * vs target on the home page too". The pre-QA field count is an operations
  * number, and a salesperson reading it beside Final has two response counts and
- * no rule for which to quote. The STATEMENT still offers Collected — that is a
- * separate surface with its own column box, and the tooltip on Export PDF
- * already says the two do not share a choice.
+ * no rule for which to quote. The STATEMENT no longer offers it either: it was
+ * deleted from the print model on 2026-09-29 — David: "i dont want to risk a
+ * sales person sending it" — so there is now no surface, screen or document,
+ * on which a salesperson meets a pre-QA field count.
  */
 
 export interface AccountProject {

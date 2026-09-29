@@ -2,12 +2,15 @@ import { describe, it, expect } from 'vitest'
 import {
   activityFigures, clearedCollection, clientStage, clientStageName, creditCell, cssString, describeRangeForClient,
   deliveredOn, documentTitle, drawnFigure, drawnLine, drawnText, drawnUnpricedPhrase, finalText, fmtDay, fmtDayLong,
-  footerText, ledgerTotals, NBSP, preSendChecks, printedName, responseCells, sortForStatement, splitTitle,
-  statementFigures, statusWhen, timeET, todayET,
+  footerText, ledgerTotals, NBSP, noResponseFigureCount, preSendChecks, printedName, responseCells, sortForStatement,
+  splitTitle, statementFigures, statusWhen, timeET, todayET,
   type StatementRow,
 } from './statement'
 import { currentTerm, rollUp, type Term } from './credits'
-import { PRINTS_ALL, printsOf, type Prints } from './printColumns'
+import {
+  ledgerColumns, parseStoredChoice, parseUrlChoice, PRINTS_ALL, printsOf, resolveChoice,
+  type PrintColumnId, type Prints,
+} from './printColumns'
 import { filterByRange, rangeFor } from './dateRange'
 import {
   FIXTURE_CLIENT, FIXTURE_NEVER_RECORDED, FIXTURE_NOW, FIXTURE_ROWS, FIXTURE_TERMS,
@@ -91,22 +94,34 @@ describe('the fixture account, end to end', () => {
     expect(statusWhen(byCode('PR00358'), TODAY)).toBe('24 Aug 2026')
   })
 
-  it('PR00257 reads "was due 23 Sep 2026", and its mid-field count is not a Final', () => {
+  it('PR00257 reads "was due 23 Sep 2026", and its mid-field count reaches no cell at all', () => {
     const p = byCode('PR00257')
     expect(statusWhen(p, TODAY)).toBe('was due 23 Sep 2026')
     const cells = responseCells(p, never.has(p.id))
     expect(finalText(cells.final)).toBe('—')
-    expect(cells.collected).toBe(22)
     expect(cells.target).toBe('50')
+    // CHANGED 2026-09-29, WITH THE REMOVAL OF THE COLLECTED COLUMN. This line
+    // read `expect(cells.collected).toBe(22)`: the 22 responses gathered so
+    // far were the one figure a mid-field survey could print. The column is
+    // gone from every client view, so the row's only printed figure is now its
+    // target, and its 22 is still recorded but has nowhere to go.
+    expect(p.n_collected).toBe(22)
+    expect(cells).not.toHaveProperty('collected')
   })
 
-  it('PR00151 prints Final "not recorded", never an estimate from its 481 collected', () => {
+  it('PR00151 prints Final "not recorded", never an estimate or a count from its 481 collected', () => {
     const p = byCode('PR00151')
     const cells = responseCells(p, never.has(p.id))
     expect(cells.final.kind).toBe('not-recorded')
     expect(finalText(cells.final)).toBe('not recorded')
-    expect(cells.collected).toBe(481)
     expect(statusWhen(p, TODAY)).toBe('date not recorded')
+    // CHANGED 2026-09-29: was `expect(cells.collected).toBe(481)`. The point
+    // it protected — that 481 never becomes a Final, by estimate or by
+    // printing it as a count — is now protected twice over: the Final cell
+    // still says "not recorded", and there is no second cell for the 481 to
+    // appear in either.
+    expect(p.n_collected).toBe(481)
+    expect(cells).not.toHaveProperty('collected')
   })
 
   it('has 8 items to settle before sending', () => {
@@ -157,11 +172,29 @@ describe('the fixture account, end to end', () => {
     expect(drawnUnpricedPhrase([{ ...byCode('PR00466'), credits: null }])).toBe(`1${NBSP}survey already in field`)
   })
 
-  it('shows Collected as a dash, not 0, for surveys not yet in field', () => {
-    const p = byCode('PR00478')
-    expect(responseCells(p, true).collected).toBeNull()
-    expect(responseCells(p, false).collected).toBeNull()
-    expect(responseCells(byCode('PR00075'), true).collected).toBe(120)
+  /**
+   * WAS "shows Collected as a dash, not 0, for surveys not yet in field", which
+   * protected the rule that a column default of 0 must never print as a count:
+   * PR00478 has not reached field and its 0 means nothing, while PR00075's 120
+   * is a real measurement. On 2026-09-29 the column was removed from every
+   * client view, so neither number can print and the rule it protected has
+   * nothing left to govern HERE — it lives on in the pre-send checklist, which
+   * still tells the difference between a 0 that was cleared and one that was
+   * never entered (see "pre-send checks for the response counts" below).
+   *
+   * Inverted rather than deleted, because the interesting half survives: the
+   * counts are still ON THE ROWS, still different from each other, and still
+   * unable to reach the page. That is the invariant now.
+   */
+  it('a pre-field 0 and a real 120 both reach the same place: nowhere', () => {
+    const notInField = byCode('PR00478'), delivered = byCode('PR00075')
+    expect(notInField.n_collected).toBe(0)
+    expect(delivered.n_collected).toBe(120)
+    for (const p of [notInField, delivered]) {
+      for (const neverRecorded of [true, false]) {
+        expect(Object.keys(responseCells(p, neverRecorded))).toEqual(['target', 'final'])
+      }
+    }
   })
 
   it('the whole-account activity reads "11 of 15; 2 in field and 2 in design"', () => {
@@ -377,6 +410,15 @@ describe('the list in internal mode', () => {
 /**
  * Review findings, 2026-09-27, each from a live row: a Collected or Final cell
  * that printed a number the data does not support, and "at least 0".
+ *
+ * REPOINTED 2026-09-29. Half of these findings were about the Collected cell,
+ * and that cell no longer exists: the column was removed from every client
+ * view rather than left off by default. The findings did not go away with it —
+ * they were faults in the DATA (a never-entered 0, a collection cleared when
+ * the final was typed in), and `clearedCollection` still names one of them for
+ * the pre-send checklist. So each test below keeps the fault it found and now
+ * asserts where the fault surfaces today: on the checklist, on screen, never
+ * on a cell. The Final-cell findings are untouched — that column still prints.
  */
 describe('Collected and Final never print a default as a count', () => {
   const del = (o: Partial<StatementRow>): StatementRow => ({
@@ -385,26 +427,47 @@ describe('Collected and Final never print a default as a count', () => {
     delivered_at: null, ...o,
   })
 
-  it('a never-recorded 0 is a dash even when a final count exists (PR00389: Final 1,279, Collected "0")', () => {
+  // The Final half of the 2026-09-27 findings, unchanged: the column prints.
+  it('a never-recorded 0 next to a final count leaves the Final cell alone (PR00389: Final 1,279)', () => {
     const c = responseCells(del({}), true)
     expect(c.final).toEqual({ kind: 'final', value: 1279, below: false })
-    expect(c.collected).toBeNull()
+    // Was `expect(c.collected).toBeNull()` — the finding was a 0 printed as a
+    // count. There is no cell to print it in as of 2026-09-29, so the same
+    // guarantee is now structural rather than conditional.
+    expect(c).not.toHaveProperty('collected')
   })
 
-  it('a 0 beside a final count is a dash even when it WAS recorded — it was cleared (PR00257: Final 20, Collected 0)', () => {
+  it('a 0 beside a final count is a cleared collection, and the checklist is what says so (PR00257: Final 20, Collected 0)', () => {
     const p = del({ n_target: 50, n_actual: 20, n_collected: 0 })
+    // `clearedCollection` outlived the column on purpose: it names a real,
+    // recurring data fault (4 of 211 delivered surveys, 2026-09-27) and the
+    // pre-send checklist's item 6a is about exactly that fault. What CHANGED
+    // on 2026-09-29 is the consequence: it used to blank a cell, and now it
+    // only tells a salesperson to go and fix the record.
     expect(clearedCollection(p)).toBe(true)
-    expect(responseCells(p, false).collected).toBeNull()
+    expect(responseCells(p, false)).not.toHaveProperty('collected')
   })
 
-  it('a real collection below the final still prints: it is on record, and the checklist flags it', () => {
+  it('a real collection below the final is not a cleared one — the checklist must say something else', () => {
     const p = del({ n_target: 300, n_actual: 492, n_collected: 450 })
+    // Was "still prints: it is on record". It is still on record and it no
+    // longer prints; the half that still matters is that the cleared-collection
+    // predicate does not fire on a genuine count, so 6a says "probably out of
+    // date" rather than "probably cleared" (asserted in full below).
     expect(clearedCollection(p)).toBe(false)
-    expect(responseCells(p, false).collected).toBe(450)
+    expect(p.n_collected).toBe(450)
+    expect(responseCells(p, false)).not.toHaveProperty('collected')
   })
 
-  it('a delivered survey with no final count keeps its recorded collection', () => {
-    expect(responseCells(del({ n_actual: null, n_collected: 481 }), false).collected).toBe(481)
+  it('a delivered survey with no final count keeps its recorded collection off the page, not off the record', () => {
+    const p = del({ n_actual: null, n_collected: 481 })
+    // Was `...collected).toBe(481)`. The row still carries the 481 — nothing
+    // was deleted from the data on 2026-09-29, only from the documents — and
+    // the client sees "not recorded" under Final rather than a field count
+    // standing in for one.
+    expect(p.n_collected).toBe(481)
+    expect(responseCells(p, false).final).toEqual({ kind: 'not-recorded' })
+    expect(responseCells(p, false)).not.toHaveProperty('collected')
   })
 
   it('no estimate from a collection of 0 (PR00486: "≈ 0 est." against a 1,000 target)', () => {
@@ -428,7 +491,13 @@ describe('pre-send checks for the response counts', () => {
   it('a cleared collection: "probably cleared when the final was entered"', () => {
     const c = run([base({ id: 'a' })]).find(x => x.id === 'collected-below-final-a')!
     expect(c.lead).toBe('PR9')
-    expect(c.text).toBe('shows 20 final but 0 collected. The collected count was probably cleared when the final was entered, so the statement prints a dash under Collected. Correct it before sending.')
+    // CHANGED 2026-09-29: the sentence used to end "…was entered, so the
+    // statement prints a dash under Collected. Correct it before sending." The
+    // clause quoted a column that has been removed from every client view, so
+    // it went with it. The item itself did not: the record is still wrong, and
+    // this is still the screen that says so before the document is sent.
+    expect(c.text).toBe('shows 20 final but 0 collected. The collected count was probably cleared when the final was entered. Correct it before sending.')
+    expect(c.text).not.toContain('Collected')
   })
 
   it('a never-entered collection says so, instead of guessing it was cleared', () => {
@@ -541,7 +610,16 @@ describe('the checklist quotes only what this print carries', () => {
     expect(text(gone, 'unpriced-drawn')).toContain('Price them and the credits drawn are exact.')
   })
 
-  it('drops the Collected dash and the final estimate with their columns', () => {
+  /**
+   * WAS "drops the Collected dash and the final estimate with their columns" —
+   * two clauses, each said only while its own column printed. On 2026-09-29
+   * the Collected column was removed, so item 6a's closing clause ("so the
+   * statement prints a dash under Collected") went with it: there is no tick
+   * that could ever have brought it back, so the sentence is now the same on
+   * every print. The Final half is unchanged and still tested both ways —
+   * that column is still a choice, and the clause still has to follow it.
+   */
+  it('the final-estimate clause follows its column; the collected warning quotes no column at all', () => {
     const rowsWith: StatementRow[] = [{
       id: 'a', project_code: 'PR9', project_name: 'Study Zulu', board_column: 'Delivery', status: 'Closed',
       phase: 'Active', n_target: 50, n_target_max: null, n_collected: 0, n_actual: 20, credits: 10,
@@ -554,19 +632,168 @@ describe('the checklist quotes only what this print carries', () => {
     const at = (prints?: Prints) => preSendChecks({
       rows: rowsWith, terms: [], term: null, today: TODAY, nameSet: true, doc: 'statement', mode: 'client', prints,
     })
-    expect(text(at(), 'collected-below-final')).toContain('so the statement prints a dash under Collected')
+    const WARNING = 'shows 20 final but 0 collected. The collected count was probably cleared when the final was entered. Correct it before sending.'
+    // Item 6a is now one sentence whatever prints — it describes the RECORD,
+    // which is wrong either way, and quotes nothing off the page.
+    expect(text(at(), 'collected-below-final')).toBe(WARNING)
+    expect(text(at(), 'collected-below-final')).not.toContain('Collected')
     expect(text(at(), 'qa-no-collection')).toContain('so the statement shows no final estimate for it')
-    const none = at(printsOf({ colsOff: ['collected', 'final'], sectionsOff: [] }, 'statement'))
-    expect(text(none, 'collected-below-final'))
-      .toBe('shows 20 final but 0 collected. The collected count was probably cleared when the final was entered. Correct it before sending.')
+    const none = at(printsOf({ colsOff: ['final'], sectionsOff: [] }, 'statement'))
+    expect(text(none, 'collected-below-final')).toBe(WARNING)
     expect(text(none, 'qa-no-collection'))
       .toBe('is in quality review with no responses collected on record. Enter the collected count before sending.')
   })
 
   it('never changes how many items there are to check', () => {
     const n = run().length
-    for (const p of [off('status'), off('credits'), off('collected', 'final'), printsOf({ colsOff: [], sectionsOff: ['contract', 'activity', 'notes'] }, 'statement')]) {
+    // `off('collected', 'final')` until 2026-09-29; 'collected' is no longer a
+    // column id, so the response-columns case is now Target and Final together.
+    for (const p of [off('status'), off('credits'), off('target', 'final'), printsOf({ colsOff: [], sectionsOff: ['contract', 'activity', 'notes'] }, 'statement')]) {
       expect(run(p)).toHaveLength(n)
     }
+  })
+})
+
+/**
+ * noResponseFigureCount feeds the one line the pre-send panel says about the
+ * response columns (printColumns.choiceNotes, 'no-response-figure'): how many
+ * surveys the client will see with no response figure at all.
+ *
+ * NEW COVERAGE, 2026-09-29, because the rule changed and nothing here watched
+ * it. While Collected existed the count took only rows that ALSO had a
+ * collection to reveal — the note it fed ended "Tick Collected to show it", and
+ * a row with nothing behind it was not part of that offer. The removal left no
+ * tick and no second column, so every dash is now a row that prints no figure
+ * and every dash is counted. The narrower count would under-report the very
+ * thing the note exists to disclose.
+ */
+describe('how many surveys print no response figure', () => {
+  it('counts every dash on the fixture account: 4, where the old offer counted 2', () => {
+    expect(noResponseFigureCount(rows, never)).toBe(4)
+    const dashes = rows.filter(p => responseCells(p, never.has(p.id)).final.kind === 'none')
+    expect(dashes.map(p => p.project_code).sort())
+      .toEqual(['PR00257', 'PR00466', 'PR00478', 'PR00479'])
+    // PR00478 and PR00479 are the two the old count left out: nothing has been
+    // collected on either, so there was never anything a tick could reveal.
+    // They still print a target and a dash, which is what the panel discloses.
+    expect(dashes.filter(p => Number(p.n_collected ?? 0) === 0).map(p => p.project_code).sort())
+      .toEqual(['PR00478', 'PR00479'])
+  })
+
+  it('a delivered survey with no final count is not a dash — it says "not recorded"', () => {
+    const p = byCode('PR00151')
+    expect(responseCells(p, never.has(p.id)).final.kind).toBe('not-recorded')
+    expect(noResponseFigureCount([p], never)).toBe(0)
+  })
+})
+
+/**
+ * ADDED 2026-09-29, WITH THE REMOVAL.
+ *
+ * Every test above proves that one row, or one choice, no longer carries a
+ * pre-QA field count. This one proves there is no way back in. David's
+ * instruction was not "default it off" — it was "lets actually remove
+ * 'collected' from all views from now … a client doesnt need to know that and i
+ * dont want to risk a sales person sending it" — so a switch left in the off
+ * position is the thing being rejected, and these assertions are about the
+ * ABSENCE of the cell, the key and the column, never about a false value.
+ *
+ * A field count could reach a client document by exactly three routes through
+ * this module, and each is closed here:
+ *
+ *   1. A CELL. responseCells returns Target and Final and nothing else, for
+ *      every row of the real account, either way round on freshness.
+ *   2. A CHOICE. A saved default, a current link (?cols=-collected) or a
+ *      year-old retired link (?cols=collected,…) can all still say the word;
+ *      none can produce a flag for it, because no such flag and no such column
+ *      definition exists. Two type-level lines make that a compile error, not
+ *      just a failing assertion.
+ *   3. THE PRE-SEND CHECKLIST, which is screen-only but was the last place the
+ *      column NAME survived ("so the statement prints a dash under Collected").
+ */
+describe('Collected cannot come back', () => {
+  // If a `collected` flag or column id is ever reintroduced, these two stop
+  // type-checking — the failure lands in tsc, before any test runs.
+  const noCollectedFlag: 'collected' extends keyof Prints ? never : true = true
+  const noCollectedColumn: 'collected' extends PrintColumnId ? never : true = true
+
+  it('no row of the real account has a Collected cell, whatever freshness says', () => {
+    expect(rows).toHaveLength(15)
+    for (const p of rows) {
+      for (const neverRecorded of [true, false]) {
+        const cells = responseCells(p, neverRecorded)
+        expect(Object.keys(cells)).toEqual(['target', 'final'])
+        expect(cells).not.toHaveProperty('collected')
+      }
+    }
+  })
+
+  it('a saved default, a current link and a retired link may all name it; none can turn it on', () => {
+    expect(noCollectedFlag).toBe(true)
+    expect(noCollectedColumn).toBe(true)
+    // 1. A v2 value left in this browser by the picker.
+    const saved = parseStoredChoice('{"colsOff":["collected"],"sectionsOff":[]}', 'statement')
+    // 2. A link in the current shape, which lists what is OFF.
+    const current = parseUrlChoice('statement', '-collected', null)
+    // 3. A year-old bookmark in the retired shape, which listed what was ON.
+    //    "collected" is deliberately still in the LEGACY map, and deliberately
+    //    means `final`: the old export's single "Collected" column showed the
+    //    FINAL count once a survey was delivered. The token survives; the
+    //    column it is named after does not.
+    const retired = parseUrlChoice('statement', 'collected,target', null)
+    expect(retired.legacy).toBe(true)
+
+    for (const choice of [resolveChoice({}, saved), resolveChoice(current, null), resolveChoice(retired, null)]) {
+      const prints = printsOf(choice, 'statement')
+      expect(Object.keys(prints)).not.toContain('collected')
+      expect(prints).not.toHaveProperty('collected')
+      expect(ledgerColumns(prints) as string[]).not.toContain('collected')
+    }
+    // The retired token switches Final on, which is what it always meant.
+    expect(printsOf(resolveChoice(retired, null), 'statement').final).toBe(true)
+    // Naming an id that no longer exists is not a choice: nothing is turned off.
+    expect(resolveChoice({}, saved)).toEqual({ colsOff: [], sectionsOff: [] })
+    // And with every tick on, the ledger still has no such column to print.
+    expect(ledgerColumns(PRINTS_ALL) as string[]).not.toContain('collected')
+  })
+
+  it('no line the pre-send checklist prints names a Collected column', () => {
+    const faults: StatementRow[] = [{
+      // Delivered, final entered, collection cleared — item 6a.
+      id: 'a', project_code: 'PR9', project_name: 'Study Zulu - Audience', board_column: 'Delivery', status: 'Closed',
+      phase: 'Active', n_target: 50, n_target_max: null, n_collected: 0, n_actual: 20, credits: 10,
+      deliver_date: '2026-09-01', delivered_at: null,
+    }, {
+      // In quality review with nothing collected — item 6b.
+      id: 'b', project_code: 'PR8', project_name: 'Study Yankee', board_column: 'Data QA', status: 'Open',
+      phase: 'Active', n_target: 50, n_target_max: null, n_collected: 0, n_actual: null, credits: 10,
+      deliver_date: '2026-10-01', delivered_at: null,
+    }]
+    const run = (o: {
+      neverRecorded?: Set<string>; prints?: Prints
+      doc?: 'statement' | 'list'; mode?: 'client' | 'internal'; accounts?: number
+    } = {}) => preSendChecks({
+      rows: faults, terms: [], term: null, today: TODAY, nameSet: true, doc: 'statement', mode: 'client', ...o,
+    })
+    const every = [
+      // The whole fixture account, with the name item and every contract item.
+      ...preSendChecks({
+        rows, terms: FIXTURE_TERMS, term: currentTerm(FIXTURE_TERMS, TODAY), today: TODAY, nameSet: false,
+        internalName: FIXTURE_CLIENT.name, doc: 'statement', mode: 'client', neverRecorded: never,
+      }),
+      ...run(),                                        // 6a, guessing it was cleared
+      ...run({ neverRecorded: new Set(['a']) }),       // 6a, knowing it never was entered
+      ...run({ prints: PRINTS_ALL }),                  // every column and section ticked
+      ...run({ doc: 'list', mode: 'internal', accounts: 2 }),
+    ]
+    expect(every.length).toBeGreaterThan(12)
+    for (const c of every) {
+      expect(c.text).not.toContain('Collected')
+      expect(c.lead ?? '').not.toContain('Collected')
+    }
+    // The lower-case word stays, and must: these items are about the collected
+    // COUNT on the record, which sales still has to go and fix. What went is
+    // the capitalised column name, which only ever meant "look at the page".
+    expect(every.some(c => c.text.includes('collected count'))).toBe(true)
   })
 })

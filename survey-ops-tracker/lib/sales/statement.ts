@@ -35,7 +35,6 @@ import { bucketOf } from './buckets'
 import { hasDrawn, rollUp, currentTerm, consumptionFor, type Consumption, type Term } from './credits'
 import { deliveredN, DELIVERY_STATS } from './deliveredN'
 import { DATE_BASES, etDate, todayET, type DateBasis, type Range } from './dateRange'
-import { STAGE_ORDER, type BoardColumn } from '@/lib/utils/stage'
 import { fmtNum } from '@/lib/utils/number'
 // Type only, deliberately: printColumns imports this module, and a value
 // import back would make the pair a run-time cycle.
@@ -209,8 +208,6 @@ export function showingLabel(bucket: string): string {
   }
 }
 
-const stageIndex = (c: string | null | undefined) => STAGE_ORDER.indexOf((c ?? '') as BoardColumn)
-const FIELDING = STAGE_ORDER.indexOf('Fielding')
 const isDelivered = (p: StatementRow) => clientStage(p).group === 'delivered'
 
 // ── Row helpers ────────────────────────────────────────────────────────────
@@ -288,10 +285,6 @@ export interface ResponseCells {
   /** "50", or "50–60" when a range was sold. Null when no target is set. */
   target: string | null
   final: FinalCell
-  /** Null when there is nothing honest to print: never recorded, a survey that
-   *  has not reached field and shows the column default of 0, or a delivered
-   *  survey whose 0 sits beside a final count (see `clearedCollection`). */
-  collected: number | null
 }
 
 /**
@@ -305,9 +298,19 @@ export interface ResponseCells {
 export function clearedCollection(p: Pick<StatementRow, 'status' | 'phase' | 'board_column' | 'n_collected' | 'n_actual'>): boolean {
   return clientStage(p).group === 'delivered' && Number(p.n_actual ?? 0) > 0 && Number(p.n_collected ?? 0) === 0
 }
+// NOTHING CALLS THIS TODAY. It decided whether responseCells printed a
+// collected figure, and the Collected column was removed on 2026-09-29.
+//
+// Kept, and said plainly rather than dressed up: the fault it names is real and
+// recurring (4 of 211 delivered surveys, 2026-09-27 — a delivered survey whose
+// collection reads 0 beside a positive final, because the collection was
+// cleared in the edit that entered the final). Pre-send warning 6a below still
+// reports that fault and re-derives the condition inline; this predicate is
+// where the condition is NAMED and where its test lives. If 6a is ever
+// rewritten, use this rather than a third copy of the comparison.
 
 /**
- * Target | Final | Collected for one row.
+ * Target | Final for one row.
  *
  * `neverRecorded` is true when the n_collected freshness view has NO row for
  * this survey (migration 111): its count was never entered, so a 0 is the
@@ -344,37 +347,30 @@ export function responseCells(p: StatementRow, neverRecorded: boolean): Response
     }
   }
 
-  const coll = Number(p.n_collected ?? 0)
-  // A 0 with no freshness row is the column default, whether or not a final
-  // count has been entered since. Tying this to "no final count" printed
-  // PR00389 as Final 1,279, Collected 0 — a default passed off as a count.
-  const never = neverRecorded && coll === 0
-  const preField = !delivered && stageIndex(p.board_column) < FIELDING
-  const collected = p.n_collected == null || never || clearedCollection(p) || (preField && coll === 0) ? null : coll
-  return { target, final, collected }
+  return { target, final }
 }
 
 /**
- * How many of these rows would print no response figure at all once the
- * Collected column is off.
+ * How many of these rows print no response figure at all.
  *
- * Final is a dash for everything before quality review — see responseCells:
- * an estimate needs Data QA, a positive target and something collected — so a
+ * Final is a dash for everything before quality review — see responseCells: an
+ * estimate needs Data QA, a positive target and something collected — so a
  * statement sent mid-engagement can show a client nothing but targets. That is
  * a reasonable document and it is also a surprising one, so the pre-send panel
- * says the number out loud and offers the tick that fills it in
- * (printColumns.choiceNotes).
+ * says the number out loud (printColumns.choiceNotes).
+ *
+ * THE CONDITION WIDENED ON 2026-09-29. While Collected existed this counted
+ * only rows that had a collection to reveal, because the note it fed ended
+ * "Tick Collected to show it" and a row with nothing behind it was not part of
+ * that offer. There is no tick now, and no second column: EVERY dash is a row
+ * that prints no figure, so every dash is counted. Counting the old, narrower
+ * set would under-report the very thing the note exists to disclose.
  *
  * Counted from responseCells rather than from the stage, so it cannot disagree
  * with what the ledger actually draws.
  */
 export function noResponseFigureCount(rows: StatementRow[], neverRecorded: Set<string>): number {
-  return rows.reduce((n, p) => {
-    const c = responseCells(p, neverRecorded.has(p.id))
-    // `collected` is what the column WOULD print; a row with nothing there
-    // gains nothing from ticking it on, so it is not part of the offer.
-    return n + (c.final.kind === 'none' && c.collected != null ? 1 : 0)
-  }, 0)
+  return rows.reduce((n, p) => n + (responseCells(p, neverRecorded.has(p.id)).final.kind === 'none' ? 1 : 0), 0)
 }
 
 /** The printed text of a Final cell, for tests and for anywhere a plain string
@@ -914,15 +910,13 @@ export function preSendChecks({
   //     surveys, one of them on the statement this module was built against.
   for (const p of printed.filter(x => isDelivered(x) && Number(x.n_actual ?? 0) > 0 && Number(x.n_collected ?? 0) < Number(x.n_actual))) {
     const fin = n0(Number(p.n_actual)), coll = Number(p.n_collected ?? 0)
-    // "prints a dash under Collected" only while that column is on the page.
-    const dash = shows('collected') ? `, so the ${word} prints a dash under Collected` : ''
     out.push({
       id: `collected-below-final-${p.id}`, lead: code(p),
       text: coll > 0
         ? `shows ${n0(coll)} collected but ${fin} final. The final count comes from the responses collected, so the collected count is probably out of date. Correct it before sending.`
         : neverRecorded?.has(p.id)
-          ? `has a final count of ${fin} but no collected count was ever entered${dash}. Enter the collected count if it is known.`
-          : `shows ${fin} final but 0 collected. The collected count was probably cleared when the final was entered${dash}. Correct it before sending.`,
+          ? `has a final count of ${fin} but no collected count was ever entered. Enter the collected count if it is known.`
+          : `shows ${fin} final but 0 collected. The collected count was probably cleared when the final was entered. Correct it before sending.`,
     })
   }
 

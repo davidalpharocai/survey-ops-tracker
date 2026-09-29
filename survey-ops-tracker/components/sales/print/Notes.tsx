@@ -14,7 +14,7 @@ export interface Note { key: 'unpriced' | 'final' | 'drawn' | 'dates' | 'list'; 
  *
  * Numbered and set in two columns like a fund report's footnotes, and each one
  * answers a question a portfolio manager asks of a statement: why is this
- * figure "at least", why does collected exceed final, when is a credit drawn,
+ * figure "at least", what the final count counts, when is a credit drawn,
  * whose clock are the dates on. Notes may break between items, never inside
  * one, so a long table does not push the whole block onto a near-empty page.
  *
@@ -32,8 +32,8 @@ export interface Note { key: 'unpriced' | 'final' | 'drawn' | 'dates' | 'list'; 
  *
  * THE NOTES FOLLOW WHAT PRINTS (printColumns). A note is kept while something
  * on the page still needs it — "Not yet priced" while the Credits column or the
- * contract summary prints, final against collected while a response column
- * prints — so the numbering never points at a figure that is not there. Each
+ * contract summary prints, the final count while a response column prints —
+ * so the numbering never points at a figure that is not there. Each
  * summary figure follows its own column, so a note that explains a column
  * covers the summary with it. With the Notes section turned off, `notes` is
  * empty and only the sign-off prints: it is who to call, not a note.
@@ -113,12 +113,15 @@ function idleSentence(u: StatementRow[], also: boolean): string {
 /**
  * Note: the final count — shared by both documents.
  *
- * Its TITLE and its first sentence follow the Collected column, which has been
- * off by default since 2026-09-28. A note headed “Final and collected” that
- * then defines a column the reader cannot find is worse than no note: it tells
- * a client to go looking for a number that is not on the page. What the note
- * must keep either way is the ≈ and the ▼, which are printed in the Final
- * column and explained nowhere else.
+ * This used to branch on the Collected column in four places, choosing between
+ * a version that defined two counts and one that defined one. The column was
+ * removed on 2026-09-29, so there is one version and no branch: a note headed
+ * “Final and collected” that then defines a column the reader cannot find is
+ * worse than no note, because it sends a client looking for a number that is
+ * not on the page.
+ *
+ * What the note keeps is the ≈ and the ▼. Those are printed in the Final
+ * column and explained nowhere else, so they are the reason it exists.
  */
 function finalNote(rows: StatementRow[], neverRecorded: Set<string>, prints: Prints): Note {
   const anyLive = rows.some(p => clientStage(p).group !== 'delivered')
@@ -129,20 +132,13 @@ function finalNote(rows: StatementRow[], neverRecorded: Set<string>, prints: Pri
   const over = ESTIMATE_BANDS.overTargetRatio, under = ESTIMATE_BANDS.underTargetRatio
   return {
     key: 'final',
-    title: prints.collected ? 'Final and collected.' : 'The final count.',
+    title: 'The final count.',
     body: (
       <>
-        The final count is the number of responses delivered after quality review
-        {prints.collected
-          ? <>; the collected count is the number gathered in field before it. Collection usually runs above target
-              because review removes responses that fail its checks.</>
-          : '.'}
-        {anyLive && (prints.collected
-          ? ' A survey in progress shows its collection so far and has no final count until delivery.'
-          // Without the collected column there is no figure at all on those
-          // rows, and a dash the client cannot account for is what makes a
-          // document look incomplete rather than current.
-          : ' A survey still in progress has no final count yet, and its response figures are left blank until it is delivered.')}
+        The final count is the number of responses delivered after quality review.
+        {/* A dash the client cannot account for is what makes a document look
+            incomplete rather than current, so the blank is named. */}
+        {anyLive && ' A survey still in progress has no final count yet, and its response figures are left blank until it is delivered.'}
         {/* The ▼ and the ≈ are printed only in the Final column. */}
         {anyBelow && prints.final && <> <BelowMark inline />{NBSP}marks a final count below target.</>}
         {prints.final && estimates.some(e => e.kind === 'estimate' && e.basis === 'at-or-over-target') && (
@@ -156,13 +152,7 @@ function finalNote(rows: StatementRow[], neverRecorded: Set<string>, prints: Pri
         )}
         {noFinal.length > 0 && (
           <> {listNames(noFinal.map(title))} {noFinal.length === 1 ? 'was' : 'were'} delivered without a final count on
-            record, so {noFinal.length === 1 ? 'it is' : 'they are'} left out of the response totals
-            {/* "are shown" only while the Collected column prints. */}
-            {prints.collected
-              ? <>;{' '}{noFinal.length === 1 && noFinal[0].n_collected != null
-                  ? `its ${n0(noFinal[0].n_collected)} collected responses are shown.`
-                  : 'the collected responses are shown.'}</>
-              : '.'}</>
+            record, so {noFinal.length === 1 ? 'it is' : 'they are'} left out of the response totals.</>
         )}
       </>
     ),
@@ -263,10 +253,10 @@ export function statementNotes({ rows, F, neverRecorded, currentTermId, time, to
   return notes
 }
 
-/** Final and collected are explained while a response column prints. The
- *  summary's final-responses figure, which carries the note's mark, follows the
- *  Final column itself, so there is nothing to explain once both are off. */
-const responsesShown = (p: Prints) => p.final || p.collected
+/** The final count is explained while the Final column prints. The summary's
+ *  final-responses figure, which carries the note's mark, follows that column
+ *  itself, so there is nothing left to explain once it is off. */
+const responsesShown = (p: Prints) => p.final
 
 /** The four list notes. `prints` is what the page prints (everything by default). */
 export function listNotes({ rows, neverRecorded, internalAccounts, time, today, prints = PRINTS_ALL }: {

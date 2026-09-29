@@ -73,7 +73,7 @@ function NCell({ row }: { row: DeliveryInput }) {
     return (
       <div className="shrink-0 text-right leading-tight">
         <div className="text-sm tabular-nums text-muted-foreground">—</div>
-        <div className="text-[11px] text-muted-foreground">nothing collected yet</div>
+        <div className="text-[11px] text-muted-foreground">no responses yet</div>
       </div>
     )
   }

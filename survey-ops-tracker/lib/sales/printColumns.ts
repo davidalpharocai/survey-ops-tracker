@@ -35,7 +35,7 @@
  *
  *   1. The link — `cols=` and `sections=` — so a link reproduces a choice.
  *   2. This person's saved default for THIS document, in this browser.
- *   3. The system default: everything except Collected.
+ *   3. The system default: everything on offer.
  *
  * The saved default is browser storage, not the database, like the accounts
  * table's saved views: it is a personal starting point, and nothing else reads
@@ -50,7 +50,7 @@ import type { DocKind } from './statement'
 
 export type PrintDoc = DocKind
 
-export type PrintColumnId = 'account' | 'requested' | 'status' | 'target' | 'final' | 'collected' | 'credits'
+export type PrintColumnId = 'account' | 'requested' | 'status' | 'target' | 'final' | 'credits'
 export type PrintSectionId = 'contract' | 'activity' | 'notes'
 
 export interface PrintColumnDef {
@@ -95,10 +95,18 @@ export const PRINT_COLUMNS: PrintColumnDef[] = [
     id: 'final', label: 'Final', docs: ['statement', 'list'], response: true,
     help: 'Responses delivered after quality review. Only a delivered survey has one; a survey still in quality review can show an estimate. Untick it and the summary’s final-responses figure goes with it.',
   },
-  {
-    id: 'collected', label: 'Collected', docs: ['statement', 'list'], response: true,
-    help: 'Responses gathered in field, before quality review. Usually above the final count, because review removes responses that fail its checks. OFF by default — the sales screens stopped showing it on 28 September and a document that prints two response counts leaves the reader to pick one. Tick it for a client who wants to see progress on a survey still in field, which otherwise prints no response figure at all.',
-  },
+  // NO 'collected' COLUMN. It was off by default from 2026-09-28 and removed
+  // outright on 2026-09-29 — David: "lets actually remove 'collected' from all
+  // views from now … a client doesnt need to know that and i dont want to risk
+  // a sales person sending it."
+  //
+  // DELETED RATHER THAN DEFAULTED OFF, and rather than made an Admin setting,
+  // which was the other option he offered. A setting does not remove the risk
+  // he named, it relocates the switch and leaves someone able to flip it; the
+  // column is the risk, so the column goes. The pre-QA field count is still
+  // recorded, still on every internal screen, and still drives the estimate a
+  // survey in quality review prints — it simply has no way to reach a client
+  // document any more.
   {
     id: 'credits', label: 'Credits', docs: ['statement', 'list'],
     help: 'The credits each survey draws, “Not yet priced”, or “committed” for a survey priced but not yet in field. The total row adds up the credits drawn, and the summary’s credit figure follows this tick. On a statement the contract summary keeps its own credits-drawn figure until that is unticked too.',
@@ -139,27 +147,28 @@ export interface PrintChoice {
 }
 
 /**
- * What prints when nobody has chosen anything: everything except Collected.
+ * What prints when nobody has chosen anything: everything on offer.
  *
- * ── WHY ONE COLUMN IS OFF AND THE REST ARE ON ───────────────────────────────
- * David, 2026-09-28: “for surveys in sales view … remove “Collected” and only
- * keep the Final (ie Delivered) and Target … i think it’s unnecessary for them
- * to see that, since we show a delivery estimate vs target on the home page
- * too”, and then, asked whether the document should follow the screens:
- * “yes update the PDF too”.
+ * ── WHY THIS IS EMPTY AGAIN ─────────────────────────────────────────────────
+ * It held ['collected'] for one day. David, 2026-09-28: “for surveys in sales
+ * view … remove “Collected” and only keep the Final (ie Delivered) and Target”,
+ * then “yes update the PDF too” — so the column went off by default. On
+ * 2026-09-29 he closed the gap: “lets actually remove ‘collected’ from all
+ * views from now … i dont want to risk a sales person sending it.” A column
+ * that is off by default is still a column a hurried person can tick, so it is
+ * gone from PRINT_COLUMNS entirely and there is nothing left to default off.
  *
- * TURNED OFF RATHER THAN DELETED. A pre-QA field count is still the only
- * honest answer to “how is my survey going” for a client whose survey has not
- * finished — responseCells prints Final as a dash for everything before Data
- * QA — so the column stays available and one tick brings it back. Deleting it
- * would have made that a code change.
+ * Every remaining column is ON, which is the state this list is meant to
+ * describe: a document prints everything it has unless a reader chose
+ * otherwise.
  *
  * THIS IS THE ONE PLACE THE DEFAULT LIVES. resolveChoice falls back to these
- * lists, not to empty ones; before this change it fell back to `[]` and a
- * second, invisible copy of “everything prints” lived there.
+ * lists, not to empty ones. That mattered when the default was non-empty and
+ * it still matters: keeping the fallback pointed here is what stops a second,
+ * invisible copy of “everything prints” growing back inside resolveChoice.
  */
 export const SYSTEM_DEFAULT: PrintChoice = Object.freeze({
-  colsOff: ['collected'],
+  colsOff: [],
   sectionsOff: [],
 }) as PrintChoice
 
@@ -239,7 +248,7 @@ const LEGACY = new Map<string, PrintColumnId[]>([
   ['submitted', []], ['code', []], ['survey', []], ['stage', []], ['deliver', []], ['client', []],
 ])
 /** The columns the retired links could switch. */
-const LEGACY_SWITCHED: PrintColumnId[] = ['requested', 'target', 'final', 'collected', 'credits']
+const LEGACY_SWITCHED: PrintColumnId[] = ['requested', 'target', 'final', 'credits']
 
 const first = (v: string | string[] | null | undefined) => (Array.isArray(v) ? v[0] : v) ?? null
 const tokens = (v: string) => v.split(',').map(t => t.trim().toLowerCase()).filter(Boolean)
@@ -337,7 +346,7 @@ export function choiceSource({ choice, saved, url, touched, doc }: {
 
 export const CHOICE_SOURCE_TEXT: Record<ChoiceSource, string> = {
   saved: 'Using your saved default.',
-  system: 'Using the system default: everything prints except Collected.',
+  system: 'Using the system default: everything prints.',
   link: 'Using the choice in this link.',
   custom: 'Changed for this print only.',
 }
@@ -359,6 +368,16 @@ export const CHOICE_SOURCE_TEXT: Record<ChoiceSource, string> = {
  *
  * The cost is one day of saved preferences: the picker shipped 2026-09-27.
  * Everyone falls back to the system default and can save again.
+ *
+ * ── AND WHY REMOVING THE COLUMN NEEDED NO v3, 2026-09-29 ────────────────────
+ * The ambiguity above ran in the direction that could put Collected BACK on a
+ * client document. Deleting the column runs the other way and closes it: a
+ * stored v2 list naming 'collected' is now an id nothing knows, and
+ * canonicalCols drops unknown ids, so it is ignored. A stored list that does
+ * NOT name it can no longer mean "I want it", because there is nothing to
+ * want. Every v2 value therefore resolves to the same document it would have
+ * resolved to under a fresh key, which is the only thing a version bump would
+ * have bought — so the saved defaults people made this week keep working.
  */
 export const PRINT_CHOICE_KEY: Record<PrintDoc, string> = {
   statement: 'socc-sales-print-statement-v2',
@@ -426,7 +445,6 @@ export interface Prints {
   status: boolean
   target: boolean
   final: boolean
-  collected: boolean
   credits: boolean
   contract: boolean
   activity: boolean
@@ -434,7 +452,7 @@ export interface Prints {
 }
 
 export const PRINTS_ALL: Prints = {
-  account: true, requested: true, status: true, target: true, final: true, collected: true, credits: true,
+  account: true, requested: true, status: true, target: true, final: true, credits: true,
   contract: true, activity: true, notes: true,
 }
 
@@ -448,7 +466,6 @@ export function printsOf(c: PrintChoice, doc: PrintDoc, { internal = false }: { 
     status: col('status'),
     target: col('target'),
     final: col('final'),
-    collected: col('collected'),
     credits: col('credits'),
     contract: sec('contract'),
     activity: sec('activity'),
@@ -501,24 +518,28 @@ export function choiceNotes(
   p: Prints,
   { unexplained = [], noResponseFigure = 0 }: {
     unexplained?: UnexplainedMark[]
-    /** Rows that would print no response figure at all: Final is a dash
-     *  (responseCells gives one to everything before quality review) and
-     *  Collected is off. */
+    /** Rows that print no response figure at all: Final is a dash, which
+     *  responseCells gives to everything before quality review. */
     noResponseFigure?: number
   } = {},
 ): ChoiceNote[] {
   const out: ChoiceNote[] = []
-  // Collected is off by default now, and the client's own surveys in field are
-  // exactly the rows that lose their only figure when it is. Said here rather
-  // than left to be noticed on the printed page, because this panel is the
-  // last screen before the document goes out.
-  if (!p.collected && noResponseFigure > 0 && (p.final || p.target)) {
+  // A statement sent mid-engagement can show a client targets and dashes. That
+  // is a reasonable document and a surprising one, so this panel — the last
+  // screen before it goes out — says the number out loud.
+  //
+  // IT NO LONGER OFFERS A FIX, because there is not one to offer. Until
+  // 2026-09-29 this note ended "Tick Collected to show what they have gathered
+  // in field so far", and that column is gone (see PRINT_COLUMNS). A note that
+  // names an impossible action is worse than one that just states the fact:
+  // the reader hunts the panel for a tick that is not there.
+  if (noResponseFigure > 0 && (p.final || p.target)) {
     const one = noResponseFigure === 1
     out.push({
       id: 'no-response-figure',
       text: `${one ? 'One survey' : `${noResponseFigure} surveys`} print${one ? 's' : ''} no response figure: ${
-        one ? 'it has' : 'they have'} not reached quality review, so there is no final count yet. Tick Collected to show what ${
-        one ? 'it has' : 'they have'} gathered in field so far.`,
+        one ? 'it has' : 'they have'} not reached quality review, so there is no final count yet. ${
+        one ? 'It shows' : 'They show'} a dash.`,
     })
   }
   if (p.final && !p.target) {

@@ -7,7 +7,8 @@ import { SurveyListPrint, type ListRow } from '../SurveyListPrint'
 import { filterByRange, rangeFor } from '@/lib/sales/dateRange'
 import { todayET, type StatementRow } from '@/lib/sales/statement'
 import {
-  PRINT_COLUMNS, PRINT_SECTIONS, PRINTS_ALL, type PrintColumnId, type PrintSectionId, type UrlChoice,
+  parseStoredChoice, parseUrlChoice, PRINT_COLUMNS, PRINT_SECTIONS, PRINTS_ALL, resolveChoice, SYSTEM_DEFAULT,
+  type PrintColumnId, type PrintSectionId, type UrlChoice,
 } from '@/lib/sales/printColumns'
 import { unexplainedMarks } from './Notes'
 import {
@@ -257,29 +258,42 @@ describe('the printed documents', () => {
   }, 300_000)
 })
 
-/** The reduced choices rendered for the print check. */
+/** The reduced choices rendered for the print check.
+ *
+ *  Each of these listed 'collected' until 2026-09-29, when the column was
+ *  removed outright. They are not shorter by accident: the point of rendering
+ *  them is to look at a REDUCED page in Chrome, so each one still turns off
+ *  enough to change the table's shape (the statement keeps both response
+ *  columns and its spanner, the internal list keeps one and loses it). */
 const REDUCED: Record<'statement' | 'list' | 'internal', UrlChoice> = {
-  statement: { colsOff: ['requested', 'collected'], sectionsOff: ['activity'] },
+  statement: { colsOff: ['requested'], sectionsOff: ['activity'] },
   list: { colsOff: ['requested', 'target'], sectionsOff: ['notes'] },
-  internal: { colsOff: ['requested', 'final', 'collected'], sectionsOff: ['activity'] },
+  internal: { colsOff: ['requested', 'final'], sectionsOff: ['activity'] },
 }
 
 describe('what prints (David, 2026-09-27)', () => {
   const all = statement()
   const noTarget = statement({ printChoice: { colsOff: ['target'] } })
 
-  it('prints everything except Collected by default', () => {
+  it('prints everything it has by default, and has nothing called Collected', () => {
     for (const h of [all, quarterList('client')]) {
       for (const head of ['Ref.', 'Survey and audience', 'Requested by', 'Status', 'Responses', 'Target', 'Final', 'Credits']) {
         expect(h).toContain(`>${head}</th>`)
       }
-      // David, 2026-09-28: the document follows the sales screens, which
-      // dropped it the same day. Still tickable — see printColumns.
+      // WAS: "Still tickable — see printColumns." On 2026-09-28 the column was
+      // merely off by default, so this line protected a DEFAULT. David closed
+      // that gap on 2026-09-29 — "lets actually remove 'collected' from all
+      // views from now … i dont want to risk a sales person sending it" — so it
+      // now protects an ABSENCE: no header on the paper, and no tick in the
+      // panel above it either, which is why the check is the bare word.
       expect(h).not.toContain('>Collected</th>')
+      expect(h).not.toContain('Collected')
     }
     expect(all).toContain('aria-label="Notes"')
     expect(all).toContain('>Contract summary')
-    expect(all).toContain('Using the system default: everything prints except Collected.')
+    // WAS "… everything prints except Collected." The exception is gone with
+    // the column: the sentence a salesperson reads has to match the page.
+    expect(all).toContain('Using the system default: everything prints.')
     expect(quarterList('internal')).toContain('>Account</th>')
   })
 
@@ -290,20 +304,33 @@ describe('what prints (David, 2026-09-27)', () => {
     expect(all).not.toContain('shows its collection so far')
   })
 
-  // The cost of the new default, said on the last screen before the document
-  // goes out. Every survey before quality review prints a dash in Final, so a
-  // statement sent mid-engagement can carry nothing but targets, and the tick
-  // that fills those rows in is one line away.
-  it('tells the sender which surveys print no response figure, and offers the tick', () => {
+  // The cost of the choice, said on the last screen before the document goes
+  // out. Every survey before quality review prints a dash in Final, so a
+  // statement sent mid-engagement can carry nothing but targets.
+  //
+  // INVERTED 2026-09-29. This test used to check that the warning ENDED in an
+  // offer — "Tick Collected to show what they have gathered in field so far" —
+  // and that taking the offer silenced it. With the column removed there is no
+  // tick to offer and no choice that fills those rows in, so what it protects
+  // now is the opposite: the disclosure states the count and the dash, names no
+  // action, and cannot be silenced by ticking anything. A note that names an
+  // impossible fix is worse than a bare fact, because the reader hunts the
+  // panel for a tick that is not there.
+  it('tells the sender which surveys print no response figure, and offers no fix that does not exist', () => {
     // The COUNT is what makes this a warning rather than a caption, so match
-    // the counted phrasing. A looser pattern matches the Collected checkbox's
-    // own tooltip, which says the same thing about the column in general.
+    // the counted phrasing rather than the bare sentence.
     const warning = /(One survey|[0-9]+ surveys) prints? no response figure/
     expect(all).toMatch(warning)
-    expect(all).toContain('Tick Collected to show what')
+    expect(all).toContain('They show a dash.')
+    expect(all).not.toContain('Tick Collected')
     expect(all).toContain('Note, does not stop printing:')
-    // Gone once Collected is on: those rows now carry a figure.
-    expect(statement({ printChoice: { colsOff: [] } })).not.toMatch(warning)
+    // Turning nothing off IS the system default, so the warning is the same one
+    // — there is no longer a second response column for it to point at.
+    expect(statement({ printChoice: { colsOff: [] } })).toMatch(warning)
+    // The only thing that silences it is printing no response column at all,
+    // which is choiceNotes' own condition: with Target and Final both off the
+    // page states no responses, so there is nothing left to disclose.
+    expect(statement({ printChoice: { colsOff: ['target', 'final'] } })).not.toMatch(warning)
   })
 
   it('warns when Final prints without Target, without adding an item to check', () => {
@@ -318,14 +345,25 @@ describe('what prints (David, 2026-09-27)', () => {
 
   it('leaves out a column, its header and its total together', () => {
     expect(noTarget).not.toContain('>Target</th>')
-    expect(noTarget).toMatch(/colspan="2" scope="colgroup" class="st-span">Responses/i)
+    // WAS: /colspan="2" scope="colgroup" class="st-span">Responses/ — with
+    // Target off, Final and Collected were the two response columns left, so
+    // the spanner still had two to cover. Collected was removed on 2026-09-29
+    // and Final is now alone under Responses, so it heads itself (the spanner
+    // rule is pinned by the next test). What this test is for is unchanged:
+    // the header and the total leave with the column.
+    expect(noTarget).toContain('>Final</th>')
+    expect(noTarget).not.toContain('scope="colgroup"')
     expect(noTarget).not.toContain('Target and Final: the')
+    // The subtotal note names only the column that is printing.
+    expect(noTarget).toContain('Final: the')
   })
 
   it('drops the Responses spanner once one response column is left to cover', () => {
     // Measured in Chrome: "Responses" is wider than any one response column,
     // and a header that does not fit pushed the table past the paper.
-    const h = statement({ printChoice: { colsOff: ['final', 'collected'] } })
+    // Since 2026-09-29 there are two response columns, not three, so unticking
+    // ONE of them reaches this case; it used to take two.
+    const h = statement({ printChoice: { colsOff: ['final'] } })
     expect(h).toContain('>Target</th>')
     // No spanner, so no second header row: the one column heads itself.
     expect(h).not.toContain('scope="colgroup"')
@@ -369,14 +407,31 @@ describe('what prints (David, 2026-09-27)', () => {
     const h = statement({ printChoice: { colsOff: ['credits'], sectionsOff: ['contract'] } })
     expect(h).not.toContain('Not yet priced.')
     expect(h).not.toContain('When credits are drawn.')
-    expect(h).toContain('<i>1</i><b>Final and collected.</b>')
+    // WAS '<i>1</i><b>Final and collected.</b>'. The note branched on the
+    // Collected column and headed itself after whichever counts it was
+    // defining; with the column removed on 2026-09-29 there is one version and
+    // one title. The renumbering is what this test protects, and it still is:
+    // note 1 is whatever is left once the credit notes drop out.
+    expect(h).toContain('<i>1</i><b>The final count.</b>')
   })
 
-  it('keeps an old export link working', () => {
-    // The account page's retired ids: collected meant Final and Collected.
-    const h = statement({ printChoice: { colsOff: ['target'], legacy: true } })
+  // WAS 'keeps an old export link working', asserting that a legacy choice
+  // printed BOTH '>Final</th>' and '>Collected</th>' — the retired `collected`
+  // token mapped to both columns until 2026-09-28. INVERTED 2026-09-29: the
+  // token still has to be honoured, because the old single "Collected" column
+  // showed the FINAL count once a survey was delivered and a bookmarked export
+  // must keep printing what it printed. Honouring the literal WORD is the one
+  // route that could put the removed column back on a client document, so this
+  // now builds the choice from the retired token itself rather than typing the
+  // result by hand, and pins both halves.
+  it('keeps an old export link working without reviving the column it names', () => {
+    const choice = parseUrlChoice('statement', 'collected,credits', null)
+    expect(choice).toEqual({ colsOff: ['requested', 'target'], legacy: true })
+    const h = statement({ printChoice: choice })
     expect(h).toContain('>Final</th>')
-    expect(h).toContain('>Collected</th>')
+    expect(h).toContain('>Credits</th>')
+    expect(h).not.toContain('>Target</th>')
+    expect(h).not.toContain('Collected')
   })
 
   it('never carries a dollar figure, whatever is ticked', () => {
@@ -396,8 +451,10 @@ describe('what prints (David, 2026-09-27)', () => {
   })
 })
 
-/** Every optional part of a statement, for the "nothing prints" case. */
-const ALL_COLS_ST: PrintColumnId[] = ['requested', 'status', 'target', 'final', 'collected', 'credits']
+/** Every optional part of a statement, for the "nothing prints" case.
+ *  Five columns since 2026-09-29, not six: Collected is not an optional part,
+ *  it is not a part. */
+const ALL_COLS_ST: PrintColumnId[] = ['requested', 'status', 'target', 'final', 'credits']
 const ALL_SECTIONS_ST: PrintSectionId[] = ['contract', 'activity', 'notes']
 
 /**
@@ -411,7 +468,9 @@ describe('a figure follows its own column, summary included', () => {
     for (const h of [
       statement({ printChoice: { colsOff: ['target'] } }),
       quarterList('client', { colsOff: ['target'] }),
-      statement({ printChoice: { colsOff: ['target', 'final', 'collected'] } }),
+      // Every response column off — which is two of them, not three, since
+      // 2026-09-29.
+      statement({ printChoice: { colsOff: ['target', 'final'] } }),
     ]) {
       expect(h).not.toContain('targeted')
       expect(h).not.toContain('104%')
@@ -524,5 +583,95 @@ describe('nothing quotes a figure the chosen document leaves out', () => {
     expect(noStatus).toContain('will say “at least 410”')
     expect(noStatus).not.toContain('The statement prints those dates')
     expect(statement()).toContain('The statement prints those dates')
+  })
+})
+
+/**
+ * ── THE COLUMN CANNOT COME BACK (2026-09-29) ───────────────────────────────
+ *
+ * David did not ask for a safer default; he asked for the risk to be gone:
+ * "lets actually remove 'collected' from all views from now … a client doesnt
+ * need to know that and i dont want to risk a sales person sending it."
+ * Off-by-default leaves a tick, and a tick gets ticked — by a salesperson in a
+ * hurry, by a link somebody forwards, or by a default saved on the one day the
+ * column existed and defaulted on.
+ *
+ * So these are not "Collected is off" tests. Each one walks a route by which a
+ * choice reaches a FINISHED DOCUMENT — the link, a saved default, a retired
+ * link, a choice forced in by hand — and shows the rendered page does not carry
+ * the word at all. A document is the right place to make that check: it is the
+ * artefact that leaves the building.
+ *
+ * THE WORD IS CHECKED CAPITALISED. Lowercase "collected" is still correct
+ * English about the pre-QA field count, and the screen-only checklist above the
+ * paper still uses it ("has a final count of 7 entered while it is still in
+ * field (22 collected)") — an internal instruction to fix a record, in a box
+ * marked Not printed, and the reason the count is still kept at all.
+ * "Collected" capitalised is the column head, the tick and the note title, and
+ * none of those may exist anywhere in the markup.
+ */
+describe('Collected cannot come back', () => {
+  /** What usePrintChoice's mount effect computes from a value in this browser's
+   *  storage — the saved-default route, end to end. */
+  const fromSaved = (raw: string): UrlChoice => resolveChoice({}, parseStoredChoice(raw, 'statement'))
+
+  /** All three documents under one choice. */
+  const docsFor = (c?: UrlChoice) => ({
+    statement: statement({ printChoice: c }),
+    list: quarterList('client', c),
+    internal: quarterList('internal', c),
+  })
+
+  it('is not on offer, and is on no document, when nobody has chosen anything', () => {
+    // The definition list is the source of every tick, every `cols=` token that
+    // is honoured, and the ledger's own column order. Nothing names it, so
+    // there is nothing to turn on.
+    expect(PRINT_COLUMNS.map(c => c.id)).not.toContain('collected')
+    // WAS ['collected'] for one day (2026-09-28), when the column existed and
+    // was defaulted off. Empty again is the whole point: there is nothing left
+    // to default off, so the deletion is not a setting anyone can argue with.
+    expect(SYSTEM_DEFAULT.colsOff).toEqual([])
+    for (const [where, h] of Object.entries(docsFor())) {
+      expect(h, where).not.toContain('Collected')
+      // Not passing because the page came out empty: it is a full document.
+      expect(h, where).toContain('>Final</th>')
+      expect(h, where).toContain('>Credits</th>')
+    }
+  })
+
+  it('ignores a link that names it, in either direction', () => {
+    // "cols=-collected" asks for it OFF and a link that simply leaves it out
+    // asks for it ON. Neither has anything to act on: "-collected" is not a
+    // known id, so it is dropped rather than turning some other column off.
+    const off = parseUrlChoice('statement', '-collected', null)
+    const on = parseUrlChoice('statement', '-requested', null)
+    expect(off).toEqual({ colsOff: [] })
+    expect(statement({ printChoice: off })).toBe(statement())
+    expect(on.colsOff).toEqual(['requested'])
+    for (const h of [statement({ printChoice: off }), statement({ printChoice: on })]) {
+      expect(h).not.toContain('Collected')
+    }
+  })
+
+  it('ignores a default saved while the column still existed', () => {
+    // A stored choice is a list of what is OFF, so the DANGEROUS value is the
+    // one that does not name Collected: under the old model that meant "print
+    // it", and it is what every v1 value looked like. Both shapes now resolve
+    // to the same page, which is what makes the storage key's version bump a
+    // belt rather than the only thing holding the column back.
+    const naming = fromSaved(JSON.stringify({ colsOff: ['collected'], sectionsOff: [] }))
+    const silent = fromSaved(JSON.stringify({ colsOff: [], sectionsOff: [] }))
+    expect(naming).toEqual(silent)
+    expect(statement({ printChoice: naming })).toBe(statement({ printChoice: silent }))
+    for (const c of [naming, silent]) expect(statement({ printChoice: c })).not.toContain('Collected')
+  })
+
+  it('cannot be forced in by hand, on any of the three documents', () => {
+    // The last route: a choice that names the id outright, as a stale caller or
+    // a regression in the pipeline would produce. It changes nothing, because
+    // there is no column definition for the documents to draw.
+    const forced = { colsOff: ['collected'] as unknown as PrintColumnId[], sectionsOff: [] as PrintSectionId[] }
+    expect(statement({ printChoice: forced })).toBe(statement())
+    for (const [where, h] of Object.entries(docsFor(forced))) expect(h, where).not.toContain('Collected')
   })
 })
