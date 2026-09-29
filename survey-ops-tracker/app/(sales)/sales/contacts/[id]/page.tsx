@@ -56,6 +56,35 @@ export default async function SalesContactPage({ params }: { params: Promise<{ i
   ])
 
   const rows = projects ?? []
+
+  /* Freshness (migration 111), so this table can tell a count that was never
+     recorded from a zero somebody measured — the same distinction the surveys
+     list draws, and the reason finalCell has a 'none' reading at all.
+
+     A SEPARATE query that is allowed to fail: 111 is applied by hand and the
+     generated types lag it, and PostgREST rejects the whole select when one
+     named column does not exist. `seen` staying empty on a failed read would
+     mark EVERY row "never recorded", which is a claim about the data rather
+     than about our access — so a failure leaves `fresh` null and every row
+     keeps `undefined`, which finalCell reads as "say nothing". */
+  const ids = rows.map(r => r.id)
+  const freshRes = ids.length
+    ? await (supabase as unknown as {
+        from: (t: string) => {
+          select: (c: string) => {
+            in: (col: string, v: string[]) => Promise<{
+              data: { project_id: string; last_updated: string }[] | null; error: unknown
+            }>
+          }
+        }
+      }).from('sales_n_collected_freshness').select('project_id, last_updated').in('project_id', ids)
+    : { data: [], error: null }
+  // The real timestamp, not a sentinel: the field means "when it was last
+  // changed", and a row that has one should carry it.
+  const fresh = freshRes.error
+    ? null
+    : new Map((freshRes.data ?? []).map(f => [f.project_id, f.last_updated]))
+
   const b = countBuckets(rows)
   const name = [contact.first_name, contact.last_name].filter(Boolean).join(' ') || 'Unnamed contact'
 
@@ -168,7 +197,12 @@ export default async function SalesContactPage({ params }: { params: Promise<{ i
                       separator either. */}
                   <td className="px-3 py-2 text-right tabular-nums">
                     {(() => {
-                      const f = finalCell(p)
+                      const f = finalCell({
+                        ...p,
+                        // null = the read succeeded and there is no audit row
+                        // (never recorded); undefined = we could not tell.
+                        n_collected_updated_at: fresh ? (fresh.get(p.id) ?? null) : undefined,
+                      })
                       if (f.value == null) {
                         return <span className="text-muted-foreground/40" title={f.note}>—</span>
                       }
