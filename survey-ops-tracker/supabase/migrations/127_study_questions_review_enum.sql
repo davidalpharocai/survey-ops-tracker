@@ -1,0 +1,26 @@
+-- 127: the board column value for Study Questions Review, 2026-09-29.
+--
+-- RUN THIS FILE ON ITS OWN, AND BEFORE 128. That is not a style preference —
+-- Postgres will not let a newly added enum value be USED in the same
+-- transaction that adds it, and 128 both backfills board_column and changes the
+-- table default to this value. 033 got away with adding four values in a file
+-- that also created tables only because nothing in that file referenced them.
+--
+-- WHY THE STAGE EXISTS. David, 2026-09-29: "the idea is that the survey was
+-- submitted to us but we're still going back and forth with the client on the
+-- survey questions draft ... only once the survey questions are approved do i
+-- consider it submitted."
+--
+-- Today that period is invisible. A study sits in Submitted from the moment it
+-- arrives, so "Submitted" currently means two different things — we have it,
+-- and we have agreed what it asks — and every cycle time measured from it
+-- includes however many weeks of questionnaire drafting happened to precede the
+-- work. That is the number this separates.
+--
+-- WHY NOT REUSE SCOPING'S "Awaiting Approval". They are different approvals by
+-- different people about different things. Awaiting Approval is commercial: is
+-- the client buying this. Study Questions Review is the instrument: is this the
+-- right questionnaire. A study can clear the first and sit in the second for
+-- weeks, and collapsing them would make "approved" mean neither precisely.
+
+alter type public.board_column add value if not exists 'Study Questions Review';

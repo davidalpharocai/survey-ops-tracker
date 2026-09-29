@@ -10,8 +10,9 @@ import {
 /**
  * THE INVARIANT THESE TWO FUNCTIONS EXIST TO SATISFY, and did not.
  *
- * `getCheckboxesForColumn(X)` answers "what should the six stage flags be for a
- * project sitting in column X". `deriveCurrentStage(flags)` answers "which
+ * `getCheckboxesForColumn(X)` answers "what should the stage flags be for a
+ * project sitting in column X" (six of them until migration 128 added
+ * stage_questions_approved, seven since). `deriveCurrentStage(flags)` answers "which
  * column do these flags mean". They are inverses, so composing them must be the
  * identity — and it was not, for six of the seven columns.
  *
@@ -46,10 +47,13 @@ describe('getCheckboxesForColumn / deriveCurrentStage are inverses', () => {
   })
 
   it('agrees with the delivered convention used by stageColumnsFor', () => {
-    // writes.ts's markDelivered branch sets all six true, and
-    // deriveCurrentStage reads all-true as Delivery. getCheckboxesForColumn
-    // must not disagree with its own sibling about what Delivery looks like.
+    // writes.ts's markDelivered branch and deriveCurrentStage must not
+    // disagree about what Delivery looks like. That branch no longer keeps its
+    // own list of flags — it calls getCheckboxesForColumn — precisely because a
+    // hand-written list could not gain migration 128's seventh flag, and a
+    // delivered study missing it would derive as Study Questions Review.
     const allTrue: StageFields = {
+      stage_questions_approved: true,
       stage_doc_programming: true,
       stage_survey_programming: true,
       stage_edwin_qa: true,
@@ -61,8 +65,15 @@ describe('getCheckboxesForColumn / deriveCurrentStage are inverses', () => {
     expect(getCheckboxesForColumn('Delivery')).toEqual(allTrue)
   })
 
-  it('Submitted means nothing has been reached yet', () => {
+  // RENAMED WITH THE MEANING IT NOW HAS. Submitted used to be the floor of the
+  // ladder, so it meant "nothing reached". Since migration 128 it sits one rung
+  // up and means something specific and new: the client has approved the
+  // questionnaire and no operational work has started. The distinction is the
+  // entire point of the stage — it is what separates weeks of questionnaire
+  // drafting from the cycle time of the work.
+  it('Submitted means the questions are approved and nothing else has started', () => {
     expect(getCheckboxesForColumn('Submitted')).toEqual({
+      stage_questions_approved: true,
       stage_doc_programming: false,
       stage_survey_programming: false,
       stage_edwin_qa: false,
@@ -77,6 +88,7 @@ describe('getCheckboxesForColumn / deriveCurrentStage are inverses', () => {
   it.each(STAGE_ORDER)('%s has no gaps in the flags it sets', (column: BoardColumn) => {
     const f = getCheckboxesForColumn(column)
     const seq = [
+      f.stage_questions_approved,
       f.stage_doc_programming,
       f.stage_survey_programming,
       f.stage_edwin_qa,
@@ -86,5 +98,49 @@ describe('getCheckboxesForColumn / deriveCurrentStage are inverses', () => {
     ]
     const firstFalse = seq.indexOf(false)
     if (firstFalse !== -1) expect(seq.slice(firstFalse).every(v => v === false)).toBe(true)
+  })
+})
+
+/**
+ * THE DEPLOY-BEFORE-MIGRATION CASE, which is not hypothetical here: migrations
+ * are applied by hand in the Supabase SQL editor, so there is always a window
+ * where this code is live and the column is not. ~117 read sites name their
+ * columns explicitly, so in that window every project arrives with
+ * stage_questions_approved undefined.
+ *
+ * If undefined were read as "not approved", the ladder's new floor would catch
+ * every project in the database at once and the entire board would fall back a
+ * column on deploy — roughly 400 studies, including delivered ones, reading as
+ * though their questionnaire were still in draft.
+ */
+describe('a database that has not run migration 128 yet', () => {
+  const legacy = {
+    stage_doc_programming: true,
+    stage_survey_programming: true,
+    stage_edwin_qa: false,
+    stage_fielding: false,
+    stage_data_qa: false,
+    stage_delivery: false,
+  } as StageFields
+
+  it('derives exactly what it derived before the stage existed', () => {
+    expect(legacy.stage_questions_approved).toBeUndefined()
+    expect(deriveCurrentStage(legacy)).toBe('Survey Programming')
+  })
+
+  it('reads a delivered study as Delivered, not as questions-in-draft', () => {
+    const delivered = {
+      stage_doc_programming: true, stage_survey_programming: true, stage_edwin_qa: true,
+      stage_fielding: true, stage_data_qa: true, stage_delivery: true,
+    } as StageFields
+    expect(deriveCurrentStage(delivered)).toBe('Delivery')
+  })
+
+  // The other half of the same coin: an EXPLICIT false is the only thing that
+  // opens the new rung, and nothing can produce one until the column is real.
+  it('opens the new stage only on an explicit false', () => {
+    expect(deriveCurrentStage({ ...legacy, stage_questions_approved: false })).toBe('Study Questions Review')
+    expect(deriveCurrentStage({ ...legacy, stage_questions_approved: null })).toBe('Survey Programming')
+    expect(deriveCurrentStage({ ...legacy, stage_questions_approved: true })).toBe('Survey Programming')
   })
 })

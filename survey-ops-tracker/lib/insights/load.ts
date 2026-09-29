@@ -40,6 +40,10 @@ export const INSIGHTS_PROJECT_COLUMNS = [
   'board_column',
   'project_type',
   'submitted_date',
+  // REQUIRES MIGRATION 128. PostgREST rejects an entire select that names a
+  // column the database has not got, so this line is why this change must not
+  // be deployed ahead of the SQL: Insights would not degrade, it would go dark.
+  'greenlit_at',
   'launch_date',
   'due_date',
   'deliver_date',
@@ -87,6 +91,8 @@ export interface InsightsProject {
   board_column: string | null
   project_type: string | null
   submitted_date: string | null
+  /** Null for every study that predates migration 128 — see cycleStartOf. */
+  greenlit_at?: string | null
   launch_date: string | null
   due_date: string | null
   deliver_date: string | null

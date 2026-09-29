@@ -7,6 +7,7 @@
 import { addMonths, format, parseISO } from 'date-fns'
 import type { Tables } from '@/lib/supabase/types'
 import { baseRerunName, nextRerunName } from '../utils/rerun'
+import { getCheckboxesForColumn } from '../utils/stage'
 
 // ---------------------------------------------------------------------------
 // Date-only helpers (dates are "YYYY-MM-DD" strings throughout this module).
@@ -231,12 +232,12 @@ export function nextWaveInherit(
     board_column: 'Submitted',
     status: 'Open',
     phase: 'Active',
-    stage_doc_programming: false,
-    stage_survey_programming: false,
-    stage_edwin_qa: false,
-    stage_fielding: false,
-    stage_data_qa: false,
-    stage_delivery: false,
+    // A repeat wave re-runs an agreed questionnaire, so it starts past the
+    // Study Questions Review gate. Via the one function that defines the flags:
+    // this list was six literal falses, and a seventh flag it could not know
+    // about would have left every spawned wave with board_column 'Submitted'
+    // and flags deriving as Study Questions Review.
+    ...getCheckboxesForColumn('Submitted'),
     rerun_date: nextRerunDate(series, prevWave, todayISO),
     due_date: advanceOptional(prevWave.due_date, series.cadence_months),
     deliver_date: advanceOptional(prevWave.deliver_date, series.cadence_months),

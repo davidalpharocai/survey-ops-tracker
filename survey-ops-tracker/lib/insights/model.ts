@@ -73,10 +73,16 @@ export interface InsightsItem {
   /** A repeat wave (lib/reruns/isRerun.ts): in a rerun series, a later wave,
    *  or the older Rerun type. */
   rerun: boolean
-  /** Calendar days from submitted to delivered; null when a date is missing or
-   *  the dates run backwards (a data error, counted separately). */
+  /** Calendar days from the cycle start (see cycleStartOf) to delivered; null
+   *  when a date is missing or the dates run backwards (a data error, counted
+   *  separately). */
   cycleDays: number | null
   cycleBackwards: boolean
+  /** True when cycleDays was measured from greenlit_at — the post-2026-09-29
+   *  definition — rather than from submitted_date. False for every study that
+   *  predates the Study Questions Review stage, so a chart can say which months
+   *  mix the two definitions instead of averaging across the changeover. */
+  cycleFromGreenlit: boolean
   /** Delivered on or before the due date. null when either date is missing. */
   onTime: boolean | null
   /** Only for a survey with NO deliver date: its due date, else its launch
@@ -92,6 +98,30 @@ export const typeHelp = (k: string) => (TYPE_HELP as Record<string, string>)[k] 
 
 /** Classify every survey once. Empty placeholders and internal projects are
  *  dropped here, and counted, so the page can say what it left out. */
+/**
+ * Where a study's cycle time starts.
+ *
+ * Until 2026-09-29 this was submitted_date, which meant "the day it reached
+ * us" — and therefore included however many weeks the questionnaire spent going
+ * back and forth with the client before anyone here could start. Migration 128
+ * separates those: greenlit_at is the day the client approved the questions,
+ * which is the day the work can actually begin.
+ *
+ * THE FALLBACK IS NOT A CONVENIENCE, IT IS THE HISTORY. greenlit_at is
+ * deliberately not backfilled, because for work that predates the stage we know
+ * when a study arrived and genuinely do not know when its questions were
+ * settled. Falling back to submitted_date means every number computed before
+ * today is identical to the number it was — nothing restates itself overnight.
+ *
+ * The cost of that is real and worth naming: a trend that spans the changeover
+ * is comparing two definitions, and the newer one is measuring a strictly
+ * shorter interval. So the item carries `cycleFromGreenlit`, which lets a chart
+ * say which months are mixed rather than quietly averaging them together.
+ */
+export function cycleStartOf(p: InsightsProject): string | null {
+  return p.greenlit_at ?? p.submitted_date ?? null
+}
+
 export function itemsOf(
   projects: InsightsProject[],
   rowCounts: Map<string, FieldRowCounts> | null,
@@ -103,8 +133,9 @@ export function itemsOf(
     const cls = classify(p, rowCounts?.get(p.id) ?? NO_ROWS)
     if (cls === 'placeholder') { placeholders++; continue }
     let cycleDays: number | null = null, cycleBackwards = false
-    if (p.submitted_date && p.deliver_date) {
-      const d = daysBetween(p.submitted_date, p.deliver_date)
+    const cycleStart = cycleStartOf(p)
+    if (cycleStart && p.deliver_date) {
+      const d = daysBetween(cycleStart, p.deliver_date)
       if (d < 0) cycleBackwards = true
       else cycleDays = d
     }
@@ -118,6 +149,7 @@ export function itemsOf(
       rerun: isRerunProject(p),
       cycleDays,
       cycleBackwards,
+      cycleFromGreenlit: cycleDays != null && p.greenlit_at != null,
       onTime: p.deliver_date && p.due_date ? p.deliver_date <= p.due_date : null,
       likely: p.deliver_date ? null : p.due_date ?? p.launch_date ?? p.submitted_date ?? null,
     })

@@ -259,7 +259,14 @@ export const isDelivered = (r: Pick<CleanupRow, 'board_column'>): boolean => r.b
  * generous is how a dashboard quietly stops reporting real gaps.
  */
 export function isScoping(r: Pick<CleanupRow, 'phase' | 'status' | 'board_column'>): boolean {
-  return r.phase === 'Scoping' && r.status === 'Open' && stageIndex(r) <= 0
+  // `!reached(r, 'Doc Programming')` rather than the `stageIndex(r) <= 0` this
+  // used to say. Both mean "no operational work has started", but the old form
+  // spelled it as a position — index 0 — and migration 127 put Study Questions
+  // Review in front of Submitted, so index 0 silently stopped meaning what the
+  // line was written to mean and every Scoping deal sitting at Submitted lost
+  // its excuse. Naming the stage cannot drift when the ladder grows a rung;
+  // `reached` a few lines up was already written that way and needed no edit.
+  return r.phase === 'Scoping' && r.status === 'Open' && !reached(r, 'Doc Programming')
 }
 
 /** The survey tool IDs on one row. `survey_tool_id` is a COMMA-SEPARATED LIST,

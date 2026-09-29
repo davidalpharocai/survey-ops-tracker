@@ -11,8 +11,9 @@ const noStages = {
 }
 
 describe('STAGE_ORDER', () => {
-  it('has 7 stages in correct order', () => {
+  it('has 8 stages in correct order', () => {
     expect(STAGE_ORDER).toEqual([
+      'Study Questions Review',
       'Submitted', 'Doc Programming', 'Survey Programming',
       'EdWin QA', 'Fielding', 'Data QA', 'Delivery',
     ])
@@ -113,8 +114,11 @@ describe('getCheckboxesForColumn', () => {
     expect(r.stage_data_qa).toBe(false)
     expect(r.stage_delivery).toBe(false)
   })
-  it('checks all six for Delivery, matching stageColumnsFor(markDelivered)', () => {
+  it('checks every flag for Delivery, matching stageColumnsFor(markDelivered)', () => {
     const r = getCheckboxesForColumn('Delivery')
+    // Migration 128's flag included: a delivered study whose questions flag was
+    // left false would derive as Study Questions Review.
+    expect(r.stage_questions_approved).toBe(true)
     expect(r.stage_doc_programming).toBe(true)
     expect(r.stage_survey_programming).toBe(true)
     expect(r.stage_edwin_qa).toBe(true)

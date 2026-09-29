@@ -206,6 +206,7 @@ export type Database = {
           status: Database['public']['Enums']['project_status']
           scoping_stage: Database['public']['Enums']['scoping_stage'] | null
           submitted_date: string | null
+          greenlit_at: string | null
           launch_date: string | null
           due_date: string | null
           deliver_date: string | null
@@ -221,6 +222,7 @@ export type Database = {
           occam: boolean
           cancel_reason: string | null
           cancelled_at: string | null
+          stage_questions_approved: boolean
           stage_doc_programming: boolean
           stage_survey_programming: boolean
           stage_edwin_qa: boolean
@@ -300,6 +302,7 @@ export type Database = {
           status?: Database['public']['Enums']['project_status']
           scoping_stage?: Database['public']['Enums']['scoping_stage'] | null
           submitted_date?: string | null
+          greenlit_at?: string | null
           launch_date?: string | null
           due_date?: string | null
           deliver_date?: string | null
@@ -315,6 +318,7 @@ export type Database = {
           cancel_reason?: string | null
           cancelled_at?: string | null
           terminations?: boolean
+          stage_questions_approved?: boolean
           stage_doc_programming?: boolean
           stage_survey_programming?: boolean
           stage_edwin_qa?: boolean
@@ -386,6 +390,7 @@ export type Database = {
           status?: Database['public']['Enums']['project_status']
           scoping_stage?: Database['public']['Enums']['scoping_stage'] | null
           submitted_date?: string | null
+          greenlit_at?: string | null
           launch_date?: string | null
           due_date?: string | null
           deliver_date?: string | null
@@ -401,6 +406,7 @@ export type Database = {
           cancel_reason?: string | null
           cancelled_at?: string | null
           terminations?: boolean
+          stage_questions_approved?: boolean
           stage_doc_programming?: boolean
           stage_survey_programming?: boolean
           stage_edwin_qa?: boolean
@@ -2416,6 +2422,7 @@ export type Database = {
       project_status: 'Open' | 'Closed' | 'Hold' | 'Cancelled'
       project_phase: 'Scoping' | 'Active'
       board_column:
+        | 'Study Questions Review'
         | 'Submitted'
         | 'Doc Programming'
         | 'Survey Programming'

@@ -1,4 +1,5 @@
 export type BoardColumn =
+  | 'Study Questions Review'
   | 'Submitted'
   | 'Doc Programming'
   | 'Survey Programming'
@@ -8,6 +9,7 @@ export type BoardColumn =
   | 'Delivery'
 
 export const STAGE_ORDER: BoardColumn[] = [
+  'Study Questions Review',
   'Submitted',
   'Doc Programming',
   'Survey Programming',
@@ -20,7 +22,8 @@ export const STAGE_ORDER: BoardColumn[] = [
 /** One-line hover descriptions for pipeline and scoping stages (used for title= tooltips). */
 export const STAGE_DESCRIPTIONS: Record<string, string> = {
   // Pipeline stages
-  'Submitted': 'Accepted into operations — work not started yet.',
+  'Study Questions Review': 'The questionnaire is still going back and forth with the client. Approving it greenlights the study.',
+  'Submitted': 'Questions approved and accepted into operations — work not started yet.',
   'Doc Programming': 'The questionnaire document is being programmed.',
   'Survey Programming': 'The survey is being built in the survey tool.',
   'EdWin QA': 'Internal QA pass in Edwin before fielding.',
@@ -31,7 +34,7 @@ export const STAGE_DESCRIPTIONS: Record<string, string> = {
   'New Inquiry': 'New pre-sale inquiry — scoping just started.',
   'Proposal Sent': 'A proposal has been sent to the client.',
   'Pricing Discussion': 'Pricing is being discussed with the client.',
-  'Awaiting Approval': 'Waiting on client approval — approval moves the project into operations at Submitted.',
+  'Awaiting Approval': 'Waiting on the client to approve the work commercially — approval moves the project into operations at Study Questions Review, where the questionnaire itself is agreed.',
 }
 
 /** User-facing label for a board column. The final stage reads as "Delivered"
@@ -41,6 +44,20 @@ export function stageLabel(column: string): string {
 }
 
 export type StageFields = {
+  /**
+   * OPTIONAL ON PURPOSE, and read with an explicit `=== false` below.
+   *
+   * Migrations are hand-applied here, so this column does not exist until David
+   * runs 128, and ~117 read sites name their columns explicitly. A project read
+   * before that lands arrives with this undefined — and undefined must mean
+   * "past the gate", because the alternative is every one of them derives as
+   * Study Questions Review and the entire board falls back a column on deploy.
+   *
+   * So: absent behaves exactly as this file behaved yesterday. Only an explicit
+   * false — which nothing can produce until the column is really there — opens
+   * the new rung.
+   */
+  stage_questions_approved?: boolean | null
   stage_doc_programming: boolean
   stage_survey_programming: boolean
   stage_edwin_qa: boolean
@@ -50,6 +67,9 @@ export type StageFields = {
 }
 
 export function deriveCurrentStage(fields: StageFields): BoardColumn {
+  // `=== false`, never `!`. See the note on StageFields.stage_questions_approved:
+  // undefined is "this database has not got the column yet", not "not approved".
+  if (fields.stage_questions_approved === false) return 'Study Questions Review'
   if (!fields.stage_doc_programming) return 'Submitted'
   if (!fields.stage_survey_programming) return 'Doc Programming'
   if (!fields.stage_edwin_qa) return 'Survey Programming'
@@ -83,20 +103,23 @@ export function deriveCurrentStage(fields: StageFields): BoardColumn {
  * the connector's advance_project — all three route through here.
  *
  * `stage_delivery` was hardcoded false, which also contradicted
- * stageColumnsFor's markDelivered branch (writes.ts), where all six true IS
- * Delivery. Now consistent. Note this does NOT let a board drag deliver
+ * stageColumnsFor's markDelivered branch (writes.ts), where every flag true IS
+ * Delivery. Now consistent — and that branch no longer keeps its own list of
+ * flags at all, it calls this function, so migration 128's seventh flag could
+ * not be forgotten there. Note this does NOT let a board drag deliver
  * something silently: the Delivery column is retired from the board (folded into
  * Data QA) and the drop handler runs complianceGate with
  * willMarkDelivered anyway.
  */
-export function getCheckboxesForColumn(column: BoardColumn): StageFields {
+export function getCheckboxesForColumn(column: BoardColumn): StageFields & { stage_questions_approved: boolean } {
   const idx = STAGE_ORDER.indexOf(column)
   return {
-    stage_doc_programming: idx >= 1,
-    stage_survey_programming: idx >= 2,
-    stage_edwin_qa: idx >= 3,
-    stage_fielding: idx >= 4,
-    stage_data_qa: idx >= 5,
-    stage_delivery: idx >= 6,
+    stage_questions_approved: idx >= 1,
+    stage_doc_programming: idx >= 2,
+    stage_survey_programming: idx >= 3,
+    stage_edwin_qa: idx >= 4,
+    stage_fielding: idx >= 5,
+    stage_data_qa: idx >= 6,
+    stage_delivery: idx >= 7,
   }
 }

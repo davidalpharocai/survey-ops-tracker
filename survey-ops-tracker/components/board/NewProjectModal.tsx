@@ -105,7 +105,11 @@ export function NewProjectModal({ teamMembers, initialClient, onClose }: NewProj
       captain_id: captainId || null,
       salesperson: salesperson.trim() || null,
       ...(skipScoping
-        ? { phase: 'Active' as const, board_column: 'Submitted' as const, submitted_date: today }
+        // David, 2026-09-29: "only once the survey questions are approved do i
+        // consider it submitted." So new work lands AT the questions gate.
+        // submitted_date is still today — that field keeps its old meaning,
+        // the day the study reached us, which is why it was not redefined.
+        ? { phase: 'Active' as const, board_column: 'Study Questions Review' as const, submitted_date: today }
         : { phase: 'Scoping' as const, scoping_stage: 'New Inquiry' as const }),
     }
     try {

@@ -16,7 +16,7 @@ import { RESTRICTED_FIELDS } from '@/lib/utils/quickFields'
 export const ENUMS: Record<string, string[]> = {
   project_type: ['PS', 'B2B', 'Rerun'],
   status: ['Open', 'Archived', 'Closed', 'Hold'],
-  board_column: ['Submitted', 'Doc Programming', 'Survey Programming', 'EdWin QA', 'Fielding', 'Data QA', 'Delivery'],
+  board_column: ['Study Questions Review', 'Submitted', 'Doc Programming', 'Survey Programming', 'EdWin QA', 'Fielding', 'Data QA', 'Delivery'],
   scoping_stage: ['New Inquiry', 'Proposal Sent', 'Pricing Discussion', 'Awaiting Approval'],
 }
 

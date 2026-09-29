@@ -6,6 +6,7 @@ import { nextRerunName } from '@/lib/utils/rerun'
 import { selectDueSeries, isLegacyEligible, addDaysISO } from '@/lib/reruns/spawn'
 import { spawnWaveForSeries, QUIET_SPAWN_SKIP_REASONS } from '@/lib/reruns/spawnSeries'
 import { renumberLegacyLineage } from '@/lib/reruns/renumberLineage'
+import { getCheckboxesForColumn } from '@/lib/utils/stage'
 import { copyProjectPricing } from '@/lib/server/clone'
 import type { Database } from '@/lib/supabase/types'
 
@@ -151,6 +152,17 @@ export async function GET(req: NextRequest) {
         phase: 'Active' as const,
         status: 'Open' as const,
         board_column: 'Submitted' as const,
+        // A repeat wave re-runs a questionnaire the client already agreed, so
+        // it starts PAST the Study Questions Review gate rather than at it —
+        // unlike new work, which arrives at that gate (NewProjectModal).
+        //
+        // The flags are spelled out via the one function that defines them
+        // because this insert names board_column and nothing else: left to the
+        // column default, stage_questions_approved would be false while
+        // board_column said Submitted, and every auto-spawned wave would be
+        // born self-contradictory — a card in Submitted whose flags derive as
+        // Study Questions Review.
+        ...getCheckboxesForColumn('Submitted'),
         captain_id: p.captain_id,
         co_captain_ids: p.co_captain_ids,
         salesperson: p.salesperson,

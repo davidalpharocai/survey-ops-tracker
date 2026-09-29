@@ -102,14 +102,22 @@ export function alignNRangePatch(before: Patch, patch: Patch): Patch {
     : { ...patch, n_target: patch.n_target_max }
 }
 
-/** Coupled stage columns. For a normal advance use getCheckboxesForColumn; for delivery set all six true. */
+/**
+ * Coupled stage columns. Both branches now go through getCheckboxesForColumn,
+ * which is the only definition of "what flags mean this column".
+ *
+ * The delivery branch used to spell the flags out by hand — all six literally
+ * true. That is the hand-copied-definition shape this repo has already been
+ * bitten by (see the note on getCheckboxesForColumn, and the ci.yml invariants
+ * job), and adding a seventh flag in migration 128 is exactly the edit that
+ * turns it from redundant into wrong: a hand-written list cannot gain a flag it
+ * does not know about, so a delivered study would have carried
+ * stage_questions_approved = false and derived as Study Questions Review — a
+ * finished study reading as one whose questionnaire is still in draft.
+ */
 export function stageColumnsFor(opts: { toColumn?: BoardColumn; markDelivered?: boolean }) {
   if (opts.markDelivered) {
-    return {
-      board_column: 'Delivery' as const,
-      stage_doc_programming: true, stage_survey_programming: true, stage_edwin_qa: true,
-      stage_fielding: true, stage_data_qa: true, stage_delivery: true,
-    }
+    return { board_column: 'Delivery' as const, ...getCheckboxesForColumn('Delivery') }
   }
   const col = opts.toColumn as BoardColumn
   return { board_column: col, ...getCheckboxesForColumn(col) }

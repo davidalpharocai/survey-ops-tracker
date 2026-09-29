@@ -31,9 +31,12 @@ export function ScopingSpine({ project }: ScopingSpineProps) {
       id: project.id,
       updates: {
         phase: 'Active',
-        board_column: 'Submitted',
+        // Commercial approval hands over to the INSTRUMENT gate, it does not
+        // clear it: the client has agreed to buy the study, not yet agreed
+        // what it asks. Those are the two approvals migration 127 separates.
+        board_column: 'Study Questions Review',
         submitted_date: today,
-        ...getCheckboxesForColumn('Submitted'),
+        ...getCheckboxesForColumn('Study Questions Review'),
       },
     })
   }

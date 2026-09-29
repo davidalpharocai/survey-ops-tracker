@@ -548,3 +548,56 @@ describe('goals are named once', () => {
     expect(CYCLE_DAYS_GOAL).toBeGreaterThan(0)
   })
 })
+
+/**
+ * WHERE CYCLE TIME STARTS, after migration 128 split "we have it" from "we have
+ * agreed what it asks".
+ *
+ * David asked directly whether the new stage would disturb the analytics. These
+ * are the answers to that question, asserted rather than promised: history does
+ * not move, new work measures the shorter interval, and a month that mixes the
+ * two definitions can be identified instead of silently averaged.
+ */
+describe('cycleStartOf: the changeover from submitted to greenlit', () => {
+  const cycleOf = (p: InsightsProject) => itemsOf([p], null).items[0]
+
+  it('measures from submitted_date when a study predates the stage', () => {
+    // greenlit_at is deliberately NOT backfilled, so this is every study that
+    // existed before 2026-09-29. The number must be the number it always was.
+    const it0 = cycleOf(P({ submitted_date: '2026-09-01', deliver_date: '2026-09-21' }))
+    expect(it0.cycleDays).toBe(20)
+    expect(it0.cycleFromGreenlit).toBe(false)
+  })
+
+  it('measures from greenlit_at once the questions have a recorded approval', () => {
+    // The whole point: the fortnight the questionnaire spent with the client is
+    // no longer counted as delivery time.
+    const it0 = cycleOf(P({
+      submitted_date: '2026-09-01', greenlit_at: '2026-09-15', deliver_date: '2026-09-21',
+    }))
+    expect(it0.cycleDays).toBe(6)
+    expect(it0.cycleFromGreenlit).toBe(true)
+  })
+
+  it('still reports a backwards pair as a data error, not as a negative cycle', () => {
+    // Greenlit AFTER delivery is impossible, and must land in the same bucket
+    // the old backwards-dates check used rather than quietly producing -8.
+    const it0 = cycleOf(P({
+      submitted_date: '2026-09-01', greenlit_at: '2026-09-29', deliver_date: '2026-09-21',
+    }))
+    expect(it0.cycleDays).toBeNull()
+    expect(it0.cycleBackwards).toBe(true)
+    expect(it0.cycleFromGreenlit).toBe(false)
+  })
+
+  it('lets a mixed month be identified rather than averaged blind', () => {
+    const { items } = itemsOf([
+      P({ submitted_date: '2026-09-01', deliver_date: '2026-09-21' }),
+      P({ submitted_date: '2026-09-01', greenlit_at: '2026-09-15', deliver_date: '2026-09-21' }),
+    ], null)
+    expect(items.map(i => i.cycleFromGreenlit)).toEqual([false, true])
+    // Both still produce a cycle time; the flag is what makes the difference
+    // between them legible, and neither is dropped from the median.
+    expect(items.every(i => i.cycleDays != null)).toBe(true)
+  })
+})
