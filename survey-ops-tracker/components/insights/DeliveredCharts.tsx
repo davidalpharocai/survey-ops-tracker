@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { BarChart, ColumnChart, LineChart, fmtPct, type Series } from '@/components/charts'
+import { BarChart, ColumnChart, LineChart, fmtPct, type CategoryRule, type Series } from '@/components/charts'
 import { fmtNum } from '@/lib/utils/number'
 import { formatRange, monthBounds } from '@/lib/insights/range'
 import { insightsHref, NO_CAPTAIN } from '@/lib/insights/filters'
@@ -28,7 +28,40 @@ const s = (n: number, one: string, many = one + 's') => `${fmtNum(n)} ${n === 1 
 export function DeliveredCharts({ model: m, open }: { model: InsightsModel; open: OpenDrill }) {
   const f = m.filter
   const words = m.filterWords.length ? ' · ' + m.filterWords.join(' · ') : ''
-  const monthScope = `Delivered · by deliver month${words}`
+
+  /* ── THE MONTH CARDS AND THE DATE RANGE ──────────────────────────────────
+   * A month chart always draws at least MIN_TREND_MONTHS months (range.ts),
+   * so "This month", "This quarter" and "Since 1 Jun" can all land on the
+   * same six-month axis and look alike. That padding is deliberate — one
+   * column with no neighbours is not a trend — but it left the reader with
+   * almost nothing to see when the preset changed (David, 2026-09-28:
+   * "nothing happens on the date range in the graph when i change it in the
+   * filters").
+   *
+   * Two answers, neither of which touches the months drawn:
+   *   the RULE  — a labelled dashed line where the chosen dates begin, so the
+   *               window is a thing on the chart and not just a wash. The
+   *               months always END on the range's last month (trendMonths),
+   *               so only the start can fall inside the picture: one rule.
+   *   the CHIP  — the words say the range and how much of the picture is
+   *               context, so the card changes even where the pixels barely
+   *               can. */
+  const firstIn = m.months.findIndex(d => d.coverage !== 'out')
+  const rangeRule: CategoryRule[] = firstIn > 0
+    ? [{ at: m.months[firstIn].key, label: `Your dates: ${m.rangeLabel}` }]
+    : []
+  const contextMonths = m.months.filter(d => d.coverage === 'out').length
+  const monthScope = [
+    'Delivered',
+    'by deliver month',
+    m.rangeLabel,
+    contextMonths > 0 ? `${s(contextMonths, 'earlier month')} for context` : null,
+    ...m.filterWords,
+  ].filter(Boolean).join(' · ')
+  // The months outside the chosen dates, drawn the same way on all three
+  // month charts: washed out, still hoverable, still clickable.
+  const outOfRange = (d: MonthRow) => (d.coverage === 'out' ? 0.35 : 1)
+  const OUT_NOTE = 'outside your dates, shown for context'
 
   const monthNote = (d: MonthRow) => {
     const where = d.coverage === 'out' ? 'Outside your dates — shown for context'
@@ -91,7 +124,7 @@ export function DeliveredCharts({ model: m, open }: { model: InsightsModel; open
     <div className="flex flex-col gap-4">
       <InsightsCard
         title="Delivered per month"
-        help="Surveys delivered each calendar month, stacked by type, placed by deliver date. The months in your dates are solid; the months around them are faded and shown for context. Click a month for its surveys."
+        help="Surveys delivered each calendar month, stacked by type, placed by deliver date. The months in your dates are solid; the months before them are faded and shown for context, with a dashed rule where your dates begin (on the first month they touch — a month is drawn whole even when your dates cover part of it). Click a month for its surveys."
         scope={monthScope}
         verdict={m.verdicts.months}
       >
@@ -105,8 +138,9 @@ export function DeliveredCharts({ model: m, open }: { model: InsightsModel; open
           xLabel="Month"
           series={series}
           topLabel={{ name: 'Total', text: d => fmtNum(d.total), description: 'Every type together' }}
-          opacity={d => (d.coverage === 'out' ? 0.35 : 1)}
-          opacityNote="outside your dates, shown for context"
+          opacity={outOfRange}
+          opacityNote={OUT_NOTE}
+          rules={rangeRule}
           note={monthNote}
           emptyMessage="No delivered surveys in these months"
           onSelect={d => openMonth(d, {}, d.total, 'Delivered')}
@@ -116,7 +150,7 @@ export function DeliveredCharts({ model: m, open }: { model: InsightsModel; open
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <InsightsCard
           title="On time, by month"
-          help={`The share of each month's deliveries that arrived on or before the due date, of those with a due date. The dashed line is the ${pctText(ON_TIME_GOAL)} goal — a goal, not a rule. A month with no due dates to judge breaks the line rather than inventing a figure.`}
+          help={`The share of each month's deliveries that arrived on or before the due date, of those with a due date. The dashed line is the ${pctText(ON_TIME_GOAL)} goal — a goal, not a rule. A month with no due dates to judge breaks the line rather than inventing a figure. Months before your dates are faded and shown for context, with a dashed rule where your dates begin.`}
           scope={monthScope}
           verdict={m.verdicts.onTime}
         >
@@ -131,6 +165,9 @@ export function DeliveredCharts({ model: m, open }: { model: InsightsModel; open
             valueFormat={v => fmtPct(v)}
             yDomain={[0, 1]}
             referenceLines={[{ value: ON_TIME_GOAL, label: `Goal ${fmtPct(ON_TIME_GOAL)}`, color: 'var(--chart-goal)' }]}
+            opacity={outOfRange}
+            opacityNote={OUT_NOTE}
+            rules={rangeRule}
             note={d => (d.judged ? `${fmtNum(d.onTime)} of ${s(d.judged, 'survey')} with a due date` : 'No due dates to judge')}
             emptyMessage="No delivered survey here has a due date"
             onSelect={d => openMonth(d, { judgedOnly: true }, d.judged, 'On time')}
@@ -139,7 +176,7 @@ export function DeliveredCharts({ model: m, open }: { model: InsightsModel; open
 
         <InsightsCard
           title="Median cycle time, by month"
-          help={`Calendar days from submitted to delivered for the middle survey each month. Lower is faster. The dashed line is the goal of ${daysText(CYCLE_DAYS_GOAL)} — a goal, not a rule. Surveys missing either date are left out.`}
+          help={`Calendar days from submitted to delivered for the middle survey each month. Lower is faster. The dashed line is the goal of ${daysText(CYCLE_DAYS_GOAL)} — a goal, not a rule. Surveys missing either date are left out. Months before your dates are faded and shown for context, with a dashed rule where your dates begin.`}
           scope={monthScope}
           verdict={m.verdicts.cycle}
         >
@@ -154,6 +191,9 @@ export function DeliveredCharts({ model: m, open }: { model: InsightsModel; open
             valueFormat={v => daysText(v)}
             axisFormat={v => fmtNum(v)}
             referenceLines={[{ value: CYCLE_DAYS_GOAL, label: `Goal ${daysText(CYCLE_DAYS_GOAL)}`, color: 'var(--chart-goal)' }]}
+            opacity={outOfRange}
+            opacityNote={OUT_NOTE}
+            rules={rangeRule}
             note={d => (d.cycleN ? `Median of ${s(d.cycleN, 'survey')}` : 'No surveys with both dates')}
             area
             emptyMessage="No delivered survey here has both a submitted and a deliver date"

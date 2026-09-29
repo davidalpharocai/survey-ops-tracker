@@ -175,6 +175,41 @@ describe('ColumnChart', () => {
     expect(within(jun).getByText('Faded: costs not reliably recorded')).toBeInTheDocument()
   })
 
+  it('fades a faded month\'s total with its column, and never its month name', () => {
+    const data = [
+      { m: 'Jun', v: 3 },
+      { m: 'Jul', v: 8 },
+    ]
+    const { container } = render(
+      <ColumnChart
+        ariaLabel="Delivered"
+        width={600}
+        data={data}
+        x={(d) => d.m}
+        series={[{ key: 'v', label: 'Delivered', value: (d) => d.v }]}
+        topLabel={{ name: 'Total', text: (d) => `${d.v}` }}
+        opacity={(d) => (d.m === 'Jun' ? 0.35 : 1)}
+        opacityNote="outside your dates"
+      />,
+    )
+    // The count belongs to the column, so it is washed with it: a context
+    // month used to print its total in full ink above a ghost of a column.
+    const washed = container.querySelector('g[opacity="0.35"]')!
+    expect([...washed.querySelectorAll('text')].map((t) => t.textContent)).toContain('3')
+    // The month NAME is the axis, and an axis you cannot read is worse.
+    const jun = [...container.querySelectorAll('text')].find((t) => t.textContent === 'Jun')!
+    expect(jun.closest('g[opacity]')).toBeNull()
+  })
+
+  it('keeps the baseline out of the way of the columns it sits on', () => {
+    const { container } = render(<ColumnChart ariaLabel="Price vs cost" data={months} x={(d) => d.m} series={series.slice(0, 1)} onSelect={() => {}} />)
+    // Drawn after the marks, so without this a 1px sliver across every
+    // column's foot swallows the hover the column was waiting for. jsdom does
+    // no hit testing, so the attribute is what can be checked here.
+    const baseline = container.querySelector('svg > line')!
+    expect(baseline.getAttribute('pointer-events')).toBe('none')
+  })
+
   it('puts the tooltip note in the table and the reference lines in the summary', () => {
     const { container } = render(
       <ColumnChart

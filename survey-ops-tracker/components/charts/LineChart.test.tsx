@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent, within } from '@testing-library/react'
 import { LineChart } from './LineChart'
 import { fmtPct } from './format'
-import { num } from './geometry.testutil'
+import { num, pathBox } from './geometry.testutil'
 
 interface P {
   m: string
@@ -43,6 +43,73 @@ describe('LineChart', () => {
     )
     expect(container.querySelectorAll('[data-mark="line"]')).toHaveLength(2)
     expect(screen.getByText('Cycle days')).toBeInTheDocument()
+  })
+
+  /* ── PERIODS OUTSIDE THE READER'S WINDOW ──────────────────────────────────
+   * A trend chart pads its axis so one period is never drawn alone; the
+   * padding is only honest if the picture says which periods are the answer
+   * and which are context. */
+
+  interface Ctx {
+    m: string
+    v: number
+    out: boolean
+  }
+  const ctx: Ctx[] = [
+    { m: 'May', v: 14, out: true },
+    { m: 'Jun', v: 12, out: true },
+    { m: 'Jul', v: 11, out: false },
+    { m: 'Aug', v: 9, out: false },
+    { m: 'Sep', v: 8, out: false },
+  ]
+  const faded = (extra: Record<string, unknown> = {}) =>
+    render(
+      <LineChart
+        ariaLabel="Cycle time"
+        width={600}
+        data={ctx}
+        x={(d) => d.m}
+        series={[{ key: 'cy', label: 'Median days', value: (d) => d.v }]}
+        opacity={(d) => (d.out ? 0.35 : 1)}
+        opacityNote="outside your dates, shown for context"
+        {...extra}
+      />,
+    )
+
+  it('fades the periods outside the window and keeps the link that crosses into it solid', () => {
+    const { container } = faded()
+    const paths = [...container.querySelectorAll('[data-mark="line"]')]
+    const points = [...container.querySelectorAll('[data-mark="point"]')].map((c) => num(c, 'cx'))
+    // Two runs: the context stretch, then everything from the boundary on.
+    expect(paths).toHaveLength(2)
+    expect(paths[0].getAttribute('opacity')).toBe('0.35')
+    expect(paths[1].getAttribute('opacity')).toBeNull()
+    const ctxBox = pathBox(paths[0].getAttribute('d'))
+    const inBox = pathBox(paths[1].getAttribute('d'))
+    // The faded run stops at Jun; the SOLID one starts there, so the line is
+    // seen arriving at the window rather than fading out a month early.
+    expect(ctxBox.x0).toBeCloseTo(points[0], 5)
+    expect(ctxBox.x1).toBeCloseTo(points[1], 5)
+    expect(inBox.x0).toBeCloseTo(points[1], 5)
+    expect(inBox.x1).toBeCloseTo(points[4], 5)
+  })
+
+  it('fades the markers of the context periods, and nothing else', () => {
+    const { container } = faded()
+    const ops = [...container.querySelectorAll('[data-mark="point"]')].map((c) => c.getAttribute('opacity'))
+    expect(ops).toEqual(['0.35', '0.35', null, null, null])
+  })
+
+  it('names the fade in the legend, the summary and the table', () => {
+    const { container } = faded()
+    expect(screen.getByText('Faded: outside your dates, shown for context')).toBeInTheDocument()
+    expect(container.querySelector('svg')!.getAttribute('aria-label')).toContain(
+      'Faded (outside your dates, shown for context): May, Jun',
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'View as table' }))
+    const may = within(screen.getByRole('table')).getByRole('rowheader', { name: 'May' }).closest('tr')!
+    expect(may.className).toContain('text-muted-foreground')
+    expect(within(may).getByText('Faded: outside your dates, shown for context')).toBeInTheDocument()
   })
 
   it('draws labelled vertical rules and a goal line', () => {

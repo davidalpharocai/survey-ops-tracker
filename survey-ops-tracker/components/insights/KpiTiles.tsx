@@ -1,8 +1,8 @@
 'use client'
 
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
-import { Sparkline, describeTrend, fmtCount, fmtPct, type Formatter } from '@/components/charts'
+import { Sparkline, fmtCount, fmtPct, type Formatter } from '@/components/charts'
 import { fmtNum } from '@/lib/utils/number'
 import {
   CYCLE_DAYS_GOAL, ON_TIME_GOAL, daysText, pctText, type Comparison, type InsightsModel, type MonthRow,
@@ -58,44 +58,81 @@ function Kpi({
 }
 
 /**
- * A tile's sparkline, with its two ends named.
+ * A tile's sparkline and the one line of text under it.
  *
- * The sparkline is 32px tall: no axis, no ticks, no tooltip, nowhere to put a
- * label per month. On its own it says something rose without saying between
- * when and when — the same complaint the chart axes just answered. So the
- * first and last month are printed under it (the rule the axes follow: the
- * ends are always named), and the hover text and the accessible summary —
- * one string, describeTrend — name the first month, the last, the peak when
- * it is neither, and the goal. Three months of twelve, not twelve.
+ * ── WHERE THE HOVERED MONTH GOES ────────────────────────────────────────────
+ * The sparkline is 32px tall: no axis, no ticks, nowhere to float a tooltip
+ * card. That used to be the end of the argument — it named its two ends and
+ * its whole trend, and said nothing at all about the month under the pointer.
+ * It is also the FIRST graphic on the page, so that is the one a reader
+ * hovers first (David, 2026-09-28: "nothing happens when i hover over the
+ * graphs"), and what he learned from it was that /insights does not answer.
  *
- * What it still will not do is name ONE point in the middle: there is no hit
- * area per month at this size, and inventing one would put a tooltip over a
- * 32px graphic. The month charts below the tiles are where a single month is
- * read, and they carry the same months.
+ * The room the graphic does not have, the line under it does. At rest that
+ * line names the window's ends, as before. With a point under the pointer (or
+ * the keyboard cursor) the SAME line becomes that month and its figure, and
+ * goes back to the ends on the way out. One line either way, so the tile
+ * never changes height and the grid never reflows.
+ *
+ * The month charts below still carry the tooltip card, the drill and the
+ * table: this is the word-sized answer, not a replacement for them.
  */
-function TileTrend({ ariaLabel, months, values, valueFormat = fmtCount, ...spark }: {
+function TileTrend({ ariaLabel, months, values, valueFormat = fmtCount, boundary, ...spark }: {
   ariaLabel: string
   months: MonthRow[]
   values: (number | null)[]
   valueFormat?: Formatter
+  /** Index of the first month inside the reader's dates, or null. */
+  boundary?: number | null
   color?: string
   goal?: number
   includeZero?: boolean
 }) {
+  const [at, setAt] = useState<number | null>(null)
   const labels = months.map(x => x.long)
   const first = months[0]
   const last = months[months.length - 1]
+  const held = at != null ? months[at] : undefined
+  const heldValue = at != null ? values[at] : null
+  // A month with no figure says so. Printing a 0 here would be the page
+  // asserting something the data never recorded.
+  const heldText = heldValue == null ? 'not recorded' : valueFormat(heldValue)
   return (
-    <div title={`${ariaLabel}. ${describeTrend(values, labels, valueFormat, spark.goal)}`}>
-      <Sparkline ariaLabel={ariaLabel} values={values} labels={labels} valueFormat={valueFormat} {...spark} />
+    <div data-part="tile-trend">
+      <Sparkline
+        ariaLabel={ariaLabel}
+        values={values}
+        labels={labels}
+        valueFormat={valueFormat}
+        boundary={boundary}
+        onActive={setAt}
+        {...spark}
+      />
       {first && (
         // The <svg> already spells the window out in its accessible name, so
-        // this repeat is for the eye only.
-        <div aria-hidden className="mt-0.5 flex justify-between text-[10px] leading-none text-muted-foreground">
-          <span>{first.short}</span>
-          {last.key !== first.key && <span>{last.short}</span>}
+        // this row is for the eye only; the screen-reader path is the live
+        // region below, which is silent until a month is actually held.
+        <div
+          aria-hidden
+          data-part="tile-readout"
+          className="mt-0.5 flex min-w-0 justify-between gap-2 text-[10px] leading-none text-muted-foreground"
+        >
+          {held ? (
+            <>
+              <span className="truncate">{held.long}</span>
+              <span className="shrink-0 font-medium tabular-nums text-foreground">{heldText}</span>
+            </>
+          ) : (
+            <>
+              <span>{first.short}</span>
+              {last.key !== first.key && <span>{last.short}</span>}
+            </>
+          )}
         </div>
       )}
+      <span role="status" className="sr-only">
+        {held ? `${ariaLabel}, ${held.long}: ${heldText}` : ''}
+      </span>
     </div>
   )
 }
@@ -144,6 +181,14 @@ export function KpiTiles({ model: m, open }: { model: InsightsModel; open: OpenD
     </>
   ) : null
 
+  // Where the reader's dates begin on the shared month axis. The trend
+  // always ENDS on the range's last month (trendMonths), so only the start
+  // can fall inside the picture — one boundary, never two. -1 (no month is
+  // out) and 0 (the first month is already inside) both mean "nothing to
+  // mark": a rule on the left edge of the graphic marks nothing.
+  const firstIn = m.months.findIndex(x => x.coverage !== 'out')
+  const boundary = firstIn > 0 ? firstIn : null
+
   const onTimeGood = c.onTimePct != null && c.onTimePct >= ON_TIME_GOAL
   const cycleGood = c.cycleMedian != null && c.cycleMedian <= CYCLE_DAYS_GOAL
 
@@ -164,7 +209,7 @@ export function KpiTiles({ model: m, open }: { model: InsightsModel; open: OpenD
         ]}
         compare={m.compare.delivered}
       >
-        <TileTrend ariaLabel="Surveys delivered per month" months={m.months} values={m.months.map(x => x.total)} />
+        <TileTrend ariaLabel="Surveys delivered per month" months={m.months} values={m.months.map(x => x.total)} boundary={boundary} />
       </Kpi>
 
       <Kpi
@@ -186,6 +231,7 @@ export function KpiTiles({ model: m, open }: { model: InsightsModel; open: OpenD
           ariaLabel="Respondents delivered per month"
           months={m.months}
           values={m.months.map(x => (x.withN ? x.respondents : null))}
+          boundary={boundary}
           color="var(--chart-cat-7)"
         />
       </Kpi>
@@ -212,6 +258,7 @@ export function KpiTiles({ model: m, open }: { model: InsightsModel; open: OpenD
           ariaLabel="Share delivered on time per month"
           months={m.months}
           values={m.months.map(x => x.onTimePct)}
+          boundary={boundary}
           goal={ON_TIME_GOAL}
           includeZero={false}
           valueFormat={v => fmtPct(v)}
@@ -241,6 +288,7 @@ export function KpiTiles({ model: m, open }: { model: InsightsModel; open: OpenD
           ariaLabel="Median days from submitted to delivered per month"
           months={m.months}
           values={m.months.map(x => x.cycleMedian)}
+          boundary={boundary}
           goal={CYCLE_DAYS_GOAL}
           valueFormat={v => daysText(v)}
           color="var(--chart-cat-7)"
@@ -282,7 +330,7 @@ export function KpiTiles({ model: m, open }: { model: InsightsModel; open: OpenD
         lines={[c.delivered ? `${fmtNum(c.reruns)} of ${s(c.delivered, 'delivery', 'deliveries')} (${pctText(c.reruns / c.delivered)})` : 'No deliveries in these dates']}
         compare={m.compare.reruns}
       >
-        <TileTrend ariaLabel="Reruns delivered per month" months={m.months} values={m.months.map(x => x.reruns)} color="var(--chart-cat-3)" />
+        <TileTrend ariaLabel="Reruns delivered per month" months={m.months} values={m.months.map(x => x.reruns)} boundary={boundary} color="var(--chart-cat-3)" />
       </Kpi>
     </div>
   )

@@ -26,8 +26,10 @@ import {
   FitText,
   FONT,
   HALO,
+  MIN_OPACITY,
   Mark,
   anyDrill,
+  clampOpacity,
   describeRefs,
   describeRules,
   describeSeries,
@@ -68,6 +70,18 @@ export interface LineChartProps<D> extends ChartCommon<D> {
   referenceLines?: ReferenceLine[]
   /** Labelled vertical rules at a period key. */
   rules?: CategoryRule[]
+  /** Per-period opacity 0..1 — the same caveat a column chart draws by
+   *  washing a bar, e.g. the months outside the reader's dates. Faded
+   *  periods stay hoverable and clickable, are named in the legend and
+   *  marked in the table.
+   *
+   *  A LINK between two periods is faded only when BOTH its ends are, so the
+   *  segment that crosses into the range keeps full ink: the eye follows the
+   *  line ARRIVING at the window rather than losing it a month early. */
+  opacity?: (d: D) => number | null | undefined
+  /** What a faded period means, for the legend and the table (default
+   *  "fewer records behind this figure"). */
+  opacityNote?: string
   yDomain?: [number, number]
   /** Start the value axis at zero (default true; switch off for a narrow band like 90–100%). */
   includeZero?: boolean
@@ -87,6 +101,8 @@ export function LineChart<D>({
   area = false,
   referenceLines = [],
   rules = [],
+  opacity,
+  opacityNote = 'fewer records behind this figure',
   yDomain,
   includeZero = true,
   note,
@@ -110,6 +126,8 @@ export function LineChart<D>({
   const empty = data.length === 0 || series.length === 0 || data.every((d) => series.every((s) => !isNum(s.value(d))))
   const allZero = !empty && data.every((d) => series.every((s) => { const v = s.value(d); return !isNum(v) || v === 0 }))
   const colorOf = (s: Series<D>, i: number) => s.color ?? `var(--chart-cat-${(i % 8) + 1})`
+  const opOf = (d: D) => (opacity ? clampOpacity(opacity(d)) : 1)
+  const anyFaded = !!opacity && data.some((d) => opOf(d) < 1)
 
   const layout = useMemo(() => {
     if (empty) return null
@@ -201,8 +219,12 @@ export function LineChart<D>({
     let s = `${head} ${[...parts, ...describeRefs(referenceLines, valueFormat)].join('; ')}.`
     const ruleText = describeRules(rules, data.map(keyOf), labels)
     if (ruleText.length) s += ` Marked: ${ruleText.join('; ')}.`
+    // A fade is a caveat, and a caveat only the eye can see is one a screen
+    // reader never learns about.
+    const faded = opacity ? data.filter((d) => clampOpacity(opacity(d)) < 1) : []
+    if (faded.length) s += ` Faded (${opacityNote}): ${faded.map(x).join(', ')}.`
     return s
-  }, [empty, data, x, keyOf, series, valueFormat, referenceLines, rules])
+  }, [empty, data, x, keyOf, series, valueFormat, referenceLines, rules, opacity, opacityNote])
 
   const showMarkers = markers ?? data.length <= 24
 
@@ -211,25 +233,40 @@ export function LineChart<D>({
       ? series.map((s, i) => ({ key: s.key, label: s.label, color: colorOf(s, i), shape: s.dashed ? ('dash' as const) : ('line' as const), description: s.description }))
       : []),
     ...referenceLines.map((r, i) => ({ key: `ref${i}`, label: r.label, color: r.color ?? 'var(--chart-goal)', shape: 'dash' as const })),
+    ...(anyFaded
+      ? [
+          {
+            key: '__faded',
+            label: `Faded: ${opacityNote}`,
+            color: `color-mix(in oklab, ${series[0]?.color ?? 'var(--chart-cat-1)'} ${Math.round(MIN_OPACITY * 100)}%, var(--chart-surface))`,
+            shape: 'line' as const,
+          },
+        ]
+      : []),
   ]
 
+  const hasNotes = !!note || anyFaded
   const table: ChartTable | null = showTableToggle
     ? {
         columns: [
           { key: 'x', label: xLabel },
           ...series.map((s) => ({ key: s.key, label: s.label, align: 'right' as const, title: s.description })),
-          ...(note ? [{ key: '__n', label: 'Note', title: 'Caveats on this period (the same note the tooltip shows)' }] : []),
+          ...(hasNotes ? [{ key: '__n', label: 'Note', title: 'Caveats on this period: the tooltip note, or why the period is faded' }] : []),
         ],
-        rows: data.map((d, i) => ({
-          key: `${i}`,
-          cells: [
-            x(d),
-            ...series.map((s) => (isNum(s.value(d)) ? valueFormat(s.value(d) as number) : MISSING)),
-            ...(note ? [note(d) ?? ''] : []),
-          ],
-          onSelect: onSelect ? () => onSelect(d) : undefined,
-          href: href?.(d) ?? null,
-        })),
+        rows: data.map((d, i) => {
+          const faded = opOf(d) < 1
+          return {
+            key: `${i}`,
+            muted: faded,
+            cells: [
+              x(d),
+              ...series.map((s) => (isNum(s.value(d)) ? valueFormat(s.value(d) as number) : MISSING)),
+              ...(hasNotes ? [note?.(d) || (faded ? `Faded: ${opacityNote}` : '')] : []),
+            ],
+            onSelect: onSelect ? () => onSelect(d) : undefined,
+            href: href?.(d) ?? null,
+          }
+        }),
       }
     : null
 
@@ -317,36 +354,47 @@ export function LineChart<D>({
             {series.map((s, si) => {
               const c = colorOf(s, si)
               const vals = data.map((d) => s.value(d))
-              const segs: { d: string; from: number; to: number }[] = []
-              let cur: { d: string; from: number; to: number } | null = null
-              vals.forEach((v, i) => {
-                if (!isNum(v)) {
+              const ops = data.map(opOf)
+              // The line is cut into runs of consecutive periods drawn at ONE
+              // opacity. It breaks at a missing value (a line through a gap
+              // would invent a figure) and where the fade changes — never in
+              // the middle of a run, so strokeLinejoin still rounds the
+              // corners of a stretch drawn together.
+              const segs: { d: string; from: number; to: number; op: number }[] = []
+              let cur: { d: string; from: number; to: number; op: number } | null = null
+              for (let i = 0; i + 1 < vals.length; i++) {
+                const a = vals[i]
+                const b = vals[i + 1]
+                if (!isNum(a) || !isNum(b)) {
                   if (cur) segs.push(cur)
                   cur = null
-                  return
+                  continue
                 }
-                const pt = `${layout.px(i)},${layout.y(v)}`
-                if (!cur) cur = { d: `M${pt}`, from: i, to: i }
-                else {
+                // max, not min: a link with one end inside the window is the
+                // boundary link, and it is drawn solid.
+                const op = Math.max(ops[i], ops[i + 1])
+                const pt = `${layout.px(i + 1)},${layout.y(b)}`
+                if (cur && cur.to === i && cur.op === op) {
                   cur.d += `L${pt}`
-                  cur.to = i
+                  cur.to = i + 1
+                } else {
+                  if (cur) segs.push(cur)
+                  cur = { d: `M${layout.px(i)},${layout.y(a)}L${pt}`, from: i, to: i + 1, op }
                 }
-              })
+              }
               if (cur) segs.push(cur)
               const base = layout.y(Math.max(layout.dom.min, Math.min(0, layout.dom.max)))
               return (
                 <g key={s.key} pointerEvents="none">
                   {area &&
-                    segs
-                      .filter((g) => g.to > g.from)
-                      .map((g, gi) => (
-                        <path
-                          key={`a${gi}`}
-                          d={`${g.d}L${layout.px(g.to)},${base}L${layout.px(g.from)},${base}Z`}
-                          opacity={0.1}
-                          style={{ fill: c }}
-                        />
-                      ))}
+                    segs.map((g, gi) => (
+                      <path
+                        key={`a${gi}`}
+                        d={`${g.d}L${layout.px(g.to)},${base}L${layout.px(g.from)},${base}Z`}
+                        opacity={0.1 * g.op}
+                        style={{ fill: c }}
+                      />
+                    ))}
                   {segs.map((g, gi) => (
                     <path
                       key={gi}
@@ -358,6 +406,7 @@ export function LineChart<D>({
                       strokeLinejoin="round"
                       strokeLinecap="round"
                       strokeDasharray={s.dashed ? '6 4' : undefined}
+                      opacity={g.op < 1 ? g.op : undefined}
                       style={{ stroke: c }}
                     />
                   ))}
@@ -376,6 +425,7 @@ export function LineChart<D>({
                         cy={layout.y(v)}
                         r={active === i ? 5 : 4}
                         strokeWidth={2}
+                        opacity={ops[i] < 1 ? ops[i] : undefined}
                         style={{ fill: c, stroke: 'var(--chart-surface)' }}
                       />
                     )

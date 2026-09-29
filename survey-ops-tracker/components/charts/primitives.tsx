@@ -578,6 +578,19 @@ export function describeRules(rules: CategoryRule[], keys: string[], labels: str
 /** "no price" → "No price": the same words in a sentence and in a table cell. */
 export const capFirst = (s: string) => (s ? s[0].toUpperCase() + s.slice(1) : s)
 
+/**
+ * The faintest a faded mark gets: still findable against the card. Shared, so
+ * a faded column and a faded line say the same thing by looking the same.
+ */
+export const MIN_OPACITY = 0.35
+
+/** A caller's per-datum opacity, clamped to [MIN_OPACITY, 1]. A MISSING
+ *  figure is not a fade — it reads as 1, and the mark itself is skipped. */
+export function clampOpacity(v: number | null | undefined): number {
+  if (!isNum(v)) return 1
+  return Math.min(1, Math.max(MIN_OPACITY, v))
+}
+
 /** Is this a usable number (not null, undefined or NaN)? */
 export const isNum = (v: number | null | undefined): v is number =>
   v !== null && v !== undefined && !Number.isNaN(v)

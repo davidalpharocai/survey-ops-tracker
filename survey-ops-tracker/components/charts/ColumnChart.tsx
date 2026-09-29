@@ -31,8 +31,10 @@ import {
   FONT,
   HALO,
   HatchDef,
+  MIN_OPACITY,
   Mark,
   anyDrill,
+  clampOpacity,
   describeRefs,
   describeRules,
   describeSeries,
@@ -107,8 +109,6 @@ const GAP = 2
 const TICK_LEN = 5
 /** Baseline to the middle of the x label: clear of the tick, not floating. */
 const TICK_GAP = 8
-/** The faintest a faded column gets: still findable against the card. */
-const MIN_OPACITY = 0.35
 
 export function ColumnChart<D>({
   data,
@@ -146,7 +146,7 @@ export function ColumnChart<D>({
   const hatchId = useSvgId('hatch')
   const fmtAxis = axisFormat ?? valueFormat
   const interactive = anyDrill(data, onSelect, href)
-  const opOf = (d: D) => (opacity ? clamp01(opacity(d)) : 1)
+  const opOf = (d: D) => (opacity ? clampOpacity(opacity(d)) : 1)
   const anyFaded = !!opacity && data.some((d) => opOf(d) < 1)
 
   const empty =
@@ -267,7 +267,7 @@ export function ColumnChart<D>({
     let s = `${head} ${parts.join('; ')}.`
     const ruleText = describeRules(rules, data.map(keyOf), labels)
     if (ruleText.length) s += ` Marked: ${ruleText.join('; ')}.`
-    const faded = opacity ? data.filter((d) => clamp01(opacity(d)) < 1) : []
+    const faded = opacity ? data.filter((d) => clampOpacity(opacity(d)) < 1) : []
     if (faded.length) s += ` Faded (${opacityNote}): ${faded.map(x).join(', ')}.`
     return s
   }, [empty, data, x, keyOf, series, mode, overlay, valueFormat, referenceLines, rules, opacity, opacityNote])
@@ -519,18 +519,28 @@ export function ColumnChart<D>({
                   onShow={() => show({ x: cx, y: Math.max(layout.plotTop - layout.topH, topY), title: x(d), rows, note: noteText || undefined })}
                   onHide={hide}
                 >
-                  <g opacity={op}>{bars}</g>
-                  {topLabel && tText && layout.topAxis.shows(i) && (
-                    <text
-                      x={cx}
-                      y={topY - 5}
-                      textAnchor="middle"
-                      className="fill-foreground tabular-nums"
-                      style={{ fontSize: layout.tickFont, fontWeight: 500, ...HALO }}
-                    >
-                      {tText}
-                    </text>
-                  )}
+                  {/* The total belongs to the column, so it carries the
+                      column's opacity: a month shown only for context used to
+                      print its count in full ink above a washed-out column,
+                      which reads as the emphasised figure on the chart. The
+                      MONTH NAME below is deliberately NOT in here — it is the
+                      axis, and an axis you cannot read is worse than a loud
+                      one; the count itself stays in full strength in the
+                      tooltip, the data table and the accessible summary. */}
+                  <g opacity={op}>
+                    {bars}
+                    {topLabel && tText && layout.topAxis.shows(i) && (
+                      <text
+                        x={cx}
+                        y={topY - 5}
+                        textAnchor="middle"
+                        className="fill-foreground tabular-nums"
+                        style={{ fontSize: layout.tickFont, fontWeight: 500, ...HALO }}
+                      >
+                        {tText}
+                      </text>
+                    )}
+                  </g>
                   {layout.xAxis.shows(i) && (
                     <FitText
                       text={layout.axisLabels[i]}
@@ -565,8 +575,13 @@ export function ColumnChart<D>({
               size={TICK_LEN}
             />
 
-            {/* zero line: the baseline every column grows from */}
+            {/* zero line: the baseline every column grows from. It is drawn
+                AFTER the marks, so without pointerEvents="none" a 1px sliver
+                across the baseline of every column eats the hover that the
+                column underneath it was waiting for (the BarChart's baseline
+                has carried the same guard since it was written). */}
             <line
+              pointerEvents="none"
               x1={layout.plotL}
               x2={layout.plotR}
               y1={layout.y(0)}
@@ -662,10 +677,6 @@ function fmtVal(v: number | null | undefined, f: Formatter): string {
   return isNum(v) ? f(v) : MISSING
 }
 
-function clamp01(v: number | null | undefined): number {
-  if (!isNum(v)) return 1
-  return Math.min(1, Math.max(MIN_OPACITY, v))
-}
 
 interface Box {
   x0: number

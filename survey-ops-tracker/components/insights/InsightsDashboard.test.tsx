@@ -59,6 +59,11 @@ beforeEach(() => {
 })
 afterEach(() => vi.useRealTimers())
 
+/** A KPI tile's trend: the sparkline, the line of text under it, and the
+ *  live region that says the same thing out loud. */
+const tileTrend = (container: HTMLElement, ariaLabel: string): HTMLElement =>
+  container.querySelector(`svg[aria-label^="${ariaLabel}."]`)!.closest('[data-part="tile-trend"]') as HTMLElement
+
 describe('InsightsDashboard', () => {
   it('leads with a computed, factual headline', () => {
     render(<InsightsDashboard />)
@@ -175,15 +180,16 @@ describe('InsightsDashboard', () => {
       expect(ticks[0].querySelectorAll('line')).toHaveLength(12)
     })
 
-    it('a KPI sparkline has no axis, so it names its ends and its whole trend on hover', () => {
+    it('a KPI sparkline has no axis, so it names its ends under it', () => {
       qs = 'range=last-12-months'
       const { container } = render(<InsightsDashboard />)
-      const trend = container.querySelector('[title^="Surveys delivered per month."]') as HTMLElement
-      expect(trend).toBeTruthy()
-      expect(trend.getAttribute('title')).toMatch(/October 2025/)
-      expect(trend.getAttribute('title')).toMatch(/September 2026/)
+      const trend = tileTrend(container, 'Surveys delivered per month')
       expect(within(trend).getByText('Oct 25')).toBeInTheDocument()
       expect(within(trend).getByText('Sep 26')).toBeInTheDocument()
+      // The whole trend, for a reader who never points at it.
+      const label = trend.querySelector('svg')!.getAttribute('aria-label')!
+      expect(label).toMatch(/October 2025/)
+      expect(label).toMatch(/September 2026/)
     })
 
     it('a clicked month still opens under its full name', () => {
@@ -191,6 +197,129 @@ describe('InsightsDashboard', () => {
       render(<InsightsDashboard />)
       fireEvent.click(screen.getAllByRole('button', { name: /^September 2026/ })[0])
       expect(screen.getByRole('dialog', { name: 'Delivered · September 2026' })).toBeInTheDocument()
+    })
+  })
+
+  /**
+   * David, 2026-09-28: "it show be that as i hover over the graph, the month
+   * and it is values pop up. nothing happens when i hover over the graphs" —
+   * hovered on the tile trends, which are the first graphics on the page and
+   * were the only inert ones.
+   */
+  describe('hovering a tile trend', () => {
+    it('swaps the two end months for the month under the pointer and its figure', () => {
+      qs = 'range=last-12-months'
+      const { container } = render(<InsightsDashboard />)
+      const trend = tileTrend(container, 'Surveys delivered per month')
+      const readout = trend.querySelector('[data-part="tile-readout"]')!
+      expect(readout.textContent).toBe('Oct 25Sep 26')
+
+      // The eleventh of twelve months is August 2026: eleven deliveries.
+      fireEvent.mouseEnter(trend.querySelector('[data-spark-hit="10"]')!)
+      expect(readout.textContent).toBe('August 202611')
+      // And out loud, for a reader who is not looking at the tile.
+      expect(within(trend).getByRole('status').textContent)
+        .toBe('Surveys delivered per month, August 2026: 11')
+
+      fireEvent.mouseLeave(trend.querySelector('[data-part="spark-hits"]')!)
+      expect(readout.textContent).toBe('Oct 25Sep 26')
+      expect(within(trend).getByRole('status').textContent).toBe('')
+    })
+
+    it('says a month is not recorded rather than calling it zero', () => {
+      qs = 'range=last-12-months'
+      const { container } = render(<InsightsDashboard />)
+      // No delivered survey in October 2025 has a cycle time, so the median
+      // is missing — which is not the same as a median of nought days.
+      const trend = tileTrend(container, 'Median days from submitted to delivered per month')
+      fireEvent.mouseEnter(trend.querySelector('[data-spark-hit="0"]')!)
+      expect(trend.querySelector('[data-part="tile-readout"]')!.textContent).toBe('October 2025not recorded')
+    })
+
+    it('is reachable from the keyboard, starting at the newest month', () => {
+      qs = 'range=last-12-months'
+      const { container } = render(<InsightsDashboard />)
+      const trend = tileTrend(container, 'Surveys delivered per month')
+      const svg = trend.querySelector('svg')!
+      fireEvent.focus(svg)
+      expect(trend.querySelector('[data-part="tile-readout"]')!.textContent).toBe('September 202612')
+      fireEvent.keyDown(svg, { key: 'ArrowLeft' })
+      expect(trend.querySelector('[data-part="tile-readout"]')!.textContent).toBe('August 202611')
+    })
+  })
+
+  /**
+   * David, 2026-09-28: "nothing happens on the date range in the graph when i
+   * change it in the filters". The trend charts pad to MIN_TREND_MONTHS, so
+   * three presets can draw the same six months; what changes must be said,
+   * not left to a wash on one chart of eight.
+   */
+  describe('changing the date range', () => {
+    const ruleLabels = (container: HTMLElement) =>
+      [...container.querySelectorAll('svg text')].map(t => t.textContent).filter(t => t?.startsWith('Your dates:'))
+    const monthChips = () =>
+      screen.getAllByTitle('Which surveys this card counts').map(c => c.textContent).filter(c => c?.includes('by deliver month'))
+    /** The rule on the "Delivered per month" columns. Scoped to that chart:
+     *  a tile sparkline's dashed GOAL line is also "3 3". */
+    const boundaryX = (container: HTMLElement) =>
+      Number(container
+        .querySelector('svg[aria-label^="Surveys delivered per month, by type."]')!
+        .querySelector('line[stroke-dasharray="3 3"]')!
+        .getAttribute('x1'))
+
+    it('marks where the chosen dates begin on all three month charts', () => {
+      qs = ''
+      const { container } = render(<InsightsDashboard />)
+      // This month: six months are drawn, and only September is the answer.
+      expect(ruleLabels(container)).toEqual([
+        'Your dates: 1–27 Sep 2026', 'Your dates: 1–27 Sep 2026', 'Your dates: 1–27 Sep 2026',
+      ])
+      // The sparklines carry the same boundary.
+      expect(container.querySelectorAll('[data-part="range-start"]').length).toBeGreaterThan(0)
+    })
+
+    it('moves the boundary when the preset changes, even though the months do not', () => {
+      qs = ''
+      const { container, unmount } = render(<InsightsDashboard />)
+      const septRule = boundaryX(container)
+      const septChip = monthChips()[0]
+      unmount()
+
+      qs = 'range=this-quarter'
+      const q = render(<InsightsDashboard />)
+      // Apr–Sep either way — the same six columns, a different answer.
+      expect(boundaryX(q.container)).toBeLessThan(septRule)
+      expect(ruleLabels(q.container)[0]).toBe('Your dates: 1 Jul–27 Sep 2026')
+      expect(monthChips()[0]).not.toBe(septChip)
+    })
+
+    it('says the range and how much of the picture is only context', () => {
+      qs = ''
+      render(<InsightsDashboard />)
+      expect(monthChips()[0]).toBe('Delivered · by deliver month · 1–27 Sep 2026 · 5 earlier months for context')
+    })
+
+    it('draws no boundary when every month drawn is inside the dates', () => {
+      qs = 'range=last-12-months'
+      const { container } = render(<InsightsDashboard />)
+      expect(ruleLabels(container)).toEqual([])
+      expect(container.querySelector('[data-part="range-start"]')).toBeNull()
+      expect(monthChips()[0]).toBe('Delivered · by deliver month · 1 Oct 2025–27 Sep 2026')
+    })
+
+    it('fades the context months on the line charts too, not just the columns', () => {
+      qs = ''
+      const { container } = render(<InsightsDashboard />)
+      const onTime = container.querySelector('svg[aria-label^="Share of deliveries on time, by month."]')!
+      // Apr–Aug are context; September is the answer.
+      expect(onTime.getAttribute('aria-label')).toContain(
+        'Faded (outside your dates, shown for context): April 2026, May 2026, June 2026, July 2026, August 2026',
+      )
+      // Only August and September have a due date to judge. August's marker
+      // is washed out…
+      expect([...onTime.querySelectorAll('[data-mark="point"]')].map(p => p.getAttribute('opacity'))).toEqual(['0.35', null])
+      // …and the one link, which crosses INTO the dates, keeps full ink.
+      expect([...onTime.querySelectorAll('[data-mark="line"]')].map(p => p.getAttribute('opacity'))).toEqual([null])
     })
   })
 
