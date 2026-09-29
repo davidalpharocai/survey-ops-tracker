@@ -1,10 +1,12 @@
 import { describe, it, expect } from 'vitest'
 import {
-  CHOICE_SOURCE_TEXT, choiceNotes, choiceSource, clearSavedChoice, columnOn, ledgerColumns, offeredColumns,
+  ALWAYS_PRINTED, CHOICE_SOURCE_TEXT, choiceNotes, choiceSource, clearSavedChoice, columnOn, ledgerColumns,
+  offeredColumns,
   parseStoredChoice, parseUrlChoice, PRINT_CHOICE_KEY, PRINT_COLUMNS, PRINT_SECTIONS, PRINTS_ALL, printsOf,
   readSavedChoice, resolveChoice, sameChoice, sectionOn, serializeUrlChoice, SYSTEM_DEFAULT, toggleColumn,
   toggleSection, withChoiceInSearch, writeSavedChoice,
-  type ChoiceStore, type PrintChoice, type PrintColumnDef, type PrintColumnId, type PrintDoc, type Prints,
+  type ChoiceStore, type LedgerColumnId, type PrintChoice, type PrintColumnDef, type PrintColumnId,
+  type PrintDoc, type Prints,
   type PrintSectionId,
 } from './printColumns'
 
@@ -26,8 +28,11 @@ const throwingStore: ChoiceStore = {
   removeItem: k => { throw new Error(`SecurityError: ${k}`) },
 }
 
-const choice = (colsOff: PrintChoice['colsOff'] = [], sectionsOff: PrintChoice['sectionsOff'] = []): PrintChoice =>
-  ({ colsOff, sectionsOff })
+const choice = (
+  colsOff: PrintChoice['colsOff'] = [],
+  sectionsOff: PrintChoice['sectionsOff'] = [],
+  colsOn: PrintChoice['colsOn'] = [],
+): PrintChoice => ({ colsOff, colsOn, sectionsOff })
 
 /**
  * A choice holding ids the type system no longer admits — 'collected' above
@@ -37,8 +42,11 @@ const choice = (colsOff: PrintChoice['colsOff'] = [], sectionsOff: PrintChoice['
  * "Collected cannot come back" has to hold on. A plain `choice([...])` would
  * only prove the compiler stops a fresh caller, which is the easy half.
  */
-const fromOutside = (colsOff: string[], sectionsOff: string[] = []): PrintChoice =>
-  ({ colsOff: colsOff as PrintChoice['colsOff'], sectionsOff: sectionsOff as PrintChoice['sectionsOff'] })
+const fromOutside = (colsOff: string[], sectionsOff: string[] = [], colsOn: string[] = []): PrintChoice => ({
+  colsOff: colsOff as PrintChoice['colsOff'],
+  colsOn: colsOn as PrintChoice['colsOn'],
+  sectionsOff: sectionsOff as PrintChoice['sectionsOff'],
+})
 
 const ALL_COLS: PrintColumnId[] = PRINT_COLUMNS.map(c => c.id)
 const ALL_SECTIONS: PrintSectionId[] = PRINT_SECTIONS.map(s => s.id)
@@ -81,12 +89,24 @@ describe('the system default', () => {
   //
   // `toEqual` is doing real work here: it fails on an EXTRA key, so this is also
   // the assertion that catches a `collected` flag creeping back into Prints.
-  it('prints everything on offer', () => {
-    expect(printsOf(SYSTEM_DEFAULT, 'statement')).toEqual({ ...PRINTS_ALL, account: false })
-    expect(printsOf(SYSTEM_DEFAULT, 'list', { internal: true })).toEqual({ ...PRINTS_ALL, contract: false })
+  //
+  // ── AND CHANGED AGAIN 2026-09-29 ────────────────────────────────────────────
+  // "Everything" is no longer the default. David: "default should NOT include
+  // but have the option to add: Final estimation, the PR#'s ...", so Ref. and
+  // the final estimate are `defaultOff` and print only once somebody ticks
+  // them. SYSTEM_DEFAULT is still both lists EMPTY — that is the point of the
+  // second list: the default lives on the column definitions, and empty means
+  // "nothing differs from it" rather than "everything is on".
+  it('prints every column that is not marked defaultOff, and neither of the two that are', () => {
+    const OPT_IN = { ref: false, estimate: false }
+    expect(printsOf(SYSTEM_DEFAULT, 'statement')).toEqual({ ...PRINTS_ALL, ...OPT_IN, account: false })
+    expect(printsOf(SYSTEM_DEFAULT, 'list', { internal: true })).toEqual({ ...PRINTS_ALL, ...OPT_IN, contract: false })
     expect(ledgerColumns(printsOf(SYSTEM_DEFAULT, 'list', { internal: true })))
       .toEqual(['account', 'requested', 'status', 'target', 'final', 'credits'])
-    expect(SYSTEM_DEFAULT).toEqual({ colsOff: [], sectionsOff: [] })
+    expect(SYSTEM_DEFAULT).toEqual({ colsOff: [], colsOn: [], sectionsOff: [] })
+    // The defaults are stated ONCE, on the defs — not here and not in
+    // SYSTEM_DEFAULT. This is the assertion that keeps them from drifting.
+    expect(PRINT_COLUMNS.filter(c => c.defaultOff).map(c => c.id)).toEqual(Object.keys(OPT_IN))
   })
 
   // ── INVERTED 2026-09-29 ─────────────────────────────────────────────────────
@@ -108,10 +128,21 @@ describe('the system default', () => {
     expect(Object.keys(printsOf(SYSTEM_DEFAULT, 'statement'))).not.toContain('collected')
   })
 
-  it('never offers the reference or the study name, and offers Account only on a list that spans accounts', () => {
+  // ── HALF INVERTED 2026-09-29 ────────────────────────────────────────────────
+  // Was "never offers the reference or the study name". The reference is now
+  // offered — David asked for the PR numbers off by default with a tick to add
+  // them — and it is offered on BOTH documents, off in both until ticked. The
+  // study name is the half that did not move: it is the only thing left in
+  // ALWAYS_PRINTED, because a row without it matches nothing the client holds.
+  it('offers the reference but never the study name, and offers Account only on a list that spans accounts', () => {
     const ids = PRINT_COLUMNS.map(c => c.id) as string[]
-    expect(ids).not.toContain('ref')
     expect(ids).not.toContain('study')
+    expect(ALWAYS_PRINTED).toEqual(['Study and audience'])
+    for (const doc of DOCS) {
+      expect(offeredColumns(doc).map(c => c.id)).toContain('ref')
+      expect(printsOf(SYSTEM_DEFAULT, doc).ref).toBe(false)
+      expect(printsOf(choice([], [], ['ref']), doc).ref).toBe(true)
+    }
     expect(offeredColumns('statement').map(c => c.id)).not.toContain('account')
     expect(offeredColumns('list').map(c => c.id)).not.toContain('account')
     expect(offeredColumns('list', { internal: true }).map(c => c.id)).toContain('account')
@@ -140,6 +171,40 @@ describe('toggling', () => {
     c = toggleSection(c, 'notes', 'statement')
     expect(sectionOn(c, 'notes')).toBe(false)
   })
+
+  // ── ADDED 2026-09-29 ────────────────────────────────────────────────────────
+  // The same toggle, for a column whose default runs the other way. It moves in
+  // and out of `colsOn` instead, and nothing about the ordinary columns changes
+  // — which is the property that let this land without a storage-key bump.
+  it('turns an off-by-default column ON and back off, in the other list', () => {
+    let c = toggleColumn(choice(), 'ref', 'statement')
+    expect(columnOn(c, 'ref')).toBe(true)
+    expect(c.colsOn).toEqual(['ref'])
+    expect(c.colsOff).toEqual([])
+    c = toggleColumn(c, 'estimate', 'statement')
+    // Print order, same as colsOff keeps: Ref. before the final estimate.
+    expect(c.colsOn).toEqual(['ref', 'estimate'])
+    c = toggleColumn(c, 'ref', 'statement')
+    expect(c.colsOn).toEqual(['estimate'])
+    expect(columnOn(c, 'ref')).toBe(false)
+    // Unticking an opt-in never writes it to colsOff — an id in the list that
+    // does not govern it would be silently ignored, and a later default flip
+    // would then resurrect a choice nobody made.
+    expect(c.colsOff).toEqual([])
+  })
+
+  // The two ways of saying "not a column" have to name the same ids: a runtime
+  // flag on the defs, and a type the ledger is written against. Nothing can
+  // make a type read a boolean off a const array, so this is the seam, and
+  // this is the test that guards it.
+  it('keeps cellOnly and LedgerColumnId in step', () => {
+    const cellOnly = PRINT_COLUMNS.filter(c => c.cellOnly).map(c => c.id)
+    expect(cellOnly).toEqual(['estimate'])
+    const drawn: LedgerColumnId[] = ledgerColumns(PRINTS_ALL)
+    for (const id of cellOnly) expect(drawn as string[]).not.toContain(id)
+    // Every other column, with every tick on, IS drawn.
+    expect(drawn).toEqual(PRINT_COLUMNS.filter(c => !c.cellOnly).map(c => c.id))
+  })
 })
 
 describe('the link', () => {
@@ -154,15 +219,40 @@ describe('the link', () => {
   // '-collected' and this test said so. With the default empty again, the
   // system default and "nothing turned off" are the same choice and both write
   // `all`.
-  it('round-trips a choice as what is OFF, and "all" when nothing is', () => {
+  it('round-trips a choice as what DIFFERS from the defaults, and "all" when nothing does', () => {
     const c = choice(['target', 'credits'], ['notes'])
     const v = serializeUrlChoice(c, 'statement')
     expect(v).toEqual({ cols: '-target,-credits', sections: '-notes' })
     const back = parseUrlChoice('statement', v.cols, v.sections)
-    expect(back).toEqual({ colsOff: ['target', 'credits'], sectionsOff: ['notes'] })
+    expect(back).toEqual({ colsOff: ['target', 'credits'], colsOn: [], sectionsOff: ['notes'] })
     expect(serializeUrlChoice(SYSTEM_DEFAULT, 'list')).toEqual({ cols: 'all', sections: 'all' })
-    expect(parseUrlChoice('list', 'all', 'all')).toEqual({ colsOff: [], sectionsOff: [] })
+    expect(parseUrlChoice('list', 'all', 'all')).toEqual({ colsOff: [], colsOn: [], sectionsOff: [] })
     expect(serializeUrlChoice(choice(), 'list')).toEqual({ cols: 'all', sections: 'all' })
+  })
+
+  // ── ADDED 2026-09-29 ────────────────────────────────────────────────────────
+  // The opt-in half of the link, and the reason its prefix is `*` and not `+`.
+  it('carries an opt-in as "*id", both ways, and survives a real query string', () => {
+    const c = choice(['target'], [], ['ref', 'estimate'])
+    const v = serializeUrlChoice(c, 'statement')
+    expect(v.cols).toBe('-target,*ref,*estimate')
+    expect(parseUrlChoice('statement', v.cols, v.sections))
+      .toEqual({ colsOff: ['target'], colsOn: ['ref', 'estimate'], sectionsOff: [] })
+    expect(printsOf(resolveChoice(parseUrlChoice('statement', v.cols, null), null), 'statement').ref).toBe(true)
+
+    // A link states the WHOLE column choice: "-target" alone means no opt-in
+    // was ticked, not "ask my saved default about the opt-ins".
+    expect(parseUrlChoice('statement', '-target', null).colsOn).toEqual([])
+
+    // THE TRAP THIS PREFIX EXISTS TO AVOID. A bare "+" in a query string
+    // decodes to a space, so "+ref" would arrive as "ref" — one of the RETIRED
+    // bare-id tokens that mean "on" — and be parsed as a legacy link. "*" is in
+    // the urlencoded safe set, so it makes the round trip through a real
+    // URLSearchParams untouched.
+    const q = withChoiceInSearch('?preset=qtd', c, 'statement')
+    expect(q).toContain('cols=-target,*ref,*estimate')
+    expect(new URLSearchParams(q).get('cols')).toBe('-target,*ref,*estimate')
+    expect(new URLSearchParams('?cols=+ref').get('cols')).toBe(' ref')
   })
 
   it('keeps every other parameter, and leaves commas readable', () => {
@@ -248,8 +338,8 @@ describe('precedence: the link, then the saved default, then everything', () => 
     expect(r.sectionsOff).not.toBe(SYSTEM_DEFAULT.sectionsOff)
     r.colsOff.push('target')
     r.sectionsOff.push('notes')
-    expect(resolveChoice({}, null)).toEqual({ colsOff: [], sectionsOff: [] })
-    expect(SYSTEM_DEFAULT).toEqual({ colsOff: [], sectionsOff: [] })
+    expect(resolveChoice({}, null)).toEqual({ colsOff: [], colsOn: [], sectionsOff: [] })
+    expect(SYSTEM_DEFAULT).toEqual({ colsOff: [], colsOn: [], sectionsOff: [] })
 
     // Per PART: a link that speaks only about sections leaves the columns to
     // whatever comes next, rather than clearing them. Checked against a SAVED
@@ -299,11 +389,51 @@ describe('precedence: the link, then the saved default, then everything', () => 
     // read "everything prints except Collected" while the column existed, and a
     // sentence on the pre-send panel naming a column the reader cannot find is
     // exactly the confusion the removal was meant to end.
-    expect(CHOICE_SOURCE_TEXT.system).toBe('Using the system default: everything prints.')
+    // It said "everything prints" until 2026-09-29, and then stopped being
+    // true: Ref. and the final estimate are off until somebody ticks them, and
+    // a line promising a column the reader cannot find is the same confusion in
+    // a different direction.
+    expect(CHOICE_SOURCE_TEXT.system).toBe('Using the system default.')
   })
 })
 
 describe('the saved default, in browser storage', () => {
+  /**
+   * ── WHY ADDING colsOn NEEDED NO v3 (2026-09-29) ────────────────────────────
+   *
+   * The v1→v2 bump happened because silence was AMBIGUOUS in the dangerous
+   * direction: a v1 value that did not name Collected could mean "I never
+   * thought about it" or "I ticked it on", and reading it the wrong way would
+   * have put a column back on a client document.
+   *
+   * Silence about `colsOn` cannot be ambiguous. Every value written before
+   * today predates every off-by-default column, so nobody could have asked for
+   * one, and an empty list is exactly what they meant. The saved defaults
+   * people made this week keep working, which is the whole reason to check.
+   */
+  it('reads a value written before colsOn existed, and defaults its opt-ins off', () => {
+    const store = memoryStore()
+    store.setItem(PRINT_CHOICE_KEY.statement, JSON.stringify({ colsOff: ['target'], sectionsOff: ['notes'] }))
+    const read = readSavedChoice('statement', store)
+    expect(read).toEqual({ colsOff: ['target'], colsOn: [], sectionsOff: ['notes'] })
+    // The deselections it DID record still apply — it is honoured, not dropped.
+    expect(printsOf(read as PrintChoice, 'statement').target).toBe(false)
+    expect(printsOf(read as PrintChoice, 'statement').ref).toBe(false)
+    // A colsOn of the wrong shape is a value this version did not write, and
+    // falls back to the system default rather than being half-applied — the
+    // same rule the other two lists have always had.
+    store.setItem(PRINT_CHOICE_KEY.list, JSON.stringify({ colsOff: [], colsOn: 'ref', sectionsOff: [] }))
+    expect(readSavedChoice('list', store)).toBeNull()
+  })
+
+  it('round-trips an opt-in, so a saved default can ask for one', () => {
+    const store = memoryStore()
+    expect(writeSavedChoice('statement', choice(['target'], [], ['ref']), store)).toBe(true)
+    expect(JSON.parse(store.getItem(PRINT_CHOICE_KEY.statement) as string))
+      .toEqual({ colsOff: ['target'], colsOn: ['ref'], sectionsOff: [] })
+    expect(printsOf(readSavedChoice('statement', store) as PrintChoice, 'statement').ref).toBe(true)
+  })
+
   it('keeps one per document, under a versioned key', () => {
     const store = memoryStore()
     expect(writeSavedChoice('statement', choice(['target']), store)).toBe(true)
@@ -376,6 +506,54 @@ describe('the saved default, in browser storage', () => {
 })
 
 describe('notes about the choice', () => {
+  // ── ADDED 2026-09-29 ────────────────────────────────────────────────────────
+  // The final estimate is the ONE tick that adds something to a client document
+  // rather than taking something away, so it is the one that gets disclosed in
+  // both directions. A projection is not a measurement, and a number in the
+  // Final column is read as a number.
+  describe('the final estimate, which puts a projection on a client document', () => {
+    const on = printsOf(choice([], [], ['estimate']), 'statement')
+    const off = printsOf(SYSTEM_DEFAULT, 'statement')
+
+    it('says how many rows carry a projection when the tick is on', () => {
+      const n = choiceNotes(on, { estimated: 3, noResponseFigure: 0 })
+      expect(n.map(x => x.id)).toEqual(['estimate-on'])
+      expect(n[0].text).toContain('3 studies')
+      expect(n[0].text).toContain('PROJECTED')
+      expect(choiceNotes(on, { estimated: 1 })[0].text).toContain('One study prints a PROJECTED')
+    })
+
+    it('says there was something to show when it is off', () => {
+      // 3 dashes, all of them the withheld projections.
+      const n = choiceNotes(off, { estimated: 3, noResponseFigure: 3 })
+      expect(n.map(x => x.id)).toEqual(['estimate-off'])
+      expect(n[0].text).toContain('Tick Final estimate')
+      // AND NOT ALSO "3 studies print no response figure". Those rows are
+      // dashes because the reader declined the projection, which the note
+      // above has just said in more useful words; counting them twice reports
+      // the same three studies as two different problems.
+      expect(n.map(x => x.id)).not.toContain('no-response-figure')
+    })
+
+    it('still reports the dashes that are nothing to do with the tick', () => {
+      // 5 dashes, 2 of which could have been projected. The other 3 are studies
+      // that have not reached quality review and could never carry a figure.
+      const n = choiceNotes(off, { estimated: 2, noResponseFigure: 5 })
+      expect(n.map(x => x.id)).toEqual(['estimate-off', 'no-response-figure'])
+      expect(n[1].text).toContain('3 studies')
+    })
+
+    it('says nothing at all when there is nothing to project', () => {
+      expect(choiceNotes(on, { estimated: 0 })).toEqual([])
+      expect(choiceNotes(off, { estimated: 0 })).toEqual([])
+      // Nor when Final is off: there is no column for a projection to sit in,
+      // and printsOf has already forced the tick off with it.
+      expect(printsOf(choice(['final'], [], ['estimate']), 'statement').estimate).toBe(false)
+      expect(choiceNotes(printsOf(choice(['final'], [], ['estimate']), 'statement'), { estimated: 3 })
+        .map(x => x.id)).not.toContain('estimate-on')
+    })
+  })
+
   it('warns, without blocking, when Final prints without Target', () => {
     const p = printsOf(choice(['target']), 'statement')
     const notes = choiceNotes(p)
@@ -495,7 +673,9 @@ describe('Collected cannot come back', () => {
       // A current link that names it, either way round. "-collected" is a
       // deselection of a column that is not there, and "collected" on its own
       // is not a current token at all.
-      expect(parseUrlChoice(doc, '-collected', null)).toEqual({ colsOff: [] })
+      expect(parseUrlChoice(doc, '-collected', null)).toEqual({ colsOff: [], colsOn: [] })
+      // Nor through the opt-in half of a link, which is the new way in.
+      expect(parseUrlChoice(doc, '*collected', null)).toEqual({ colsOff: [], colsOn: [] })
       expect(parseUrlChoice(doc, '-target,-collected', null).colsOff).toEqual(['target'])
       // The retired token, alone. It maps to `final` by design (build notes
       // 3G): the word on the old account screen meant the final count. So it

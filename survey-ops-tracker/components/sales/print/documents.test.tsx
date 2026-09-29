@@ -235,18 +235,28 @@ describe('the printed documents', () => {
       const sub = path.join(dir, 'subsets')
       fs.mkdirSync(sub, { recursive: true })
       const subsets = <T,>(xs: T[]) => Array.from({ length: 1 << xs.length }, (_, m) => xs.filter((_, i) => m & (1 << i)))
-      const colIds = (doc: 'statement' | 'list') => PRINT_COLUMNS.filter(c => c.docs.includes(doc)).map(c => c.id)
+      // The DESELECTABLE ids only. An off-by-default column is governed by the
+      // other list, so putting it in `colsOff` says nothing — and a sweep built
+      // that way would silently stop covering the WIDEST table, which is the
+      // one page-width regressions show up in. Each subset is therefore
+      // rendered twice, with the opt-ins off and with them on.
+      const colIds = (doc: 'statement' | 'list') =>
+        PRINT_COLUMNS.filter(c => c.docs.includes(doc) && !c.defaultOff).map(c => c.id)
+      const optIn = (doc: 'statement' | 'list') =>
+        PRINT_COLUMNS.filter(c => c.docs.includes(doc) && c.defaultOff && !c.cellOnly).map(c => c.id)
       const secIds = (doc: 'statement' | 'list') => PRINT_SECTIONS.filter(c => c.docs.includes(doc)).map(c => c.id)
       const name = (off: string[]) => off.length ? off.join('.') : 'all'
       const write = (file: string, html: string, title: string) => fs.writeFileSync(path.join(sub, file), page(title, html, appCss))
       for (const off of subsets(colIds('statement'))) {
         write(`st-c-${name(off)}.html`, statement({ printChoice: { colsOff: off } }), ST)
+        write(`st-c-${name(off)}+ref.html`, statement({ printChoice: { colsOff: off, colsOn: optIn('statement') } }), ST)
       }
       for (const off of subsets(secIds('statement'))) {
         write(`st-s-${name(off)}.html`, statement({ printChoice: { sectionsOff: off } }), ST)
       }
       for (const off of subsets(colIds('list'))) {
         write(`li-c-${name(off)}.html`, quarterList('internal', { colsOff: off }), IN)
+        write(`li-c-${name(off)}+ref.html`, quarterList('internal', { colsOff: off, colsOn: optIn('list') }), IN)
         if (!off.includes('account')) write(`lc-c-${name(off)}.html`, quarterList('client', { colsOff: off }), LI)
       }
       for (const off of subsets(secIds('list'))) {
@@ -254,6 +264,10 @@ describe('the printed documents', () => {
       }
       write('st-none.html', statement({ printChoice: { colsOff: colIds('statement'), sectionsOff: secIds('statement') } }), ST)
       write('li-none.html', quarterList('internal', { colsOff: colIds('list'), sectionsOff: secIds('list') }), IN)
+      // And the widest each document can be: every deselectable column on AND
+      // every opt-in ticked.
+      write('st-widest.html', statement({ printChoice: { colsOff: [], colsOn: optIn('statement') } }), ST)
+      write('li-widest.html', quarterList('internal', { colsOff: [], colsOn: optIn('list') }), IN)
     }
   }, 300_000)
 })
@@ -275,11 +289,24 @@ describe('what prints (David, 2026-09-27)', () => {
   const all = statement()
   const noTarget = statement({ printChoice: { colsOff: ['target'] } })
 
-  it('prints everything it has by default, and has nothing called Collected', () => {
+  it('prints every column it does not hold back, and has nothing called Collected', () => {
     for (const h of [all, quarterList('client')]) {
-      for (const head of ['Ref.', 'Study and audience', 'Requested by', 'Status', 'Responses', 'Target', 'Final', 'Credits']) {
+      for (const head of ['Study and audience', 'Requested by', 'Status', 'Responses', 'Target', 'Final', 'Credits']) {
         expect(h).toContain(`>${head}</th>`)
       }
+      // ── ADDED 2026-09-29 ──────────────────────────────────────────────────
+      // Ref. is NOT in that list any more. David: "default should NOT include
+      // but have the option to add … the PR#'s". It is a real column with a
+      // real tick — Ledger.test.tsx proves ticking it puts the header back on
+      // the left of the study name — it is simply not on by default, and this
+      // is the assertion that says the document a salesperson gets without
+      // touching anything does not carry our internal project numbers.
+      expect(h).not.toContain('>Ref.</th>')
+      // Not the header and not the cells. NOT a bare search for "PR00": the
+      // pre-send checklist names studies by their code on purpose, and that
+      // panel never goes to a client — it is the screen the salesperson reads
+      // before pressing print.
+      expect(h).not.toContain('class="st-ref"')
       // WAS: "Still tickable — see printColumns." On 2026-09-28 the column was
       // merely off by default, so this line protected a DEFAULT. David closed
       // that gap on 2026-09-29 — "lets actually remove 'collected' from all
@@ -291,9 +318,11 @@ describe('what prints (David, 2026-09-27)', () => {
     }
     expect(all).toContain('aria-label="Notes"')
     expect(all).toContain('>Contract summary')
-    // WAS "… everything prints except Collected." The exception is gone with
-    // the column: the sentence a salesperson reads has to match the page.
-    expect(all).toContain('Using the system default: everything prints.')
+    // WAS "… everything prints except Collected", then just "everything
+    // prints". Neither is true now that two columns are held back, and the
+    // sentence a salesperson reads has to match the page.
+    expect(all).toContain('Using the system default.')
+    expect(all).not.toContain('everything prints')
     expect(quarterList('internal')).toContain('>Account</th>')
   })
 
@@ -573,7 +602,17 @@ describe('nothing quotes a figure the chosen document leaves out', () => {
     expect(unexplainedMarks({ ...args, prints: PRINTS_ALL })).toEqual(['estimate'])
     // The ≈ is printed only in the Final column.
     expect(unexplainedMarks({ ...args, prints: { ...PRINTS_ALL, final: false } })).toEqual([])
+    // ── ADDED 2026-09-29 ──────────────────────────────────────────────────
+    // And only while its own tick is on. This is the assertion that the gate
+    // went in at responseCells rather than at the component: with the tick
+    // off there is no ≈ on the page, so there is nothing left unexplained and
+    // the panel has no business warning about it.
+    expect(unexplainedMarks({ ...args, prints: { ...PRINTS_ALL, estimate: false } })).toEqual([])
   })
+
+  // The projection's own rendering is pinned in Ledger.test.tsx, on a row in
+  // quality review — there is none in this fixture, which is why the statement
+  // above carries no "≈" to begin with.
 
   it('the checklist does not send anyone to fix a date or a figure that is not printing', () => {
     const none = statement({ printChoice: { colsOff: ALL_COLS_ST, sectionsOff: ALL_SECTIONS_ST } })
@@ -650,7 +689,7 @@ describe('Collected cannot come back', () => {
     // known id, so it is dropped rather than turning some other column off.
     const off = parseUrlChoice('statement', '-collected', null)
     const on = parseUrlChoice('statement', '-requested', null)
-    expect(off).toEqual({ colsOff: [] })
+    expect(off).toEqual({ colsOff: [], colsOn: [] })
     expect(statement({ printChoice: off })).toBe(statement())
     expect(on.colsOff).toEqual(['requested'])
     for (const h of [statement({ printChoice: off }), statement({ printChoice: on })]) {

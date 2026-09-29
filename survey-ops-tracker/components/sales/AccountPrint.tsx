@@ -5,7 +5,7 @@ import type { Term } from '@/lib/sales/credits'
 import type { DateBasis, Range } from '@/lib/sales/dateRange'
 import {
   activityFigures, clientStage, describeRangeForClient, documentTitle, fmtDay, fmtDayLong, footerText, n0, nb,
-  noResponseFigureCount, preSendChecks, printedName, statementFigures, timeET, type Glyph,
+  estimatedCount, noResponseFigureCount, preSendChecks, printedName, statementFigures, timeET, type Glyph,
 } from '@/lib/sales/statement'
 import { choiceNotes, ledgerColumns, type UrlChoice } from '@/lib/sales/printColumns'
 import type { AccountProject } from './AccountDetail'
@@ -97,7 +97,8 @@ export function AccountPrint({
   // only the notes account for.
   const cNotes = choiceNotes(prints, {
     unexplained: unexplainedMarks({ rows, neverRecorded: never, prints, notes: allNotes }),
-    noResponseFigure: noResponseFigureCount(rows, never),
+    noResponseFigure: noResponseFigureCount(rows, never, { estimate: prints.estimate }),
+    estimated: estimatedCount(rows, never),
   })
 
   const checks = preSendChecks({
@@ -191,6 +192,7 @@ export function AccountPrint({
               `Total${credits ? ' credits drawn' : ''} · ${ranged ? '' : 'all '}${n0(n)} ${n === 1 ? 'study' : 'studies'} listed`}
             fn={fn}
             columns={ledgerColumns(prints)}
+            estimate={prints.estimate}
           />
         </section>
 

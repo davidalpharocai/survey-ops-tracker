@@ -90,7 +90,7 @@ export function unexplainedMarks({ rows, neverRecorded, prints, notes }: {
   // "at least" and "Not yet priced" print wherever this note would be needed.
   if (notes.some(n => n.key === 'unpriced')) out.push('floor')
   if (prints.final) {
-    const finals = rows.map(p => responseCells(p, neverRecorded.has(p.id)).final)
+    const finals = rows.map(p => responseCells(p, neverRecorded.has(p.id), { estimate: prints.estimate }).final)
     if (finals.some(f => f.kind === 'estimate')) out.push('estimate')
     if (finals.some(f => f.kind === 'not-recorded')) out.push('not-recorded')
   }
@@ -125,7 +125,7 @@ function idleSentence(u: StatementRow[], also: boolean): string {
  */
 function finalNote(rows: StatementRow[], neverRecorded: Set<string>, prints: Prints): Note {
   const anyLive = rows.some(p => clientStage(p).group !== 'delivered')
-  const cells = rows.map(p => responseCells(p, neverRecorded.has(p.id)))
+  const cells = rows.map(p => responseCells(p, neverRecorded.has(p.id), { estimate: prints.estimate }))
   const anyBelow = cells.some(c => c.final.kind === 'final' && c.final.below)
   const estimates = cells.map(c => c.final).filter(f => f.kind === 'estimate')
   const noFinal = rows.filter(p => clientStage(p).group === 'delivered' && p.n_actual == null)

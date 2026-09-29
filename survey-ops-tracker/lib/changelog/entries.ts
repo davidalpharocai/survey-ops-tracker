@@ -80,6 +80,60 @@ export function changelogFor(audience: ChangeAudience): ChangelogEntry[] {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    date: '2026-09-29',
+    changes: [
+      // ── The client documents. These ARE the sales tier's own screens, so
+      //    almost everything here is 'all': a salesperson who does not know
+      //    what changed on the page they send is the person this file is for.
+      {
+        kind: 'IMPROVED',
+        text: 'Everything a client reads now says "study" rather than "survey". The two documents are the Study Activity Statement and the Study List, and the table is headed "Study and audience".',
+        audience: 'all',
+      },
+      {
+        kind: 'NEW',
+        text: 'A study now starts in Study Questions Review — the stage before anyone builds anything, while the questions are still being agreed. On a client document it reads "Questions in review".',
+        audience: 'all',
+      },
+      {
+        kind: 'NEW',
+        text: 'Cycle time is now measured from the day a study was actually cleared to start, not from the day it arrived, so waiting on sign-off no longer counts against the team. Studies from before that day are measured the old way, and the charts mark where the change begins.',
+      },
+      {
+        kind: 'IMPROVED',
+        text: 'The statement and the list no longer tally how many studies fell short of target. The percentage of target and the mark beside a low final count are still there, so a low figure is still visible on its own row — the summary just stops counting up misses.',
+        audience: 'all',
+      },
+      {
+        kind: 'NEW',
+        text: 'Two things can now be ADDED to a client document instead of only taken away: our PR numbers (the Ref. column), and a projected final count for a study still in quality review. Both are off unless you tick them, and both stay ticked if you save your default.',
+        audience: 'all',
+      },
+      {
+        kind: 'NEW',
+        text: 'Before you print, the panel says how many studies would carry a projected final count — whether you have turned it on or left it off — so a projection never reaches a client unnoticed and never gets left off by accident either.',
+        audience: 'all',
+      },
+      {
+        kind: 'FIXED',
+        text: '"Collected" has gone from client documents entirely. A client sees what they bought and what was delivered, and there is no longer a tick that can put the in-field count back.',
+        audience: 'all',
+      },
+      {
+        kind: 'FIXED',
+        text: 'Saving a change to a contract now tells you it saved, and says so plainly if the database refused it. Removing one no longer reports success over a contract that is still there.',
+      },
+      {
+        kind: 'IMPROVED',
+        text: 'A contract now has a visible edit button beside the remove one. Clicking the contract name still opens the same editor.',
+      },
+      {
+        kind: 'IMPROVED',
+        text: 'Insights has moved into the top bar, and Admin and Sign out now live under the circle with your initials in the corner.',
+      },
+    ],
+  },
+  {
     date: '2026-09-28',
     changes: [
       // ── The finance hub. Every bullet here is about money, so none of them

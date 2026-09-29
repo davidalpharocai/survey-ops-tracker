@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 import { usePrintChoice } from './usePrintChoice'
-import { CHOICE_SOURCE_TEXT, parseUrlChoice, PRINT_CHOICE_KEY } from '@/lib/sales/printColumns'
+import { CHOICE_SOURCE_TEXT, parseUrlChoice, PRINT_CHOICE_KEY, PRINT_COLUMNS } from '@/lib/sales/printColumns'
 
 /**
  * The live choice on the print page: the saved default applied after mount,
@@ -64,7 +64,7 @@ describe('usePrintChoice', () => {
     expect(window.location.search).not.toMatch(/collected/i)
     // What the address bar now says reproduces the choice.
     expect(parseUrlChoice('statement', sp.get('cols'), sp.get('sections')))
-      .toEqual({ colsOff: ['target'], sectionsOff: [] })
+      .toEqual({ colsOff: ['target'], colsOn: [], sectionsOff: [] })
   })
 
   it('saves a default per document, and reset returns to the system default and forgets it', () => {
@@ -78,37 +78,41 @@ describe('usePrintChoice', () => {
     // off on the page being saved and Collected was off there. That is what
     // made the stored shape unable to express "I want an off-by-default column
     // ON", and it is why PRINT_CHOICE_KEY was versioned to v2 rather than have
-    // v1 values reinterpreted. As of 2026-09-29 no column is off by default,
-    // so a saved value is once again only what this person deselected — and
-    // the shape's one weakness is now a safety property: a list of what is OFF
-    // has no way to ask for a column that no longer exists.
+    // v1 values reinterpreted. LATER THE SAME DAY that weakness was fixed
+    // properly rather than avoided: a stored choice now carries `colsOn` too,
+    // so it can say "I want this off-by-default column ON" without anyone
+    // having to guess from silence. The empty `colsOn` here is that being
+    // honest — this person ticked no opt-in, and saying so costs nothing.
     expect(JSON.parse(localStorage.getItem(PRINT_CHOICE_KEY.statement) as string))
-      .toEqual({ colsOff: [], sectionsOff: ['activity'] })
+      .toEqual({ colsOff: [], colsOn: [], sectionsOff: ['activity'] })
     expect(localStorage.getItem(PRINT_CHOICE_KEY.statement)).not.toMatch(/collected/i)
     expect(localStorage.getItem(PRINT_CHOICE_KEY.list)).toBeNull()
 
     act(() => result.current.controls.reset())
     expect(localStorage.getItem(PRINT_CHOICE_KEY.statement)).toBeNull()
     expect(result.current.prints.activity).toBe(true)
-    // Reset goes to the SYSTEM default, and the system default IS "everything"
-    // again — the line under the checkboxes says so in as many words, and that
-    // sentence is only true while no column is quietly held back. Every tick on
-    // offer comes back on, and the flags are spelled out in full so that a
-    // column added to the document later has to be accounted for here (and so
-    // that a `collected` flag creeping back would fail this equality, not
-    // silently pass an `every(Boolean)`).
-    expect(result.current.controls.columns.every(c => c.on)).toBe(true)
+    // Reset goes to the SYSTEM default. The line under the checkboxes no
+    // longer claims that means "everything prints", because since 2026-09-29 it
+    // does not: Ref. and the final estimate are held back until ticked. Every
+    // tick that is ON by default comes back on and every opt-in goes back off,
+    // and the flags are spelled out in full so that a column added to the
+    // document later has to be accounted for here (and so that a `collected`
+    // flag creeping back would fail this equality, not silently pass an
+    // `every(Boolean)`).
+    const optIn = new Set(PRINT_COLUMNS.filter(c => c.defaultOff).map(c => c.id))
+    expect(result.current.controls.columns.every(c => c.on === !optIn.has(c.def.id))).toBe(true)
     expect(result.current.controls.sections.every(s => s.on)).toBe(true)
     expect(result.current.prints).toEqual({
       // `account` is not a statement column at all — a statement is one
       // account — so it is false whatever is ticked. Everything the document
-      // HAS prints.
+      // HAS and does not hold back prints.
       account: false,
+      ref: false, estimate: false,
       requested: true, status: true, target: true, final: true, credits: true,
       contract: true, activity: true, notes: true,
     })
     expect(result.current.controls.source).toBe('system')
-    expect(CHOICE_SOURCE_TEXT.system).toBe('Using the system default: everything prints.')
+    expect(CHOICE_SOURCE_TEXT.system).toBe('Using the system default.')
     expect(result.current.controls.hasSaved).toBe(false)
     expect(result.current.controls.feedback).toBe('reset')
   })
@@ -117,7 +121,10 @@ describe('usePrintChoice', () => {
     const client = renderHook(() => usePrintChoice('list', {})).result.current.controls.columns.map(c => c.def.id)
     const internal = renderHook(() => usePrintChoice('list', {}, { internal: true })).result.current.controls.columns.map(c => c.def.id)
     expect(client).not.toContain('account')
-    expect(internal[0]).toBe('account')
+    // Ref. leads the picker on every document (it is first in PRINT_COLUMNS,
+    // because it prints left of the study name), so Account is second.
+    expect(internal[0]).toBe('ref')
+    expect(internal[1]).toBe('account')
   })
 
   /**
@@ -187,7 +194,7 @@ describe('usePrintChoice', () => {
       // The token is dropped, not honoured and not fatal: the rest of the link
       // still means what it says. (No `sectionsOff` key — a link carries only
       // the parts it names, and this one names no sections.)
-      expect(url).toEqual({ colsOff: ['target'] })
+      expect(url).toEqual({ colsOff: ['target'], colsOn: [] })
       const { result } = renderHook(() => usePrintChoice('statement', url))
       expect(result.current.prints.target).toBe(false)
       expect(result.current.prints.final).toBe(true)

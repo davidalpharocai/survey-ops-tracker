@@ -4,7 +4,7 @@ import { Ledger } from './Ledger'
 import { clientStage, ledgerTotals, n0, todayET, type StatementRow } from '@/lib/sales/statement'
 import {
   PRINT_COLUMNS, SYSTEM_DEFAULT, ledgerColumns, parseStoredChoice, parseUrlChoice,
-  printsOf, resolveChoice, type PrintColumnId,
+  printsOf, resolveChoice, type LedgerColumnId,
 } from '@/lib/sales/printColumns'
 import {
   FIXTURE_CLIENT, FIXTURE_NEVER_RECORDED, FIXTURE_NOW, FIXTURE_ROWS,
@@ -38,12 +38,14 @@ import {
 const TODAY = todayET(FIXTURE_NOW)
 const never = new Set(FIXTURE_NEVER_RECORDED)
 const rows = FIXTURE_ROWS.map(p => ({ ...p, client_id: FIXTURE_CLIENT.id })) as StatementRow[]
-const ALL = PRINT_COLUMNS.map(c => c.id)
-const HEAD: Partial<Record<PrintColumnId, string>> = { target: 'Target', final: 'Final' }
+// Every column the ledger can draw. 'estimate' is a tick, not a column
+// (printColumns `cellOnly`), so it is not one of these.
+const ALL: LedgerColumnId[] = PRINT_COLUMNS.filter(c => !c.cellOnly).map(c => c.id as LedgerColumnId)
+const HEAD: Partial<Record<LedgerColumnId, string>> = { target: 'Target', final: 'Final' }
 /** The columns that sit under the "Responses" spanner. Two, since 2026-09-29. */
-const RESPONSES: PrintColumnId[] = ['target', 'final']
+const RESPONSES: LedgerColumnId[] = ['target', 'final']
 
-function render(columns: PrintColumnId[], { grouped = true, accountCol = false } = {}) {
+function render(columns: LedgerColumnId[], { grouped = true, accountCol = false } = {}) {
   const html = renderToStaticMarkup(
     <Ledger
       rows={rows}
@@ -129,23 +131,85 @@ describe('the ledger, all columns (the system default)', () => {
   })
 })
 
-describe('the ledger, every optional column off', () => {
-  const t = render([])
+// ── NARROWED 2026-09-29 ─────────────────────────────────────────────────────
+// Was "every optional column off" leaving Ref. and the study name, because Ref.
+// was not optional. It is now (David: the PR numbers off by default, with a
+// tick to add them), so the narrowest table this component can draw is ONE
+// column: the study and its audience, which is the only thing left that a row
+// cannot be identified without.
+/**
+ * ── THE PROJECTION IN THE FINAL COLUMN (2026-09-29) ─────────────────────────
+ *
+ * David: "default should NOT include but have the option to add: Final
+ * estimation". Rendered rather than unit-tested, because what is being
+ * protected is what a CLIENT reads: a projected number sitting in a column
+ * headed Final, which they have every reason to take for a delivered count.
+ * There is no row in quality review in the shared fixture, so this describe
+ * brings its own.
+ */
+describe('the final estimate', () => {
+  const qa: StatementRow = {
+    id: 'qa', project_code: 'PR9', project_name: 'Study Zulu - Audience', board_column: 'Data QA',
+    status: 'Open', phase: 'Active', n_target: 1000, n_target_max: null, n_collected: 900,
+    n_actual: null, credits: 10, deliver_date: '2026-10-01', delivered_at: null,
+  }
+  const draw = (estimate: boolean) => renderToStaticMarkup(
+    <Ledger
+      rows={[qa]} grouped={false} today={TODAY} currentTermId="term-2026" neverRecorded={never}
+      totalLabel={n => `Total · ${n} listed`} fn={{ unpriced: null, final: null }}
+      columns={['target', 'final']} estimate={estimate}
+    />,
+  )
 
-  it('is the reference and the study, in one header row, with no spanner', () => {
-    expect(t.cols).toBe(2)
+  it('is a dash unless the tick is on, and a marked projection when it is', () => {
+    const off = draw(false)
+    expect(off).not.toContain('st-est')
+    expect(off).toContain('st-dash')
+    const on = draw(true)
+    expect(on).toContain('st-est-tag')
+    expect(on).toContain('est.')
+    // The TARGET is unaffected either way: it is a figure the client bought,
+    // not one we projected.
+    for (const h of [off, on]) expect(h).toContain('1,000')
+  })
+
+  it('never withholds a measured final, which is not a projection', () => {
+    const delivered = { ...qa, board_column: 'Delivery', status: 'Closed', n_actual: 940 } as StatementRow
+    const html = renderToStaticMarkup(
+      <Ledger
+        rows={[delivered]} grouped={false} today={TODAY} currentTermId="term-2026" neverRecorded={never}
+        totalLabel={n => `Total · ${n} listed`} fn={{ unpriced: null, final: null }}
+        columns={['target', 'final']} estimate={false}
+      />,
+    )
+    expect(html).toContain('940')
+    expect(html).not.toContain('st-est')
+  })
+})
+
+describe('the ledger, every column off that can be', () => {
+  const t = render([])
+  const withRef = render(['ref'])
+
+  it('is the study alone, in one header row, with no spanner', () => {
+    expect(t.cols).toBe(1)
     expect(t.headRows).toBe(1)
-    expect(t.head1).toEqual(['Ref.', 'Study and audience'])
+    expect(t.head1).toEqual(['Study and audience'])
     expect(t.spanner).toBeNull()
-    expect(new Set(t.bodyWidths)).toEqual(new Set([2]))
+    expect(new Set(t.bodyWidths)).toEqual(new Set([1]))
+    // And Ref. is a column like any other: ticking it adds exactly one, on the
+    // LEFT of the study name rather than with the rest on the right.
+    expect(withRef.cols).toBe(2)
+    expect(withRef.head1).toEqual(['Ref.', 'Study and audience'])
   })
 
   it('prints no subtotal or total row, since none would hold a figure', () => {
     expect(t.subs).toBe(0)
     expect(t.total).toBeNull()
     expect(t.html).not.toContain('Total credits drawn')
-    // Still every survey, still grouped.
-    expect(t.table.querySelectorAll('td.st-ref').length).toBe(rows.length)
+    // No Ref. cells at all, and one per row once it is ticked.
+    expect(t.table.querySelectorAll('td.st-ref').length).toBe(0)
+    expect(withRef.table.querySelectorAll('td.st-ref').length).toBe(rows.length)
     expect(t.table.querySelectorAll('tr.st-grp').length).toBe(GROUPS)
   })
 })
@@ -232,7 +296,7 @@ describe('the ledger, Credits off', () => {
 describe('the ledger, every subset of columns', () => {
   // 2^6 subsets, on the grouped statement and the ungrouped internal list.
   // (Was 2^7 until the Collected column was removed on 2026-09-29.)
-  const subsets: PrintColumnId[][] = []
+  const subsets: LedgerColumnId[][] = []
   for (let m = 0; m < 1 << ALL.length; m++) subsets.push(ALL.filter((_, i) => m & (1 << i)))
 
   it('always spans exactly its declared columns, with the spanner over only the response columns that print', () => {
@@ -242,7 +306,9 @@ describe('the ledger, every subset of columns', () => {
         const shown = cols.filter(id => id !== 'account' || mode.accountCol)
         const responses = shown.filter(id => RESPONSES.includes(id))
         const where = `${mode.grouped ? 'statement' : 'list'} [${cols.join(',')}]`
-        expect(t.cols, where).toBe(2 + shown.length)
+        // ONE fixed column since 2026-09-29 — the study name. Ref. is inside
+        // `shown` now, and this loop renders it in every combination there is.
+        expect(t.cols, where).toBe(1 + shown.length)
         expect(t.headWidths.every(w => w === t.cols), where).toBe(true)
         expect(t.bodyWidths.every(w => w === t.cols), where).toBe(true)
         // The spanner groups, so it appears only with two or more to group;
@@ -287,12 +353,15 @@ describe('Collected cannot come back', () => {
     // module will honour, and ALL_COLUMNS inside Ledger itself. Nothing names
     // it, so there is nothing to turn on.
     expect(PRINT_COLUMNS.map(c => c.id)).not.toContain('collected')
-    expect(ALL).toEqual(['account', 'requested', 'status', 'target', 'final', 'credits'])
+    expect(ALL).toEqual(['ref', 'account', 'requested', 'status', 'target', 'final', 'credits'])
     // WAS: SYSTEM_DEFAULT.colsOff === ['collected'] — the one-day state where
-    // the column existed and was defaulted off. It is empty again because
-    // everything that exists now prints, which is what makes the deletion
-    // total rather than a default somebody can argue with.
+    // the column existed and was defaulted off. Both lists are empty, which is
+    // the point: a column held back is held back by its own definition
+    // (`defaultOff`, and Ref. is one), never by a name sitting in here. That is
+    // what makes the deletion total rather than a default somebody can argue
+    // with — there is no list of exceptions for it to be argued back onto.
     expect(SYSTEM_DEFAULT.colsOff).toEqual([])
+    expect(SYSTEM_DEFAULT.colsOn).toEqual([])
   })
 
   it('prints nothing named Collected when nobody has chosen anything', () => {
@@ -302,8 +371,10 @@ describe('Collected cannot come back', () => {
     expect(t.html).not.toMatch(/collected/i)
     // The system default is still a full document: this is not passing because
     // the table came out empty.
-    expect(t.cols).toBe(7)
-    expect(t.table.querySelectorAll('td.st-ref').length).toBe(rows.length)
+    // The system default is a full document minus the two opt-ins, and Ref.
+    // is one of them — so six columns, and no Ref. cells until it is ticked.
+    expect(t.cols).toBe(6)
+    expect(t.table.querySelectorAll('td.st-ref').length).toBe(0)
   })
 
   it('ignores a saved default that names Collected, and one that omits it', () => {
@@ -352,13 +423,13 @@ describe('Collected cannot come back', () => {
     // The last line of defence: Ledger filters `columns` through its own
     // ALL_COLUMNS, so an id from a stale caller, a hand-written test or a
     // future regression in the choice pipeline cannot reach the table.
-    const forced = render(['collected'] as unknown as PrintColumnId[])
-    expect(forced.cols).toBe(2)
+    const forced = render(['collected'] as unknown as LedgerColumnId[])
+    expect(forced.cols).toBe(1)
     expect(forced.headRows).toBe(1)
-    expect(forced.head1).toEqual(['Ref.', 'Study and audience'])
+    expect(forced.head1).toEqual(['Study and audience'])
     expect(forced.html).not.toMatch(/collected/i)
     // Smuggled in beside the real columns, it changes nothing at all.
-    const smuggled = render([...ALL, 'collected'] as unknown as PrintColumnId[])
+    const smuggled = render([...ALL, 'collected'] as unknown as LedgerColumnId[])
     expect(smuggled.html).toBe(render(ALL).html)
   })
 })

@@ -266,26 +266,29 @@ Clients view their data in Occam, so a new contact needs their Occam welcome ema
 
 Salespeople send clients two printed documents, both produced by the app and both designed to be saved as a PDF from the browser's own print dialog:
 
-- **Survey Activity Statement** — one account, opened with **Export PDF** on that account's page.
-- **Survey List** — whatever the sales surveys list is showing (same group, filters and search), opened with **⎙ Export** above the list.
+- **Study Activity Statement** — one account, opened with **Export PDF** on that account's page.
+- **Study List** — whatever the sales studies list is showing (same group, filters and search), opened with **⎙ Export** above the list.
 
-**What the statement carries:** a masthead with the account name, the statement date, the period covered, the contract in force and the client's AlphaROC contact; a **contract summary** (credits drawn, and the balance against the allowance); an **activity summary** (surveys delivered, final responses); the **survey ledger** — Ref., survey and audience, Requested by, Status, Target, Final, Collected and Credits, with group subtotals and a total; and the **notes** that explain any mark in the table. Every page carries a footer: *AlphaROC · Confidential · Prepared for the account name* on the left, the document name, the date and *Page n of N* on the right. A list covering more than one account is an **internal** document: it prints marked Internal, never says "Prepared for", and is not for sending to a client.
+**What the statement carries:** a masthead with the account name, the statement date, the period covered, the contract in force and the client's AlphaROC contact; a **contract summary** (credits drawn, and the balance against the allowance); an **activity summary** (studies delivered, final responses); the **study ledger** — study and audience, Requested by, Status, Target, Final and Credits, with group subtotals and a total (plus **Ref.**, our PR number, if you tick it); and the **notes** that explain any mark in the table. Every page carries a footer: *AlphaROC · Confidential · Prepared for the account name* on the left, the document name, the date and *Page n of N* on the right. A list covering more than one account is an **internal** document: it prints marked Internal, never says "Prepared for", and is not for sending to a client.
 
 **No dollar figure reaches either document.** Credits are counts; what a credit is worth, what we spend, what we charge and our internal targets stay inside the analyst and finance pages.
 
 ### Choosing what prints
 
-By default **everything prints**. To change it for one print:
+By default **everything prints except two things you can add**: our **PR numbers** (the Ref. column) and the **final estimate**. To change it for one print:
 
 1. Open the document (**Export PDF** on an account, or **⎙ Export** on the surveys list). It opens in a new tab with a **pre-send panel** at the top — that panel is on screen only and never prints.
-2. In the panel's **What prints** box, untick any **column** (Requested by, Status, Target, Final, Collected, Credits — plus Account on a multi-account internal list) or any **section** (Contract summary, Activity summary, Notes). The page below changes at once, so you are always looking at what will come out.
-3. **Ref.** and **Survey and audience** are shown ticked and greyed out: they always print, because a row without them matches nothing the client holds.
-4. Click **Save as my default** to make the current ticks your starting point for that kind of document, or **Reset to system default** to turn everything back on and forget the saved one. A line in the box always says which is in effect — *using your saved default*, *the system default*, *the choice in this link*, or *changed for this print only*.
-5. Print or save as PDF. The print dialog opens by itself once the **"Check before sending"** list at the top is empty; while something is still on that list, read it first and print by hand.
+2. In the panel's **What prints** box, untick any **column** (Requested by, Status, Target, Final, Credits — plus Account on a multi-account internal list) or any **section** (Contract summary, Activity summary, Notes). The page below changes at once, so you are always looking at what will come out.
+3. Two ticks work the other way round — they are **off until you turn them on**:
+   - **Ref. (PR number)** — our project number, PR00494 and the like. It is an internal code, so a client has nothing to match it against unless we have quoted it to them.
+   - **Final estimate** — for a study still in quality review, a projected final count (*≈ 480 est.*) in the Final column instead of a dash. It is a projection from how past studies of ours finished against target, **not a measured figure**, so the pre-send panel tells you how many rows carry one before you print. When it is off, the panel still tells you there was something it could have shown.
+4. **Study and audience** is shown ticked and greyed out: it always prints, because a row without it matches nothing the client holds.
+5. Click **Save as my default** to make the current ticks your starting point for that kind of document, or **Reset to system default** to put every tick back where it started and forget the saved one. A line in the box always says which is in effect — *using your saved default*, *the system default*, *the choice in this link*, or *changed for this print only*.
+6. Print or save as PDF. The print dialog opens by itself once the **"Check before sending"** list at the top is empty; while something is still on that list, read it first and print by hand.
 
 **Things worth knowing:**
 
-- Your saved default lives **in your browser** (so it doesn't follow you to another machine), and **statements and survey lists keep separate defaults**. If the browser refuses to save it — a private window, or blocked site data — the panel says so and the print still uses your choice.
+- Your saved default lives **in your browser** (so it doesn't follow you to another machine), and **statements and study lists keep separate defaults**. It remembers what you turned off *and* what you turned on, so a saved default can include the PR numbers. If the browser refuses to save it — a private window, or blocked site data — the panel says so and the print still uses your choice.
 - The **address bar carries your choice**, so a copied link reproduces the same print. An older export link still prints what it always did.
 - **Totals follow the columns.** Turn off Target and no target or percentage is stated anywhere, including the summary; turn off Credits and the credit total goes with it. A subtotal that would hold no figure is left out rather than printed empty, and the "Responses" banner only appears when it has more than one column to group.
 - **Notes and their marks follow too** — a note prints only while something on the page still needs it, so the numbering never points at a figure that isn't there.

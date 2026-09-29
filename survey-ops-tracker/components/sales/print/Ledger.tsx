@@ -4,16 +4,17 @@ import {
   NOT_YET_PRICED, responseCells, sortForStatement, splitTitle, statusWhen,
   type LedgerTotals, type StageGroup, type StatementRow,
 } from '@/lib/sales/statement'
-import { PRINT_COLUMNS, type PrintColumnId } from '@/lib/sales/printColumns'
+import { PRINT_COLUMNS, type LedgerColumnId } from '@/lib/sales/printColumns'
 import { BelowMark, Fn, StatusGlyph } from './StatusGlyph'
 
 /**
  * The survey table, shared by both documents so they cannot drift.
  *
  * THE COLUMNS ARE CHOSEN, not fixed (David, 2026-09-27; lib/sales/printColumns
- * holds the rules). Ref. and "Survey and audience" always print — a row
- * without them matches nothing. Every other column is on unless the
- * salesperson turned it off, and the rest of the table follows:
+ * holds the rules). Only "Study and audience" always prints — a row without it
+ * matches nothing. Every other column is on unless the salesperson turned it
+ * off, or, for the few that default off (Ref., the final estimate), off until
+ * they tick it, and the rest of the table follows:
  *
  *   - Totals follow the columns. No Target subtotal when Target is off, no
  *     credit total when Credits is off, and a subtotal or total row that would
@@ -41,11 +42,17 @@ import { BelowMark, Fn, StatusGlyph } from './StatusGlyph'
  */
 const GROUPS: StageGroup[] = ['progress', 'delivered', 'stopped']
 
-/** Every optional column, in print order — the system default. */
-const ALL_COLUMNS: PrintColumnId[] = PRINT_COLUMNS.map(c => c.id)
+/** Every column this table can draw, in print order. NOT the system default
+ *  any more: Ref. is off until it is ticked. It is still the right fallback
+ *  for a caller that passes no `columns` at all, which is only the internal
+ *  on-screen use and the tests. */
+const ALL_COLUMNS: LedgerColumnId[] = PRINT_COLUMNS.filter(c => !c.cellOnly).map(c => c.id as LedgerColumnId)
 
-/** Colgroup class and header text per optional column. */
-const COL: Record<PrintColumnId, { cls: string; head: string }> = {
+/** Colgroup class and header text per optional column. `estimate` is a tick,
+ *  not a column (printColumns `cellOnly`), so it never reaches this table —
+ *  ledgerColumns filters it out and ALL_COLUMNS is built the same way. */
+const COL: Record<LedgerColumnId, { cls: string; head: string }> = {
+  ref: { cls: 'c-ref', head: 'Ref.' },
   account: { cls: 'c-acct', head: 'Account' },
   requested: { cls: 'c-req', head: 'Requested by' },
   status: { cls: 'c-status', head: 'Status' },
@@ -53,8 +60,12 @@ const COL: Record<PrintColumnId, { cls: string; head: string }> = {
   final: { cls: 'c-fin', head: 'Final' },
   credits: { cls: 'c-cr', head: 'Credits' },
 }
-const RESPONSE: PrintColumnId[] = ['target', 'final']
-const NUMERIC: PrintColumnId[] = ['target', 'final', 'credits']
+/** Ref. prints LEFT of the study name; every other column prints right of it.
+ *  Kept as a named constant because three places (the colgroup, the header row
+ *  and the body row) have to agree about it. */
+const LEADING: LedgerColumnId = 'ref'
+const RESPONSE: LedgerColumnId[] = ['target', 'final']
+const NUMERIC: LedgerColumnId[] = ['target', 'final', 'credits']
 
 function creditSubnotes(t: LedgerTotals, rows: StatementRow[]): string[] {
   const out: string[] = []
@@ -94,6 +105,7 @@ const Dash = () => <span className="st-dash">—</span>
 export function Ledger({
   rows, grouped, accountCol = false, accountNameById, today, currentTermId, neverRecorded, totalLabel, fn,
   columns = ALL_COLUMNS,
+  estimate = true,
 }: {
   rows: StatementRow[]
   /** Group into in progress / delivered / stopped. The list prints ungrouped. */
@@ -113,14 +125,20 @@ export function Ledger({
   fn: { unpriced: number | null; final: number | null; offTerm?: string | null }
   /** The optional columns to print (printColumns.ledgerColumns). Everything by
    *  default. */
-  columns?: PrintColumnId[]
+  columns?: LedgerColumnId[]
+  /** The "Final estimate" tick (printColumns `prints.estimate`). Separate from
+   *  `columns` because it is not one: it decides what the Final column prints
+   *  for a study still in quality review, a projection or a dash. */
+  estimate?: boolean
 }) {
   if (rows.length === 0) {
     return <p className="st-empty">No studies match this selection.</p>
   }
 
   const shown = ALL_COLUMNS.filter(id => columns.includes(id) && (id !== 'account' || accountCol))
-  const has = (id: PrintColumnId) => shown.includes(id)
+  const has = (id: LedgerColumnId) => shown.includes(id)
+  /** The columns right of the study name — everything but Ref. */
+  const after = shown.filter(id => id !== LEADING)
   const responses = shown.filter(id => RESPONSE.includes(id))
   const numeric = shown.filter(id => NUMERIC.includes(id))
   // The spanner groups columns, so it needs two to group. Over a single one it
@@ -130,7 +148,8 @@ export function Ledger({
   // header says the same thing in the space there is.
   const spanner = responses.length > 1
   const headRows = spanner ? 2 : 1
-  const cols = 2 + shown.length
+  // The study name is the only fixed column now; Ref. is inside `shown`.
+  const cols = 1 + shown.length
   // The label cell of a subtotal or total spans everything left of the first
   // figure column (numeric columns always print last, in NUMERIC order).
   const labelSpan = cols - numeric.length
@@ -156,11 +175,11 @@ export function Ledger({
     const st = clientStage(p)
     const [title, aud] = splitTitle(p.project_name)
     const when = statusWhen(p, today)
-    const r = responseCells(p, neverRecorded.has(p.id))
+    const r = responseCells(p, neverRecorded.has(p.id), { estimate })
     const cr = creditCell(p, currentTermId)
     return (
       <tr key={p.id}>
-        <td className="st-ref">{p.project_code ?? <Dash />}</td>
+        {has('ref') && <td className="st-ref">{p.project_code ?? <Dash />}</td>}
         <td>
           <span className="st-title">{title}</span>
           {aud && <span className="st-aud">{aud}</span>}
@@ -205,7 +224,7 @@ export function Ledger({
   }
 
   /** One figure cell per numeric column that prints, in order. */
-  function figures(cells: Partial<Record<PrintColumnId, ReactNode>>) {
+  function figures(cells: Partial<Record<LedgerColumnId, ReactNode>>) {
     // Every numeric column is right-aligned. The ternary this replaced existed
     // only to left-align Collected, which is no longer a column.
     return numeric.map(id => <td key={id} className="r">{cells[id] ?? null}</td>)
@@ -215,15 +234,15 @@ export function Ledger({
     <div className="st-scroll">
       <table className={`st-ledger${has('account') ? ' has-acct' : ''}`}>
         <colgroup>
-          <col className="c-ref" />
+          {has('ref') && <col className="c-ref" />}
           <col />
-          {shown.map(id => <col key={id} className={COL[id].cls} />)}
+          {after.map(id => <col key={id} className={COL[id].cls} />)}
         </colgroup>
         <thead>
           <tr>
-            <th rowSpan={headRows} scope="col">Ref.</th>
+            {has('ref') && <th rowSpan={headRows} scope="col">Ref.</th>}
             <th rowSpan={headRows} scope="col">Study and audience</th>
-            {shown.filter(id => !RESPONSE.includes(id) && id !== 'credits').map(id => (
+            {after.filter(id => !RESPONSE.includes(id) && id !== 'credits').map(id => (
               <th key={id} rowSpan={headRows} scope="col">{COL[id].head}</th>
             ))}
             {spanner

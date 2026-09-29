@@ -332,8 +332,18 @@ export function clearedCollection(p: Pick<StatementRow, 'status' | 'phase' | 'bo
  * this survey (migration 111): its count was never entered, so a 0 is the
  * column default, not a measurement. Pass false when freshness could not be
  * read — a failed read says nothing about the data.
+ *
+ * `estimate` is the "Final estimate" tick (David, 2026-09-29: off by default,
+ * available to add). IT IS GATED HERE, at the one place the cell is decided,
+ * rather than where the cell is drawn — because the projection is not only
+ * drawn. It is counted by noResponseFigureCount, it is what makes the pre-send
+ * panel warn about an unexplained "≈", and it is why the final note exists at
+ * all. Turning it off anywhere but here would leave the page silently
+ * explaining a mark that is no longer on it.
  */
-export function responseCells(p: StatementRow, neverRecorded: boolean): ResponseCells {
+export function responseCells(
+  p: StatementRow, neverRecorded: boolean, { estimate = true }: { estimate?: boolean } = {},
+): ResponseCells {
   const delivered = isDelivered(p)
   const target = p.n_target == null ? null
     : p.n_target_max != null && p.n_target_max !== p.n_target
@@ -346,6 +356,7 @@ export function responseCells(p: StatementRow, neverRecorded: boolean): Response
       ? { kind: 'final', value: p.n_actual, below: p.n_target != null && p.n_actual < p.n_target }
       : { kind: 'not-recorded' }
   } else if (
+    estimate &&
     bucketOf({ status: p.status, phase: p.phase, board_column: p.board_column }) === 'active' &&
     p.board_column === 'Data QA' && p.n_target != null && p.n_target > 0 &&
     // Nothing collected is nothing to estimate FROM. The short-of-target ratio
@@ -385,8 +396,27 @@ export function responseCells(p: StatementRow, neverRecorded: boolean): Response
  * Counted from responseCells rather than from the stage, so it cannot disagree
  * with what the ledger actually draws.
  */
-export function noResponseFigureCount(rows: StatementRow[], neverRecorded: Set<string>): number {
-  return rows.reduce((n, p) => n + (responseCells(p, neverRecorded.has(p.id)).final.kind === 'none' ? 1 : 0), 0)
+export function noResponseFigureCount(
+  rows: StatementRow[], neverRecorded: Set<string>, { estimate = true }: { estimate?: boolean } = {},
+): number {
+  // The estimate tick is passed through, not ignored: turning it off turns
+  // projections into dashes, and a count that did not follow would under-report
+  // the dashes by exactly the rows the reader just chose not to project.
+  return rows.reduce((n, p) => n + (responseCells(p, neverRecorded.has(p.id), { estimate }).final.kind === 'none' ? 1 : 0), 0)
+}
+
+/**
+ * How many rows WOULD print a projected final count — whether or not the
+ * "Final estimate" tick is on, which is the point of it.
+ *
+ * Ticking that box puts a number on a client document that nobody measured:
+ * it is derived from how past studies of ours finished against target. A
+ * client reads a number in the Final column as a number. So the pre-send panel
+ * says how many there are before it goes out, the same way it already says how
+ * many rows print no figure at all.
+ */
+export function estimatedCount(rows: StatementRow[], neverRecorded: Set<string>): number {
+  return rows.reduce((n, p) => n + (responseCells(p, neverRecorded.has(p.id)).final.kind === 'estimate' ? 1 : 0), 0)
 }
 
 /** The printed text of a Final cell, for tests and for anywhere a plain string

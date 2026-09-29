@@ -1,6 +1,6 @@
 /**
- * WHAT PRINTS on the two client documents — the Survey Activity Statement and
- * the Survey List — and where that choice comes from.
+ * WHAT PRINTS on the two client documents — the Study Activity Statement and
+ * the Study List — and where that choice comes from.
  *
  * David's decision of 2026-09-27, which replaced the fixed columns of the first
  * build (build notes 3G):
@@ -9,19 +9,26 @@
  *    everything is default ... but one can save their preset as their new
  *    default and can always revert back to system default."
  *
- * So the model is DESELECTION. A choice records only what was turned OFF,
+ * So the model was DESELECTION: a choice recorded only what was turned OFF,
  * which is what makes a column added later print for someone whose saved
  * default is older than it — they never turned it off, so it is on.
  *
- * The system default started as literally everything. It is now everything
- * except COLLECTED, which David turned off on 2026-09-28 (SYSTEM_DEFAULT says
- * why). That is the model's one soft spot and it is worth naming: a list of
- * what is OFF cannot record that somebody wants an off-by-default column ON,
- * so the storage key was versioned rather than reinterpreted. Turning a second
- * column off by default would need the same treatment.
+ * ── AND WHY IT IS NOW BOTH, 2026-09-29 ──────────────────────────────────────
+ * That model's one soft spot was named here the day it shipped: a list of what
+ * is OFF cannot record that somebody wants an off-by-default column ON. David
+ * then asked for exactly that — "default should NOT include but have the
+ * option to add" — so a choice now carries two lists. `colsOff` governs the
+ * ordinary columns and means what it always did; `colsOn` governs the few
+ * marked `defaultOff` and means the mirror of it. Every column belongs to
+ * exactly one of them, neither list has to be exhaustive, and the property
+ * that made the first model worth having survives in both directions: silence
+ * about a column always means "leave it at its default", so a column added
+ * after somebody saved their default lands where it was designed to land.
  *
- * ALWAYS PRINTED, never offered: the survey reference and the survey name. A
- * row without them matches nothing the client holds.
+ * ALWAYS PRINTED, never offered: the study name and audience. A row without it
+ * matches nothing the client holds. (Ref. was here too until David turned it
+ * into the first opt-in — ALWAYS_PRINTED says why the argument was only half
+ * right.)
  *
  * ONE RULE FOR EVERY FIGURE: a figure prints only while ITS COLUMN prints, and
  * a section only decides whether its panel prints at all. Unticking Target has
@@ -35,7 +42,7 @@
  *
  *   1. The link — `cols=` and `sections=` — so a link reproduces a choice.
  *   2. This person's saved default for THIS document, in this browser.
- *   3. The system default: everything on offer.
+ *   3. The system default: every column except the ones marked `defaultOff`.
  *
  * The saved default is browser storage, not the database, like the accounts
  * table's saved views: it is a personal starting point, and nothing else reads
@@ -50,7 +57,7 @@ import type { DocKind } from './statement'
 
 export type PrintDoc = DocKind
 
-export type PrintColumnId = 'account' | 'requested' | 'status' | 'target' | 'final' | 'credits'
+export type PrintColumnId = 'ref' | 'account' | 'requested' | 'status' | 'target' | 'final' | 'estimate' | 'credits'
 export type PrintSectionId = 'contract' | 'activity' | 'notes'
 
 export interface PrintColumnDef {
@@ -64,6 +71,24 @@ export interface PrintColumnDef {
   response?: boolean
   /** Only on a list that spans accounts (internal mode). */
   internalOnly?: boolean
+  /**
+   * OFF until somebody ticks it, rather than on until somebody unticks it.
+   *
+   * This is the axis the first build did not have (see the header): a choice
+   * that records only what is OFF cannot record that you want an off-by-default
+   * thing ON. `colsOn` is that record, and this flag is what decides which of
+   * the two lists an id belongs in. Everything without it keeps the original
+   * behaviour exactly — a column added later prints for a reader whose saved
+   * default predates it, because they never turned it off.
+   */
+  defaultOff?: true
+  /**
+   * NOT A COLUMN: a tick that changes what an existing column prints in a
+   * cell. `estimate` is the only one — it decides whether a study still in
+   * quality review shows the projection or a dash, inside the Final column —
+   * and ledgerColumns leaves it out so the table never tries to draw it.
+   */
+  cellOnly?: true
 }
 
 export interface PrintSectionDef {
@@ -75,6 +100,10 @@ export interface PrintSectionDef {
 
 /** The ledger's optional columns, in the order they print. */
 export const PRINT_COLUMNS: PrintColumnDef[] = [
+  {
+    id: 'ref', label: 'Ref. (PR number)', docs: ['statement', 'list'], defaultOff: true,
+    help: 'Our project number for each study (PR00494 and the like). It is an internal code — the client has nothing to match it against unless we have quoted it to them — so it is off unless you tick it. The study name and audience always print.',
+  },
   {
     id: 'account', label: 'Account', docs: ['list'], internalOnly: true,
     help: 'Which account each study belongs to. Offered only on a list that covers more than one account, which prints marked Internal.',
@@ -93,7 +122,11 @@ export const PRINT_COLUMNS: PrintColumnDef[] = [
   },
   {
     id: 'final', label: 'Final', docs: ['statement', 'list'], response: true,
-    help: 'Responses delivered after quality review. Only a delivered study has one; a study still in quality review can show an estimate. Untick it and the summary’s final-responses figure goes with it.',
+    help: 'Responses delivered after quality review. Only a delivered study has one. Untick it and the summary’s final-responses figure goes with it.',
+  },
+  {
+    id: 'estimate', label: 'Final estimate', docs: ['statement', 'list'], defaultOff: true, cellOnly: true,
+    help: 'For a study still in quality review, print a projected final count (“≈ 480 est.”) in the Final column instead of a dash. It is a projection from how past studies of ours finished against target, not a measured figure, so it is off unless you tick it. Needs the Final column.',
   },
   // NO 'collected' COLUMN. It was off by default from 2026-09-28 and removed
   // outright on 2026-09-29 — David: "lets actually remove 'collected' from all
@@ -137,17 +170,36 @@ export const PRINT_SECTIONS: PrintSectionDef[] = [
   },
 ]
 
-/** Printed on every row, whatever is ticked. */
-export const ALWAYS_PRINTED = ['Ref.', 'Study and audience'] as const
+/**
+ * Printed on every row, whatever is ticked.
+ *
+ * Ref. WAS ONE OF THESE UNTIL 2026-09-29. The argument for it — "a row without
+ * them matches nothing the client holds" — was half right: the client matches
+ * a row by the study's NAME, which they commissioned and which still always
+ * prints. PR00494 is our number, and David asked for it off by default with a
+ * tick to put it back (it is the first thing `defaultOff` was built for).
+ */
+export const ALWAYS_PRINTED = ['Study and audience'] as const
 
-/** What is turned OFF. Everything not listed prints. */
+/**
+ * What was turned OFF, and what was turned ON.
+ *
+ * `colsOff` is the original model and still carries every ordinary column:
+ * absence means it prints. `colsOn` is its mirror for the handful of columns
+ * marked `defaultOff`, where absence means it does NOT print — so between them
+ * the two lists say the same thing about every column, and neither has to be
+ * exhaustive. A column that moves from one default to the other moves between
+ * these lists, and old saved choices stay readable because an id in the list
+ * that no longer governs it is simply not consulted.
+ */
 export interface PrintChoice {
   colsOff: PrintColumnId[]
+  colsOn: PrintColumnId[]
   sectionsOff: PrintSectionId[]
 }
 
 /**
- * What prints when nobody has chosen anything: everything on offer.
+ * What prints when nobody has chosen anything: every column's own default.
  *
  * ── WHY THIS IS EMPTY AGAIN ─────────────────────────────────────────────────
  * It held ['collected'] for one day. David, 2026-09-28: “for surveys in sales
@@ -158,9 +210,13 @@ export interface PrintChoice {
  * that is off by default is still a column a hurried person can tick, so it is
  * gone from PRINT_COLUMNS entirely and there is nothing left to default off.
  *
- * Every remaining column is ON, which is the state this list is meant to
- * describe: a document prints everything it has unless a reader chose
- * otherwise.
+ * ── AND WHY BOTH LISTS ARE EMPTY, 2026-09-29 ───────────────────────────────
+ * Empty no longer means "everything prints". It means "nothing differs from
+ * the defaults", and the defaults now live on the column definitions
+ * themselves (`defaultOff`), which is the only place that can state them once
+ * for the picker, the link, the saved value and the page at the same time.
+ * Reading a default off a list of exceptions was what made the Collected
+ * episode above cost a storage key.
  *
  * THIS IS THE ONE PLACE THE DEFAULT LIVES. resolveChoice falls back to these
  * lists, not to empty ones. That mattered when the default was non-empty and
@@ -169,8 +225,15 @@ export interface PrintChoice {
  */
 export const SYSTEM_DEFAULT: PrintChoice = Object.freeze({
   colsOff: [],
+  colsOn: [],
   sectionsOff: [],
 }) as PrintChoice
+
+/** The ids whose default is OFF — the ones `colsOn` governs instead of
+ *  `colsOff`. Derived from the defs so the flag is stated in exactly one
+ *  place, and taking the defs so a test can supply its own. */
+const defaultOffSet = (defs: PrintColumnDef[] = PRINT_COLUMNS) =>
+  new Set(defs.filter(d => d.defaultOff).map(d => d.id))
 
 export const columnsFor = (doc: PrintDoc, defs: PrintColumnDef[] = PRINT_COLUMNS) => defs.filter(c => c.docs.includes(doc))
 export const sectionsFor = (doc: PrintDoc, defs: PrintSectionDef[] = PRINT_SECTIONS) => defs.filter(s => s.docs.includes(doc))
@@ -187,20 +250,35 @@ function canonicalSections(ids: readonly string[], doc: PrintDoc, defs: PrintSec
 }
 
 export function canonicalChoice(c: PrintChoice, doc: PrintDoc): PrintChoice {
-  return { colsOff: canonicalCols(c.colsOff, doc), sectionsOff: canonicalSections(c.sectionsOff, doc) }
+  return {
+    colsOff: canonicalCols(c.colsOff, doc),
+    colsOn: canonicalCols(c.colsOn ?? [], doc),
+    sectionsOff: canonicalSections(c.sectionsOff, doc),
+  }
 }
 
 export function sameChoice(a: PrintChoice, b: PrintChoice, doc: PrintDoc): boolean {
   const x = canonicalChoice(a, doc), y = canonicalChoice(b, doc)
-  return x.colsOff.join() === y.colsOff.join() && x.sectionsOff.join() === y.sectionsOff.join()
+  return x.colsOff.join() === y.colsOff.join()
+    && x.colsOn.join() === y.colsOn.join()
+    && x.sectionsOff.join() === y.sectionsOff.join()
 }
 
-export const columnOn = (c: PrintChoice, id: PrintColumnId) => !c.colsOff.includes(id)
+/** Which list governs this id decides which way the question is asked. */
+export function columnOn(c: PrintChoice, id: PrintColumnId, defs: PrintColumnDef[] = PRINT_COLUMNS): boolean {
+  return defaultOffSet(defs).has(id) ? (c.colsOn ?? []).includes(id) : !c.colsOff.includes(id)
+}
 export const sectionOn = (c: PrintChoice, id: PrintSectionId) => !c.sectionsOff.includes(id)
 
-/** Flip one column or section. */
+/** Flip one column or section. A `defaultOff` column moves in and out of
+ *  `colsOn`; every other one moves in and out of `colsOff`. */
 export function toggleColumn(c: PrintChoice, id: PrintColumnId, doc: PrintDoc): PrintChoice {
-  const off = columnOn(c, id) ? [...c.colsOff, id] : c.colsOff.filter(x => x !== id)
+  const on = columnOn(c, id)
+  if (defaultOffSet().has(id)) {
+    const next = on ? (c.colsOn ?? []).filter(x => x !== id) : [...(c.colsOn ?? []), id]
+    return { ...c, colsOn: canonicalCols(next, doc) }
+  }
+  const off = on ? [...c.colsOff, id] : c.colsOff.filter(x => x !== id)
   return { ...c, colsOff: canonicalCols(off, doc) }
 }
 export function toggleSection(c: PrintChoice, id: PrintSectionId, doc: PrintDoc): PrintChoice {
@@ -216,6 +294,7 @@ export function toggleSection(c: PrintChoice, id: PrintSectionId, doc: PrintDoc)
  */
 export interface UrlChoice {
   colsOff?: PrintColumnId[]
+  colsOn?: PrintColumnId[]
   sectionsOff?: PrintSectionId[]
   /** The link used the retired `cols` values (build notes 3G). */
   legacy?: boolean
@@ -256,12 +335,18 @@ const tokens = (v: string) => v.split(',').map(t => t.trim().toLowerCase()).filt
 /**
  * `cols=` and `sections=` as a link writes them:
  *
- *   all              everything prints
- *   -target,-final   everything prints except these
+ *   all              the defaults, whatever they are
+ *   -target,-final   the defaults, except these two switched off
+ *   *ref             the defaults, plus this off-by-default one switched on
  *
- * Written as what is OFF, like the saved default, so a column added after the
- * link was made prints (nobody turned it off). The leading "-" is also what
- * tells a current link from a retired one, which listed what was ON.
+ * Written as what DIFFERS from the defaults, like the saved default, so a
+ * column added after the link was made still lands on its own default. A
+ * prefix on every token is also what tells a current link from a retired one,
+ * which listed bare ids meaning "on" — hence `all` rather than an empty value
+ * for "I changed nothing", and hence the prefix for opt-ins is `*` and NOT the
+ * obvious `+`: a bare `+` in a query string decodes to a SPACE, so `+ref`
+ * would arrive here as `ref` and be read as one of those retired bare ids.
+ * `*` is in the urlencoded safe set, so it survives a round trip untouched.
  */
 export function parseUrlChoice(
   doc: PrintDoc,
@@ -272,9 +357,16 @@ export function parseUrlChoice(
   const c = first(cols)
   if (c != null && c.trim() !== '') {
     const t = tokens(c)
-    if (t.includes('all') || t.some(x => x.startsWith('-'))) {
+    if (t.includes('all') || t.some(x => x.startsWith('-') || x.startsWith('*'))) {
+      // A link in the current format states the WHOLE column choice, so both
+      // lists are set: `cols=-target` means Target off and no opt-in ticked,
+      // not "Target off, and ask my saved default about the opt-ins".
       out.colsOff = canonicalCols(t.filter(x => x.startsWith('-')).map(x => x.slice(1)), doc)
+      out.colsOn = canonicalCols(t.filter(x => x.startsWith('*')).map(x => x.slice(1)), doc)
     } else if (t.some(x => LEGACY.has(x))) {
+      // colsOn is deliberately left unset. A retired link predates every
+      // off-by-default column, so it has nothing to say about them — the same
+      // reason it leaves Account and Status at their defaults above.
       const on = new Set(t.flatMap(x => LEGACY.get(x) ?? []))
       out.colsOff = canonicalCols(LEGACY_SWITCHED.filter(id => !on.has(id)), doc)
       out.legacy = true
@@ -293,8 +385,13 @@ export function parseUrlChoice(
 /** The two values a link carries for a choice. */
 export function serializeUrlChoice(c: PrintChoice, doc: PrintDoc): { cols: string; sections: string } {
   const k = canonicalChoice(c, doc)
+  const cols = [...k.colsOff.map(id => `-${id}`), ...k.colsOn.map(id => `*${id}`)]
   return {
-    cols: k.colsOff.length ? k.colsOff.map(id => `-${id}`).join(',') : 'all',
+    // 'all' is "I changed nothing from the defaults", which is what an empty
+    // list of differences means. It was literally every column once; it is not
+    // any more, and the word is kept so links written before opt-ins existed
+    // still parse as the choice they were.
+    cols: cols.length ? cols.join(',') : 'all',
     sections: k.sectionsOff.length ? k.sectionsOff.map(id => `-${id}`).join(',') : 'all',
   }
 }
@@ -324,6 +421,7 @@ export function resolveChoice(url: UrlChoice, saved: PrintChoice | null): PrintC
     // 2026-09-28 and this line would have kept printing it for every reader
     // who had never opened the picker.
     colsOff: url.colsOff ?? saved?.colsOff ?? [...SYSTEM_DEFAULT.colsOff],
+    colsOn: url.colsOn ?? saved?.colsOn ?? [...SYSTEM_DEFAULT.colsOn],
     sectionsOff: url.sectionsOff ?? saved?.sectionsOff ?? [...SYSTEM_DEFAULT.sectionsOff],
   }
 }
@@ -346,7 +444,10 @@ export function choiceSource({ choice, saved, url, touched, doc }: {
 
 export const CHOICE_SOURCE_TEXT: Record<ChoiceSource, string> = {
   saved: 'Using your saved default.',
-  system: 'Using the system default: everything prints.',
+  // NOT "everything prints" any more. Ref. and the final estimate are off
+  // until they are ticked, and a line claiming otherwise would send a reader
+  // looking for a column that is not on the page.
+  system: 'Using the system default.',
   link: 'Using the choice in this link.',
   custom: 'Changed for this print only.',
 }
@@ -406,11 +507,19 @@ export function parseStoredChoice(
   let v: unknown
   try { v = JSON.parse(raw) } catch { return null }
   if (!v || typeof v !== 'object' || Array.isArray(v)) return null
-  const o = v as { colsOff?: unknown; sectionsOff?: unknown }
+  const o = v as { colsOff?: unknown; colsOn?: unknown; sectionsOff?: unknown }
   const strings = (x: unknown): x is string[] => Array.isArray(x) && x.every(s => typeof s === 'string')
   if (!strings(o.colsOff) || !strings(o.sectionsOff)) return null
+  // colsOn MAY BE MISSING, and that needs no new storage key. Every value
+  // written before 2026-09-29 predates the off-by-default columns, so its
+  // silence about them means "I never had the chance to want these", which is
+  // exactly what an empty list says. That is the opposite of the v1→v2 bump,
+  // where silence about Collected was ambiguous in the direction that would
+  // have put a column BACK on a client document. Here it cannot.
+  if (o.colsOn !== undefined && !strings(o.colsOn)) return null
   return {
     colsOff: canonicalCols(o.colsOff, doc, defs.cols),
+    colsOn: canonicalCols(o.colsOn ?? [], doc, defs.cols),
     sectionsOff: canonicalSections(o.sectionsOff, doc, defs.sections),
   }
 }
@@ -426,7 +535,7 @@ export function writeSavedChoice(doc: PrintDoc, c: PrintChoice, store: ChoiceSto
   if (!store) return false
   const k = canonicalChoice(c, doc)
   try {
-    store.setItem(PRINT_CHOICE_KEY[doc], JSON.stringify({ colsOff: k.colsOff, sectionsOff: k.sectionsOff }))
+    store.setItem(PRINT_CHOICE_KEY[doc], JSON.stringify({ colsOff: k.colsOff, colsOn: k.colsOn, sectionsOff: k.sectionsOff }))
     return true
   } catch { return false }
 }
@@ -440,32 +549,45 @@ export function clearSavedChoice(doc: PrintDoc, store: ChoiceStore | null = brow
 
 /** One flag per column and section, for this document and mode. */
 export interface Prints {
+  ref: boolean
   account: boolean
   requested: boolean
   status: boolean
   target: boolean
   final: boolean
+  /** Not a column: whether the Final column prints a projection or a dash for
+   *  a study still in quality review. False whenever Final itself is off. */
+  estimate: boolean
   credits: boolean
   contract: boolean
   activity: boolean
   notes: boolean
 }
 
+/** Literally every tick on, including the ones the system default leaves off.
+ *  A starting point for tests and for the internal on-screen table, NOT the
+ *  system default — printsOf(SYSTEM_DEFAULT) is that, and they differ. */
 export const PRINTS_ALL: Prints = {
-  account: true, requested: true, status: true, target: true, final: true, credits: true,
-  contract: true, activity: true, notes: true,
+  ref: true, account: true, requested: true, status: true, target: true, final: true, estimate: true,
+  credits: true, contract: true, activity: true, notes: true,
 }
 
 /** `internal`: the list spans accounts, so it has an Account column to offer. */
 export function printsOf(c: PrintChoice, doc: PrintDoc, { internal = false }: { internal?: boolean } = {}): Prints {
   const col = (id: PrintColumnId) => columnsFor(doc).some(d => d.id === id) && columnOn(c, id)
   const sec = (id: PrintSectionId) => sectionsFor(doc).some(d => d.id === id) && sectionOn(c, id)
+  const final = col('final')
   return {
+    ref: col('ref'),
     account: internal && col('account'),
     requested: col('requested'),
     status: col('status'),
     target: col('target'),
-    final: col('final'),
+    final,
+    // ONE RULE FOR EVERY FIGURE (see the header): the estimate lives inside
+    // the Final column, so it cannot outlive it. Ticking the estimate and
+    // unticking Final has to leave nothing behind, or the choice is a lie.
+    estimate: final && col('estimate'),
     credits: col('credits'),
     contract: sec('contract'),
     activity: sec('activity'),
@@ -473,9 +595,21 @@ export function printsOf(c: PrintChoice, doc: PrintDoc, { internal = false }: { 
   }
 }
 
-/** The optional columns the ledger prints, in order. */
-export function ledgerColumns(p: Prints): PrintColumnId[] {
-  return PRINT_COLUMNS.map(c => c.id).filter(id => p[id])
+/**
+ * The ids that are really columns of the table.
+ *
+ * The runtime twin of this is the `cellOnly` flag on the defs, and the two
+ * have to name the same ids — a type cannot read a boolean off a const array.
+ * ledgerColumns is the one place that bridges them, and a test asserts they
+ * agree, so adding a second cell-only tick fails loudly here rather than
+ * quietly asking the ledger to draw a column it has no header for.
+ */
+export type LedgerColumnId = Exclude<PrintColumnId, 'estimate'>
+
+/** The optional columns the ledger prints, in order — `cellOnly` ticks are not
+ *  columns and never appear here. */
+export function ledgerColumns(p: Prints): LedgerColumnId[] {
+  return PRINT_COLUMNS.filter(c => !c.cellOnly).map(c => c.id as LedgerColumnId).filter(id => p[id])
 }
 
 /** The columns and sections to offer as checkboxes: Account only where there
@@ -516,14 +650,37 @@ function joinPhrases(xs: string[]): string {
  */
 export function choiceNotes(
   p: Prints,
-  { unexplained = [], noResponseFigure = 0 }: {
+  { unexplained = [], noResponseFigure = 0, estimated = 0 }: {
     unexplained?: UnexplainedMark[]
     /** Rows that print no response figure at all: Final is a dash, which
      *  responseCells gives to everything before quality review. */
     noResponseFigure?: number
+    /** Rows that would print a projected final count if the tick were on
+     *  (statement.estimatedCount) — counted whether it is on or off, because
+     *  the note runs both ways. */
+    estimated?: number
   } = {},
 ): ChoiceNote[] {
   const out: ChoiceNote[] = []
+  // THE ONE TICK THAT ADDS SOMETHING TO A CLIENT DOCUMENT RATHER THAN REMOVING
+  // IT, so it is the one that gets said out loud in both directions. A
+  // projection is not a measurement, and a number in the Final column is read
+  // as a number; a salesperson who ticks it should know how many rows it
+  // touches, and one who leaves it off should know there was something to show.
+  if (p.final && estimated > 0) {
+    const one = estimated === 1
+    out.push(p.estimate
+      ? {
+          id: 'estimate-on',
+          text: `${one ? 'One study' : `${estimated} studies`} print${one ? 's' : ''} a PROJECTED final count (“≈ est.”), not a measured one: ${
+            one ? 'it is' : 'they are'} still in quality review. The figure comes from how past studies finished against target. Untick Final estimate to print a dash instead.`,
+        }
+      : {
+          id: 'estimate-off',
+          text: `${one ? 'One study' : `${estimated} studies`} could show a projected final count and ${
+            one ? 'shows' : 'show'} a dash instead. Tick Final estimate to print the projection, clearly marked as one.`,
+        })
+  }
   // A statement sent mid-engagement can show a client targets and dashes. That
   // is a reasonable document and a surprising one, so this panel — the last
   // screen before it goes out — says the number out loud.
@@ -533,11 +690,20 @@ export function choiceNotes(
   // in field so far", and that column is gone (see PRINT_COLUMNS). A note that
   // names an impossible action is worse than one that just states the fact:
   // the reader hunts the panel for a tick that is not there.
-  if (noResponseFigure > 0 && (p.final || p.target)) {
-    const one = noResponseFigure === 1
+  //
+  // MINUS THE ONES THE NOTE ABOVE JUST NAMED. With the estimate off, a study
+  // in quality review prints a dash and so is inside `noResponseFigure`, and
+  // it is also inside `estimated` — counting it in both notes would report the
+  // same rows twice, once as "no figure" and once as "could be projected". The
+  // specific note is the more useful of the two, so it keeps them. With the
+  // estimate on those rows print a projection and are not dashes at all, so
+  // there is nothing to subtract.
+  const otherDashes = Math.max(0, noResponseFigure - (p.estimate ? 0 : estimated))
+  if (otherDashes > 0 && (p.final || p.target)) {
+    const one = otherDashes === 1
     out.push({
       id: 'no-response-figure',
-      text: `${one ? 'One study' : `${noResponseFigure} studies`} print${one ? 's' : ''} no response figure: ${
+      text: `${one ? 'One study' : `${otherDashes} studies`} print${one ? 's' : ''} no response figure: ${
         one ? 'it has' : 'they have'} not reached quality review, so there is no final count yet. ${
         one ? 'It shows' : 'They show'} a dash.`,
     })

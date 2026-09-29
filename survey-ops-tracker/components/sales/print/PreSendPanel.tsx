@@ -147,7 +147,7 @@ function WhatPrints({ c }: { c: PrintChoiceControls }) {
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <h3 id="whatPrintsTitle" className="flex items-center text-[12.5px] font-semibold text-foreground">
           What prints
-          <InfoTooltip text={`Untick anything you do not want on this ${docWord}; the page below changes at once. Everything prints unless you, or your saved default, turn it off. The link in the address bar carries your choice, so opening it again reproduces this print.`} />
+          <InfoTooltip text={`Tick or untick anything on this ${docWord}; the page below changes at once. Most of it prints unless you, or your saved default, turn it off; a few — our PR numbers and the final estimate — print only once you tick them. The link in the address bar carries your choice, so opening it again reproduces this print.`} />
         </h3>
         <span className="text-[12px] font-medium text-muted-foreground" aria-live="polite">{CHOICE_SOURCE_TEXT[c.source]}</span>
       </div>
@@ -160,7 +160,7 @@ function WhatPrints({ c }: { c: PrintChoiceControls }) {
         <span className="inline-flex items-center text-[13px] text-muted-foreground">
           <input type="checkbox" checked disabled aria-label={`${ALWAYS_PRINTED.join(' and ')}, always printed`} className="mr-1.5 h-3.5 w-3.5" />
           {ALWAYS_PRINTED.join(', ')}
-          <InfoTooltip text="Always printed. A row without its reference and study name matches nothing the client holds." />
+          <InfoTooltip text="Always printed. A row without the study name and audience matches nothing the client holds. Our own project number is the tick beside this one." />
         </span>
         {c.columns.map(({ def, on }) => box(def.id, def.label, def.help, on, () => c.toggleColumn(def.id)))}
       </div>

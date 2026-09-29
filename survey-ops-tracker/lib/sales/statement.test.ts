@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   activityFigures, clearedCollection, clientStage, clientStageName, creditCell, cssString, describeRangeForClient,
   deliveredOn, documentTitle, drawnFigure, drawnLine, drawnText, drawnUnpricedPhrase, finalText, fmtDay, fmtDayLong,
-  footerText, ledgerTotals, NBSP, noResponseFigureCount, preSendChecks, printedName, responseCells, sortForStatement,
+  estimatedCount, footerText, ledgerTotals, NBSP, noResponseFigureCount, preSendChecks, printedName, responseCells, sortForStatement,
   splitTitle, statementFigures, statusWhen, timeET, todayET,
   type StatementRow,
 } from './statement'
@@ -375,6 +375,44 @@ describe('the estimate cell', () => {
     expect(responseCells(inQA({ board_column: 'Fielding' }), false).final.kind).toBe('none')
   })
 
+  /**
+   * ── THE TICK, AND WHY IT IS GATED IN responseCells (2026-09-29) ────────────
+   *
+   * David: "default should NOT include but have the option to add: Final
+   * estimation". Off, the cell is a dash and is INDISTINGUISHABLE from a study
+   * that could never have been projected — which is the whole reason the gate
+   * lives here, at the one place the cell is decided, rather than in the
+   * component that draws it. Four other things read this function: the count
+   * the pre-send panel discloses, the "≈" clause in the final note, the
+   * unexplained-mark warning, and the ledger itself. A gate anywhere else
+   * would leave the page explaining a mark that is no longer on it.
+   */
+  it('prints a dash, not a projection, until the Final estimate tick is on', () => {
+    expect(responseCells(inQA({}), false, { estimate: false }).final).toEqual({ kind: 'none' })
+    expect(finalText(responseCells(inQA({}), false, { estimate: false }).final)).toBe('—')
+    // Default ON at this level: every internal screen and every caller that
+    // does not care keeps the behaviour it had. The DOCUMENT default is off,
+    // and that is printsOf's job, not this one's.
+    expect(responseCells(inQA({}), false).final.kind).toBe('estimate')
+    // A measured final is not a projection and is never withheld by this tick.
+    const delivered = inQA({ board_column: 'Delivery', status: 'Closed', n_actual: 70 })
+    expect(responseCells(delivered, false, { estimate: false }).final)
+      .toEqual({ kind: 'final', value: 70, below: true })
+  })
+
+  it('counts a withheld projection as a row printing no figure, and as one that could', () => {
+    const rows = [inQA({}), inQA({ id: 'f', board_column: 'Fielding' })]
+    const none = new Set<string>()
+    // With the tick on, only the study in field is a dash.
+    expect(noResponseFigureCount(rows, none)).toBe(1)
+    // With it off, both are — the count follows the choice rather than
+    // under-reporting by exactly the rows the reader chose not to project.
+    expect(noResponseFigureCount(rows, none, { estimate: false })).toBe(2)
+    // And estimatedCount says how many COULD be projected, either way, which
+    // is what lets the pre-send panel warn in both directions.
+    expect(estimatedCount(rows, none)).toBe(1)
+  })
+
   it('marks a delivered final below target', () => {
     const c = responseCells(inQA({ board_column: 'Delivery', status: 'Closed', n_actual: 70 }), false)
     expect(c.final).toEqual({ kind: 'final', value: 70, below: true })
@@ -610,7 +648,7 @@ describe('the checklist quotes only what this print carries', () => {
   })
   const text = (checks: ReturnType<typeof run>, id: string) => checks.find(c => c.id.startsWith(id))!.text
   const off = (...ids: Parameters<typeof printsOf>[0]['colsOff']) =>
-    printsOf({ colsOff: ids, sectionsOff: [] }, 'statement')
+    printsOf({ colsOff: ids, colsOn: [], sectionsOff: [] }, 'statement')
 
   it('says the same as before when everything prints, given or not', () => {
     for (const checks of [run(), run(PRINTS_ALL)]) {
@@ -629,9 +667,9 @@ describe('the checklist quotes only what this print carries', () => {
 
   it('stops quoting the credits drawn when neither the column nor the contract panel prints', () => {
     // The Credits column alone is enough to keep the quotation.
-    expect(text(run(printsOf({ colsOff: ['credits'], sectionsOff: [] }, 'statement')), 'unpriced-drawn'))
+    expect(text(run(printsOf({ colsOff: ['credits'], colsOn: [], sectionsOff: [] }, 'statement')), 'unpriced-drawn'))
       .toContain('The statement will say “at least 410”')
-    const gone = run(printsOf({ colsOff: ['credits'], sectionsOff: ['contract'] }, 'statement'))
+    const gone = run(printsOf({ colsOff: ['credits'], colsOn: [], sectionsOff: ['contract'] }, 'statement'))
     expect(text(gone, 'unpriced-drawn')).not.toContain('at least 410')
     expect(text(gone, 'unpriced-drawn')).toContain('Price them and the credits drawn are exact.')
   })
@@ -664,7 +702,7 @@ describe('the checklist quotes only what this print carries', () => {
     expect(text(at(), 'collected-below-final')).toBe(WARNING)
     expect(text(at(), 'collected-below-final')).not.toContain('Collected')
     expect(text(at(), 'qa-no-collection')).toContain('so the statement shows no final estimate for it')
-    const none = at(printsOf({ colsOff: ['final'], sectionsOff: [] }, 'statement'))
+    const none = at(printsOf({ colsOff: ['final'], colsOn: [], sectionsOff: [] }, 'statement'))
     expect(text(none, 'collected-below-final')).toBe(WARNING)
     expect(text(none, 'qa-no-collection'))
       .toBe('is in quality review with no responses collected on record. Enter the collected count before sending.')
@@ -674,7 +712,7 @@ describe('the checklist quotes only what this print carries', () => {
     const n = run().length
     // `off('collected', 'final')` until 2026-09-29; 'collected' is no longer a
     // column id, so the response-columns case is now Target and Final together.
-    for (const p of [off('status'), off('credits'), off('target', 'final'), printsOf({ colsOff: [], sectionsOff: ['contract', 'activity', 'notes'] }, 'statement')]) {
+    for (const p of [off('status'), off('credits'), off('target', 'final'), printsOf({ colsOff: [], colsOn: [], sectionsOff: ['contract', 'activity', 'notes'] }, 'statement')]) {
       expect(run(p)).toHaveLength(n)
     }
   })
@@ -778,7 +816,7 @@ describe('Collected cannot come back', () => {
     // The retired token switches Final on, which is what it always meant.
     expect(printsOf(resolveChoice(retired, null), 'statement').final).toBe(true)
     // Naming an id that no longer exists is not a choice: nothing is turned off.
-    expect(resolveChoice({}, saved)).toEqual({ colsOff: [], sectionsOff: [] })
+    expect(resolveChoice({}, saved)).toEqual({ colsOff: [], colsOn: [], sectionsOff: [] })
     // And with every tick on, the ledger still has no such column to print.
     expect(ledgerColumns(PRINTS_ALL) as string[]).not.toContain('collected')
   })
