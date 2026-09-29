@@ -60,7 +60,7 @@ import { financeResults, type FinanceResultsArgs } from '@/lib/mcp/financeResult
 const REPORT_BASE = 'https://survey-ops-tracker.vercel.app'
 import { cloneProject } from '@/lib/server/clone'
 import {
-  cadenceToMonths, createSeriesFromProject, setSeriesDefaults,
+  cadenceToMonths, createSeriesFromProject, setSeriesDefaults, updateSeriesFields,
   pauseSeries, endSeries, resumeSeries, spawnNextWave,
   attachProjectToSeries, detachProjectFromSeries, previewAttachFamily,
   promotionFamilyConflict,
@@ -786,6 +786,60 @@ export const TOOLS: AssistantTool[] = [
             ok: true,
             series_id: series.id,
             future_defaults: data.redactFutureDefaults(series.future_defaults, canViewFinancials),
+          }
+        }
+      )
+    },
+  },
+  {
+    name: 'set_rerun_notes',
+    description:
+      "Write the three free-text fields on a rerun series: `guidance` (how the series is meant to be RUN — the standing instruction that should outlast whoever picks up the next wave: fielding windows, who must be asked, what must not change between waves), `notes` (whatever is worth recording about it right now), and `data_qa_note` (a known quirk in this study's DATA — a question that always needs recoding, a segment that under-fills). Only the fields you pass are changed; the rest are left alone. Pass an empty string to CLEAR one. This does not touch what future waves inherit — that is set_rerun_defaults. Identify the series by id or a client / survey-name query. Preview first; confirm to apply.",
+    kind: 'write',
+    schema: {
+      series: z.string(),
+      guidance: z.string().optional(),
+      notes: z.string().optional(),
+      data_qa_note: z.string().optional(),
+      confirm: z.boolean().optional(),
+    },
+    handler: async (rawArgs, ctx, meta) => {
+      const args = rawArgs as {
+        series: string; guidance?: string; notes?: string; data_qa_note?: string; confirm?: boolean
+      }
+      const { userEmail } = ctx
+      const resolved = await data.resolveSeriesForWrite(args.series)
+      if ('error' in resolved) return resolved
+      if ('note' in resolved) return resolved
+      const { seriesId, label } = resolved
+      const admin = createAdminClient()
+      // An empty string CLEARS; `undefined` leaves the field alone. Those have to
+      // stay distinguishable all the way down, which is why this builds the patch
+      // by key presence rather than by truthiness — `if (args.notes)` would make
+      // "clear the notes" silently mean "change nothing".
+      const provided: Record<string, string | null> = {}
+      for (const key of ['guidance', 'notes', 'data_qa_note'] as const) {
+        const v = args[key]
+        if (v !== undefined) provided[key] = v.trim() || null
+      }
+      if (Object.keys(provided).length === 0) {
+        return { needs: 'a change', message: 'Specify at least one of guidance, notes, or data_qa_note.' }
+      }
+      const changeDesc = Object.entries(provided)
+        .map(([k, v]) => `${fieldLabel(k)} → ${v == null ? '(cleared)' : v}`)
+        .join('; ')
+      return confirmable(
+        args,
+        async () => ({ summary: `Set on the ${label} rerun series: ${changeDesc}`, changes: provided }),
+        async () => {
+          const { series } = await updateSeriesFields(admin, seriesId, provided, `${userEmail} via Claude`)
+          meta.detail = { series_id: seriesId, fields: Object.keys(provided) }
+          return {
+            ok: true,
+            series_id: series.id,
+            guidance: series.guidance ?? null,
+            notes: series.notes ?? null,
+            data_qa_note: series.data_qa_note ?? null,
           }
         }
       )

@@ -62,6 +62,10 @@ export const UPDATE_FIELD_WHITELIST = [
   'survey_name',
   'notes',
   'data_qa_note',
+  // Added 2026-09-29 with migration 129. Standing instructions for running the
+  // series, as distinct from `notes` (what is worth recording now) and
+  // `data_qa_note` (a known quirk in the data).
+  'guidance',
   'anchor_date',
   // Added 2026-09-28 so the series record can edit every field it displays,
   // rather than showing four of them read-only and sending people to SQL.

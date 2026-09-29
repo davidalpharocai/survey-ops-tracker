@@ -48,6 +48,35 @@ describe('pickSeriesUpdatePatch', () => {
     expect('id' in res.patch).toBe(false)
   })
 
+  /**
+   * ── THE THREE FREE-TEXT FIELDS (2026-09-29) ───────────────────────────────
+   *
+   * David asked for "two text fields. 1) Rerun/Series Guidance, and 2) Notes".
+   * `notes` and `data_qa_note` were already on the table AND already on this
+   * whitelist — they were simply never DISPLAYED on the record, which from the
+   * outside looks exactly like not existing. `guidance` is the genuinely new
+   * one (migration 129).
+   *
+   * Clearing is the part worth pinning: null has to survive the patch. A
+   * whitelist that dropped nulls would make "clear the guidance" quietly mean
+   * "change nothing", and the person would be left staring at text they thought
+   * they had deleted.
+   */
+  it('carries guidance, notes and the data/QA note, including clearing them', () => {
+    const res = pickSeriesUpdatePatch({ guidance: 'Field Mon-Thu only.', notes: 'Paused over the holidays.' })
+    expect('error' in res).toBe(false)
+    if ('error' in res) return
+    expect(res.patch).toEqual({ guidance: 'Field Mon-Thu only.', notes: 'Paused over the holidays.' })
+
+    const cleared = pickSeriesUpdatePatch({ guidance: null, notes: null, data_qa_note: null })
+    expect('error' in cleared).toBe(false)
+    if ('error' in cleared) return
+    expect(cleared.patch).toEqual({ guidance: null, notes: null, data_qa_note: null })
+    // Present-and-null, not absent: `key in patch` is what makes the write
+    // actually clear the column rather than leave it as it was.
+    expect('guidance' in cleared.patch).toBe(true)
+  })
+
   it('accepts next_wave_no, which the series record now edits', () => {
     const res = pickSeriesUpdatePatch({ next_wave_no: 4 })
     expect('error' in res).toBe(false)

@@ -131,6 +131,18 @@ export const CHANGELOG: ChangelogEntry[] = [
         kind: 'IMPROVED',
         text: 'Insights has moved into the top bar, and Admin and Sign out now live under the circle with your initials in the corner.',
       },
+      {
+        kind: 'NEW',
+        text: 'A rerun series now carries Rerun guidance — the standing instruction for how that series is run, meant to outlast whoever picks up the next wave.',
+      },
+      {
+        kind: 'FIXED',
+        text: 'A series’ Notes and Data / QA note are shown on the record. They were always saveable, but vanished the moment you left the edit form, so a note you had written looked like a field that did not exist.',
+      },
+      {
+        kind: 'NEW',
+        text: 'You can ask Claude to write a rerun series’ guidance, notes or data note, and it shows you the change before saving it.',
+      },
     ],
   },
   {

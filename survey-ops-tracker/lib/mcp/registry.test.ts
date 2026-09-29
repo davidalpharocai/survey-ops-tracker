@@ -57,6 +57,34 @@ describe('TOOLS registry shape', () => {
     for (const r of READ) expect(names.has(r), `registry is missing read tool ${r}`).toBe(true)
   })
 
+  /**
+   * ── CONNECTOR PARITY FOR THE SERIES FREE TEXT (2026-09-29) ─────────────────
+   *
+   * Standing rule: a feature that writes data ships its connector tool in the
+   * SAME change. Before this, nothing in the registry could write a rerun
+   * series' notes at all — set_rerun_defaults writes `future_defaults`, which
+   * is what future WAVES inherit, a different thing that happens to live on
+   * the same record. So "add a note to the Acme tracker series" had no tool
+   * and would have been answered with a description of the UI.
+   */
+  it('set_rerun_notes can write the series free text, and is not set_rerun_defaults', () => {
+    const t = TOOLS.find(x => x.name === 'set_rerun_notes')
+    expect(t, 'registry is missing set_rerun_notes').toBeDefined()
+    expect(t!.kind).toBe('write')
+    expect('confirm' in t!.schema, 'must preview before it writes').toBe(true)
+    for (const f of ['series', 'guidance', 'notes', 'data_qa_note']) {
+      expect(f in t!.schema, `set_rerun_notes takes ${f}`).toBe(true)
+    }
+    // The two tools stay disjoint. A series' standing instruction is not a
+    // default a future wave inherits, and merging them would mean a caller
+    // setting an N target could not avoid touching the notes blob.
+    const d = TOOLS.find(x => x.name === 'set_rerun_defaults')!
+    for (const f of ['guidance', 'notes', 'data_qa_note']) {
+      expect(f in d.schema, `set_rerun_defaults must NOT take ${f}`).toBe(false)
+    }
+    expect('n_target' in t!.schema, 'set_rerun_notes must NOT take n_target').toBe(false)
+  })
+
   it('the cost-line tools exist and keep their preview-then-apply contract', () => {
     // These write money into actual_spend (migration 101 -> the project_costs
     // spend trigger), so committing on the first call would move a project's

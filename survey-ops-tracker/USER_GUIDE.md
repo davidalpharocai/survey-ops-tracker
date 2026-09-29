@@ -235,6 +235,14 @@ The **✦ Assistant** is now a full working assistant — it can both **answer q
 
 That last one is worth knowing about. Normally the next due date is *computed*: the last wave's date plus the cadence. Setting **Next due (by hand)** overrides that arithmetic, and works even on a series with no cadence set at all — which is the only way to give a due date to a series whose cadence was never known. It **expires by itself** once a wave lands on or after that date, so you never have to come back and clear it. Leave it empty for the usual computation.
 
+**Writing things down on a series.** *Series details* carries three free-text fields, all shown on the record and all editable under **✎ Edit**:
+
+- **Rerun guidance** — how the series is meant to be *run*: the standing instruction that should outlast whoever happens to pick up the next wave. Fielding windows, who has to be asked, what must not change between waves.
+- **Notes** — whatever is worth recording about the series right now.
+- **Data / QA note** — a known quirk in this study's *data*: a question that always needs recoding, a segment that under-fills.
+
+Notes and the data/QA note were always saveable but were never shown once you left the edit form; they are on the record now, so an empty one reads as empty rather than as missing. You can also set all three by asking Claude ("add guidance to the Acme tracker series: …"), which previews the change before it writes.
+
 ## 7. Project IDs & Admin
 
 - Every project has a permanent **Project ID** like `PR00042` — shown next to the project title and in the list view, included in CSV exports, and assigned automatically to new projects. It never changes, so use it when referencing a project in email or Slack. Clients have matching `Cl#####` ids.

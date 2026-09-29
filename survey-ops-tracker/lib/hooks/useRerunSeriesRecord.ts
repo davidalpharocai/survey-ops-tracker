@@ -131,6 +131,10 @@ export type RerunSeriesFieldsPatch = Partial<{
   survey_name: string
   notes: string | null
   data_qa_note: string | null
+  /** Standing instructions for running this series (migration 129). Reads are
+   *  `select('*')` on rerun_series_status, so before that migration lands this
+   *  simply arrives undefined and every reader falls back to empty. */
+  guidance: string | null
   anchor_date: string | null
   resume_anchor: string | null
   /** An explicit next-wave due date that overrides the cadence arithmetic

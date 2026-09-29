@@ -1961,6 +1961,7 @@ export type Database = {
           notes: string | null
           data_qa_note: string | null
           next_due_override: string | null
+          guidance: string | null
           created_at: string
           updated_at: string
           updated_by: string | null
@@ -1988,6 +1989,7 @@ export type Database = {
           notes?: string | null
           data_qa_note?: string | null
           next_due_override?: string | null
+          guidance?: string | null
           created_at?: string
           updated_at?: string
           updated_by?: string | null
@@ -2015,6 +2017,7 @@ export type Database = {
           notes?: string | null
           data_qa_note?: string | null
           next_due_override?: string | null
+          guidance?: string | null
           created_at?: string
           updated_at?: string
           updated_by?: string | null
@@ -2212,6 +2215,7 @@ export type Database = {
           notes: string | null
           data_qa_note: string | null
           next_due_override: string | null
+          guidance: string | null
           created_at: string
           updated_at: string
           updated_by: string | null

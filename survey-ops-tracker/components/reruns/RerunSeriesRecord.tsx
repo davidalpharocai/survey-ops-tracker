@@ -781,6 +781,7 @@ function SeriesDetailsSection({
   // '' keeps the <select> a controlled string. Picking PS/B2B classifies it.
   const [baseType, setBaseType] = useState(series.base_type ?? '')
   const [surveyName, setSurveyName] = useState(series.survey_name)
+  const [guidance, setGuidance] = useState(series.guidance ?? '')
   const [notes, setNotes] = useState(series.notes ?? '')
   const [anchorDate, setAnchorDate] = useState(series.anchor_date ?? '')
   const [nextDue, setNextDue] = useState(series.next_due_override ?? '')
@@ -795,6 +796,7 @@ function SeriesDetailsSection({
     setOwnerEmail(series.owner_email ?? '')
     setBaseType(series.base_type ?? '')
     setSurveyName(series.survey_name)
+    setGuidance(series.guidance ?? '')
     setNotes(series.notes ?? '')
     setAnchorDate(series.anchor_date ?? '')
     setNextDue(series.next_due_override ?? '')
@@ -813,6 +815,34 @@ function SeriesDetailsSection({
     </div>
   )
 
+  /**
+   * A LONG-TEXT FIELD, AND WHY IT IS SHOWN WHEN IT IS EMPTY.
+   *
+   * `notes` and `data_qa_note` have been on this record since migration 073 and
+   * were EDITABLE the whole time — and displayed nowhere. You could type a
+   * note, save it, and never see it again without pressing Edit, which from the
+   * outside is indistinguishable from the field not existing. David asked for a
+   * Notes field on 2026-09-29; one was already here, invisible.
+   *
+   * So an empty one still prints its label and a dash, exactly as Field does
+   * above. A record page's job is to show the shape of the record, not only the
+   * parts of it somebody has filled in.
+   *
+   * `whitespace-pre-wrap`: people type these as lists. Collapsing the line
+   * breaks they entered would rewrite what they wrote.
+   */
+  const Prose = ({ label, value, tip }: { label: string; value: string; tip?: string }) => (
+    <div>
+      <div className="text-[11px] text-muted-foreground flex items-center">
+        {label}
+        {tip && <InfoTooltip text={tip} />}
+      </div>
+      <div className={`text-sm whitespace-pre-wrap ${value ? 'text-foreground' : 'text-muted-foreground'}`}>
+        {value || '—'}
+      </div>
+    </div>
+  )
+
   return (
     <div className="bg-card border border-border shadow-sm rounded-xl p-4 flex flex-col gap-3">
       <div className="flex items-center justify-between">
@@ -825,6 +855,7 @@ function SeriesDetailsSection({
       </div>
 
       {!editing ? (
+        <>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <Field label="Cadence" value={cadenceLabel(series.cadence_months)} tip="How often a new wave runs (monthly, quarterly, etc.). Drives the next-wave due date." />
           <Field label="Delivery cadence" value={series.delivery_cadence ?? '—'} tip="When each wave is delivered to the client (free text, e.g. “Beginning of month”)." />
@@ -843,6 +874,24 @@ function SeriesDetailsSection({
           <Field label="In service" value={!series.in_service ? 'Ended' : series.paused ? 'Paused' : 'Yes'} tip="Whether the series is actively running. Ended = no more waves; Paused = temporarily stopped; Yes = live." />
           <Field label="Mode" value={series.service_mode === 'auto' ? 'Auto' : 'Manual'} tip="Auto = waves are created automatically before they’re due. Manual = you create each wave by hand." />
         </div>
+        <div className="flex flex-col gap-3 border-t border-border pt-3">
+          <Prose
+            label="Rerun guidance"
+            value={series.guidance ?? ''}
+            tip="How this series is meant to be RUN — the standing instruction that should survive whoever happens to pick up the next wave. Fielding windows, who must be asked, what must not change between waves."
+          />
+          <Prose
+            label="Notes"
+            value={series.notes ?? ''}
+            tip="Whatever is worth recording about this series right now, as opposed to the standing instruction above."
+          />
+          <Prose
+            label="Data / QA note"
+            value={series.data_qa_note ?? ''}
+            tip="Anything the next person running a wave of this study needs to know about its data — a known quirk, a question that always needs recoding, a segment that under-fills."
+          />
+        </div>
+        </>
       ) : (
         <div className="flex flex-col gap-2.5">
           <label className="flex flex-col gap-1">
@@ -927,8 +976,18 @@ function SeriesDetailsSection({
             </label>
           </div>
           <label className="flex flex-col gap-1">
-            <span className="text-[12px] text-muted-foreground">Notes</span>
-            <textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} className={`${inputCls} resize-none`} />
+            <span className="text-[12px] text-muted-foreground flex items-center">
+              Rerun guidance
+              <InfoTooltip text="How this series is meant to be RUN — the standing instruction that should survive whoever happens to pick up the next wave. Fielding windows, who must be asked, what must not change between waves." />
+            </span>
+            <textarea rows={3} value={guidance} onChange={(e) => setGuidance(e.target.value)} className={`${inputCls} resize-none`} />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-[12px] text-muted-foreground flex items-center">
+              Notes
+              <InfoTooltip text="Whatever is worth recording about this series right now, as opposed to the standing instruction above." />
+            </span>
+            <textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} className={`${inputCls} resize-none`} />
           </label>
           <label className="flex flex-col gap-1">
             <span className="text-[12px] text-muted-foreground flex items-center">
@@ -951,6 +1010,7 @@ function SeriesDetailsSection({
                   service_mode: serviceMode,
                   template_id: templateId.trim() || null,
                   owner_email: ownerEmail.trim() || null,
+                  guidance: guidance.trim() || null,
                   notes: notes.trim() || null,
                   data_qa_note: dataQaNote.trim() || null,
                   // '' is what an emptied <input type="date"> gives, and a date
