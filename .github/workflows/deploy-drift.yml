@@ -30,13 +30,32 @@
 # there is no webhook, no Resend key and nothing else to keep alive. The one
 # thing to know: GitHub disables scheduled workflows in repos with no activity
 # for 60 days, which is not a risk on a repo committed to daily.
+#
+# WHY IT WAITS BEFORE CRYING DRIFT
+#
+# Because it cried once, and was wrong. On 2026-09-28 it read main at 20:08:43
+# and reported "a push did not produce a deployment" — and Vercel created that
+# very commit's deployment record at 20:11:15, two and a half minutes later.
+# Both SHAs it printed were correct; the conclusion drawn from them was not. It
+# was reading GitHub and Vercel as though they were sampled at the same instant,
+# and they never are: a push reaches GitHub first and Vercel some minutes later.
+#
+# "A deployment is missing" and "a deployment has not appeared YET" look
+# identical in a single sample and are told apart only by waiting. So the check
+# waits — but only on the branch that is about to fail. On a normal day the SHAs
+# already match and it exits in about four seconds, which is what lets the grace
+# window be generous without costing anything.
 name: deploy drift
 
 on:
   schedule:
-    # Daily, 13:20 UTC (~09:20 ET). After the working day has started, so a
-    # failure email is seen rather than buried overnight. Vercel Hobby limits
-    # only apply to vercel.json crons, not to this.
+    # Asked for 13:20 UTC. NOT what happens: across the 20 scheduled runs up to
+    # 2026-09-28 this fired between 16:21 and 20:08 UTC — never once at 13:20,
+    # with nearly four hours of spread. GitHub delays scheduled workflows under
+    # load and promises nothing about when a cron actually runs. The time below
+    # is left as the request rather than tuned against the delay, because the
+    # delay is GitHub's to change without telling us. Read it as "once a day,
+    # some time in the afternoon UTC".
     - cron: '20 13 * * *'
   # So it can be run by hand from the Actions tab right after a suspicious merge
   # instead of waiting for the next morning.
@@ -49,6 +68,10 @@ permissions:
 jobs:
   check:
     runs-on: ubuntu-latest
+    # The job idles only while waiting out the grace window, and only on a day
+    # when main is ahead. It must still be bounded, or a hung API call would
+    # hold a runner for six hours.
+    timeout-minutes: 20
     steps:
       - name: Compare the live production deployment against main
         env:
@@ -57,21 +80,62 @@ jobs:
         run: |
           set -euo pipefail
 
-          MAIN_SHA=$(gh api "repos/$REPO/commits/main" --jq '.sha')
+          # How long a just-pushed commit is given to produce a deployment
+          # RECORD before the absence of one is called drift. The one measured
+          # lag was 2m32s; ten minutes is four times that, and the August
+          # outage this check exists for lasted four DAYS — so a window this
+          # size costs the alert nothing in speed while removing the whole
+          # class of false alarm.
+          GRACE_SECONDS=600
+          POLL_SECONDS=60
 
-          # The most recent PRODUCTION deployment, and the state of its latest
-          # status. A deployment RECORD existing proves nothing — all three of
-          # the failed deploys in August created records and then failed.
-          DEP=$(gh api "repos/$REPO/deployments?environment=production&per_page=1" --jq '.[0].id // empty')
-          if [ -z "$DEP" ]; then
+          # Both halves of the comparison, re-read together. Re-reading main is
+          # deliberate: someone can push again while this is waiting, and
+          # comparing a fresh deployment against a stale main would invent
+          # drift of its own.
+          read_state() {
+            MAIN_SHA=$(gh api "repos/$REPO/commits/main" --jq '.sha')
+            # The most recent PRODUCTION deployment, and the state of its
+            # latest status. A deployment RECORD existing proves nothing — all
+            # three of the failed deploys in August created records and then
+            # failed. The state is what carries the answer.
+            DEP=$(gh api "repos/$REPO/deployments?environment=production&per_page=1" --jq '.[0].id // empty')
+            if [ -z "$DEP" ]; then
+              DEP_SHA=""
+              STATE="none"
+              return
+            fi
+            DEP_SHA=$(gh api "repos/$REPO/deployments/$DEP" --jq '.sha')
+            STATE=$(gh api "repos/$REPO/deployments/$DEP/statuses?per_page=1" --jq '.[0].state // "none"')
+          }
+
+          report() {
+            echo "main:                 $MAIN_SHA"
+            echo "latest production:    ${DEP_SHA:-<none>}  ($STATE)"
+          }
+
+          read_state
+          report
+
+          if [ -z "$DEP_SHA" ]; then
             echo "::error::No production deployment found at all for $REPO."
             exit 1
           fi
-          DEP_SHA=$(gh api "repos/$REPO/deployments/$DEP" --jq '.sha')
-          STATE=$(gh api "repos/$REPO/deployments/$DEP/statuses?per_page=1" --jq '.[0].state // "none"')
 
-          echo "main:                 $MAIN_SHA"
-          echo "latest production:    $DEP_SHA  ($STATE)"
+          # Wait out the grace window, but ONLY while the answer could still
+          # change. A deployment already in state 'failure' has been decided,
+          # and no amount of waiting undecides it, so that case leaves the loop
+          # at once and is reported below as the failure it is.
+          WAITED=0
+          while [ "$MAIN_SHA" != "$DEP_SHA" ] \
+            && [ "$STATE" != "failure" ] && [ "$STATE" != "error" ] \
+            && [ "$WAITED" -lt "$GRACE_SECONDS" ]; do
+            echo "main is ahead of the newest production deployment. Vercel may not have registered the push yet — waited ${WAITED}s of ${GRACE_SECONDS}s."
+            sleep "$POLL_SECONDS"
+            WAITED=$((WAITED + POLL_SECONDS))
+            read_state
+            report
+          done
 
           # A failed newest deployment is the actual August signature: the
           # deployment for the newest commit exists and failed, so what is being
@@ -84,9 +148,11 @@ jobs:
 
           # Drift with no failed deployment: a push that never triggered a build
           # at all. Seen twice in August on squash-merges. The fix is an
-          # empty-commit re-trigger against the same tree.
+          # empty-commit re-trigger against the same tree. The elapsed time is
+          # named because it IS the evidence — this is no longer one sample, it
+          # is a claim that nothing appeared for that long.
           if [ "$MAIN_SHA" != "$DEP_SHA" ]; then
-            echo "::error::Production is on $DEP_SHA but main is $MAIN_SHA — a push did not produce a deployment. Re-trigger with an empty commit on the same tree: NEW=\$(git commit-tree \"origin/main^{tree}\" -p origin/main -m 're-trigger deploy'); git push origin \$NEW:main"
+            echo "::error::Production is on $DEP_SHA but main is $MAIN_SHA, and still was after ${WAITED}s of waiting — a push did not produce a deployment. Re-trigger with an empty commit on the same tree: NEW=\$(git commit-tree \"origin/main^{tree}\" -p origin/main -m 're-trigger deploy'); git push origin \$NEW:main"
             exit 1
           fi
 
