@@ -70,7 +70,7 @@ describe('ImproveTab', () => {
     const first = within(list).getAllByRole('listitem')[0]
     expect(first).toHaveTextContent('Client price missing on costed work')
     expect(first).toHaveTextContent('$520')
-    expect(screen.getByText(/Client price covers 1 of 3 delivered surveys/)).toBeInTheDocument()
+    expect(screen.getByText(/Client price covers 1 of 3 delivered studies/)).toBeInTheDocument()
   })
 
   /**
@@ -86,7 +86,7 @@ describe('ImproveTab', () => {
       '2026-04', '2026-05', '2026-06', '2026-07', '2026-08', '2026-09']
     const extra = months.map(m => P({ id: `m${m}`, deliver_date: `${m}-15` }))
     const { container } = render(<ImproveTab {...propsOf([], extra)} />)
-    const grid = container.querySelector('figure[aria-label^="Share of delivered surveys carrying each field"]')!
+    const grid = container.querySelector('figure[aria-label^="Share of delivered studies carrying each field"]')!
     // A FitText carries its long form as a <title> child, which textContent
     // would fold into the drawn words.
     const drawn = [...grid.querySelectorAll('svg text')]
@@ -130,7 +130,7 @@ describe('ImproveTab', () => {
   it('opens a gap’s surveys in a drill that reconciles', () => {
     const props = propsOf()
     render(<ImproveTab {...props} />)
-    fireEvent.click(screen.getAllByRole('button', { name: /Show the 2 surveys/ })[0])
+    fireEvent.click(screen.getAllByRole('button', { name: /Show the 2 studies/ })[0])
     const spec = (props.openDrill as ReturnType<typeof vi.fn>).mock.calls[0][0] as DrillSpec
     expect(spec.key).toBe('improve-gap-price')
     expect(reconcile(spec).ok).toBe(true)

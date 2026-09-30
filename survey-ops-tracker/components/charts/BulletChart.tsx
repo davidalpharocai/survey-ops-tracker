@@ -36,7 +36,7 @@ export interface BulletProgress {
 export interface BulletChartProps<D> extends ChartCommon<D> {
   data: D[]
   label: (d: D) => string
-  /** Table header for the name column (default "Survey"). */
+  /** Table header for the name column (default "Study"). */
   labelHeader?: string
   /** Second line under the label, e.g. "BAM · Fielding". */
   sublabel?: (d: D) => string | null | undefined
@@ -74,7 +74,7 @@ const DEFAULT_NAMES = {
 export function BulletChart<D>({
   data,
   label,
-  labelHeader = 'Survey',
+  labelHeader = 'Study',
   sublabel,
   value,
   max,
@@ -162,7 +162,7 @@ export function BulletChart<D>({
         columns: [
           { key: 'l', label: labelHeader },
           { key: 'v', label: names.value, align: 'right', title: 'Recorded field cost so far' },
-          ...(max ? [{ key: 'm', label: names.max, align: 'right' as const, title: 'Price per N × the N target: what the survey is worth if it lands on target' }] : []),
+          ...(max ? [{ key: 'm', label: names.max, align: 'right' as const, title: 'Price per N × the N target: what the study is worth if it lands on target' }] : []),
           ...(max ? [{ key: 'pct', label: 'Spent ÷ contract', align: 'right' as const, title: 'Spend so far as a share of the contract value (blank when there is no price above $0)' }] : []),
           ...(budget ? [{ key: 'b', label: names.budget, align: 'right' as const, title: 'The most we planned to spend' }] : []),
           ...(goal ? [{ key: 'g', label: names.goal, align: 'right' as const, title: 'A starting goal for spend, not a rule' }] : []),

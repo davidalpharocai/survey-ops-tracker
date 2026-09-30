@@ -60,7 +60,7 @@ export function ContactsDirectory() {
       <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
         <h3 className={`${heading} mb-0`}>
           Contacts ({contacts.length})
-          <InfoTooltip text="Everyone we know at every account, grouped by account. Click a contact for their page — every survey they've requested. Add or edit contacts on the account's own page." />
+          <InfoTooltip text="Everyone we know at every account, grouped by account. Click a contact for their page — every study they've requested. Add or edit contacts on the account's own page." />
         </h3>
         <input
           value={q}

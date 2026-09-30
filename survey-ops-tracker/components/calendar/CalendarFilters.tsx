@@ -132,7 +132,7 @@ export function CalendarFilters({ filters, onChange }: CalendarFiltersProps) {
           </select>
         </Field>
 
-        <Field label="Type" tooltip="Base survey type: PS (PureSpectrum consumer panel) or B2B (expert/business panel).">
+        <Field label="Type" tooltip="Base study type: PS (PureSpectrum consumer panel) or B2B (expert/business panel).">
           <select
             value={filters.projectType ?? ''}
             onChange={e =>

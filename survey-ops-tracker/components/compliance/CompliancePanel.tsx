@@ -292,7 +292,7 @@ export function CompliancePanel({
               Compliance Review
             </h3>
           )}
-          <InfoTooltip text="Submit the survey's question list for the client's compliance team to review and approve before launch. After you hit send there's a 60-second window to recall and edit before anything is visible to the client. Reviewers get an email with a one-click review link; you'll be notified when they approve or reject." />
+          <InfoTooltip text="Submit the study's question list for the client's compliance team to review and approve before launch. After you hit send there's a 60-second window to recall and edit before anything is visible to the client. Reviewers get an email with a one-click review link; you'll be notified when they approve or reject." />
         </span>
         {latest && (
           <span className={`text-xs px-2 py-1 rounded shrink-0 ${latestIsUndispatched ? 'bg-amber-500/20 text-amber-600 dark:text-amber-400' : STATUS_BADGE[latest.status]}`}>

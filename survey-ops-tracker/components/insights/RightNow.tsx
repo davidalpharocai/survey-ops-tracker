@@ -26,7 +26,7 @@ export function RightNow({ model: m, open }: { model: InsightsModel; open: OpenD
   const n = m.now
   const f = m.filter
   const words = m.filterWords.length ? ' · ' + m.filterWords.join(' · ') : ''
-  const scope = `In flight · right now${words} · ${fmtNum(n.inFlight)} survey${n.inFlight === 1 ? '' : 's'}`
+  const scope = `In flight · right now${words} · ${fmtNum(n.inFlight)} ${n.inFlight === 1 ? 'study' : 'studies'}`
   const listCaptain = f.captain ? (f.captain === NO_CAPTAIN ? 'unassigned' : f.captain) : null
 
   /** The List link for a set, with the ways the List may differ spelled out. */
@@ -34,7 +34,7 @@ export function RightNow({ model: m, open }: { model: InsightsModel; open: OpenD
     const qs = new URLSearchParams()
     for (const [k, v] of Object.entries(params)) if (v) qs.set(k, v)
     const notes: string[] = []
-    if (params.captain && params.captain !== 'unassigned') notes.push('the List also counts surveys this person co-captains')
+    if (params.captain && params.captain !== 'unassigned') notes.push('the List also counts studies this person co-captains')
     if (f.type || f.account) notes.push('the List has no type or account filter, so it shows every type and account')
     notes.push('the List shows open, active-phase work')
     return {
@@ -76,11 +76,11 @@ export function RightNow({ model: m, open }: { model: InsightsModel; open: OpenD
         </h2>
         <span className="text-sm text-muted-foreground">
           {fmtNum(n.inFlight)} in flight ·{' '}
-          <OpenCount title="Show the surveys on hold" onOpen={() => open(sideBucketRequest(m, 'hold', 'in the header'))}>
+          <OpenCount title="Show the studies on hold" onOpen={() => open(sideBucketRequest(m, 'hold', 'in the header'))}>
             {fmtNum(n.hold)} on hold
           </OpenCount>
           {' · '}
-          <OpenCount title="Show the surveys still being scoped" onOpen={() => open(sideBucketRequest(m, 'scoping', 'in the header'))}>
+          <OpenCount title="Show the studies still being scoped" onOpen={() => open(sideBucketRequest(m, 'scoping', 'in the header'))}>
             {fmtNum(n.scoping)} still scoping
           </OpenCount>
         </span>
@@ -90,11 +90,11 @@ export function RightNow({ model: m, open }: { model: InsightsModel; open: OpenD
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <NowTile
           label="Overdue"
-          help="In-flight surveys whose due date has passed. A survey due today is not overdue yet — it is due this week."
+          help="In-flight studies whose due date has passed. A study due today is not overdue yet — it is due this week."
           value={n.overdue}
           tone={n.overdue > 0 ? 'text-red-600 dark:text-red-400' : 'text-foreground'}
           sub={n.overdue > 0 ? 'Past the due date — oldest first in the list' : 'Nothing past its due date'}
-          openTitle="Show the overdue surveys"
+          openTitle="Show the overdue studies"
           onOpen={() => open({
             key: 'now-overdue', title: 'Overdue', population: `In flight · past the due date${words}`,
             query: { kind: 'open', due: 'overdue' }, expected: n.overdue, expectedWhere: 'in the tile',
@@ -103,10 +103,10 @@ export function RightNow({ model: m, open }: { model: InsightsModel; open: OpenD
         />
         <NowTile
           label="Due this week"
-          help={`In-flight surveys due today or in the next ${DUE_SOON_DAYS - 1} days — the same rule as the List's "due this week".`}
+          help={`In-flight studies due today or in the next ${DUE_SOON_DAYS - 1} days — the same rule as the List's "due this week".`}
           value={n.dueSoon}
           sub={`Today to ${DUE_SOON_DAYS - 1} days out`}
-          openTitle={`Show the surveys due in the next ${DUE_SOON_DAYS} days`}
+          openTitle={`Show the studies due in the next ${DUE_SOON_DAYS} days`}
           onOpen={() => open({
             key: 'now-soon', title: `Due in the next ${DUE_SOON_DAYS} days`, population: `In flight · due today to ${DUE_SOON_DAYS - 1} days out${words}`,
             query: { kind: 'open', due: 'soon' }, expected: n.dueSoon, expectedWhere: 'in the tile',
@@ -115,11 +115,11 @@ export function RightNow({ model: m, open }: { model: InsightsModel; open: OpenD
         />
         <NowTile
           label="Behind target"
-          help="Surveys in Fielding that have collected fewer responses than their minimum N target so far. Not necessarily late — just not there yet."
+          help="Studies in Fielding that have collected fewer responses than their minimum N target so far. Not necessarily late — just not there yet."
           value={n.behind}
           tone={n.behind > 0 ? 'text-amber-700 dark:text-amber-400' : 'text-foreground'}
           sub="In Fielding, short of the minimum N"
-          openTitle="Show the fielding surveys still short of their minimum N"
+          openTitle="Show the fielding studies still short of their minimum N"
           onOpen={() => open({
             key: 'now-behind', title: 'Behind target in Fielding', population: `In flight · Fielding · short of the minimum N${words}`,
             query: { kind: 'open', behind: true }, expected: n.behind, expectedWhere: 'in the tile',
@@ -130,17 +130,17 @@ export function RightNow({ model: m, open }: { model: InsightsModel; open: OpenD
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <InsightsCard
           title="Pipeline by stage"
-          help="Where in-flight work sits today, by board column. Click a stage for its surveys."
+          help="Where in-flight work sits today, by board column. Click a stage for its studies."
           scope={scope}
           verdict={
             <>
               {n.stageVerdict}
               {n.collectionPct != null && (
-                <> Across in-flight surveys with an N target, {fmtNum(n.collected)} of {formatNRange(n.targetMin, n.targetMax)} responses are in ({pctText(n.collectionPct)}{targetIsRange ? ' of the minimum' : ''}).</>
+                <> Across in-flight studies with an N target, {fmtNum(n.collected)} of {formatNRange(n.targetMin, n.targetMax)} responses are in ({pctText(n.collectionPct)}{targetIsRange ? ' of the minimum' : ''}).</>
               )}
               {n.collectionPct != null && n.untargeted > 0 && (
                 <>
-                  {' '}Left out of that: {fmtNum(n.untargeted)} in-flight survey{n.untargeted === 1 ? '' : 's'} with no N target
+                  {' '}Left out of that: {fmtNum(n.untargeted)} in-flight {n.untargeted === 1 ? 'study' : 'studies'} with no N target
                   {n.untargetedCollected > 0 ? `, holding ${fmtNum(n.untargetedCollected)} response${n.untargetedCollected === 1 ? '' : 's'}` : ''}.
                 </>
               )}
@@ -148,12 +148,12 @@ export function RightNow({ model: m, open }: { model: InsightsModel; open: OpenD
           }
         >
           <BarChart
-            ariaLabel="In-flight surveys by stage"
+            ariaLabel="In-flight studies by stage"
             data={n.byStage}
             label={d => stageLabel(d.stage)}
             labelHeader="Stage"
             value={d => d.count}
-            valueName="Surveys"
+            valueName="Studies"
             note={d => d.help}
             color="var(--chart-cat-1)"
             emptyMessage="Nothing in flight in this view"
@@ -163,12 +163,12 @@ export function RightNow({ model: m, open }: { model: InsightsModel; open: OpenD
 
         <InsightsCard
           title="Workload by captain"
-          help="In-flight surveys per lead captain, with how many are overdue. A survey with no captain needs an owner. Click a bar for the surveys."
+          help="In-flight studies per lead captain, with how many are overdue. A study with no captain needs an owner. Click a bar for the studies."
           scope={scope}
           verdict={n.workloadVerdict}
         >
           <BarChart
-            ariaLabel="In-flight surveys by captain"
+            ariaLabel="In-flight studies by captain"
             data={n.workload}
             label={d => (d.id === NO_CAPTAIN ? 'No captain' : d.name)}
             labelHeader="Captain"
@@ -177,10 +177,10 @@ export function RightNow({ model: m, open }: { model: InsightsModel; open: OpenD
             valueLabel={{
               name: 'In flight · overdue',
               text: d => (d.overdue ? `${fmtNum(d.open)} · ${fmtNum(d.overdue)} overdue` : fmtNum(d.open)),
-              description: 'Open surveys, and how many are past their due date',
+              description: 'Open studies, and how many are past their due date',
             }}
             color={d => (d.id === NO_CAPTAIN ? 'var(--chart-loss)' : 'var(--chart-cat-1)')}
-            note={d => (d.id === NO_CAPTAIN ? 'These surveys need a captain' : null)}
+            note={d => (d.id === NO_CAPTAIN ? 'These studies need a captain' : null)}
             emptyMessage="Nobody has open work in this view"
             onSelect={openWorkload}
           />

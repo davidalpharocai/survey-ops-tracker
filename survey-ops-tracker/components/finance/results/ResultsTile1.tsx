@@ -26,9 +26,9 @@ import { fmtNum } from '@/lib/utils/number'
 export const TILE1_NEEDS: Needs = RESULTS_NEEDS
 
 const HELP = {
-  card: 'Did we make money on finished work? Client price and our cost on the same surveys — the delivered ones where we know both what the client pays and what we spent. “We keep” is what is left after field cost, before salaries and overhead.',
+  card: 'Did we make money on finished work? Client price and our cost on the same studies — the delivered ones where we know both what the client pays and what we spent. “We keep” is what is left after field cost, before salaries and overhead.',
   price: 'What clients pay us: their price per respondent times respondents delivered, never more than the N they bought.',
-  cost: 'Field cost on the same surveys: panel, blast rewards and sends, vendor costs, less rewards recovered. No salaries or overhead.',
+  cost: 'Field cost on the same studies: panel, blast rewards and sends, vendor costs, less rewards recovered. No salaries or overhead.',
   kept: 'What is left after field cost, before salaries and overhead.',
   budget: `A budget is the most we planned to spend — a cost ceiling, meant to be about ${goalCostWords()} per $1 of client price. Going over it is not the same as losing money.`,
 }
@@ -64,32 +64,32 @@ export function ResultsTile1({ props, model, open }: {
       ) : (
         <>
           {t1.surveys === 0 ? (
-            <Empty>No delivered survey in this view has both a client price and a recorded cost.</Empty>
+            <Empty>No delivered study in this view has both a client price and a recorded cost.</Empty>
           ) : (
             <div className="grid grid-cols-2 divide-border lg:grid-cols-4 lg:divide-x">
               <Figure
                 label="Client price" help={HELP.price} tone="price"
                 value={t1.text.price.value} sub={t1.text.price.sub}
                 onOpen={() => open({ kind: 'price' })}
-                openLabel={`Show the ${fmtNum(t1.surveys)} surveys behind the client price`}
+                openLabel={`Show the ${fmtNum(t1.surveys)} studies behind the client price`}
               />
               <Figure
                 label="Our cost" help={HELP.cost} tone="cost"
                 value={t1.text.cost.value} sub={t1.text.cost.sub}
                 onOpen={() => open({ kind: 'cost' })}
-                openLabel="Show our cost on the same surveys"
+                openLabel="Show our cost on the same studies"
               />
               <Figure
                 label="We keep" help={HELP.kept} tone={t1.kept < 0 ? 'loss' : 'keep'}
                 value={t1.text.kept.value} sub={t1.text.kept.sub}
                 onOpen={() => open({ kind: 'kept' })}
-                openLabel="Show what we keep on each survey, worst first"
+                openLabel="Show what we keep on each study, worst first"
               />
               <Figure
                 label="Budget set at" help={HELP.budget}
                 value={t1.text.budget.value} sub={t1.text.budget.sub}
                 onOpen={t1.budget.withBudget > 0 ? () => open({ kind: 'budget' }) : undefined}
-                openLabel="Show every delivered survey with a budget: spend ÷ budget and spend ÷ price"
+                openLabel="Show every delivered study with a budget: spend ÷ budget and spend ÷ price"
               />
             </div>
           )}
@@ -112,7 +112,7 @@ export function ResultsTile1({ props, model, open }: {
             />
             {model.undated && model.undated.delivered > 0 && (
               <p className="mt-2 text-xs text-muted-foreground">
-                {fmtNum(model.undated.delivered)} delivered {model.undated.delivered === 1 ? 'survey has' : 'surveys have'} no
+                {fmtNum(model.undated.delivered)} delivered {model.undated.delivered === 1 ? 'study has' : 'studies have'} no
                 deliver, launch or submitted date: {model.undated.delivered === 1 ? 'it is' : 'they are'} in the figures above but in no month.
               </p>
             )}

@@ -30,7 +30,7 @@ export function AddNextStep({ projectId, code, text }: { projectId: string; code
   const queryClient = useQueryClient()
   const [stage, setStage] = useState<Stage>('idle')
   const [error, setError] = useState<string | null>(null)
-  const label = code ?? 'this survey'
+  const label = code ?? 'this study'
 
   const { data: user, isPending: userPending } = useQuery({
     queryKey: ['auth-user'],

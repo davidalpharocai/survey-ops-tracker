@@ -92,7 +92,7 @@ export function ClientContacts({ clientId }: { clientId: string }) {
       {isLoading ? (
         <p className="text-xs text-muted-foreground/60">Loading…</p>
       ) : active.length === 0 && !adding ? (
-        <p className="text-xs text-muted-foreground/60">No contacts yet — add the person who requests this client&apos;s surveys.</p>
+        <p className="text-xs text-muted-foreground/60">No contacts yet — add the person who requests this client&apos;s studies.</p>
       ) : shown.length === 0 ? (
         <p className="text-xs text-muted-foreground/60">
           None of this client&apos;s {active.length} contacts match &ldquo;{query}&rdquo;.
@@ -128,7 +128,7 @@ export function ClientContacts({ clientId }: { clientId: string }) {
                     <Link
                       href={`/contacts/${c.id}`}
                       className="truncate text-primary hover:underline"
-                      title={`Open ${contactName(c)}'s page — every survey they requested`}
+                      title={`Open ${contactName(c)}'s page — every study they requested`}
                     >
                       {contactName(c)}
                     </Link>
@@ -187,7 +187,7 @@ export function ClientContacts({ clientId }: { clientId: string }) {
                       <Link
                         href={`/contacts/${c.id}`}
                         className="hover:text-foreground hover:underline transition-colors"
-                        title={`Open ${contactName(c)}'s page — every survey they requested`}
+                        title={`Open ${contactName(c)}'s page — every study they requested`}
                       >
                         {contactName(c)}
                       </Link>

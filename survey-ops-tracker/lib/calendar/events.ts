@@ -52,7 +52,7 @@ export const EVENT_TYPE_META: Record<
     icon: '🚀',
     dot: 'bg-violet-500',
     chip: 'bg-violet-500/15 text-violet-700 dark:text-violet-300',
-    tip: 'Field go-live date — when the survey launches into field (survey_projects.launch_date).',
+    tip: 'Field go-live date — when the study launches into field (survey_projects.launch_date).',
   },
   rerun: {
     label: 'Rerun (next wave)',

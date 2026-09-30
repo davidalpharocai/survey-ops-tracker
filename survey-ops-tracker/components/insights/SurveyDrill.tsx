@@ -91,20 +91,20 @@ export function SurveyDrill({ req, model, accounts, onClose }: {
           }
         >
           {agrees
-            ? `${fmtNum(rows.length)} survey${rows.length === 1 ? '' : 's'} listed — the same as the ${fmtNum(req.expected)} ${req.expectedWhere} ✓`
+            ? `${fmtNum(rows.length)} ${rows.length === 1 ? 'study' : 'studies'} listed — the same as the ${fmtNum(req.expected)} ${req.expectedWhere} ✓`
             : `${fmtNum(rows.length)} listed, but ${fmtNum(req.expected)} ${req.expectedWhere}. The two disagree — please tell Claude so it can be fixed.`}
         </div>
 
         <div className="min-h-0 flex-1 overflow-auto">
           {rows.length === 0 ? (
-            <p className="px-4 py-10 text-center text-sm text-muted-foreground">No surveys behind this figure.</p>
+            <p className="px-4 py-10 text-center text-sm text-muted-foreground">No studies behind this figure.</p>
           ) : (
             <table className="w-full text-[13px]">
               <thead className="sticky top-0 bg-card">
                 <tr className="border-b border-border text-left text-[11px] uppercase tracking-wider text-muted-foreground">
-                  <th className="px-3 py-1.5 font-medium" title="The survey's code; opens the project">Survey</th>
+                  <th className="px-3 py-1.5 font-medium" title="The study's code; opens the project">Study</th>
                   <th className="px-3 py-1.5 font-medium" title="Project name, account and type">What</th>
-                  <th className="px-3 py-1.5 font-medium" title="The survey's lead captain">Captain</th>
+                  <th className="px-3 py-1.5 font-medium" title="The study's lead captain">Captain</th>
                   {delivered ? (
                     <>
                       <th className="px-3 py-1.5 text-right font-medium" title="The deliver date — the day the client had it">Delivered</th>
@@ -114,7 +114,7 @@ export function SurveyDrill({ req, model, accounts, onClose }: {
                     </>
                   ) : (
                     <>
-                      <th className="px-3 py-1.5 font-medium" title="The board column the survey is in">Stage</th>
+                      <th className="px-3 py-1.5 font-medium" title="The board column the study is in">Stage</th>
                       <th className="px-3 py-1.5 text-right font-medium" title="Internal due date">Due</th>
                       <th className="px-3 py-1.5 text-right font-medium" title="Responses collected so far, against the N target (a range when a maximum is set)">Collected</th>
                     </>

@@ -53,10 +53,10 @@ export function FieldingGuidance({
       || project.status === 'Hold' || project.status === 'Closed' || project.status === 'Cancelled'
     return (
       <section className="rounded-xl border border-border bg-card p-8 text-center shadow-sm">
-        <p className="text-sm font-medium">No guidance for this survey</p>
+        <p className="text-sm font-medium">No guidance for this study</p>
         <p className="mx-auto mt-1.5 max-w-md text-[13px] leading-relaxed text-muted-foreground">
           {finished
-            ? 'The fielding decisions on this one are already made. Guidance only appears while a survey is open and still has choices left in it.'
+            ? 'The fielding decisions on this one are already made. Guidance only appears while a study is open and still has choices left in it.'
             : 'Nothing here yet — guidance needs a target N, or blasts and launches on file, before it has anything to price or compare. It appears as soon as either exists.'}
         </p>
       </section>
@@ -69,7 +69,7 @@ export function FieldingGuidance({
         <span className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
           Fielding guidance
         </span>
-        <InfoTooltip text={`What this survey's own route, N and blast history imply, priced against every survey SOCC has recorded. Measured ${EVIDENCE_DATE}. Cost only — client rates are recorded on 4 of 322 delivered surveys, so nothing here can speak to margin.`} />
+        <InfoTooltip text={`What this study's own route, N and blast history imply, priced against every study SOCC has recorded. Measured ${EVIDENCE_DATE}. Cost only — client rates are recorded on 4 of 322 delivered studies, so nothing here can speak to margin.`} />
       </h3>
 
       {items.map(g => {

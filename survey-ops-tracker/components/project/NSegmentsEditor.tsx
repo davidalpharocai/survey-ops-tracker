@@ -38,9 +38,9 @@ type ProjectUpdate = Database['public']['Tables']['survey_projects']['Update']
 
 const TIP = {
   section:
-    'Target and collected sample, plus who the survey is fielded to. Split into per-segment Ns (e.g. Buyers / Sellers) when a project needs separate targets — the totals here then sum the segments.',
+    'Target and collected sample, plus who the study is fielded to. Split into per-segment Ns (e.g. Buyers / Sellers) when a project needs separate targets — the totals here then sum the segments.',
   nTarget:
-    'The number of survey responses to collect, as the range agreed with the client (minimum – maximum). One agreed number? Type it once and leave the max blank.',
+    'The number of study responses to collect, as the range agreed with the client (minimum – maximum). One agreed number? Type it once and leave the max blank.',
   nInternal:
     'Your internal collection goal — usually a cushion above N Target to cover cleaning and terminations.',
   nCollected: 'Completes collected so far — also auto-syncs from the sheet.',
@@ -50,7 +50,7 @@ const TIP = {
   audienceUsed:
     'How many of those contacts we have actually drawn on so far. Leave blank if nobody has recorded it. Deliberately NOT the same as blast reach: re-sending to the same list raises reach without using up a single new contact.',
   audience:
-    'Who the survey is fielded to — the target respondent profile (free text, e.g. "US adults 18+, likely voters").',
+    'Who the study is fielded to — the target respondent profile (free text, e.g. "US adults 18+, likely voters").',
   segmentTotal:
     'The project N Target: the sum of the segment minimums through to the sum of the segment maximums.',
   segmentNote:

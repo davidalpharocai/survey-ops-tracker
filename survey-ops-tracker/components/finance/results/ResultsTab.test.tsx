@@ -64,7 +64,7 @@ describe('ResultsTab', () => {
   it('opens a drill that reconciles when a figure is clicked', () => {
     const { p, openDrill } = props()
     render(<ResultsTab {...p} />)
-    fireEvent.click(screen.getByTitle('Show the 31 surveys behind the client price'))
+    fireEvent.click(screen.getByTitle('Show the 31 studies behind the client price'))
     const spec = openDrill.mock.calls[0][0]
     expect(spec.key).toBe('results-price')
     expect(reconcile(spec).ok).toBe(true)

@@ -208,8 +208,8 @@ const SERIES_COLUMNS: SeriesColumnDef[] = [
   },
   {
     key: 'survey',
-    label: 'Survey',
-    tooltip: 'Survey name, with its base type (PS / B2B / Rerun Service).',
+    label: 'Study',
+    tooltip: 'Study name, with its base type (PS / B2B / Rerun Service).',
     render: (s) => (
       <span className="inline-flex items-center gap-1.5">
         <BaseTypeTag baseType={s.base_type} rerunService={s.rerun_service} />
@@ -283,7 +283,7 @@ const WAVE_COLUMNS: WaveColumnDef[] = [
   },
   {
     key: 'survey',
-    label: 'Series / Survey',
+    label: 'Series / Study',
     tooltip: 'The series this wave belongs to.',
     render: (w, { seriesMap }) => {
       const parent = seriesMap.get(w.series_id)

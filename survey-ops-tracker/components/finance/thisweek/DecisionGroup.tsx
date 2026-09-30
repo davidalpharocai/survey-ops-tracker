@@ -84,8 +84,8 @@ export function DecisionGroup({ group }: { group: WeekGroup }) {
                 // can need two or three decisions, so this total and the one
                 // on the next group can cover the same money.
                 title={group.stakeUnknown
-                  ? `The dollars at stake across the rows IN THIS GROUP that have a figure. ${fmtNum(group.stakeUnknown)} ${group.stakeUnknown === 1 ? 'row has' : 'rows have'} none and ${group.stakeUnknown === 1 ? 'is' : 'are'} left out of this total, not counted as $0. A survey can need more than one decision, so do not add this total to another group's.`
-                  : 'The dollars at stake across the rows in this group. Each row here is a different survey or contract, but a survey can need more than one decision, so do not add this total to another group’s.'}
+                  ? `The dollars at stake across the rows IN THIS GROUP that have a figure. ${fmtNum(group.stakeUnknown)} ${group.stakeUnknown === 1 ? 'row has' : 'rows have'} none and ${group.stakeUnknown === 1 ? 'is' : 'are'} left out of this total, not counted as $0. A study can need more than one decision, so do not add this total to another group's.`
+                  : 'The dollars at stake across the rows in this group. Each row here is a different study or contract, but a study can need more than one decision, so do not add this total to another group’s.'}
               >
                 {money(group.stakeTotal)} at stake
                 {group.stakeUnknown > 0 && <span className="font-normal text-muted-foreground"> · {fmtNum(group.stakeUnknown)} with no dollar figure</span>}
@@ -111,8 +111,8 @@ export function DecisionGroup({ group }: { group: WeekGroup }) {
           </ol>
           {bullets.length > 0 && (
             <BulletChart
-              ariaLabel={`${meta.label}: spend against what each survey is worth`}
-              info="Teal track: the contract value (price per N × N sold). Navy: spent so far, red past the contract value. Ink tick: the budget. Amber tick: the 50% goal (a guide, not a rule). Thin bar: N collected against the N target. A survey with no price or no target shows spend against budget on a hatched track."
+              ariaLabel={`${meta.label}: spend against what each study is worth`}
+              info="Teal track: the contract value (price per N × N sold). Navy: spent so far, red past the contract value. Ink tick: the budget. Amber tick: the 50% goal (a guide, not a rule). Thin bar: N collected against the N target. A study with no price or no target shows spend against budget on a hatched track."
               data={bullets}
               label={r => r.code ?? '(no code)'}
               sublabel={r => `${r.account} · ${r.owner}`}
@@ -165,7 +165,7 @@ function DecisionRow({ row }: { row: WeekRow }) {
           </span>
         )}
         <span className="text-xs text-muted-foreground" title="The client account">{row.account}</span>
-        <span className="text-xs text-muted-foreground" title={row.ownerNote ?? 'The survey captain: who owns this decision'}>
+        <span className="text-xs text-muted-foreground" title={row.ownerNote ?? 'The study captain: who owns this decision'}>
           Owner: {row.owner}
         </span>
         <span
@@ -177,11 +177,11 @@ function DecisionRow({ row }: { row: WeekRow }) {
         </span>
       </div>
       <dl className="mt-1 grid gap-x-3 gap-y-0.5 text-[13px] leading-relaxed sm:grid-cols-[6.5rem_minmax(0,1fr)]">
-        <dt className="text-xs text-muted-foreground sm:pt-0.5" title="The fact that put this survey on the list, computed from its records">What happened</dt>
+        <dt className="text-xs text-muted-foreground sm:pt-0.5" title="The fact that put this study on the list, computed from its records">What happened</dt>
         <dd>{row.happened}</dd>
         <dt className="text-xs text-muted-foreground sm:pt-0.5" title="The dollars this decision protects or recovers, and how they are measured">At stake</dt>
         <dd>{row.stakeText}</dd>
-        <dt className="text-xs text-muted-foreground sm:pt-0.5" title="The action to take. “Add as next step” puts this text on the survey’s own next-step list.">What to do</dt>
+        <dt className="text-xs text-muted-foreground sm:pt-0.5" title="The action to take. “Add as next step” puts this text on the study’s own next-step list.">What to do</dt>
         <dd className="font-medium">{row.action}</dd>
       </dl>
       <div className="mt-1.5">

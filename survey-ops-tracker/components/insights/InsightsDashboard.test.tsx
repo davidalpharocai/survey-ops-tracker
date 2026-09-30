@@ -68,7 +68,7 @@ describe('InsightsDashboard', () => {
   it('leads with a computed, factual headline', () => {
     render(<InsightsDashboard />)
     expect(screen.getByText(
-      'The team has delivered 12 surveys so far in September, up from 11 in 1–27 Aug 2026. ' +
+      'The team has delivered 12 studies so far in September, up from 11 in 1–27 Aug 2026. ' +
       'That is 1,800 respondents, and 100% of those with a due date arrived on or before it.',
     )).toBeInTheDocument()
   })
@@ -80,14 +80,14 @@ describe('InsightsDashboard', () => {
 
   it('leaves the empty placeholder out and says so', () => {
     render(<InsightsDashboard />)
-    expect(screen.getByText(/Left out everywhere: 1 empty rerun placeholder and 2 demo or test-account surveys\./)).toBeInTheDocument()
+    expect(screen.getByText(/Left out everywhere: 1 empty rerun placeholder and 2 demo or test-account studies\./)).toBeInTheDocument()
   })
 
   it('a clicked tile lists exactly its surveys, each a real link', () => {
     render(<InsightsDashboard />)
     fireEvent.click(screen.getByRole('button', { name: '12' }))
-    const panel = screen.getByRole('dialog', { name: 'Surveys delivered' })
-    expect(within(panel).getByText(/12 surveys listed — the same as the 12 in the tile ✓/)).toBeInTheDocument()
+    const panel = screen.getByRole('dialog', { name: 'Studies delivered' })
+    expect(within(panel).getByText(/12 studies listed — the same as the 12 in the tile ✓/)).toBeInTheDocument()
     const links = within(panel).getAllByRole('link').filter(a => a.getAttribute('href')?.startsWith('/projects/'))
     expect(links).toHaveLength(12)
   })
@@ -97,7 +97,7 @@ describe('InsightsDashboard', () => {
     // The stacked monthly chart is the first chart on the page.
     fireEvent.click(screen.getAllByRole('button', { name: /^Aug/ })[0])
     const panel = screen.getByRole('dialog', { name: 'Delivered · August 2026' })
-    expect(within(panel).getByText(/11 surveys listed — the same as the 11 on the chart ✓/)).toBeInTheDocument()
+    expect(within(panel).getByText(/11 studies listed — the same as the 11 on the chart ✓/)).toBeInTheDocument()
     // …with a real link that filters the whole page to that month.
     expect(within(panel).getByRole('link', { name: 'Filter the page to 1–31 Aug 2026' }))
       .toHaveAttribute('href', '/insights?range=custom&from=2026-08-01&to=2026-08-31')
@@ -108,7 +108,7 @@ describe('InsightsDashboard', () => {
     render(<InsightsDashboard />)
     // A past month reads in the past tense, and August has no earlier month to
     // rank against or compare with, so the sentence claims nothing more.
-    expect(screen.getByText(/^The team delivered 11 surveys in August\./)).toBeInTheDocument()
+    expect(screen.getByText(/^The team delivered 11 studies in August\./)).toBeInTheDocument()
     expect(replace).not.toHaveBeenCalled()
   })
 
@@ -116,7 +116,7 @@ describe('InsightsDashboard', () => {
     raw = { ...fixture(), projects: [], blocked: [{ table: 'survey_projects', message: 'permission denied' }] }
     render(<InsightsDashboard />)
     expect(screen.getByRole('alert')).toHaveTextContent('Blocked: survey_projects did not load (permission denied)')
-    expect(screen.queryByText(/Surveys delivered/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Studies delivered/)).not.toBeInTheDocument()
   })
 
   it('when clients fail, the footer says demo accounts could not be checked — never "0 demo"', () => {
@@ -131,7 +131,7 @@ describe('InsightsDashboard', () => {
     render(<InsightsDashboard />)
     fireEvent.click(screen.getAllByRole('button', { name: '1 on hold' })[0])
     const panel = screen.getByRole('dialog', { name: 'On hold' })
-    expect(within(panel).getByText(/1 survey listed — the same as the 1 in the tile ✓/)).toBeInTheDocument()
+    expect(within(panel).getByText(/1 study listed — the same as the 1 in the tile ✓/)).toBeInTheDocument()
     expect(within(panel).getAllByRole('link').filter(a => a.getAttribute('href')?.startsWith('/projects/'))).toHaveLength(1)
   })
 
@@ -183,7 +183,7 @@ describe('InsightsDashboard', () => {
     it('a KPI sparkline has no axis, so it names its ends under it', () => {
       qs = 'range=last-12-months'
       const { container } = render(<InsightsDashboard />)
-      const trend = tileTrend(container, 'Surveys delivered per month')
+      const trend = tileTrend(container, 'Studies delivered per month')
       expect(within(trend).getByText('Oct 25')).toBeInTheDocument()
       expect(within(trend).getByText('Sep 26')).toBeInTheDocument()
       // The whole trend, for a reader who never points at it.
@@ -210,7 +210,7 @@ describe('InsightsDashboard', () => {
     it('swaps the two end months for the month under the pointer and its figure', () => {
       qs = 'range=last-12-months'
       const { container } = render(<InsightsDashboard />)
-      const trend = tileTrend(container, 'Surveys delivered per month')
+      const trend = tileTrend(container, 'Studies delivered per month')
       const readout = trend.querySelector('[data-part="tile-readout"]')!
       expect(readout.textContent).toBe('Oct 25Sep 26')
 
@@ -219,7 +219,7 @@ describe('InsightsDashboard', () => {
       expect(readout.textContent).toBe('August 202611')
       // And out loud, for a reader who is not looking at the tile.
       expect(within(trend).getByRole('status').textContent)
-        .toBe('Surveys delivered per month, August 2026: 11')
+        .toBe('Studies delivered per month, August 2026: 11')
 
       fireEvent.mouseLeave(trend.querySelector('[data-part="spark-hits"]')!)
       expect(readout.textContent).toBe('Oct 25Sep 26')
@@ -239,7 +239,7 @@ describe('InsightsDashboard', () => {
     it('is reachable from the keyboard, starting at the newest month', () => {
       qs = 'range=last-12-months'
       const { container } = render(<InsightsDashboard />)
-      const trend = tileTrend(container, 'Surveys delivered per month')
+      const trend = tileTrend(container, 'Studies delivered per month')
       const svg = trend.querySelector('svg')!
       fireEvent.focus(svg)
       expect(trend.querySelector('[data-part="tile-readout"]')!.textContent).toBe('September 202612')
@@ -258,12 +258,12 @@ describe('InsightsDashboard', () => {
     const ruleLabels = (container: HTMLElement) =>
       [...container.querySelectorAll('svg text')].map(t => t.textContent).filter(t => t?.startsWith('Your dates:'))
     const monthChips = () =>
-      screen.getAllByTitle('Which surveys this card counts').map(c => c.textContent).filter(c => c?.includes('by deliver month'))
+      screen.getAllByTitle('Which studies this card counts').map(c => c.textContent).filter(c => c?.includes('by deliver month'))
     /** The rule on the "Delivered per month" columns. Scoped to that chart:
      *  a tile sparkline's dashed GOAL line is also "3 3". */
     const boundaryX = (container: HTMLElement) =>
       Number(container
-        .querySelector('svg[aria-label^="Surveys delivered per month, by type."]')!
+        .querySelector('svg[aria-label^="Studies delivered per month, by type."]')!
         .querySelector('line[stroke-dasharray="3 3"]')!
         .getAttribute('x1'))
 
@@ -327,6 +327,6 @@ describe('InsightsDashboard', () => {
     raw = { ...fixture(), rowCounts: null, blocked: [{ table: 'project_costs', message: 'timeout' }] }
     render(<InsightsDashboard />)
     expect(screen.getByText(/Blocked: project_costs did not load \(timeout\)/)).toBeInTheDocument()
-    expect(screen.getByText('Surveys delivered')).toBeInTheDocument()
+    expect(screen.getByText('Studies delivered')).toBeInTheDocument()
   })
 })

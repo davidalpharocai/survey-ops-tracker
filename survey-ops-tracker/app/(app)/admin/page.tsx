@@ -235,7 +235,7 @@ export default function AdminPage() {
               live there, with the legacy-import scope and the exports. */}
           <Link
             href="/admin/cleanup"
-            title="Data cleanup — every structural gap in the survey book as tiles that should all read 0, with a CSV worksheet per tile."
+            title="Data cleanup — every structural gap in the study book as tiles that should all read 0, with a CSV worksheet per tile."
             className="text-xs border border-border rounded-lg px-3 py-1.5 hover:bg-accent transition-colors shrink-0"
           >
             Data cleanup →

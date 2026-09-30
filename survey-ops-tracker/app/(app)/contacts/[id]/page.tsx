@@ -350,7 +350,7 @@ export default function ContactPage() {
           {rows.length === 0 ? (
             <div className="bg-card border border-border shadow-sm rounded-xl p-6 text-sm text-muted-foreground flex items-center justify-between gap-3 flex-wrap">
               <span>
-                No surveys requested by {ct.first_name} yet — set them as a project&apos;s
+                No studies requested by {ct.first_name} yet — set them as a project&apos;s
                 &ldquo;Requested by&rdquo; and it shows up here.
               </span>
               {client && (
@@ -370,7 +370,7 @@ export default function ContactPage() {
                 <div className={tile}>
                   <span className="text-xs text-muted-foreground flex items-center">
                     Requesting since
-                    <InfoTooltip text="Date of the first survey this contact requested (submitted date, or when it was first recorded)." />
+                    <InfoTooltip text="Date of the first study this contact requested (submitted date, or when it was first recorded)." />
                   </span>
                   <span className="text-2xl font-semibold text-foreground leading-tight">
                     {formatDate(stats!.since)}
@@ -379,8 +379,8 @@ export default function ContactPage() {
                 </div>
                 <div className={tile}>
                   <span className="text-xs text-muted-foreground flex items-center">
-                    Surveys
-                    <InfoTooltip text="Every survey this contact is the 'Requested by' on, by current status. Projects they only reviewed for compliance are not counted." />
+                    Studies
+                    <InfoTooltip text="Every study this contact is the 'Requested by' on, by current status. Projects they only reviewed for compliance are not counted." />
                   </span>
                   <span className="text-2xl font-semibold text-foreground leading-tight">{rows.length}</span>
                   <span className="text-xs text-muted-foreground">
@@ -392,7 +392,7 @@ export default function ContactPage() {
                 <div className={tile}>
                   <span className="text-xs text-muted-foreground flex items-center">
                     Responses collected
-                    <InfoTooltip text="Total N collected across every survey this contact requested — what they have actually received data on, not what was targeted." />
+                    <InfoTooltip text="Total N collected across every study this contact requested — what they have actually received data on, not what was targeted." />
                   </span>
                   <span className="text-2xl font-semibold text-foreground leading-tight">
                     {fmtNum(stats!.collected)}
@@ -400,13 +400,13 @@ export default function ContactPage() {
                   <span className="text-xs text-muted-foreground">
                     {stats!.withData === 0
                       ? 'no responses collected yet'
-                      : `across ${stats!.withData} of ${rows.length} surveys`}
+                      : `across ${stats!.withData} of ${rows.length} studies`}
                   </span>
                 </div>
                 <div className={tile}>
                   <span className="text-xs text-muted-foreground flex items-center">
                     Comes back every
-                    <InfoTooltip text="Average days between the surveys this person requests — their own repeat pulse. Lower means a steadier requester." />
+                    <InfoTooltip text="Average days between the studies this person requests — their own repeat pulse. Lower means a steadier requester." />
                   </span>
                   <span className="text-2xl font-semibold text-foreground leading-tight">
                     {stats!.avgGapDays != null ? `${stats!.avgGapDays}d` : '—'}
@@ -421,7 +421,7 @@ export default function ContactPage() {
               <div className="bg-card border border-border shadow-sm rounded-xl overflow-hidden">
                 <div className="flex items-center justify-between px-4 py-2 border-b border-border">
                   <span className="text-xs text-muted-foreground uppercase tracking-widest font-medium">
-                    Surveys requested
+                    Studies requested
                   </span>
                   <span className="text-xs text-muted-foreground/70">{fmtNum(rows.length)} total</span>
                 </div>
@@ -518,7 +518,7 @@ export default function ContactPage() {
             </div>
             {ct.archived && (
               <p className="text-xs text-amber-600 dark:text-amber-400 border-t border-border pt-3">
-                Archived contact — out of the Requested-by picker, but it still resolves on the surveys listed here.
+                Archived contact — out of the Requested-by picker, but it still resolves on the studies listed here.
               </p>
             )}
           </div>

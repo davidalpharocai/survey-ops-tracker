@@ -175,7 +175,7 @@ export function WaveSeriesView({
             style={{ gridTemplateColumns: GRID }}
           >
             <span title="Wave number and status">Wave</span>
-            <span title="Survey name">Project</span>
+            <span title="Study name">Project</span>
             <span title="When it went to the client">Delivered</span>
             <span title="Permanent project ID">ID</span>
             <span />

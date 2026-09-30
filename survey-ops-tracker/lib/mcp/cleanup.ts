@@ -150,7 +150,7 @@ export async function loadCleanup(opts: { includeLegacyImport?: boolean } = {}):
     // a real survey from a demo one, and this tool would count a population the
     // dashboard does not — which is exactly the divergence it exists to avoid.
     ;[raw, accounts] = await Promise.all([
-      pageAll<RawProject>('surveys', (from, to) =>
+      pageAll<RawProject>('studies', (from, to) =>
         supabase.from('survey_projects')
           // `actual_spend` and `n_internal_target` ride along ONLY to be
           // collapsed into a boolean and a membership below, and are deleted
@@ -292,8 +292,8 @@ export function resolveCheck(ref: string): CleanupCheck | { ambiguous: { id: str
  *  without saying which surveys it counted. */
 function scopeNote(report: CleanupReport): string {
   return report.scope.includeLegacyImport
-    ? `All ${report.inScope} live surveys, INCLUDING the legacy sheet import of ${LEGACY_IMPORT_CUTOFF} and earlier.`
-    : `The ${report.inScope} surveys created after the legacy sheet import (${LEGACY_IMPORT_CUTOFF}); ` +
+    ? `All ${report.inScope} live studies, INCLUDING the legacy sheet import of ${LEGACY_IMPORT_CUTOFF} and earlier.`
+    : `The ${report.inScope} studies created after the legacy sheet import (${LEGACY_IMPORT_CUTOFF}); ` +
       `${report.excludedLegacy} imported rows are excluded — pass include_legacy_import:true to count them too.`
 }
 
@@ -334,7 +334,7 @@ export async function dataCleanup(args: CleanupArgs = {}) {
   if (fatal) {
     return {
       error:
-        `The surveys table did not load (${fatal}), so nothing was checked. ` +
+        `The studies table did not load (${fatal}), so nothing was checked. ` +
         'This is not a count of 0 and not a clean database — it is an unmeasured one. ' +
         'Say the read failed rather than reporting anything as clean.',
     }
@@ -396,7 +396,7 @@ export function formatCleanup(report: CleanupReport, args: CleanupArgs = {}) {
       truncated: rows.length > shown.length,
       ...(csv ? { csv, csv_filename: cleanupCsvFilename(resolved, report.today), csv_rows: rows.length } : {}),
       summary:
-        `${resolved.label}: ${res.count} survey(s)` +
+        `${resolved.label}: ${res.count} ${res.count === 1 ? 'study' : 'studies'}` +
         (res.waveCount ? `, plus ${res.waveCount} rerun wave(s) not yet picked up` : '') +
         ` — out of the ${res.applies} this check applies to. ${scopeNote(report)}` +
         (!args.include_waves && res.waveCount ? ' The waves are listed only with include_waves:true.' : ''),
@@ -462,9 +462,9 @@ export function formatCleanup(report: CleanupReport, args: CleanupArgs = {}) {
     blocked: [...new Set(report.blocked)].map(s => SOURCE_LABEL[s]),
     summary:
       (report.clean
-        ? `Every tile is at zero across the ${report.inScope} surveys in scope.`
+        ? `Every tile is at zero across the ${report.inScope} studies in scope.`
         : `${atZero} of ${measured.length} measured tiles are at zero. ` +
-          `${report.surveysNeedingWork} survey(s) need work, ${openItems} field(s) to fill in all told` +
+          `${report.surveysNeedingWork} ${report.surveysNeedingWork === 1 ? 'study needs' : 'studies need'} work, ${openItems} field(s) to fill in all told` +
           (openWaves ? `, plus ${openWaves} on rerun waves` : '') + '.') +
       (unmeasured.length
         ? ` ${unmeasured.length} check(s) could NOT be measured (${[...new Set(report.blocked)].map(s => SOURCE_LABEL[s]).join(', ')} did not load) — say so rather than calling those clean.`

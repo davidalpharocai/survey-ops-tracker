@@ -29,14 +29,14 @@ export function Waterfall({ model, onLine }: {
       <BarChart<WaterfallLine>
         ariaLabel="Delivered spend by cost line, with recovered rewards as money back"
         title="Where the delivered spend went"
-        info="Recorded field cost on every delivered survey in view, split by what it bought. Blast rewards are gross; rewards that came back unclaimed are their own negative line. Click a line to see its surveys."
+        info="Recorded field cost on every delivered study in view, split by what it bought. Blast rewards are gross; rewards that came back unclaimed are their own negative line. Click a line to see its studies."
         data={lines}
         label={l => l.label}
         labelHeader="Cost line"
         value={l => l.amount}
         valueName="Amount"
         valueFormat={v => fmtMoney(v)}
-        valueLabel={{ name: 'Amount · surveys', text: l => `${money(l.amount)} · ${fmtCount(l.surveys)}` }}
+        valueLabel={{ name: 'Amount · studies', text: l => `${money(l.amount)} · ${fmtCount(l.surveys)}` }}
         diverging
         positiveLabel="Money out"
         negativeLabel="Money back"
@@ -51,7 +51,7 @@ export function Waterfall({ model, onLine }: {
           <button
             type="button"
             onClick={() => onLine('total')}
-            title="Show every delivered survey with spend, checked against the raw cost records"
+            title="Show every delivered study with spend, checked against the raw cost records"
             className="rounded font-semibold tabular-nums underline decoration-dotted underline-offset-4 hover:decoration-solid"
           >
             {money(total.amount)}

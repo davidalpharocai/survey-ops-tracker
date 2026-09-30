@@ -59,7 +59,7 @@ export interface FinalCellInput extends DeliveryInput {
   n_collected_updated_at?: string | null
 }
 
-const NEVER_NOTE = 'No count has been recorded for this survey yet.'
+const NEVER_NOTE = 'No count has been recorded for this study yet.'
 
 export function finalCell(r: FinalCellInput): FinalCell {
   // Strict null on n_actual: undefined means we could not tell.
@@ -94,7 +94,7 @@ export function finalCell(r: FinalCellInput): FinalCell {
       reading: 'so-far',
       value,
       mark: 'so far',
-      note: d?.note || 'Responses in hand. This survey is still in field, so it has no final figure yet.',
+      note: d?.note || 'Responses in hand. This study is still in field, so it has no final figure yet.',
     }
   }
 
@@ -103,7 +103,7 @@ export function finalCell(r: FinalCellInput): FinalCell {
     value,
     mark: 'not final',
     note: d?.note ||
-      'Responses gathered in field. No count has been recorded since quality review, and this survey sold a ' +
+      'Responses gathered in field. No count has been recorded since quality review, and this study sold a ' +
       'range rather than a single target, so nothing is projected from it.',
   }
 }

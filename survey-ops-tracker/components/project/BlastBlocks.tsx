@@ -41,7 +41,7 @@ const TIP = {
   people:
     'How many messages this blast sent. DRIVES THE SEND COST (# people × $/send) and is the denominator of the completion rate. Counts sends, not unique people: re-sending to the same list adds to this every time, and is charged every time. Blank = not recorded; 0 means it genuinely reached nobody.',
   completes:
-    'How many of those people completed the survey. Trickles in for days after the send — fill it in when you know. Blank = NOT RECORDED YET, and the cost then shows as unknown; 0 means the blast really produced nothing. Cost = $/bid × completes.',
+    'How many of those people completed the study. Trickles in for days after the send — fill it in when you know. Blank = NOT RECORDED YET, and the cost then shows as unknown; 0 means the blast really produced nothing. Cost = $/bid × completes.',
   bid: 'The per-completion reward (dollars paid per completed response). $/bid × completes = this blast’s REWARD cost, one of its two costs. Blank = not recorded; 0 means an unpaid send.',
   costPerSend:
     'What it costs to send ONE message on this blast — currently $0.02 across the board. Charged per send, not per person: three reminder passes over the same list are charged three times. This is NOT the cost of buying the contacts (that goes in Other costs as a flat fee); it is the cost of sending to them. Stored per blast, so changing the standard rate later re-prices new blasts and leaves this one alone.',

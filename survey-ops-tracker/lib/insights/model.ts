@@ -94,7 +94,7 @@ export interface InsightsItem {
 }
 
 export const typeLabel = (k: string) => (TYPE_LABEL as Record<string, string>)[k] ?? k
-export const typeHelp = (k: string) => (TYPE_HELP as Record<string, string>)[k] ?? `Surveys with the type ${k}.`
+export const typeHelp = (k: string) => (TYPE_HELP as Record<string, string>)[k] ?? `Studies with the type ${k}.`
 
 /** Classify every survey once. Empty placeholders and internal projects are
  *  dropped here, and counted, so the page can say what it left out. */
@@ -345,10 +345,10 @@ export function figuresOf(set: InsightsItem[], hidden: InsightsItem[]): {
 
 const undatedWords = (cur: number, prev: number) =>
   cur > 0 && prev > 0
-    ? `${fmtNum(cur)} delivered survey${cur === 1 ? '' : 's'} in your dates and ${fmtNum(prev)} from then have no deliver date`
+    ? `${fmtNum(cur)} delivered ${cur === 1 ? 'study' : 'studies'} in your dates and ${fmtNum(prev)} from then have no deliver date`
     : cur > 0
-      ? `${plural(cur, 'delivered survey')} in your dates ${cur === 1 ? 'has' : 'have'} no deliver date`
-      : `${plural(prev, 'delivered survey')} from then ${prev === 1 ? 'has' : 'have'} no deliver date`
+      ? `${plural(cur, 'delivered study', 'delivered studies')} in your dates ${cur === 1 ? 'has' : 'have'} no deliver date`
+      : `${plural(prev, 'delivered study', 'delivered studies')} from then ${prev === 1 ? 'has' : 'have'} no deliver date`
 
 /**
  * This period against the previous one, in words. Stated only when BOTH sides
@@ -616,12 +616,12 @@ function buildNow(items: InsightsItem[], f: InsightsFilter, today: string): NowM
     workload,
     stageVerdict: open.length === 0
       ? 'Nothing is in flight in this view.'
-      : `${busiest.stage} holds the most open work: ${plural(busiest.count, 'survey')} of ${fmtNum(open.length)}.`,
+      : `${busiest.stage} holds the most open work: ${plural(busiest.count, 'study', 'studies')} of ${fmtNum(open.length)}.`,
     workloadVerdict: !topLoad
       ? 'Nobody has open work in this view.'
       : topLoad.id === NO_CAPTAIN
-        ? `${plural(topLoad.open, 'open survey has', 'open surveys have')} no captain — the biggest pile; each needs an owner.`
-        : `${topLoad.name} carries the most open work: ${plural(topLoad.open, 'survey')}${topLoad.overdue ? `, ${fmtNum(topLoad.overdue)} overdue` : ''}.`,
+        ? `${plural(topLoad.open, 'open study has', 'open studies have')} no captain — the biggest pile; each needs an owner.`
+        : `${topLoad.name} carries the most open work: ${plural(topLoad.open, 'study', 'studies')}${topLoad.overdue ? `, ${fmtNum(topLoad.overdue)} overdue` : ''}.`,
   }
 }
 
@@ -878,7 +878,7 @@ export function buildInsightsModel(input: InsightsInput): InsightsModel {
     ...(accountName ? [`Account: ${accountName}`] : []),
   ]
   const scopeBase = ['Delivered', rangeLabel, ...filterWords].join(' · ')
-  const scope = `${scopeBase} · ${plural(cur.delivered, 'survey')}`
+  const scope = `${scopeBase} · ${plural(cur.delivered, 'study', 'studies')}`
 
   // Every comparison sees the undated deliveries each side probably holds, and
   // is withheld when they could change its answer (see compareFigures).
@@ -936,44 +936,44 @@ export function buildInsightsModel(input: InsightsInput): InsightsModel {
   const inView = months.filter(m => m.coverage !== 'out')
   const busiest = [...inView].sort((a, b) => b.total - a.total || b.key.localeCompare(a.key))[0]
   const monthsVerdict = !busiest || busiest.total === 0
-    ? 'No surveys were delivered in your dates.'
+    ? 'No studies were delivered in your dates.'
     : inView.length === 1
-      ? `${busiest.long}${busiest.running ? ' so far has' : ' had'} ${plural(busiest.total, 'delivered survey')}.`
-      : `${busiest.long} was the busiest month in your range, with ${plural(busiest.total, 'survey')} delivered.`
+      ? `${busiest.long}${busiest.running ? ' so far has' : ' had'} ${plural(busiest.total, 'delivered study', 'delivered studies')}.`
+      : `${busiest.long} was the busiest month in your range, with ${plural(busiest.total, 'study', 'studies')} delivered.`
   const judgedMonths = months.filter(m => m.coverage !== 'out' && m.judged > 0)
   const metOnTime = judgedMonths.filter(m => (m.onTimePct as number) >= ON_TIME_GOAL).length
   const soFar = (m: MonthRow) => `${m.long}${m.running ? ' so far' : ''}`
   const onTimeVerdict = judgedMonths.length === 0
-    ? 'No delivered survey in your range has a due date to judge against.'
+    ? 'No delivered study in your range has a due date to judge against.'
     : judgedMonths.length === 1
-      ? `${soFar(judgedMonths[0])} ${metOnTime ? 'meets' : 'is below'} the ${pctText(ON_TIME_GOAL)} goal: ${fmtNum(judgedMonths[0].onTime)} of ${plural(judgedMonths[0].judged, 'survey')} on time.`
+      ? `${soFar(judgedMonths[0])} ${metOnTime ? 'meets' : 'is below'} the ${pctText(ON_TIME_GOAL)} goal: ${fmtNum(judgedMonths[0].onTime)} of ${plural(judgedMonths[0].judged, 'study', 'studies')} on time.`
       : `On time met the ${pctText(ON_TIME_GOAL)} goal in ${fmtNum(metOnTime)} of ${plural(judgedMonths.length, 'month')} in your range.`
   const cycleMonths = months.filter(m => m.coverage !== 'out' && m.cycleMedian != null)
   const metCycle = cycleMonths.filter(m => (m.cycleMedian as number) <= CYCLE_DAYS_GOAL).length
   const goalDays = `${fmtNum(CYCLE_DAYS_GOAL)}-day`
   const cycleVerdict = cycleMonths.length === 0
-    ? 'No delivered survey in your range has both a submitted and a deliver date.'
+    ? 'No delivered study in your range has both a submitted and a deliver date.'
     : cycleMonths.length === 1
       ? `${soFar(cycleMonths[0])} has a median of ${daysText(cycleMonths[0].cycleMedian)}, ${metCycle ? 'within' : 'over'} the ${goalDays} goal.`
       : `The median was within the ${goalDays} goal in ${fmtNum(metCycle)} of ${plural(cycleMonths.length, 'month')} in your range.`
   const topCap = byCaptain[0]
   const captainVerdict = !topCap
-    ? 'No surveys were delivered in this view.'
+    ? 'No studies were delivered in this view.'
     : byCaptain.length === 1
-      ? `All ${plural(topCap.count, 'survey')} in this view ${topCap.key === NO_CAPTAIN ? 'have no captain recorded' : `were captained by ${topCap.label}`}.`
+      ? `All ${plural(topCap.count, 'study', 'studies')} in this view ${topCap.key === NO_CAPTAIN ? 'have no captain recorded' : `were captained by ${topCap.label}`}.`
       : topCap.key === NO_CAPTAIN
-        ? `${plural(topCap.count, 'survey')} of ${fmtNum(cur.delivered)} have no captain recorded — the largest group.`
-        : `${topCap.label} captained the most: ${fmtNum(topCap.count)} of ${plural(cur.delivered, 'survey')}.`
+        ? `${plural(topCap.count, 'study', 'studies')} of ${fmtNum(cur.delivered)} have no captain recorded — the largest group.`
+        : `${topCap.label} captained the most: ${fmtNum(topCap.count)} of ${plural(cur.delivered, 'study', 'studies')}.`
   const topType = byType[0]
   const typeVerdict = !topType
-    ? 'No surveys were delivered in this view.'
-    : `${topType.key === 'none' ? 'Surveys with no type set' : topType.key === 'Rerun' ? 'Surveys filed under the older Rerun type' : `${topType.label} surveys`} made up ${fmtNum(topType.count)} of ${fmtNum(cur.delivered)} (${pctText(topType.share)}).`
+    ? 'No studies were delivered in this view.'
+    : `${topType.key === 'none' ? 'Studies with no type set' : topType.key === 'Rerun' ? 'Studies filed under the older Rerun type' : `${topType.label} studies`} made up ${fmtNum(topType.count)} of ${fmtNum(cur.delivered)} (${pctText(topType.share)}).`
   const topAcct = byAccount[0]
   const accountVerdict = !topAcct
-    ? 'No surveys were delivered in this view.'
-    : `${topAcct.label} received the most: ${fmtNum(topAcct.count)} of ${plural(cur.delivered, 'survey')}${allAccounts.length > 1 ? `, across ${plural(allAccounts.length, 'account')} in all` : ''}.`
+    ? 'No studies were delivered in this view.'
+    : `${topAcct.label} received the most: ${fmtNum(topAcct.count)} of ${plural(cur.delivered, 'study', 'studies')}${allAccounts.length > 1 ? `, across ${plural(allAccounts.length, 'account')} in all` : ''}.`
   const biggestVerdict = biggest.length === 0
-    ? (cur.delivered === 0 ? 'No surveys were delivered in this view.' : 'None of the delivered surveys in this view has respondents recorded yet.')
+    ? (cur.delivered === 0 ? 'No studies were delivered in this view.' : 'None of the delivered studies in this view has respondents recorded yet.')
     : `The largest, ${biggest[0].code}, delivered ${plural(biggest[0].respondents, 'respondent')}.`
 
   const headline = buildHeadline({

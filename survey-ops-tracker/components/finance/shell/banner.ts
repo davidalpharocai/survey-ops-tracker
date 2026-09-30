@@ -97,7 +97,7 @@ function dayET(iso: string): string {
 const monthET = (iso: string) =>
   new Date(iso).toLocaleDateString('en-CA', { timeZone: 'America/New_York' }).slice(0, 7)
 
-const surveys = (n: number) => `${fmtNum(n)} survey${n === 1 ? '' : 's'}`
+const surveys = (n: number) => `${fmtNum(n)} stud${n === 1 ? 'y' : 'ies'}`
 
 /** The month most rows were written in, when it holds more than half of them —
  *  the sign of a bulk backfill rather than records kept as the work happened. */
@@ -140,7 +140,7 @@ export function buildBannerModel(input: BannerInput): BannerModel {
   const reliability: string[] = [
     costLabel
       ? `Costs are reliable from ${costLabel}.`
-      : 'Costs are not yet recorded on most delivered surveys in any month.',
+      : 'Costs are not yet recorded on most delivered studies in any month.',
   ]
   const p = dates.price.month ? monthLabel(dates.price.month) : null
   const b = dates.budget.month ? monthLabel(dates.budget.month) : null
@@ -171,7 +171,7 @@ export function buildBannerModel(input: BannerInput): BannerModel {
     const have = thin.reduce((t, m) => t + m.cells.price.have, 0)
     const of = thin.reduce((t, m) => t + m.cells.price.of, 0)
     return `Client prices are still thin in ${listMonths(thin.map(m => m.key))}: ` +
-      `${fmtNum(have)} of ${fmtNum(of)} delivered surveys there carry one, under the ${pctText(priceBar)} a month needs. ` +
+      `${fmtNum(have)} of ${fmtNum(of)} delivered studies there carry one, under the ${pctText(priceBar)} a month needs. ` +
       'Every price added moves this line by itself.'
   })()
 
@@ -186,14 +186,14 @@ export function buildBannerModel(input: BannerInput): BannerModel {
     const spendBy = new Map(inView.map(i => [i.p.id, spendOf(i.p, blasts, suppliers, costs, ix).total]))
     const costed = inView.filter(i => (spendBy.get(i.p.id) ?? 0) > 0).length
     if (n === 0) {
-      view.push('There are no delivered surveys in this view.')
+      view.push('There are no delivered studies in this view.')
     } else if (pricesUnavailable) {
-      view.push(`In this view ${fmtNum(costed)} of ${fmtNum(n)} delivered surveys (${pctText(costed / n)}) carry a recorded cost.`)
+      view.push(`In this view ${fmtNum(costed)} of ${fmtNum(n)} delivered studies (${pctText(costed / n)}) carry a recorded cost.`)
     } else {
       const priced = inView.filter(i => hasPrice(i.p, rates.get(i.p.id))).length
       const m = marginOf(inView.map(i => i.p), rates, blasts, suppliers, costs)
       view.push(
-        `In this view ${fmtNum(costed)} of ${fmtNum(n)} delivered surveys (${pctText(costed / n)}) carry a recorded cost, ` +
+        `In this view ${fmtNum(costed)} of ${fmtNum(n)} delivered studies (${pctText(costed / n)}) carry a recorded cost, ` +
         `and ${fmtNum(priced)} carry a client price.`,
       )
       if (m.spend > 0) {
@@ -206,14 +206,14 @@ export function buildBannerModel(input: BannerInput): BannerModel {
     if (floorLine) view.push(floorLine)
     const undated = undatedDropped(items, 'results', filter, today)
     if (undated > 0) {
-      view.push(`${fmtNum(undated)} delivered ${undated === 1 ? 'survey has' : 'surveys have'} no date and ${undated === 1 ? 'appears' : 'appear'} in no date range.`)
+      view.push(`${fmtNum(undated)} delivered ${undated === 1 ? 'study has' : 'studies have'} no date and ${undated === 1 ? 'appears' : 'appear'} in no date range.`)
     }
 
     // The two eras. Undated surveys only reach an unbounded view, so a range
     // that starts on or after the cost month has none of these.
     const costDate = dates.cost.date
     if (n > 0 && !costDate) {
-      mixed = 'No month yet has a recorded cost on most of its delivered surveys, so every figure here is a thin floor.'
+      mixed = 'No month yet has a recorded cost on most of its delivered studies, so every figure here is a thin floor.'
     } else if (n > 0 && costDate) {
       const early = inView.filter(i => i.date == null || i.date < costDate)
       if (early.length > 0) {
@@ -225,10 +225,10 @@ export function buildBannerModel(input: BannerInput): BannerModel {
         const spendEarly = early.reduce((t, i) => t + (spendBy.get(i.p.id) ?? 0), 0)
         const worse = later > 0 && earlyCosted / e < laterCosted / later
         mixed = e === n
-          ? `Every delivered survey in this view is from before ${costLabel} or has no date, when most surveys carried no recorded cost (${fmtNum(earlyCosted)} of ${fmtNum(n)} here do). ` +
+          ? `Every delivered study in this view is from before ${costLabel} or has no date, when most studies carried no recorded cost (${fmtNum(earlyCosted)} of ${fmtNum(n)} here do). ` +
             'Use this view to find old records to fix, not to judge performance.'
-          : `This view mixes two eras. It adds ${fmtNum(e)} delivered ${e === 1 ? 'survey' : 'surveys'} from before ${costLabel} or with no date: ` +
-            `${pctText(e / n)} of the surveys` + (spendAll > 0 ? ` but ${pctText(spendEarly / spendAll)} of the spend` : '') + '. ' +
+          : `This view mixes two eras. It adds ${fmtNum(e)} delivered ${e === 1 ? 'study' : 'studies'} from before ${costLabel} or with no date: ` +
+            `${pctText(e / n)} of the studies` + (spendAll > 0 ? ` but ${pctText(spendEarly / spendAll)} of the spend` : '') + '. ' +
             `${fmtNum(earlyCosted)} of them ${earlyCosted === 1 ? 'carries' : 'carry'} any cost` +
             (worse ? ', so coverage and medians read worse than the business did. ' : '. ') +
             'Use this view to find old records to fix, not to judge performance.'
@@ -246,11 +246,11 @@ export function buildBannerModel(input: BannerInput): BannerModel {
     const cur = dated[at]
     help.push(
       `Why ${costLabel} for costs: ` +
-      (prev ? `${pctText(prev.cells.cost.pct)} of delivered surveys carried a recorded cost in ${monthLabel(prev.key)} and ` : '') +
-      `${pctText(cur?.cells.cost.pct)} in ${costLabel}. A month counts as reliable once at least ${pctText(costBar)} of its delivered surveys carry one and every later month stays there.`,
+      (prev ? `${pctText(prev.cells.cost.pct)} of delivered studies carried a recorded cost in ${monthLabel(prev.key)} and ` : '') +
+      `${pctText(cur?.cells.cost.pct)} in ${costLabel}. A month counts as reliable once at least ${pctText(costBar)} of its delivered studies carry one and every later month stays there.`,
     )
   } else {
-    help.push(`A month counts as reliable for costs once at least ${pctText(costBar)} of its delivered surveys carry one and every later month stays there. No month has yet.`)
+    help.push(`A month counts as reliable for costs once at least ${pctText(costBar)} of its delivered studies carry one and every later month stays there. No month has yet.`)
   }
   const fb = firstBlastAt(blasts)
   if (fb) help.push(`The first dated blast is ${dayET(fb)}, so no blast cost can be recorded before then.`)
@@ -278,7 +278,7 @@ export function buildBannerModel(input: BannerInput): BannerModel {
     priceGap,
     mixed,
     offerDefault: mixed != null && filter.range.preset !== DEFAULT_FILTER.range.preset,
-    floor: 'Every total is a floor: a survey with nothing logged adds $0.',
+    floor: 'Every total is a floor: a study with nothing logged adds $0.',
     help: help.join(' '),
     dates,
     pricesUnavailable,

@@ -137,15 +137,15 @@ export default async function SalesContactPage({ params }: { params: Promise<{ i
           </h2>
           <p className="text-sm text-foreground">
             {rows.length === 0
-              ? 'No survey on your book records this person as the requester.'
-              : `${fmtNum(rows.length)} survey${rows.length === 1 ? '' : 's'} — ` +
+              ? 'No study on your book records this person as the requester.'
+              : `${fmtNum(rows.length)} ${rows.length === 1 ? 'study' : 'studies'} — ` +
                 ([['delivered', 'delivered'], ['active', 'active'], ['scoping', 'scoping'],
                   ['hold', 'on hold'], ['cancelled', 'cancelled'], ['archived', 'archived']] as const)
                   .filter(([k]) => b[k]).map(([k, l]) => `${b[k]} ${l}`).join(', ')}
           </p>
           {rows.length === 0 && (
             <p className="mt-2 text-xs text-muted-foreground">
-              Surveys are attributed by the Requested-by field, not by name — work
+              Studies are attributed by the Requested-by field, not by name — work
               logged against a free-text name rather than this record will not appear.
             </p>
           )}
@@ -158,12 +158,12 @@ export default async function SalesContactPage({ params }: { params: Promise<{ i
             <thead>
               <tr className="border-b border-border bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
                 <th className="px-3 py-2 font-medium">Code</th>
-                <th className="px-3 py-2 font-medium">Survey</th>
+                <th className="px-3 py-2 font-medium">Study</th>
                 <th className="px-3 py-2 font-medium">Stage</th>
                 <th className="px-3 py-2 text-right font-medium">N Target</th>
                 <th
                   className="px-3 py-2 text-right font-medium"
-                  title="Responses delivered after quality review. Only an unmarked figure is a final one: “so far” is a count still coming in, “~ … est.” is projected while a survey is in quality review, and “not final” is a field count on a survey whose delivered figure was never recorded."
+                  title="Responses delivered after quality review. Only an unmarked figure is a final one: “so far” is a count still coming in, “~ … est.” is projected while a study is in quality review, and “not final” is a field count on a study whose delivered figure was never recorded."
                 >
                   Final
                 </th>

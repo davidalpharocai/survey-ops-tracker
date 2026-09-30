@@ -87,8 +87,8 @@ describe('buildPanelsModel — reconciles to the Panel (PureSpectrum) line of th
     // the total: green, but no tick, and the words say what was not done.
     expect(m.check.verified).toBe(false)
     expect(m.check.text).toBe(
-      'The 3 panels below add up to $244 — the same purchases the Panel (PureSpectrum) line of the spend breakdown counts, summed survey by survey instead of panel by panel. ' +
-      'None of the 2 surveys here that bought only from panels records a spend of its own, so nothing outside this page confirmed the total.',
+      'The 3 panels below add up to $244 — the same purchases the Panel (PureSpectrum) line of the spend breakdown counts, summed study by study instead of panel by panel. ' +
+      'None of the 2 studies here that bought only from panels records a spend of its own, so nothing outside this page confirmed the total.',
     )
     // Blast rewards, sends and cost lines on the mixed survey are not panel money.
     expect(m.total.spend).toBeCloseTo(0.84 * 120 + 1.12 * 60 + 0.9 * 45 + 1.09 * 33, 9)
@@ -106,8 +106,8 @@ describe('buildPanelsModel — reconciles to the Panel (PureSpectrum) line of th
     expect(m.check.ok).toBe(false)
     expect(m.check.text).toBe(
       'These panels add up to $244 but the Panel (PureSpectrum) line of the spend breakdown says $264 — a gap of $20. ' +
-      '1 panel that bought on these surveys is missing from the list. ' +
-      'None of the 2 surveys here that bought only from panels records a spend of its own, so nothing outside this page confirmed the total. ' +
+      '1 panel that bought on these studies is missing from the list. ' +
+      'None of the 2 studies here that bought only from panels records a spend of its own, so nothing outside this page confirmed the total. ' +
       'Do not rely on either number until this is explained.',
     )
   })
@@ -157,7 +157,7 @@ describe('buildPanelsModel — the outside check against the spend the database 
     expect(m.stored).toMatchObject({ checked: 2, skipped: 0, mismatches: [] })
     expect(m.check.ok).toBe(true)
     expect(m.check.verified).toBe(true)
-    expect(m.check.text).toContain('On the 2 surveys here that bought only from panels, it also agrees with the spend the database recorded for them, which nothing on this page computes.')
+    expect(m.check.text).toContain('On the 2 studies here that bought only from panels, it also agrees with the spend the database recorded for them, which nothing on this page computes.')
   })
 
   it('subtracts the cost lines, because a stored spend carries them too', () => {
@@ -176,8 +176,8 @@ describe('buildPanelsModel — the outside check against the spend the database 
     expect(m.check.ok).toBe(false)
     expect(m.check.verified).toBe(false)
     expect(m.check.text).toBe(
-      'The 1 panel below adds up to $200 — the same purchases the Panel (PureSpectrum) line of the spend breakdown counts, summed survey by survey instead of panel by panel. ' +
-      '1 of the 2 surveys here that bought only from panels does not agree with the spend the database recorded for it (B). ' +
+      'The 1 panel below adds up to $200 — the same purchases the Panel (PureSpectrum) line of the spend breakdown counts, summed study by study instead of panel by panel. ' +
+      '1 of the 2 studies here that bought only from panels does not agree with the spend the database recorded for it (B). ' +
       'Do not rely on either number until this is explained.',
     )
   })
@@ -196,7 +196,7 @@ describe('buildPanelsModel — the outside check against the spend the database 
     const m = run([paid('a', 150)], rows, { blasts })
     expect(m.stored).toMatchObject({ checked: 0, skipped: 0, mismatches: [] })
     expect(m.check.verified).toBe(false)
-    expect(m.check.text).toContain('No survey here bought from panels alone, so nothing outside this page could confirm the total.')
+    expect(m.check.text).toContain('No study here bought from panels alone, so nothing outside this page could confirm the total.')
   })
 
   it('stands down when the blast rows did not load, instead of flagging every survey', () => {
@@ -208,7 +208,7 @@ describe('buildPanelsModel — the outside check against the spend the database 
     expect(m.stored).toMatchObject({ checked: 0, skipped: 0, mismatches: [], unavailable: true })
     expect(m.check.ok).toBe(true)
     expect(m.check.verified).toBe(false)
-    expect(m.check.text).toContain('The blast rows did not load, so which surveys bought from panels alone is not known')
+    expect(m.check.text).toContain('The blast rows did not load, so which studies bought from panels alone is not known')
   })
 
   it('skips a survey with no stored spend rather than counting it as agreeing', () => {

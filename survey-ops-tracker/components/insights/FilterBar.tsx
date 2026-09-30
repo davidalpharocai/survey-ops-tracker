@@ -34,7 +34,7 @@ export function FilterBar({ model, onChange }: {
       <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Date range">
         <span className={`${label} mr-1`}>
           Dates
-          <InfoTooltip text="Which delivered surveys to count. A survey is placed by its deliver date — the day the client had it. Work in flight right now is shown whatever the dates." />
+          <InfoTooltip text="Which delivered studies to count. A study is placed by its deliver date — the day the client had it. Work in flight right now is shown whatever the dates." />
         </span>
         {RANGE_PRESETS.map(p => {
           const on = f.range.preset === p.id
@@ -86,7 +86,7 @@ export function FilterBar({ model, onChange }: {
         <Picker
           id="insights-type"
           label="Type"
-          help="What the survey mainly is: PS (PureSpectrum panel) or B2B (email / text blasts). The number beside each is how many were delivered in the dates above."
+          help="What the study mainly is: PS (PureSpectrum panel) or B2B (email / text blasts). The number beside each is how many were delivered in the dates above."
           value={f.type ?? ''}
           all="All types"
           options={model.options.types}
@@ -95,7 +95,7 @@ export function FilterBar({ model, onChange }: {
         <Picker
           id="insights-captain"
           label="Captain"
-          help="The survey's lead captain. Co-captains are not counted, so every survey belongs to exactly one person. The number beside each is how many they delivered in the dates above."
+          help="The study's lead captain. Co-captains are not counted, so every study belongs to exactly one person. The number beside each is how many they delivered in the dates above."
           value={f.captain ?? ''}
           all="Everyone"
           options={model.options.captains}
@@ -104,7 +104,7 @@ export function FilterBar({ model, onChange }: {
         <Picker
           id="insights-account"
           label="Account"
-          help="The client account (grouped by the account record, not the free-text client label). The number beside each is how many surveys it received in the dates above."
+          help="The client account (grouped by the account record, not the free-text client label). The number beside each is how many studies it received in the dates above."
           value={f.account ?? ''}
           all="Every account"
           options={model.options.accounts}

@@ -71,7 +71,7 @@ export function DeliveredCharts({ model: m, open }: { model: InsightsModel; open
     // how many probably belong here, so a short column is not read as a slow
     // month.
     const missing = d.undated > 0
-      ? `${s(d.undated, 'more delivered survey')} with no deliver date probably ${d.undated === 1 ? 'belongs' : 'belong'} here (by due, launch or submitted date) and ${d.undated === 1 ? 'is' : 'are'} not in the column`
+      ? `${s(d.undated, 'more delivered study', 'more delivered studies')} with no deliver date probably ${d.undated === 1 ? 'belongs' : 'belong'} here (by due, launch or submitted date) and ${d.undated === 1 ? 'is' : 'are'} not in the column`
       : null
     return [where, missing].filter(Boolean).join('. ') || null
   }
@@ -124,12 +124,12 @@ export function DeliveredCharts({ model: m, open }: { model: InsightsModel; open
     <div className="flex flex-col gap-4">
       <InsightsCard
         title="Delivered per month"
-        help="Surveys delivered each calendar month, stacked by type, placed by deliver date. The months in your dates are solid; the months before them are faded and shown for context, with a dashed rule where your dates begin (on the first month they touch — a month is drawn whole even when your dates cover part of it). Click a month for its surveys."
+        help="Studies delivered each calendar month, stacked by type, placed by deliver date. The months in your dates are solid; the months before them are faded and shown for context, with a dashed rule where your dates begin (on the first month they touch — a month is drawn whole even when your dates cover part of it). Click a month for its studies."
         scope={monthScope}
         verdict={m.verdicts.months}
       >
         <ColumnChart
-          ariaLabel="Surveys delivered per month, by type"
+          ariaLabel="Studies delivered per month, by type"
           mode="stacked"
           data={m.months}
           x={d => d.long}
@@ -142,7 +142,7 @@ export function DeliveredCharts({ model: m, open }: { model: InsightsModel; open
           opacityNote={OUT_NOTE}
           rules={rangeRule}
           note={monthNote}
-          emptyMessage="No delivered surveys in these months"
+          emptyMessage="No delivered studies in these months"
           onSelect={d => openMonth(d, {}, d.total, 'Delivered')}
         />
       </InsightsCard>
@@ -168,15 +168,15 @@ export function DeliveredCharts({ model: m, open }: { model: InsightsModel; open
             opacity={outOfRange}
             opacityNote={OUT_NOTE}
             rules={rangeRule}
-            note={d => (d.judged ? `${fmtNum(d.onTime)} of ${s(d.judged, 'survey')} with a due date` : 'No due dates to judge')}
-            emptyMessage="No delivered survey here has a due date"
+            note={d => (d.judged ? `${fmtNum(d.onTime)} of ${s(d.judged, 'study', 'studies')} with a due date` : 'No due dates to judge')}
+            emptyMessage="No delivered study here has a due date"
             onSelect={d => openMonth(d, { judgedOnly: true }, d.judged, 'On time')}
           />
         </InsightsCard>
 
         <InsightsCard
           title="Median cycle time, by month"
-          help={`Calendar days from submitted to delivered for the middle survey each month. Lower is faster. The dashed line is the goal of ${daysText(CYCLE_DAYS_GOAL)} — a goal, not a rule. Surveys missing either date are left out. Months before your dates are faded and shown for context, with a dashed rule where your dates begin.`}
+          help={`Calendar days from submitted to delivered for the middle study each month. Lower is faster. The dashed line is the goal of ${daysText(CYCLE_DAYS_GOAL)} — a goal, not a rule. Studies missing either date are left out. Months before your dates are faded and shown for context, with a dashed rule where your dates begin.`}
           scope={monthScope}
           verdict={m.verdicts.cycle}
         >
@@ -187,16 +187,16 @@ export function DeliveredCharts({ model: m, open }: { model: InsightsModel; open
             xShort={d => d.short}
             xKey={d => d.key}
             xLabel="Month"
-            series={[{ key: 'cy', label: 'Median days', value: d => d.cycleMedian, color: 'var(--chart-cat-7)', description: 'Calendar days from submitted to delivered, middle survey' }]}
+            series={[{ key: 'cy', label: 'Median days', value: d => d.cycleMedian, color: 'var(--chart-cat-7)', description: 'Calendar days from submitted to delivered, middle study' }]}
             valueFormat={v => daysText(v)}
             axisFormat={v => fmtNum(v)}
             referenceLines={[{ value: CYCLE_DAYS_GOAL, label: `Goal ${daysText(CYCLE_DAYS_GOAL)}`, color: 'var(--chart-goal)' }]}
             opacity={outOfRange}
             opacityNote={OUT_NOTE}
             rules={rangeRule}
-            note={d => (d.cycleN ? `Median of ${s(d.cycleN, 'survey')}` : 'No surveys with both dates')}
+            note={d => (d.cycleN ? `Median of ${s(d.cycleN, 'study', 'studies')}` : 'No studies with both dates')}
             area
-            emptyMessage="No delivered survey here has both a submitted and a deliver date"
+            emptyMessage="No delivered study here has both a submitted and a deliver date"
             onSelect={d => openMonth(d, { cycleOnly: true }, d.cycleN, 'Cycle time')}
           />
         </InsightsCard>
@@ -205,12 +205,12 @@ export function DeliveredCharts({ model: m, open }: { model: InsightsModel; open
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <InsightsCard
           title="Delivered by captain"
-          help="Surveys delivered in your dates, by the survey's lead captain. Co-captains are not counted, so each survey appears once. Click a bar for the surveys."
+          help="Studies delivered in your dates, by the study's lead captain. Co-captains are not counted, so each study appears once. Click a bar for the studies."
           scope={m.scope}
           verdict={m.verdicts.captain}
         >
           <BarChart
-            ariaLabel="Surveys delivered by captain"
+            ariaLabel="Studies delivered by captain"
             data={m.byCaptain}
             label={d => d.label}
             labelHeader="Captain"
@@ -218,20 +218,20 @@ export function DeliveredCharts({ model: m, open }: { model: InsightsModel; open
             valueName="Delivered"
             valueLabel={{ name: 'Delivered · share', text: d => `${fmtNum(d.count)} · ${pctText(d.share)}` }}
             color={d => (d.key === NO_CAPTAIN ? 'var(--chart-muted)' : 'var(--chart-cat-1)')}
-            note={d => (d.key === NO_CAPTAIN ? 'No captain recorded on these surveys' : null)}
-            emptyMessage="No surveys delivered in this view"
+            note={d => (d.key === NO_CAPTAIN ? 'No captain recorded on these studies' : null)}
+            emptyMessage="No studies delivered in this view"
             onSelect={d => openGroup(d, 'captain', 'Delivered')}
           />
         </InsightsCard>
 
         <InsightsCard
           title="Delivered by type"
-          help="Surveys delivered in your dates, by what the survey mainly is. Click a bar for the surveys."
+          help="Studies delivered in your dates, by what the study mainly is. Click a bar for the studies."
           scope={m.scope}
           verdict={m.verdicts.type}
         >
           <BarChart
-            ariaLabel="Surveys delivered by type"
+            ariaLabel="Studies delivered by type"
             data={m.byType}
             label={d => d.label}
             labelHeader="Type"
@@ -240,7 +240,7 @@ export function DeliveredCharts({ model: m, open }: { model: InsightsModel; open
             valueLabel={{ name: 'Delivered · share', text: d => `${fmtNum(d.count)} · ${pctText(d.share)}` }}
             color={d => (d.key === 'none' ? 'var(--chart-muted)' : typeColor(d.key, 0))}
             note={d => d.help}
-            emptyMessage="No surveys delivered in this view"
+            emptyMessage="No studies delivered in this view"
             onSelect={d => openGroup(d, 'type', 'Delivered')}
           />
         </InsightsCard>
@@ -249,12 +249,12 @@ export function DeliveredCharts({ model: m, open }: { model: InsightsModel; open
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <InsightsCard
           title="Delivered by account"
-          help="The accounts that received the most surveys in your dates, grouped by the account record (not the free-text client label, which splits one firm many ways). Click a bar for the surveys."
+          help="The accounts that received the most studies in your dates, grouped by the account record (not the free-text client label, which splits one firm many ways). Click a bar for the studies."
           scope={m.scope}
           verdict={m.verdicts.account}
         >
           <BarChart
-            ariaLabel="Surveys delivered by account"
+            ariaLabel="Studies delivered by account"
             data={m.byAccount}
             label={d => d.label}
             labelHeader="Account"
@@ -262,19 +262,19 @@ export function DeliveredCharts({ model: m, open }: { model: InsightsModel; open
             valueName="Delivered"
             valueLabel={{ name: 'Delivered · share', text: d => `${fmtNum(d.count)} · ${pctText(d.share)}` }}
             color={d => (d.key === NO_ACCOUNT ? 'var(--chart-muted)' : 'var(--chart-cat-2)')}
-            emptyMessage="No surveys delivered in this view"
+            emptyMessage="No studies delivered in this view"
             onSelect={d => openGroup(d, 'account', 'Delivered')}
           />
           {m.accountsMore.accounts > 0 && (
             <p className="mt-2 text-xs text-muted-foreground">
-              And {s(m.accountsMore.accounts, 'more account')} with {s(m.accountsMore.surveys, 'survey')} between them.
+              And {s(m.accountsMore.accounts, 'more account')} with {s(m.accountsMore.surveys, 'study', 'studies')} between them.
             </p>
           )}
         </InsightsCard>
 
         <InsightsCard
           title="Biggest deliveries"
-          help="The delivered surveys in your dates with the most respondents (post-QA N). Surveys with no respondent count recorded are not ranked."
+          help="The delivered studies in your dates with the most respondents (post-QA N). Studies with no respondent count recorded are not ranked."
           scope={m.scope}
           verdict={m.verdicts.biggest}
         >
@@ -284,7 +284,7 @@ export function DeliveredCharts({ model: m, open }: { model: InsightsModel; open
             <table className="w-full text-[13px]">
               <thead>
                 <tr className="border-b border-border text-left text-[11px] uppercase tracking-wider text-muted-foreground">
-                  <th className="py-1 pr-2 font-medium" title="The survey's code; opens the project">Survey</th>
+                  <th className="py-1 pr-2 font-medium" title="The study's code; opens the project">Study</th>
                   <th className="py-1 pr-2 font-medium" title="Project name and account">What</th>
                   <th className="py-1 pr-2 text-right font-medium" title="The deliver date">Delivered</th>
                   <th className="py-1 text-right font-medium" title="Respondents that passed QA (post-QA N)">Respondents</th>

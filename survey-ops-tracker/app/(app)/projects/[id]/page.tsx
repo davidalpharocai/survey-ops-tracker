@@ -51,7 +51,7 @@ type ActiveTab = 'overview' | 'insights' | 'fielding' | 'context' | 'deliverable
 const PROJECT_TABS: { id: ActiveTab; label: string; title: string }[] = [
   { id: 'overview', label: 'Overview', title: 'The full project view — stats, pipeline, next steps, documents, and details' },
   { id: 'insights', label: 'Insights', title: 'Performance stats — completion/fill rates, cost per complete, pace, supplier mix' },
-  { id: 'fielding', label: 'Fielding Guidance', title: 'What the measured history says to do about this survey — route cost, when to stop blasting, channel, and how much raw N to buy. Every item shows its sample size.' },
+  { id: 'fielding', label: 'Fielding Guidance', title: 'What the measured history says to do about this study — route cost, when to stop blasting, channel, and how much raw N to buy. Every item shows its sample size.' },
   { id: 'context', label: 'Context', title: 'Background on this project from the open web — what appears to have sparked the study, what moved during the field window, and the links behind both. Internal reading, refreshed daily; never a client deliverable.' },
   { id: 'deliverables', label: 'Deliverables', title: 'Files delivered to the client for this project' },
   { id: 'activity', label: 'Activity', title: 'Logged emails and events for this project' },
@@ -60,22 +60,22 @@ const PROJECT_TABS: { id: ActiveTab; label: string; title: string }[] = [
 
 const TOOLTIPS: Record<string, string> = {
   'Client': 'The client this project is for.',
-  'N Target': "Total number of survey responses you're aiming to collect.",
+  'N Target': "Total number of study responses you're aiming to collect.",
   'N Collected': 'Responses collected so far. Auto-synced every 15 minutes — manual edits may be overwritten by the next sync.',
   'Total Available Audience Size': 'How many contacts the team has handed us for this project. Our own supply, not an estimate of the market.',
   'Audience Size Used': 'How many of those contacts we have actually drawn on so far.',
-  'Audience': 'Who the survey is fielded to — the target respondent profile (free text, e.g. "US adults 18+, likely voters").',
+  'Audience': 'Who the study is fielded to — the target respondent profile (free text, e.g. "US adults 18+, likely voters").',
   'N Internal Target': 'Your internal collection goal — usually a cushion above N Target to cover cleaning and terminations.',
   'Row-Level Data': 'Whether individual respondent-level data is included in the deliverable.',
   'Project Captain': 'The team member responsible for this project end-to-end. Add co-captains below when a project is shared.',
   'Co-Captains': 'Additional captains sharing this project. Most projects have none — the main captain stays the primary owner.',
   'Salesperson': 'The sales lead for this project.',
-  'Requested by': "The client contact who requested this survey. Pick from this client's people or add a new one; click the name to view or edit their details.",
+  'Requested by': "The client contact who requested this study. Pick from this client's people or add a new one; click the name to view or edit their details.",
   'N Actual': 'Final usable response count after cleaning N Collected.',
   'Longitudinal': 'Whether this is a longitudinal study tracked across multiple waves.',
   'Survey IDs': 'IDs of this project\'s surveys, comma separated. Auto-filled from the attached Google Sheet by the scheduled sync; manual edits stick unless the sheet changes.',
   'Submitted': 'Date the project was submitted into the pipeline.',
-  'Launch Date': 'Date the survey went (or goes) live in the field.',
+  'Launch Date': 'Date the study went (or goes) live in the field.',
   'Due Date': 'Internal deadline — when everything needs to be finished on our side.',
   'Deliver Date': 'Client-facing deadline — when the client needs the project in hand. Often the same day as the internal due date.',
 }
@@ -388,7 +388,7 @@ export default function ProjectDetailPage() {
                   <Link
                     href={`/reruns/series/${project.series_id}`}
                     onClick={() => setActionsOpen(false)}
-                    title="Open this survey's first-class rerun series record"
+                    title="Open this study's first-class rerun series record"
                     className="flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm text-foreground/90 hover:bg-accent transition-colors text-left w-full"
                   >
                     <span aria-hidden="true">↻</span> View rerun series
@@ -745,7 +745,7 @@ export default function ProjectDetailPage() {
                 and a place in a series, a related survey has neither. Putting
                 them in one card is how people end up recording a soft launch as
                 wave 2. */}
-            <SidebarCard title="Related surveys" dense collapsible defaultCollapsed>
+            <SidebarCard title="Related studies" dense collapsible defaultCollapsed>
               <RelatedSurveys project={project} />
             </SidebarCard>
           </div>

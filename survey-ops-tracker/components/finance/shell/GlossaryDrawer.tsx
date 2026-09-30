@@ -30,7 +30,7 @@ export function GlossaryDrawer({ open, onClose }: { open: boolean; onClose: () =
           <div className="min-w-0">
             <h2 id={titleId} className="text-sm font-semibold text-foreground">How to read this page</h2>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              The words the finance page uses, one sentence each. Every figure is a floor: a survey with nothing logged adds $0.
+              The words the finance page uses, one sentence each. Every figure is a floor: a study with nothing logged adds $0.
             </p>
           </div>
           <button

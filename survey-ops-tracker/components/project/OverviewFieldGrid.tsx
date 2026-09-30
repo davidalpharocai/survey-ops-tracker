@@ -28,13 +28,13 @@ const TYPE_OPTIONS = [
 
 const TIP = {
   submitted: 'Date the project was submitted into the pipeline.',
-  launch: 'Date the survey went (or goes) live in the field. Auto-filled with the day the project first enters Fielding (only if left blank); editable anytime.',
+  launch: 'Date the study went (or goes) live in the field. Auto-filled with the day the project first enters Fielding (only if left blank); editable anytime.',
   due: 'Internal deadline — when everything needs to be finished on our side.',
   deliver:
     'Client-facing deadline — when the client needs the project in hand. Often the same day as the internal due date.',
   rerun:
     'Date the next wave auto-spawns (arms the rerun cron); changing it re-arms it.',
-  type: 'PS (PureSpectrum sample) or B2B (blast outreach) — what the survey mainly is. It no longer decides what Money shows: a survey fielded through both records both, and either section appears as soon as it has rows. Rerun is shown as a separate ↻ chip, not a type.',
+  type: 'PS (PureSpectrum sample) or B2B (blast outreach) — what the study mainly is. It no longer decides what Money shows: a study fielded through both records both, and either section appears as soon as it has rows. Rerun is shown as a separate ↻ chip, not a type.',
   surveyIds:
     "IDs of this project's surveys, comma separated. Auto-filled from the attached Google Sheet by the scheduled sync; manual edits stick unless the sheet changes.",
   longitudinal: 'Whether this is a longitudinal study tracked across multiple waves.',

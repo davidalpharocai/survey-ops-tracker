@@ -46,7 +46,7 @@ function NotInBook() {
   return (
     <p role="alert" className="rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground">
       The selected account is not in your book, so there is no list to print for it.{' '}
-      <Link href="/sales/surveys" className="font-medium text-foreground underline underline-offset-2">Back to your surveys</Link>
+      <Link href="/sales/surveys" className="font-medium text-foreground underline underline-offset-2">Back to your studies</Link>
     </p>
   )
 }

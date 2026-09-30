@@ -51,7 +51,7 @@ export function exportContextFor(i: ExportContextInput): { header: string[]; aud
   const scoping = rule.classes.includes('scoping')
   const header = [
     ...d.header,
-    `Surveys in view: ${fmtNum(i.surveysInView)}`,
+    `Studies in view: ${fmtNum(i.surveysInView)}`,
     ...(rule.side.length ? [`On hold, listed separately and never in the totals: ${fmtNum(i.onHold)}`] : []),
     `Scoping work: ${scoping ? 'included' : 'not included'}`,
   ]

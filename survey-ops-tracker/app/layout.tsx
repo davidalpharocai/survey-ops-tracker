@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Study Ops Command Center",
-  description: "AlphaRoc survey operations tracker",
+  description: "AlphaRoc study operations tracker",
 };
 
 export default function RootLayout({

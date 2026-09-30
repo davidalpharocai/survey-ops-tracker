@@ -38,10 +38,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   if (!src) return NextResponse.json({ error: 'Activity entry not found' }, { status: 404 })
   if (src.type !== 'email' || !src.external_id) {
-    return NextResponse.json({ error: 'Only emails can be logged to another survey' }, { status: 400 })
+    return NextResponse.json({ error: 'Only emails can be logged to another study' }, { status: 400 })
   }
   if (src.project_id === projectId) {
-    return NextResponse.json({ error: 'Already on that survey' }, { status: 400 })
+    return NextResponse.json({ error: 'Already on that study' }, { status: 400 })
   }
 
   const result = await promoteEmail(

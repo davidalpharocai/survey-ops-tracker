@@ -155,7 +155,7 @@ describe('finance_results returns the panel supplier view, not an apology', () =
     expect(out.tile2.rows[1]).toMatchObject({ surveys: 1, spend: 260 })
   })
 
-  it('carries no client price or margin, because clients pay per survey and not per panel', async () => {
+  it('carries no client price or margin, because clients pay per study and not per panel', async () => {
     const out = await financeResults({ group_by: 'panel' }, { userId: 'david' }, deps()) as Out
     for (const r of out.tile2.rows) {
       expect(r.client_price).toBeUndefined()

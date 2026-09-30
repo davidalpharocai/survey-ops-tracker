@@ -120,7 +120,7 @@ describe('SalesPipeline columns', () => {
   it('shows Target and Final, and no Collected, by default', () => {
     show()
     expect(headers()).toEqual([
-      'Survey', 'Client', 'Requested by', 'Stage', 'Target', 'Final', 'Credits', 'Deliver',
+      'Study', 'Client', 'Requested by', 'Stage', 'Target', 'Final', 'Credits', 'Deliver',
     ])
     expect(headers()).not.toContain('Collected')
   })
@@ -259,19 +259,19 @@ describe('SalesPipeline: a column choice saved when Collected existed', () => {
   it('replaces Collected with Final', () => {
     localStorage.setItem(STORE_KEY, JSON.stringify(['client', 'collected']))
     show()
-    expect(headers()).toEqual(['Survey', 'Client', 'Final'])
+    expect(headers()).toEqual(['Study', 'Client', 'Final'])
   })
 
   it('never leaves the table without its response count, even when Collected was the only tick', () => {
     localStorage.setItem(STORE_KEY, JSON.stringify(['collected']))
     show()
-    expect(headers()).toEqual(['Survey', 'Final'])
+    expect(headers()).toEqual(['Study', 'Final'])
   })
 
   it('adds Final once when a choice named both, in the order the table renders', () => {
     localStorage.setItem(STORE_KEY, JSON.stringify(['final', 'collected', 'client']))
     show()
-    expect(headers()).toEqual(['Survey', 'Client', 'Final'])
+    expect(headers()).toEqual(['Study', 'Client', 'Final'])
   })
 
   // Deliberate, and pinned so nobody "helpfully" adds it: Target answers a
@@ -298,7 +298,7 @@ describe('SalesPipeline: a column choice saved when Collected existed', () => {
     // through the migration changes nothing.
     cleanup()
     show()
-    expect(headers()).toEqual(['Survey', 'Client', 'Final', 'Credits'])
+    expect(headers()).toEqual(['Study', 'Client', 'Final', 'Credits'])
   })
 
   // A private window, or blocked site data: the read throws outright rather

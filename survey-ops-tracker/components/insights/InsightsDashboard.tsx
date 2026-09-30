@@ -63,7 +63,7 @@ export function InsightsDashboard() {
       <div className="mx-auto flex max-w-6xl flex-col gap-4">
         <Title />
         <div role="alert" className="rounded-xl border border-red-500/40 bg-red-500/5 p-4 text-sm text-red-700 dark:text-red-400">
-          {projectsBlocked ? blockedText(projectsBlocked) : `Blocked: the surveys did not load${error ? ` (${(error as Error).message})` : ''}`}.
+          {projectsBlocked ? blockedText(projectsBlocked) : `Blocked: the studies did not load${error ? ` (${(error as Error).message})` : ''}`}.
           {' '}No figures are shown, because a failed read is not zero. Reload the page to try again.
         </div>
       </div>
@@ -80,12 +80,12 @@ export function InsightsDashboard() {
       {clientsBlocked && (
         <div role="alert" className="rounded-xl border border-amber-500/40 bg-amber-500/5 px-4 py-2 text-sm text-amber-800 dark:text-amber-300">
           {blockedText(clientsBlocked)}. Demo and test accounts could not be removed and account names are missing,
-          so the figures below may include demo surveys.
+          so the figures below may include demo studies.
         </div>
       )}
       {childBlocked.map(b => (
         <div key={b.table} role="alert" className="rounded-xl border border-amber-500/40 bg-amber-500/5 px-4 py-2 text-sm text-amber-800 dark:text-amber-300">
-          {blockedText(b)}. Empty rerun placeholders could not be checked for field rows, so any survey flagged as a
+          {blockedText(b)}. Empty rerun placeholders could not be checked for field rows, so any study flagged as a
           placeholder with no respondents was left out on the flag alone.
         </div>
       ))}
@@ -101,7 +101,7 @@ export function InsightsDashboard() {
 
       <p className="flex flex-wrap items-center gap-x-1 text-xs text-muted-foreground">
         {leftOut(model.excluded.placeholders, data.demoDropped, model.excluded.internal)}
-        <InfoTooltip text="An empty rerun placeholder is a wave the system created ahead of time that holds no blast, panel or cost row and no respondents yet — not work anyone did. Demo and test accounts are not business. Internal projects are not client surveys." />
+        <InfoTooltip text="An empty rerun placeholder is a wave the system created ahead of time that holds no blast, panel or cost row and no respondents yet — not work anyone did. Demo and test accounts are not business. Internal projects are not client studies." />
         <span className="ml-1">Counts only: this page shows no dollar figures.</span>
       </p>
 
@@ -117,7 +117,7 @@ function leftOut(placeholders: number, demo: number | null, internal: number): s
   const s = (n: number, one: string, many: string) => `${fmtNum(n)} ${n === 1 ? one : many}`
   const parts = [
     s(placeholders, 'empty rerun placeholder', 'empty rerun placeholders'),
-    ...(demo != null ? [s(demo, 'demo or test-account survey', 'demo or test-account surveys')] : []),
+    ...(demo != null ? [s(demo, 'demo or test-account study', 'demo or test-account studies')] : []),
     ...(internal > 0 ? [s(internal, 'internal project', 'internal projects')] : []),
   ]
   const list = parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}` : parts[0]

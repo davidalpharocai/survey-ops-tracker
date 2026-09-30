@@ -24,7 +24,7 @@ export function deriveWaitingOn(p: WaitingOnInput): string {
   if (p.status === 'Hold') return '—'
   if (p.phase === 'Scoping') return 'Us — scoping'
   if (!p.stage_doc_programming) return 'Us — doc programming'
-  if (!p.stage_survey_programming) return 'Us — survey programming'
+  if (!p.stage_survey_programming) return 'Us — study programming'
   if (!p.stage_edwin_qa) return 'Us — EdWin QA'
   if (!p.stage_fielding) return 'Us — launch'
   // Still in fielding (data QA not started): collecting if under target,

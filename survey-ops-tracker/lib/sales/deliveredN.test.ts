@@ -64,7 +64,7 @@ describe("David's example: 2,000 collected against a 1,000 target", () => {
     expect(d.note).toContain('1,000 target')
     // The reason, not just the label.
     expect(d.note).toContain('delivers roughly what it sold')
-    expect(d.note).toContain('115 past surveys')
+    expect(d.note).toContain('115 past studies')
   })
 })
 

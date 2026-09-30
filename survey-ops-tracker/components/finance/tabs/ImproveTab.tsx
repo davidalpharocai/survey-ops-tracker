@@ -57,7 +57,7 @@ export function ImproveTab(props: FinanceTabProps) {
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
-        What to record next, ranked by how much each gap hides. Each row names the field, who records it and when, and opens the exact surveys.
+        What to record next, ranked by how much each gap hides. Each row names the field, who records it and when, and opens the exact studies.
       </p>
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="min-w-0 lg:col-span-2">

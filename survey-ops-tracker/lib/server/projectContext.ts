@@ -1597,7 +1597,7 @@ const EXTRACT_SCHEMA: Record<string, unknown> = {
 }
 
 const EXTRACT_SYSTEM = [
-  'You read the internal records of one market-research survey project and name what it is ABOUT, so that a later step can search the public record for why it was commissioned.',
+  'You read the internal records of one market-research study and name what it is ABOUT, so that a later step can search the public record for why it was commissioned.',
   '',
   'Return two lists.',
   '',
@@ -1753,8 +1753,8 @@ export async function extractSubjects(
  * report about our own tool configuration is not.
  * ------------------------------------------------------------------------- */
 const SYSTEM_PROMPT = [
-  'You are a research assistant for an internal survey-operations tool used by market-research analysts.',
-  'Your job: explain, from public sources, WHY a particular survey project exists right now, and what happened while it was in the field.',
+  'You are a research assistant for an internal study-operations tool used by market-research analysts.',
+  'Your job: explain, from public sources, WHY a particular study exists right now, and what happened while it was in the field.',
   '',
   'How to search:',
   `- YOUR SEARCH BUDGET IS ${MAX_SEARCHES} SEARCHES, and it is a hard limit enforced by the tool, not a guideline. Decide what the ${MAX_SEARCHES} highest-value queries are before you spend the first one. Prefer a few broad, well-aimed queries over many narrow ones, and never spend a search re-confirming something a result already told you.`,

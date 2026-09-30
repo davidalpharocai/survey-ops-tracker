@@ -29,7 +29,7 @@ export function GroupByPicker({ by }: { by: ResultsGroupBy }) {
     <nav aria-label="Group Where it was made and lost by" className="flex flex-wrap items-center gap-1.5">
       <span className="flex items-center text-xs text-muted-foreground">
         Group by
-        <InfoTooltip text="Choose how the card below splits the margin: by account, route, month, contact, type as filed, survey, or panel supplier." />
+        <InfoTooltip text="Choose how the card below splits the margin: by account, route, month, contact, type as filed, study, or panel supplier." />
       </span>
       {GROUP_BY_OPTIONS.map(o => {
         const on = o.id === by

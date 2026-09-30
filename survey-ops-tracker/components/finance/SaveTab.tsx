@@ -46,7 +46,7 @@ export function SaveTab({ view, floor, onDrill }: {
         wide
         title="Where the money could come out"
         floor={floor}
-        tip="Every lever is recomputed from current data on each load, never read from a stored figure — so this cannot quote a saving that was captured months ago. Thresholds are percentiles of the comparable surveys, not constants, so the engine sharpens as data accumulates."
+        tip="Every lever is recomputed from current data on each load, never read from a stored figure — so this cannot quote a saving that was captured months ago. Thresholds are percentiles of the comparable studies, not constants, so the engine sharpens as data accumulates."
       >
         {view.levers.length === 0 ? (
           <Empty>Nothing in this view carries enough recorded cost to find a lever in.</Empty>
@@ -58,7 +58,7 @@ export function SaveTab({ view, floor, onDrill }: {
             <div className="border-b border-border/60 px-4 py-3">
               <div className="text-sm">
                 {fmtNum(view.levers.length)} lever{view.levers.length === 1 ? '' : 's'} found in{' '}
-                {money(view.spend)} of recorded spend on {fmtNum(view.surveys)} delivered and live surveys in view
+                {money(view.spend)} of recorded spend on {fmtNum(view.surveys)} delivered and live studies in view
               </div>
               <div className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
                 Each range is a share of that spend. They overlap, so they are not added up. Most depend on
@@ -73,7 +73,7 @@ export function SaveTab({ view, floor, onDrill }: {
                     <span className="min-w-0 text-sm font-medium">
                       <span className="mr-2 text-muted-foreground">{i + 1}.</span>
                       <Drillable onOpen={() => onDrill('lever-' + l.key)}
-                        title="Show the surveys behind this lever">
+                        title="Show the studies behind this lever">
                         {l.title}
                       </Drillable>
                     </span>
@@ -100,8 +100,8 @@ export function SaveTab({ view, floor, onDrill }: {
                       </span>
                     ) : null}
                     {l.tooFew && (
-                      <span title={`Fewer than ${MIN_CLASS_N} surveys behind it`} className="rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                        too few surveys here to call
+                      <span title={`Fewer than ${MIN_CLASS_N} studies behind it`} className="rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                        too few studies here to call
                       </span>
                     )}
                     <span className="text-xs text-muted-foreground">{l.population}</span>
@@ -128,8 +128,8 @@ export function SaveTab({ view, floor, onDrill }: {
             <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
               The obvious rule, and the one three separate analyses reached for first. It has no
               input: <span className="font-medium text-foreground">the QA yield is written at
-              delivery, after the money is spent</span> — it lands before a survey&apos;s last blast
-              on 11 of 412 surveys. Nor can it be forecast from account history: BofA&apos;s own p25
+              delivery, after the money is spent</span> — it lands before a study&apos;s last blast
+              on 11 of 412 studies. Nor can it be forecast from account history: BofA&apos;s own p25
               keep is 0.444 against a 0.801 median. Replayed wave by wave, a 1.13× cap would have
               saved {money(13625)} and broken <span className="font-medium text-foreground">twelve
               deliveries worth {money(28714)}</span>.
@@ -146,7 +146,7 @@ export function SaveTab({ view, floor, onDrill }: {
           <div className="px-4 py-3">
             <div className="text-sm font-medium">Switch SMS to email because email sends are free</div>
             <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
-              Email response is about nine times worse inside the same survey. Replacing the SMS
+              Email response is about nine times worse inside the same study. Replacing the SMS
               volume would need roughly 91M addresses against the 358,766 ever sent.
             </p>
           </div>

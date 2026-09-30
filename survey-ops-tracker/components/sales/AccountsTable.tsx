@@ -93,7 +93,7 @@ interface Col {
 const surveys = (id: string, g: string) => `/sales/surveys?c=${id}&g=${g}`
 
 const COLS: Col[] = [
-  { id: 'total', label: 'Surveys', title: 'Every survey on this account, all time.', href: r => surveys(r.id, 'all'), value: r => r.total },
+  { id: 'total', label: 'Studies', title: 'Every study on this account, all time.', href: r => surveys(r.id, 'all'), value: r => r.total },
   { id: 'active', label: 'Active', title: 'Scoped and running — not yet delivered.', href: r => surveys(r.id, 'active'), value: r => r.active },
   { id: 'scoping', label: 'Scoping', title: 'Still being scoped and priced.', href: r => surveys(r.id, 'scoping'), value: r => r.scoping },
   { id: 'delivered', label: 'Delivered', title: 'Reached the Delivery stage and went to the client.', href: r => surveys(r.id, 'delivered'), value: r => r.delivered },
@@ -111,7 +111,7 @@ const COLS: Col[] = [
   },
   {
     id: 'creditsAllTime', label: 'Credits (all time)',
-    title: 'Credits drawn across every survey on the account, inside a term or not.',
+    title: 'Credits drawn across every study on the account, inside a term or not.',
     href: r => `/sales/accounts/${r.id}`, value: r => r.creditsAllTime,
   },
   {
@@ -327,9 +327,9 @@ export function AccountsTable({ rows, offBook = 0 }: { rows: AccountRow[]; offBo
         {shown.length === rows.length
           ? `${fmtNum(rows.length)} account${rows.length === 1 ? '' : 's'}`
           : `${fmtNum(shown.length)} of ${fmtNum(rows.length)} accounts`}
-        {' · '}{fmtNum(shown.reduce((t, r) => t + r.total, 0))} surveys between them
+        {' · '}{fmtNum(shown.reduce((t, r) => t + r.total, 0))} studies between them
         {offBook > 0 && (
-          <span title="You are named as the salesperson on these, but their account belongs to someone else — so they appear on your surveys list without an account row here.">
+          <span title="You are named as the salesperson on these, but their account belongs to someone else — so they appear on your studies list without an account row here.">
             {' · '}{fmtNum(offBook)} more on accounts you don&apos;t own
           </span>
         )}
@@ -375,7 +375,7 @@ export function AccountsTable({ rows, offBook = 0 }: { rows: AccountRow[]; offBo
                     : c.id === 'creditsAllTime' ? { n: r.unpricedDrawn, dir: 'floor' as const }
                     : c.id === 'creditsRemaining' ? { n: r.unpricedDrawnTerm, dir: 'ceiling' as const }
                     : null
-                  const surveysHave = (n: number) => `${n} ${n === 1 ? 'survey has' : 'surveys have'}`
+                  const surveysHave = (n: number) => `${n} ${n === 1 ? 'study has' : 'studies have'}`
                   const scope = c.id === 'creditsAllTime' ? 'on this account' : `in the ${r.termName ?? 'current term'}`
                   // Drawn 0 with an unpriced survey that HAS drawn is not a
                   // measured 0 — nothing that drew has been counted. The PDF
@@ -386,7 +386,7 @@ export function AccountsTable({ rows, offBook = 0 }: { rows: AccountRow[]; offBo
                       {v == null || unknown ? (
                         <span className="text-muted-foreground/40" title={
                           nothingPriced
-                            ? `None of this account's ${r.total} surveys is priced in credits yet — which is not the same as none being used.`
+                            ? `None of this account's ${r.total} studies is priced in credits yet — which is not the same as none being used.`
                             : unknown
                               ? `${surveysHave(qual.n)} fielded ${scope} but none of what has drawn is priced yet, so the amount drawn is not known — which is not the same as none.`
                               : c.id === 'creditsRemaining'

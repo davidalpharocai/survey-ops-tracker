@@ -143,7 +143,7 @@ function ClientComplianceCard({ client }: { client: Client }) {
       <button onClick={() => setOpen(o => !o)} className="flex items-center justify-between gap-2 text-left" aria-expanded={open}>
         <span className="text-xs text-muted-foreground uppercase tracking-widest font-medium flex items-center">
           Compliance
-          <InfoTooltip text="When set, this client's surveys are blocked from being fielded (before) or delivered (after) until the matching compliance review is approved. Seeded from the sheet's Compliance tab; editable here." />
+          <InfoTooltip text="When set, this client's studies are blocked from being fielded (before) or delivered (after) until the matching compliance review is approved. Seeded from the sheet's Compliance tab; editable here." />
         </span>
         <span className="flex items-center gap-1.5 text-xs">
           <span className={required ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'}>{status}</span>
@@ -194,7 +194,7 @@ function ClientComplianceCard({ client }: { client: Client }) {
                 if (notes !== (client.compliance_notes ?? ''))
                   update.mutate({ id: client.id, updates: { compliance_notes: notes.trim() || null } })
               }}
-              placeholder="e.g. only if the survey contains open-text questions"
+              placeholder="e.g. only if the study contains open-text questions"
               className="bg-muted border border-border rounded px-2 py-1 text-sm text-foreground focus:outline-none focus:border-ring"
             />
           </label>
@@ -577,7 +577,7 @@ export default function ClientPage() {
           <Link
             href={`/clients/${c.id}/statement`}
             className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-            title="The client-facing Survey Activity Statement for this account — choose what prints, then save it as a PDF. Nothing is sent to the client from here."
+            title="The client-facing Study Activity Statement for this account — choose what prints, then save it as a PDF. Nothing is sent to the client from here."
           >
             Client statement →
           </Link>

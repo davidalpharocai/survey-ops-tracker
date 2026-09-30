@@ -45,17 +45,17 @@ export function UnitTab({ cpqr, mixed, rates, accounts, ladder, incidence, canFi
       <Card
         title="CPQR — cost per qualified respondent"
         floor={blocks.costs}
-        tip="Recorded spend (net of recovered rewards) ÷ n_actual, the post-QA count the client actually received. The 'per complete bought' figure on each row is the same spend ÷ the completes we PAID for, on exactly the same surveys — so the gap between the two is exactly the scrub. Delivered surveys only, and only those whose recorded completes cover both the N collected and the N delivered — without that guard this card reported blast at half its true cost and an impossible 116% QA yield. A survey fielded both ways contributes one observation to each route, built from that route's own spend and its own delivered respondents, and only once both can be established."
+        tip="Recorded spend (net of recovered rewards) ÷ n_actual, the post-QA count the client actually received. The 'per complete bought' figure on each row is the same spend ÷ the completes we PAID for, on exactly the same studies — so the gap between the two is exactly the scrub. Delivered studies only, and only those whose recorded completes cover both the N collected and the N delivered — without that guard this card reported blast at half its true cost and an impossible 116% QA yield. A study fielded both ways contributes one observation to each route, built from that route's own spend and its own delivered respondents, and only once both can be established."
       >
         {cpqr.length === 0 ? (
-          <Empty>No delivered survey here has both a recorded cost and a post-QA count.</Empty>
+          <Empty>No delivered study here has both a recorded cost and a post-QA count.</Empty>
         ) : (
           <div className="divide-y divide-border/60">
             {cpqr.map(c => (
               <div key={c.route} className="px-4 py-3">
                 <div className="flex items-baseline justify-between">
                   <Drillable onOpen={() => onDrill('cpqr-' + c.route)}
-                    title={`Show the ${c.n} surveys behind this rate`}>
+                    title={`Show the ${c.n} studies behind this rate`}>
                     <span className="text-sm font-medium">
                       {c.route === 'panel' ? 'PureSpectrum panel' : 'B2B blasts'}
                     </span>
@@ -65,10 +65,10 @@ export function UnitTab({ cpqr, mixed, rates, accounts, ladder, incidence, canFi
                   </span>
                 </div>
                 <div className="mt-0.5 text-xs tabular-nums text-muted-foreground">
-                  typical survey {money2(c.median)} · {money2(c.p25)} – {money2(c.p75)} · n={c.n}
+                  typical study {money2(c.median)} · {money2(c.p25)} – {money2(c.p75)} · n={c.n}
                 </div>
                 <div className="mt-0.5 text-xs tabular-nums text-muted-foreground">
-                  {money2(c.perComplete)} per complete bought, on the same surveys
+                  {money2(c.perComplete)} per complete bought, on the same studies
                   {c.recovered < 0 && <> · {money2(c.blendedGross)} per qualified before {money(-c.recovered)} of rewards came back</>}
                 </div>
                 <div className="mt-0.5 text-xs text-muted-foreground">
@@ -76,11 +76,11 @@ export function UnitTab({ cpqr, mixed, rates, accounts, ladder, incidence, canFi
                   <span className="font-medium text-red-600 dark:text-red-400">
                     {Math.round(c.scrubRate * 100)}% scrubbed across the book
                   </span>
-                  {', '}<span className="font-medium">{Math.round(c.scrubRateMedian * 100)}% on the typical survey</span>
+                  {', '}<span className="font-medium">{Math.round(c.scrubRateMedian * 100)}% on the typical study</span>
                   {c.excluded > 0 && <> · {fmtNum(c.excluded)} excluded, records do not reconcile</>}
                   {c.mixed > 0 && (
                     <> · {fmtNum(c.mixed)} of these {c.mixed === 1 ? 'is' : 'are'} one side of a
-                    survey fielded both ways, counted on its own money</>
+                    study fielded both ways, counted on its own money</>
                   )}
                 </div>
               </div>
@@ -89,9 +89,9 @@ export function UnitTab({ cpqr, mixed, rates, accounts, ladder, incidence, canFi
               <Note>
                 <span className="font-medium text-foreground">Use the right one of those two.</span>{' '}
                 The book figure is what one qualified respondent cost across the whole book; the
-                typical-survey figure is what to expect on the next one, and they differ because a
+                typical-study figure is what to expect on the next one, and they differ because a
                 handful of studies scrub catastrophically rather than because the routes behave
-                differently. Per-survey keep runs{' '}
+                differently. Per-study keep runs{' '}
                 {panel && <>{Math.round(panel.keepP25 * 100)}–{Math.round(panel.keepP75 * 100)}% on panel</>}
                 {panel && blast && ' and '}
                 {blast && <>{Math.round(blast.keepP25 * 100)}–{Math.round(blast.keepP75 * 100)}% on blast</>}
@@ -101,20 +101,20 @@ export function UnitTab({ cpqr, mixed, rates, accounts, ladder, incidence, canFi
             {mixed && mixed.surveys > mixed.priced && (
               <Note>
                 <span className="font-medium text-foreground">
-                  {fmtNum(mixed.surveys - mixed.priced)} survey
-                  {mixed.surveys - mixed.priced === 1 ? '' : 's'} fielded BOTH ways{' '}
+                  {fmtNum(mixed.surveys - mixed.priced)} stud
+                  {mixed.surveys - mixed.priced === 1 ? 'y' : 'ies'} fielded BOTH ways{' '}
                   {mixed.surveys - mixed.priced === 1 ? 'is' : 'are'} missing from the two rates
                   above
                 </span>
                 {' '}— {money2(mixed.blockedSpend)} of spend and {fmtNum(mixed.blockedN)} delivered
-                respondents. A survey that used blasts and PureSpectrum together only reaches these
+                respondents. A study that used blasts and PureSpectrum together only reaches these
                 figures once every dollar and every delivered respondent can be placed on one side
                 or the other, because a rate built by splitting them down the middle would be wrong
                 on both.{' '}
                 {mixed.reasons['no-split'] ? (
                   <>{fmtNum(mixed.reasons['no-split'])} need{mixed.reasons['no-split'] === 1 ? 's' : ''} the
                   delivered N split by route — join the deliverable&rsquo;s transaction IDs to the QA
-                  file, then record it on the survey. </>
+                  file, then record it on the study. </>
                 ) : null}
                 {mixed.reasons['unrouted-cost'] ? (
                   <>{fmtNum(mixed.reasons['unrouted-cost'])} carr
@@ -155,7 +155,7 @@ export function UnitTab({ cpqr, mixed, rates, accounts, ladder, incidence, canFi
       <Card
         title="Cost per complete — what we bought"
         floor={blocks.costs}
-        tip="The median survey's recorded cost ÷ completes we PAID for, on surveys whose records cover their collected N. A different statistic and a different set of surveys from the CPQR card, so do not subtract one from the other — the CPQR card's own 'per complete bought' line is the like-for-like comparison."
+        tip="The median study's recorded cost ÷ completes we PAID for, on studies whose records cover their collected N. A different statistic and a different set of studies from the CPQR card, so do not subtract one from the other — the CPQR card's own 'per complete bought' line is the like-for-like comparison."
       >
         {rates.length === 0 ? (
           <Empty>Nothing in this view reconciles well enough to price.</Empty>
@@ -186,12 +186,12 @@ export function UnitTab({ cpqr, mixed, rates, accounts, ladder, incidence, canFi
           wide
           title="Account P&L — what they pay against what they cost"
           floor={blocks.prices ? null : blocks.costs}
-          tip="Price and cost are both per BILLED respondent (min of delivered and the N sold), on the same surveys, so price minus cost is what we keep per respondent. Split by route: an account fielded more than one way shows its per-respondent figures on each route row only, because a panel price averaged with a blast price describes the mix, not the client. `n` is on every row — a figure from two surveys is not comparable to one from fourteen."
+          tip="Price and cost are both per BILLED respondent (min of delivered and the N sold), on the same studies, so price minus cost is what we keep per respondent. Split by route: an account fielded more than one way shows its per-respondent figures on each route row only, because a panel price averaged with a blast price describes the mix, not the client. `n` is on every row — a figure from two studies is not comparable to one from fourteen."
         >
           {blocks.prices ? (
             <BlockedFigure text={blocks.prices} />
           ) : priced.length === 0 ? (
-            <Empty>No account in this view has a survey with both a client price and a recorded cost.</Empty>
+            <Empty>No account in this view has a study with both a client price and a recorded cost.</Empty>
           ) : (
             <>
               <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-x-4 border-b border-border/60 px-4 py-1.5 text-[11px] uppercase tracking-wider text-muted-foreground">
@@ -199,7 +199,7 @@ export function UnitTab({ cpqr, mixed, rates, accounts, ladder, incidence, canFi
                 <span className="text-right" title="Client price ÷ billed respondents">Price / billed N</span>
                 <span className="text-right" title="Our field cost ÷ the same billed respondents">Cost / billed N</span>
                 <span className="text-right" title="(Client price − our cost) ÷ client price. Field contribution, before salaries and overhead.">We keep</span>
-                <span className="text-right" title="Surveys behind the row">n</span>
+                <span className="text-right" title="Studies behind the row">n</span>
               </div>
               <div className="divide-y divide-border/60">
                 {priced.slice(0, 12).map(a => {
@@ -236,7 +236,7 @@ export function UnitTab({ cpqr, mixed, rates, accounts, ladder, incidence, canFi
                       )}
                       {a.freeSurveys > 0 && (
                         <div className="mt-0.5 text-xs text-muted-foreground">
-                          Includes {fmtNum(a.freeSurveys)} survey{a.freeSurveys === 1 ? '' : 's'} given away at $0.
+                          Includes {fmtNum(a.freeSurveys)} stud{a.freeSurveys === 1 ? 'y' : 'ies'} given away at $0.
                         </div>
                       )}
                       {a.unpricedSpend > 0 && (

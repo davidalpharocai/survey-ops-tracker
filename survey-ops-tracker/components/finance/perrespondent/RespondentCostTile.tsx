@@ -28,16 +28,16 @@ import type { FinanceTabProps } from '@/components/finance/tabs/types'
 import { withParam } from './href'
 
 const TILE_HELP =
-  'Pooled over one set of delivered surveys whose cost records add up: the ring is cost per complete bought, the dot is cost per qualified respondent (after QA), so the gap between them is exactly what QA removed. ' +
-  'The box is the typical survey — the middle half, median ticked. Panel and blast are on their own axes and never averaged. Click a row for its surveys.'
+  'Pooled over one set of delivered studies whose cost records add up: the ring is cost per complete bought, the dot is cost per qualified respondent (after QA), so the gap between them is exactly what QA removed. ' +
+  'The box is the typical study — the middle half, median ticked. Panel and blast are on their own axes and never averaged. Click a row for its studies.'
 
 const LINE_HELP = {
-  coverage: 'Which delivered surveys this card counts. A survey is left out when its field rows do not cover the N it claims (its cost per respondent would read too low), or when its N actual counts only some of its segments.',
+  coverage: 'Which delivered studies this card counts. A study is left out when its field rows do not cover the N it claims (its cost per respondent would read too low), or when its N actual counts only some of its segments.',
   recovered: 'Blast rewards that went unclaimed and came back. The card is net of them; the figure before they came back is shown too, because recoveries are booked in batches.',
-  quote: 'Cost per BILLED respondent — the same denominator as a client price — times 1 ÷ (1 − the 50% goal). At or above it, spend stays within about half the price on the typical survey. The safer floor uses the dearer quarter of surveys instead of the typical one. The typical cost is rounded before the multiple is applied, so the floor is exactly the multiple of the figure printed beside it.',
-  priced: 'Delivered surveys fielded ONLY this way in view with a client price above $0, compared with the floor. A $0 price is left out: free work is not a quote. A survey fielded both ways, or with no recorded field cost, belongs to neither card — the closing line counts those separately.',
-  priceBlocked: 'The client prices this comparison needs did not load. The surveys are still there; the comparison is missing, not zero.',
-  buy: 'How many completes to buy for each respondent sold: 1 ÷ the keep rate a quarter of past surveys fell below. Counted on the same surveys, so the "covers" figure is real, not assumed.',
+  quote: 'Cost per BILLED respondent — the same denominator as a client price — times 1 ÷ (1 − the 50% goal). At or above it, spend stays within about half the price on the typical study. The safer floor uses the dearer quarter of studies instead of the typical one. The typical cost is rounded before the multiple is applied, so the floor is exactly the multiple of the figure printed beside it.',
+  priced: 'Delivered studies fielded ONLY this way in view with a client price above $0, compared with the floor. A $0 price is left out: free work is not a quote. A study fielded both ways, or with no recorded field cost, belongs to neither card — the closing line counts those separately.',
+  priceBlocked: 'The client prices this comparison needs did not load. The studies are still there; the comparison is missing, not zero.',
+  buy: 'How many completes to buy for each respondent sold: 1 ÷ the keep rate a quarter of past studies fell below. Counted on the same studies, so the "covers" figure is real, not assumed.',
   concentration: 'The fewest panels carrying at least 80% of panel spend in view, and what was paid above the cheapest panel buying in the same PureSpectrum wave. Direction only: panel capacity and per-panel QA are not recorded.',
 }
 
@@ -114,8 +114,8 @@ function RouteCardView({ card, model, tab }: { card: RouteCard; model: PerRespon
         {card.title}
         <InfoTooltip text={
           card.route === 'panel'
-            ? 'Surveys bought from PureSpectrum panels. Route is read from each survey’s own cost records, not from how it was filed.'
-            : 'Surveys fielded through B2B email and text blasts. Route is read from each survey’s own cost records, not from how it was filed.'
+            ? 'Studies bought from PureSpectrum panels. Route is read from each study’s own cost records, not from how it was filed.'
+            : 'Studies fielded through B2B email and text blasts. Route is read from each study’s own cost records, not from how it was filed.'
         } />
       </h3>
       {c ? (
@@ -123,9 +123,9 @@ function RouteCardView({ card, model, tab }: { card: RouteCard; model: PerRespon
           <DumbbellChart
             ariaLabel={`${card.title}: cost per complete bought and per qualified respondent`}
             data={[card]}
-            label={() => `${fmtCount(c.ids.length)} ${c.ids.length === 1 ? 'survey' : 'surveys'}, pooled`}
-            labelHeader="Surveys"
-            sublabel={() => `Box: the typical survey across ${fmtCount(c.n)}, median ticked`}
+            label={() => `${fmtCount(c.ids.length)} ${c.ids.length === 1 ? 'study' : 'studies'}, pooled`}
+            labelHeader="Studies"
+            sublabel={() => `Box: the typical study across ${fmtCount(c.n)}, median ticked`}
             start={() => c.perComplete}
             end={() => c.blended}
             connectorLabel={() => (card.qaRemoved != null ? `QA removed ${pctText(card.qaRemoved)}` : null)}
@@ -144,7 +144,7 @@ function RouteCardView({ card, model, tab }: { card: RouteCard; model: PerRespon
               <button
                 type="button"
                 onClick={openBelow}
-                title="Show the surveys priced below the floor"
+                title="Show the studies priced below the floor"
                 className="rounded text-left underline decoration-dotted underline-offset-4 hover:decoration-solid focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--chart-price)]"
               >
                 {card.lines.quotePriced}
@@ -171,9 +171,9 @@ function RouteCardView({ card, model, tab }: { card: RouteCard; model: PerRespon
           type="button"
           onClick={open}
           className="mt-2 text-xs font-medium text-primary underline-offset-2 hover:underline"
-          title="Every survey behind this card, ranked by the dollars it cost above a typical survey"
+          title="Every study behind this card, ranked by the dollars it cost above a typical study"
         >
-          Show the {fmtCount(c.ids.length)} {c.ids.length === 1 ? 'survey' : 'surveys'} →
+          Show the {fmtCount(c.ids.length)} {c.ids.length === 1 ? 'study' : 'studies'} →
         </button>
       )}
     </section>

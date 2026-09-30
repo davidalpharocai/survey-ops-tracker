@@ -205,7 +205,7 @@ describe('boardExportHelp — the Export tooltip says what the file really holds
     const parts = partitionBoard([...rows, row('m1', 'Active', 'Paused'), row('m2', null, 'Open')])
     for (const mode of ['full', 'operations'] as const) {
       const help = boardExportHelp(parts, mode)
-      expect(help).toContain('It also holds the 2 surveys listed above that fit no section.')
+      expect(help).toContain('It also holds the 2 studies listed above that fit no section.')
       expect(help).toContain(`Downloads a CSV of ${boardExportRows(parts, mode).length} projects`)
     }
   })

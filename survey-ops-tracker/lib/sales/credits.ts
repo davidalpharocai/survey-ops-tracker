@@ -242,7 +242,7 @@ export function describeConsumption(c: Consumption): string {
   // rather than as a correction.
   const held = c.committed > 0
     ? ` A further ${n(c.committed)} ${c.committed === 1 ? 'credit is' : 'credits are'} priced on ${
-        c.committedCount} survey${c.committedCount === 1 ? '' : 's'} that ${
+        c.committedCount} ${c.committedCount === 1 ? 'study' : 'studies'} that ${
         c.committedCount === 1 ? 'has' : 'have'} not fielded yet, so ${
         c.committedCount === 1 ? 'it is' : 'they are'} committed but not drawn.`
     : ''
@@ -253,13 +253,13 @@ export function describeConsumption(c: Consumption): string {
   // sentence has already counted some unpriced surveys.
   const k = c.unpricedUndrawn
   const idle = k > 0
-    ? ` ${k} ${c.isFloor ? 'more' : `survey${k === 1 ? '' : 's'}`} ${k === 1 ? 'is' : 'are'} not priced and ${
+    ? ` ${k} ${c.isFloor ? 'more' : k === 1 ? 'study' : 'studies'} ${k === 1 ? 'is' : 'are'} not priced and ${
         k === 1 ? 'has' : 'have'} not fielded, so ${k === 1 ? 'it has' : 'they have'} drawn nothing.`
     : ''
 
   if (c.total == null) {
-    if (c.priced === 0) return 'No term recorded, and none of these surveys is priced in credits yet.' + held
-    return `${n(c.used)} credits used across ${c.priced} survey${c.priced === 1 ? '' : 's'}${
+    if (c.priced === 0) return 'No term recorded, and none of these studies is priced in credits yet.' + held
+    return `${n(c.used)} credits used across ${c.priced} ${c.priced === 1 ? 'study' : 'studies'}${
       c.isFloor ? `, with ${c.unpricedDrawn} more that ${c.unpricedDrawn === 1 ? 'has' : 'have'} fielded but ${
         c.unpricedDrawn === 1 ? 'is' : 'are'} not yet priced` : ''
     }. No term allowance recorded to measure it against.` + idle + held
@@ -269,8 +269,8 @@ export function describeConsumption(c: Consumption): string {
   // unknown, which is not the same as zero. When nothing at all has drawn, the
   // general sentence below is simply true ("0 of 375 used") and says so.
   if (c.priced === 0 && c.unpricedDrawn > 0) {
-    return `${n(c.total)} credits on the term. ${c.unpricedDrawn} survey${
-      c.unpricedDrawn === 1 ? ' has' : 's have'
+    return `${n(c.total)} credits on the term. ${c.unpricedDrawn} ${
+      c.unpricedDrawn === 1 ? 'study has' : 'studies have'
     } fielded here but none is priced yet, so the amount drawn is "not recorded", which is not the same as "nothing used".` + idle + held
   }
 
@@ -284,7 +284,7 @@ export function describeConsumption(c: Consumption): string {
         : ''
   // Only the unpriced surveys that have DRAWN make this a floor — see rollUp.
   const floor = c.isFloor
-    ? `. ${c.unpricedDrawn} survey${c.unpricedDrawn === 1 ? ' that has' : 's that have'} fielded ${
+    ? `. ${c.unpricedDrawn} ${c.unpricedDrawn === 1 ? 'study that has' : 'studies that have'} fielded ${
         c.unpricedDrawn === 1 ? 'is' : 'are'} not priced yet, so the used figure is a floor.`
     : '.'
   return head + pct + left + floor + idle + held

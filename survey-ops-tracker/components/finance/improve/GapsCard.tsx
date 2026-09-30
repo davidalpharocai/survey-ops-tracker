@@ -22,7 +22,7 @@ import type { FinanceTabProps } from '../tabs/types'
 import { FinanceCard, Figure, Note } from '../tabs/Card'
 
 const HELP =
-  'Everything here can be fixed with a field SOCC already has. Each row says what is missing, on how many surveys, how many dollars it hides, who records it and when — and opens the exact surveys. ' +
+  'Everything here can be fixed with a field SOCC already has. Each row says what is missing, on how many studies, how many dollars it hides, who records it and when — and opens the exact studies. ' +
   'Ranked by dollars hidden. "Recorded cost" is spend already logged that a figure cannot use; "Client price" is price the margin cannot count yet; an estimate is money not recorded at all, sized at a rate measured on the book and marked "about".'
 
 const DOLLAR_TONE: Record<Gap['dollarsKind'], string> = {
@@ -76,8 +76,8 @@ const GAP_SHORT: Record<GapKey, string> = {
 }
 
 const KIND_HELP: Record<Gap['dollarsKind'], string> = {
-  spend: 'Field cost already recorded on these surveys, which the figure named here cannot use.',
-  price: 'Client price on these surveys that the margin cannot count yet.',
+  spend: 'Field cost already recorded on these studies, which the figure named here cannot use.',
+  price: 'Client price on these studies that the margin cannot count yet.',
   estimate: 'Money that is not recorded at all, sized at a rate measured on the book. Never added to a recorded figure.',
   none: 'This gap hides no dollars; it ranks after the ones that do.',
 }
@@ -139,8 +139,8 @@ function GapChart({ gaps, props }: { gaps: Gap[]; props: Props }) {
         valueName="Dollars hidden"
         valueFormat={fmtMoney}
         valueLabel={{
-          name: 'Dollars hidden · surveys',
-          description: 'An estimate is marked "about". The survey count is how many surveys the gap touches. The exact figure is on the row below.',
+          name: 'Dollars hidden · studies',
+          description: 'An estimate is marked "about". The study count is how many studies the gap touches. The exact figure is on the row below.',
           // Rounded at the bar tip so sixteen labels leave room for sixteen
           // bars; the tooltip and the row beneath both carry it to the dollar.
           text: g => `${g.dollarsKind === 'estimate' ? 'about ' : ''}${fmtMoneyCompact(g.dollars)} · ${fmtNum(g.surveys)}`,
@@ -170,16 +170,16 @@ function HeaderFigures({ header, priceGap, props }: { header: PriceHeader; price
       <div className="grid grid-cols-1 sm:grid-cols-3">
         <Figure
           label="Client price covers"
-          help="Delivered surveys in view carrying a client price per N. A $0 price counts: it is a real price."
+          help="Delivered studies in view carrying a client price per N. A $0 price counts: it is a real price."
           value={`${fmtNum(header.priced)} of ${fmtNum(header.delivered)}`}
-          sub="delivered surveys"
+          sub="delivered studies"
           tone="price"
           onOpen={drill ? () => props.openDrill(drill) : undefined}
-          openLabel="Show the costed surveys with no price"
+          openLabel="Show the costed studies with no price"
         />
         <Figure
           label="Share of spend priced"
-          help="Recorded cost on priced delivered surveys, as a share of all recorded cost on delivered surveys in view."
+          help="Recorded cost on priced delivered studies, as a share of all recorded cost on delivered studies in view."
           value={pctText(header.spendPct)}
           sub={`${money(header.pricedSpend)} of ${money(header.spend)}`}
         />
@@ -247,7 +247,7 @@ function GapItem({ gap: g, rank, props }: { gap: Gap; rank: number | null; props
                   </Link>
                 ) : <span className="font-medium">{a.name}</span>}
                 {a.dollars != null && <span className="tabular-nums"> · {money(a.dollars)}</span>}
-                {g.unit === 'survey' && <span className="text-muted-foreground"> · {fmtNum(a.count)} survey{a.count === 1 ? '' : 's'}</span>}
+                {g.unit === 'survey' && <span className="text-muted-foreground"> · {fmtNum(a.count)} stud{a.count === 1 ? 'y' : 'ies'}</span>}
                 {a.note && <span className="block text-muted-foreground">{a.note}</span>}
               </li>
             ))}
@@ -256,7 +256,7 @@ function GapItem({ gap: g, rank, props }: { gap: Gap; rank: number | null; props
         <dl className="mt-2 grid gap-x-4 gap-y-0.5 text-xs sm:grid-cols-[auto_1fr]">
           <dt className="text-muted-foreground" title="The person who records the missing field.">Who</dt>
           <dd>{g.who}</dd>
-          <dt className="text-muted-foreground" title="The moment in the survey’s life when it is recorded.">When</dt>
+          <dt className="text-muted-foreground" title="The moment in the study’s life when it is recorded.">When</dt>
           <dd>{g.when}</dd>
           <dt className="text-muted-foreground" title="Where the field is entered.">Where</dt>
           <dd>{g.where}</dd>
@@ -268,7 +268,7 @@ function GapItem({ gap: g, rank, props }: { gap: Gap; rank: number | null; props
               onClick={() => props.openDrill(g.drill!)}
               className="rounded-md border border-border px-2 py-1 font-medium text-primary hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--chart-price)]"
             >
-              Show the {fmtNum(g.drill!.rows.length)} survey{g.drill!.rows.length === 1 ? '' : 's'}
+              Show the {fmtNum(g.drill!.rows.length)} stud{g.drill!.rows.length === 1 ? 'y' : 'ies'}
             </button>
           )}
           {g.link && (
@@ -285,7 +285,7 @@ function Resolved({ gaps, props }: { gaps: Gap[]; props: Props }) {
     <div className="border-t border-border bg-muted/20 px-4 py-3">
       <h3 className="flex items-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         Resolved in this view
-        <InfoTooltip text="Gaps the data shows as closed under the current filters. Each comes back on its own the day a survey falls into it again." />
+        <InfoTooltip text="Gaps the data shows as closed under the current filters. Each comes back on its own the day a study falls into it again." />
       </h3>
       <ul className="mt-1.5 space-y-1 text-xs">
         {gaps.map(g => (

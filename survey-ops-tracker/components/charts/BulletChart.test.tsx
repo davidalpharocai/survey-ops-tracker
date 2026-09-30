@@ -76,7 +76,7 @@ describe('BulletChart', () => {
     expect(onSelect).toHaveBeenCalledWith(live[1])
     fireEvent.click(screen.getByRole('button', { name: 'View as table' }))
     const table = screen.getByRole('table')
-    expect(within(table).getByRole('columnheader', { name: 'Survey' })).toBeInTheDocument()
+    expect(within(table).getByRole('columnheader', { name: 'Study' })).toBeInTheDocument()
     expect(within(table).getByText('60%')).toBeInTheDocument()
     expect(within(table).getByText('No price')).toBeInTheDocument()
   })

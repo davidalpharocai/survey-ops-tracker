@@ -14,7 +14,7 @@ const NOT_MIGRATED =
   'Not saved: the database does not have this field yet (update 122 has not been applied). Nothing was changed.'
 
 const TIP =
-  'The client’s own name, as it should appear after “Prepared for” and in the page footer of the Survey Activity Statement and the Survey List that salespeople send to this client. Leave it blank to print the internal name. Salespeople can still change it for a single print; this is the default they start from.'
+  'The client’s own name, as it should appear after “Prepared for” and in the page footer of the Study Activity Statement and the Study List that salespeople send to this client. Leave it blank to print the internal name. Salespeople can still change it for a single print; this is the default they start from.'
 
 /**
  * "Name as printed on client documents" (clients.display_name, migration 122).

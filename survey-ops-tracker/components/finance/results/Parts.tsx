@@ -15,10 +15,10 @@ import type { Part, ResultsAction } from '@/lib/finance/results'
 
 const ACTION_TITLE: Record<ResultsAction, string> = {
   waterfall: 'Show where this spend went, line by line',
-  unpriced: 'Show the surveys with spend and no client price',
+  unpriced: 'Show the studies with spend and no client price',
   improve: 'Open the Improve tab, which ranks the missing prices',
-  cancelled: 'Show the cancelled surveys and what they spent',
-  archived: 'Show the surveys archived without delivery and what they spent',
+  cancelled: 'Show the cancelled studies and what they spent',
+  archived: 'Show the studies archived without delivery and what they spent',
 }
 
 export function Parts({ parts, onAction, improveHref, expanded }: {

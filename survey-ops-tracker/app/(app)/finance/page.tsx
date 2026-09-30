@@ -235,9 +235,9 @@ function FinanceShell() {
   })
   const rule = TAB_RULES[tab]
   const headline = tab === 'this-week'
-    ? `${fmtNum(population.length)} live survey${population.length === 1 ? '' : 's'}` +
+    ? `${fmtNum(population.length)} live ${population.length === 1 ? 'study' : 'studies'}` +
       (side.length ? ` · ${fmtNum(side.length)} on hold` : '') + ` · ${rule.ignoredNote ?? 'All dates'}`
-    : `${fmtNum(delivered ?? 0)} delivered survey${delivered === 1 ? '' : 's'} · ${formatRange(resolveRange(filter.range, today))}`
+    : `${fmtNum(delivered ?? 0)} delivered ${delivered === 1 ? 'study' : 'studies'} · ${formatRange(resolveRange(filter.range, today))}`
 
   const props: FinanceTabProps = {
     tab, load, ix, items, population, side, filter, today, scope, accountName, openDrill, hrefFor, registerExport,

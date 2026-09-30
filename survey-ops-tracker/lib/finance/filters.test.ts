@@ -190,7 +190,7 @@ describe('per-tab population rules', () => {
     expect(populationByRule(items, TAB_RULES.results, F(), TODAY)).toEqual(populationFor(items, 'results', F(), TODAY))
     // Its scope chip names the narrower population, not the tab's.
     expect(describeFilter(F(), { tab: 'per-respondent', today: TODAY, count: 3, rule: LEVER_RULE }).chip)
-      .toBe('Delivered and live · From 1 Jun 2026 · 3 surveys')
+      .toBe('Delivered and live · From 1 Jun 2026 · 3 studies')
   })
 
   it('no tab ever shows scoping work', () => {
@@ -227,13 +227,13 @@ describe('option counts reflect the OTHER active filters', () => {
 describe('describe(): one set of words for chip, drill, export and audit', () => {
   it('writes the scope chip', () => {
     const d = describeFilter(F({ account: 'bam' }), { tab: 'results', today: TODAY, count: 41, accountName: 'BAM' })
-    expect(d.chip).toBe('Delivered · From 1 Jun 2026 · BAM · 41 surveys')
+    expect(d.chip).toBe('Delivered · From 1 Jun 2026 · BAM · 41 studies')
     expect(d.ignored).toEqual([])
   })
 
   it('says out loud when a tab ignores the date', () => {
     const d = describeFilter(F(), { tab: 'this-week', today: TODAY, count: 12 })
-    expect(d.chip).toBe('Live · Live work — all dates · 12 surveys')
+    expect(d.chip).toBe('Live · Live work — all dates · 12 studies')
     expect(d.ignored).toEqual(['Live work — all dates'])
     expect(d.audit).toMatchObject({ date_applied: false, from: null, to: null })
   })

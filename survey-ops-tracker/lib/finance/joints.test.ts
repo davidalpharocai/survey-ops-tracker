@@ -595,7 +595,7 @@ describe('a segmented survey is billed as the invoice bills it (David, 2026-09-2
     expect(segmentPriceDiffers(seg, rates.get('seg'))).toBe(true)
     expect(pnl.find(r => r.id === 'seg')).toMatchObject({ revenue: 9000, rate: 100, segmentPriceDiffers: true })
     expect(invoicedBillable(widgetSurvey(seg), rates.get('seg') ?? null)).toBe(9000)
-    expect(csvCell('seg', 'Price status')).toBe('Priced; a segment is priced differently and the bill uses the survey rate')
+    expect(csvCell('seg', 'Price status')).toBe('Priced; a segment is priced differently and the bill uses the study rate')
   })
 
   it('segment counts that do not add up block nothing on the bill, and are a note (PR00231)', () => {
@@ -605,7 +605,7 @@ describe('a segmented survey is billed as the invoice bills it (David, 2026-09-2
       revenue: 840, billableN: 280, inMargin: true, segmentsDisagree: true, segmentsMissingN: 1, partialRollUp: true,
     })
     expect(invoicedBillable(widgetSurvey(partial), rates.get('partial') ?? null)).toBe(840)
-    expect(csvCell('partial', 'Segment check')).toBe('1 of 2 segments has no N actual; the survey N actual adds up only the others; CPQR and Scrub N left blank')
+    expect(csvCell('partial', 'Segment check')).toBe('1 of 2 segments has no N actual; the study N actual adds up only the others; CPQR and Scrub N left blank')
     const worklist = exceptions(pnl, budgetVariance(rows, blasts, suppliers, costs, accounts), { book: new Map() }, { canViewFinancials: false })
     expect(worklist.find(e => e.id === 'partial')?.badges).toContain('segment-counts')
   })
@@ -675,7 +675,7 @@ describe('a segmented survey is billed as the invoice bills it (David, 2026-09-2
     expect(r).toMatchObject({ actual: 200, actualSource: 'segments', billableN: 200, overN: 0, shortN: 0, revenue: 4000 })
     expect(marginOf([rolled], rr, rb, [], []).revenue).toBe(4000)
     expect(invoicedBillable(widgetSurvey(rolled), 20)).toBe(4000)
-    expect(buildFinanceCsv([r], FIN_COLUMNS).split('\r\n')[1]).toContain('Survey N actual blank; rolled up from the segments')
+    expect(buildFinanceCsv([r], FIN_COLUMNS).split('\r\n')[1]).toContain('Study N actual blank; rolled up from the segments')
   })
 })
 

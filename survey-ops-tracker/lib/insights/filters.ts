@@ -26,10 +26,10 @@ export const TYPE_LABEL: Record<TypeKey, string> = {
 }
 
 export const TYPE_HELP: Record<TypeKey, string> = {
-  PS: 'PureSpectrum panel surveys.',
-  B2B: 'B2B surveys, fielded by email or text blasts.',
-  Rerun: 'Surveys filed with the type "Rerun" before rerun became a separate tag. Newer reruns are PS or B2B surveys with the rerun tag.',
-  none: 'No type is recorded on the survey.',
+  PS: 'PureSpectrum panel studies.',
+  B2B: 'B2B studies, fielded by email or text blasts.',
+  Rerun: 'Studies filed with the type "Rerun" before rerun became a separate tag. Newer reruns are PS or B2B studies with the rerun tag.',
+  none: 'No type is recorded on the study.',
 }
 
 /** The value the filter stores for "no captain" — a real team member id is a

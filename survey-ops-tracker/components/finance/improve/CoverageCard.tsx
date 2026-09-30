@@ -25,8 +25,8 @@ import type { FinanceTabProps } from '../tabs/types'
 import { FinanceCard, Note } from '../tabs/Card'
 
 const HELP =
-  'Each cell is the share of that month’s delivered surveys carrying the field. Every month with delivered work is shown whatever dates you pick; the months your dates select are highlighted. ' +
-  'The lines are the dates the banner uses, computed on the whole book: a line moves by itself once the months before it are filled in. Click a cell to list the surveys missing that field.'
+  'Each cell is the share of that month’s delivered studies carrying the field. Every month with delivered work is shown whatever dates you pick; the months your dates select are highlighted. ' +
+  'The lines are the dates the banner uses, computed on the whole book: a line moves by itself once the months before it are filled in. Click a cell to list the studies missing that field.'
 
 export function CoverageCard({ grid, input, props }: {
   grid: CoverageGrid
@@ -70,11 +70,11 @@ export function CoverageCard({ grid, input, props }: {
     >
       <div className="px-4 py-3">
         <Heatmap<CoverageHeatCell>
-          ariaLabel="Share of delivered surveys carrying each field, by delivery month"
+          ariaLabel="Share of delivered studies carrying each field, by delivery month"
           rows={grid.rows.map(r => ({ key: r.key, label: r.label, description: r.help }))}
           columns={grid.columns.map(c => ({
             key: c.key, label: c.label, shortLabel: monthShort(c.key, crossesYear),
-            description: `${fmtNum(c.delivered)} delivered survey${c.delivered === 1 ? '' : 's'}${c.selected ? ' · in your dates' : ''}`,
+            description: `${fmtNum(c.delivered)} delivered stud${c.delivered === 1 ? 'y' : 'ies'}${c.selected ? ' · in your dates' : ''}`,
           }))}
           cells={grid.cells}
           rowHeader="Field"
@@ -84,10 +84,10 @@ export function CoverageCard({ grid, input, props }: {
           rules={grid.rules.map(r => ({ at: r.at, label: r.label }))}
           highlight={grid.highlight}
           note={c => c.of === 0
-            ? 'No surveys this row applies to'
+            ? 'No studies this row applies to'
             : `${fmtNum(c.have)} of ${fmtNum(c.of)}${c.missingIds.length ? ` · click to list the ${fmtNum(c.missingIds.length)} missing` : ''}`}
           onSelect={open}
-          emptyMessage="No delivered surveys under the account and route picked."
+          emptyMessage="No delivered studies under the account and route picked."
         />
         {/* The row labels are drawn inside the chart, where an (i) cannot sit,
             so each one's explainer is here. */}

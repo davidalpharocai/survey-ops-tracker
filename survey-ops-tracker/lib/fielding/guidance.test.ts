@@ -183,7 +183,7 @@ describe('every rule can be audited', () => {
     expect(all.length).toBeGreaterThan(3)
     for (const g of all) {
       expect(g.evidence).toBeTruthy()
-      expect(g.evidence).toMatch(/n=\d+|\d+ (matched segments|campaigns|multi-blast)|surveys/)
+      expect(g.evidence).toMatch(/n=\d+|\d+ (matched segments|campaigns|multi-blast)|studies/)
     }
   })
 

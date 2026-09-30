@@ -223,6 +223,10 @@ function makeCtx(input: ImproveInput): Ctx {
 const COST_TABLES: FinanceTable[] = ['project_blasts', 'project_suppliers', 'project_costs']
 
 const pl = (n: number, one: string, many = `${one}s`) => `${fmtNum(n)} ${n === 1 ? one : many}`
+/** 'study' does not take an s. The units are a tiny closed set, so a map
+ *  beats turning `unit` into a {one, many} pair everywhere it is read. */
+const UNIT_PLURAL: Record<string, string> = { study: 'studies' }
+const units = (unit: string) => UNIT_PLURAL[unit] ?? `${unit}s`
 const verb = (n: number, one: string, many: string) => (n === 1 ? one : many)
 const sum = <T,>(xs: T[], f: (x: T) => number) => xs.reduce((t, x) => t + f(x), 0)
 const share = (a: number, b: number): number | null => (b > 0 ? a / b : null)
@@ -413,16 +417,16 @@ function scanPrice(ctx: Ctx): PriceScan {
   const blocked = ctx.priceBlock ?? (ctx.costBlock ? blockedText(ctx.costBlock) : null)
   let sentence: string
   if (blocked) sentence = `${blocked}, so price coverage cannot be measured. This is missing, not zero.`
-  else if (ctx.delivered.length === 0) sentence = 'There are no delivered surveys in this view, so there is no price coverage to measure.'
+  else if (ctx.delivered.length === 0) sentence = 'There are no delivered studies in this view, so there is no price coverage to measure.'
   else {
-    sentence = `Client price covers ${fmtNum(priced.length)} of ${fmtNum(ctx.delivered.length)} delivered surveys (${pctText(spendPct)} of spend).`
+    sentence = `Client price covers ${fmtNum(priced.length)} of ${fmtNum(ctx.delivered.length)} delivered studies (${pctText(spendPct)} of spend).`
     if (top.length) {
       const which = top.length < accounts.length
         ? `the top ${pl(top.length, 'unpriced account')}`
         : `${top.length === 1 ? 'the one' : `all ${fmtNum(top.length)}`} unpriced ${verb(top.length, 'account', 'accounts')}`
       sentence += ` Pricing ${which} would take it to ${pctText(ifTopPriced)}.`
     } else {
-      sentence += ' Every delivered survey with a recorded cost carries a price.'
+      sentence += ' Every delivered study with a recorded cost carries a price.'
     }
   }
   return {
@@ -579,8 +583,8 @@ function gridVerdict(
   parts.push(costTable
     ? `${blockedText(costTable)}, so the cost line cannot be placed.`
     : rel.cost.month
-      ? `Costs are recorded on most delivered surveys from ${monthLabel(rel.cost.month)}.`
-      : `Costs do not yet stay above ${pctText(RELIABILITY.cost.threshold)} of delivered surveys in any run of months.`)
+      ? `Costs are recorded on most delivered studies from ${monthLabel(rel.cost.month)}.`
+      : `Costs do not yet stay above ${pctText(RELIABILITY.cost.threshold)} of delivered studies in any run of months.`)
   if (ctx.priceBlock) {
     parts.push(`${ctx.priceBlock}, so the price line cannot be placed.`)
     return parts.join(' ')
@@ -593,7 +597,7 @@ function gridVerdict(
   } else if (p) {
     parts.push(`Client prices are entered regularly from ${monthLabel(p)}; budgets do not yet stay above ${pctText(RELIABILITY.budget.threshold)} in any run of months.`)
   } else {
-    parts.push(`Client prices do not yet stay above ${pctText(RELIABILITY.price.threshold)} of delivered surveys in any run of months.`)
+    parts.push(`Client prices do not yet stay above ${pctText(RELIABILITY.price.threshold)} of delivered studies in any run of months.`)
   }
   const start = RELIABLE_FROM.slice(0, 7)
   const target = p ?? book.filter(m => m.key !== 'undated').slice(-1)[0]?.key ?? null
@@ -610,8 +614,8 @@ function gridVerdict(
       const list = below.map(m => `${monthLabel(m.key)} (${pctText(m.cells.price.pct)} today)`)
       const joined = list.length === 1 ? list[0] : `${list.slice(0, -1).join(', ')} and ${list[list.length - 1]}`
       parts.push(scoped
-        ? `In this view, price ${joined} up to ${pctText(RELIABILITY.price.threshold)} of delivered surveys; the book’s line moves back to ${monthLabel(start)} once every account does.`
-        : `Price ${joined} up to ${pctText(RELIABILITY.price.threshold)} of delivered surveys to move the price line back to ${monthLabel(start)}.`)
+        ? `In this view, price ${joined} up to ${pctText(RELIABILITY.price.threshold)} of delivered studies; the book’s line moves back to ${monthLabel(start)} once every account does.`
+        : `Price ${joined} up to ${pctText(RELIABILITY.price.threshold)} of delivered studies to move the price line back to ${monthLabel(start)}.`)
     } else if (scoped) {
       parts.push(`In this view, every month back to ${monthLabel(start)} with enough delivered work is already at or above ${pctText(RELIABILITY.price.threshold)}; the book’s line is held back by work outside it.`)
     }
@@ -678,22 +682,22 @@ export function coverageCellDrill(
   const spec: DrillSpec = {
     key: `improve-coverage-${metric}-${col}`,
     title: rows.length
-      ? `${label} missing · ${monthWords} · ${pl(rows.length, 'survey')}`
+      ? `${label} missing · ${monthWords} · ${pl(rows.length, 'study', 'studies')}`
       : `Nothing missing · ${label} · ${monthWords}`,
     // The drill is one month, so the month IS its date words — appending it to
     // the grid's "All months" chip read "All months · Jun 2026".
     population: chipFor(ctx, { ...ALL_MONTHS_DELIVERED, ignoredNote: monthWords }, inMonth.length),
     columns: [
       { key: 'account', header: 'Account', tip: 'The client account, by its consolidated name.', value: r => String(r.account ?? '') },
-      { key: 'type', header: 'Filed as', tip: 'The survey type as filed (PS or B2B).', value: r => String(r.type ?? '') },
+      { key: 'type', header: 'Filed as', tip: 'The study type as filed (PS or B2B).', value: r => String(r.type ?? '') },
       { key: 'detail', header: 'What to enter', tip: METRIC_LABEL[metric].help, value: r => String(r.detail ?? '') },
-      { key: 'amount', header: 'Recorded cost', tip: 'Field cost recorded on the survey today. A survey with nothing logged shows $0.', num: true, value: r => moneyOrDash(r.amount as number | null) },
-      { key: 'where', header: 'Where to fix', tip: 'Where the field is entered. The survey code opens its project page.', value: r => String(r.where ?? '') },
+      { key: 'amount', header: 'Recorded cost', tip: 'Field cost recorded on the study today. A study with nothing logged shows $0.', num: true, value: r => moneyOrDash(r.amount as number | null) },
+      { key: 'where', header: 'Where to fix', tip: 'Where the field is entered. The study code opens its project page.', value: r => String(r.where ?? '') },
     ],
     rows,
     expectedTotal: spendOfIds(expectedIds, ctx.raw.blasts, ctx.raw.suppliers, ctx.raw.costs),
     expectedIds,
-    totalLabel: 'Recorded cost on these surveys',
+    totalLabel: 'Recorded cost on these studies',
     format: 'money',
   }
   const month = col === 'undated' ? null : {
@@ -998,7 +1002,7 @@ interface GapBase {
 
 const blankGap = (b: GapBase): Gap => ({
   key: b.key, specNo: b.specNo, title: b.title, help: b.help, status: 'open', what: '',
-  count: 0, unit: b.unit ?? 'survey', surveys: 0, ids: [], dollars: null, dollarsKind: 'none', dollarsWords: '',
+  count: 0, unit: b.unit ?? 'study', surveys: 0, ids: [], dollars: null, dollarsKind: 'none', dollarsWords: '',
   who: b.who, when: b.when, where: b.where, details: [], accounts: [], link: null, drill: null, note: null,
 })
 
@@ -1014,7 +1018,7 @@ const resolved = (b: GapBase, note: string, extra: Partial<Gap> = {}): Gap =>
   ({ ...blankGap(b), status: 'resolved', note, ...extra })
 
 const oneLink = (items: FinItem[]) =>
-  items.length === 1 ? { href: `/projects/${items[0].p.id}`, label: `Open ${items[0].p.project_code ?? 'the survey'}` } : null
+  items.length === 1 ? { href: `/projects/${items[0].p.id}`, label: `Open ${items[0].p.project_code ?? 'the study'}` } : null
 
 interface GapRowIn { it: FinItem; amount: number | null; detail: string; where?: string }
 
@@ -1038,7 +1042,7 @@ function gapDrill(ctx: Ctx, g: {
     { key: 'date', header: 'Date', tip: 'Deliver date, else launch date, else submitted date.', value: r => (r.date as string | null) ?? 'No date' },
     { key: 'detail', header: g.detailHeader, tip: g.detailTip, value: r => String(r.detail ?? '') },
     { key: 'amount', header: g.amountHeader, tip: g.amountTip, num: true, value: r => moneyOrDash(r.amount as number | null) },
-    { key: 'where', header: 'Where to fix', tip: 'Where the field is entered. The survey code opens its project page.', value: r => String(r.where ?? '') },
+    { key: 'where', header: 'Where to fix', tip: 'Where the field is entered. The study code opens its project page.', value: r => String(r.where ?? '') },
   ]
   return {
     key: `improve-gap-${g.key}`,
@@ -1058,9 +1062,9 @@ const spendIds = (ctx: Ctx, ids: string[]) => spendOfIds(ids, ctx.raw.blasts, ct
 
 const PRICE: GapBase = {
   key: 'price', specNo: 1, title: 'Client price missing on costed work',
-  help: `Delivered surveys that carry a recorded cost but no client price sit outside every margin figure. This stays on the list until priced surveys hold at least ${pctText(PRICE_COVERAGE_GOAL)} of the delivered spend in view. Internal work needs a price too: record $0, or a transfer price.`,
+  help: `Delivered studies that carry a recorded cost but no client price sit outside every margin figure. This stays on the list until priced studies hold at least ${pctText(PRICE_COVERAGE_GOAL)} of the delivered spend in view. Internal work needs a price too: record $0, or a transfer price.`,
   who: 'Finance (David or Vineet)',
-  when: 'When the survey is sold. For past work, from the contract or the last quote to that account.',
+  when: 'When the study is sold. For past work, from the contract or the last quote to that account.',
   where: 'Project page → Money → Price / N',
   needs: ['project_blasts', 'project_suppliers', 'project_costs'], price: true,
 }
@@ -1075,7 +1079,7 @@ function gapPrice(ctx: Ctx, scan: PriceScan): Gap {
     const acc = it.p.client_id
     const onRoute = acc && it.route !== 'none' ? last.byAccRoute.get(`${acc}|${it.route}`) : undefined
     const any = acc ? last.byAcc.get(acc) : undefined
-    const cite = (x: LastPrice) => `${perN(x.rate)} (${x.code ?? 'a survey'})`
+    const cite = (x: LastPrice) => `${perN(x.rate)} (${x.code ?? 'a study'})`
     // Same route first. A price from the OTHER route is shown as a warning, not
     // a suggestion: a panel survey priced at a blast rate is ~40× too dear.
     const detail = isInternal(ctx.account(it.p)) ? 'Internal work: record $0, or a transfer price'
@@ -1090,30 +1094,30 @@ function gapPrice(ctx: Ctx, scan: PriceScan): Gap {
     note: a.internal ? 'Internal: record $0 or a transfer price.'
       : a.lastByRoute.length
         ? `Last priced: ${a.lastByRoute.slice().sort((x, y) => x.route.localeCompare(y.route))
-          .map(x => `${ROUTE_WORD[x.route]} ${perN(x.rate)} (${x.code ?? 'a survey'})`).join('; ')}.`
-        : a.lastPrice ? `Last priced at ${perN(a.lastPrice.rate)} (${a.lastPrice.code ?? 'a survey'}), on another route.` : 'No price at this account yet.',
+          .map(x => `${ROUTE_WORD[x.route]} ${perN(x.rate)} (${x.code ?? 'a study'})`).join('; ')}.`
+        : a.lastPrice ? `Last priced at ${perN(a.lastPrice.rate)} (${a.lastPrice.code ?? 'a study'}), on another route.` : 'No price at this account yet.',
   }))
   const extra: Partial<Gap> = {
     count: hits.length, surveys: hits.length, ids, dollars, dollarsKind: 'spend',
     dollarsWords: 'of recorded cost that no margin can see', accounts, link: oneLink(hits),
     drill: hits.length ? gapDrill(ctx, {
-      key: 'price', title: `Costed work with no client price · ${pl(hits.length, 'survey')}`, rows,
-      expectedTotal: dollars, expectedIds: ids, totalLabel: 'Recorded cost on these surveys',
-      amountHeader: 'Recorded cost', amountTip: 'Field cost recorded on the survey — the spend no margin can see until it is priced.',
+      key: 'price', title: `Costed work with no client price · ${pl(hits.length, 'study', 'studies')}`, rows,
+      expectedTotal: dollars, expectedIds: ids, totalLabel: 'Recorded cost on these studies',
+      amountHeader: 'Recorded cost', amountTip: 'Field cost recorded on the study — the spend no margin can see until it is priced.',
       detailHeader: 'Pre-fill from', detailTip: 'The most recent price above $0 at the same account (on the same route when there is one), to start the backfill from.',
       where: PRICE.where, rule: DELIVERED_RULE,
     }) : null,
   }
-  if (!hits.length) return resolved(PRICE, 'Every delivered survey with a recorded cost in view carries a client price.')
+  if (!hits.length) return resolved(PRICE, 'Every delivered study with a recorded cost in view carries a client price.')
   const pctNow = header.spendPct
   if (pctNow != null && pctNow >= PRICE_COVERAGE_GOAL) {
     return resolved(PRICE,
-      `Priced surveys hold ${pctText(pctNow)} of delivered spend in view, past the ${pctText(PRICE_COVERAGE_GOAL)} goal; ${pl(hits.length, 'costed survey')} ${verb(hits.length, 'is', 'are')} still unpriced.`,
+      `Priced studies hold ${pctText(pctNow)} of delivered spend in view, past the ${pctText(PRICE_COVERAGE_GOAL)} goal; ${pl(hits.length, 'costed study', 'costed studies')} ${verb(hits.length, 'is', 'are')} still unpriced.`,
       extra)
   }
   return {
     ...blankGap(PRICE), ...extra,
-    what: `${pl(hits.length, 'delivered survey')} ${verb(hits.length, 'carries', 'carry')} ${money(dollars)} of recorded cost and no client price, so no margin can see ${verb(hits.length, 'it', 'them')}. Priced surveys hold ${pctText(pctNow)} of delivered spend in view; this stays listed until they hold ${pctText(PRICE_COVERAGE_GOAL)}.`,
+    what: `${pl(hits.length, 'delivered study', 'delivered studies')} ${verb(hits.length, 'carries', 'carry')} ${money(dollars)} of recorded cost and no client price, so no margin can see ${verb(hits.length, 'it', 'them')}. Priced studies hold ${pctText(pctNow)} of delivered spend in view; this stays listed until they hold ${pctText(PRICE_COVERAGE_GOAL)}.`,
   }
 }
 
@@ -1123,7 +1127,7 @@ const SMS: GapBase = {
   key: 'sms-rate', specNo: 2, title: 'SMS send cost is assumed, not invoiced',
   help: 'Text blasts are costed at the per-message rate on each blast. When every SMS blast carries one identical rate, it is a default nobody has checked against the carrier invoice. It stays listed while that is true.',
   who: 'Finance', when: 'Once, from the carrier invoice; then monthly.',
-  where: 'Each blast’s cost per send (Project page → Blasts)', unit: 'survey', needs: ['project_blasts'],
+  where: 'Each blast’s cost per send (Project page → Blasts)', unit: 'study', needs: ['project_blasts'],
 }
 
 function gapSms(ctx: Ctx): Gap {
@@ -1155,17 +1159,17 @@ function gapSms(ctx: Ctx): Gap {
     ...blankGap(SMS),
     count: ids.length, surveys: ids.length, ids, dollars, dollarsKind: 'spend',
     dollarsWords: 'of send cost resting on one assumed rate',
-    what: `Every SMS blast in view is costed at ${money2(rates[0])} a message: ${money(dollars)} of send cost across ${pl(sms.length, 'blast')} on ${pl(ids.length, 'survey')}. One carrier invoice confirms or corrects it.`,
+    what: `Every SMS blast in view is costed at ${money2(rates[0])} a message: ${money(dollars)} of send cost across ${pl(sms.length, 'blast')} on ${pl(ids.length, 'study', 'studies')}. One carrier invoice confirms or corrects it.`,
     link: oneLink(hitItems),
     drill: gapDrill(ctx, {
-      key: 'sms-rate', title: `SMS sends at one assumed rate · ${pl(ids.length, 'survey')}`, rows,
+      key: 'sms-rate', title: `SMS sends at one assumed rate · ${pl(ids.length, 'study', 'studies')}`, rows,
       // Not `dollars`: that and the rows are the same loop over the same blast
       // rows, so the strip could never turn red. spendOf reaches the send cost
       // by its own indexed path (email sends are free there, as they are here).
       expectedTotal: sum(hitItems, it => ctx.spend(it.p).send),
-      expectedIds: ids, totalLabel: 'Send cost on these surveys',
+      expectedIds: ids, totalLabel: 'Send cost on these studies',
       amountHeader: 'Send cost', amountTip: 'Texts sent × the per-message rate on each blast.',
-      detailHeader: 'Texts sent', detailTip: 'People texted across the survey’s SMS blasts.',
+      detailHeader: 'Texts sent', detailTip: 'People texted across the study’s SMS blasts.',
       where: SMS.where,
     }),
   }
@@ -1174,14 +1178,14 @@ function gapSms(ctx: Ctx): Gap {
 /* 3 & 16 ─ field rows missing on the route a survey was filed as ─────────── */
 
 const PS_ROWS: GapBase = {
-  key: 'ps-rows', specNo: 3, title: 'Panel purchases missing on PureSpectrum surveys',
-  help: 'Delivered surveys filed as PureSpectrum (PS) with no panel purchase recorded read $0 of cost. The dollars are an estimate at the middle panel cost per complete on the book, never added to a recorded figure. A survey far larger than any PS survey that does record its panel purchases is listed but never sized.',
+  key: 'ps-rows', specNo: 3, title: 'Panel purchases missing on PureSpectrum studies',
+  help: 'Delivered studies filed as PureSpectrum (PS) with no panel purchase recorded read $0 of cost. The dollars are an estimate at the middle panel cost per complete on the book, never added to a recorded figure. A study far larger than any PS study that does record its panel purchases is listed but never sized.',
   who: 'Ops', when: 'When each wave closes: pull the Buyer Surveys export and run the PureSpectrum import.',
   where: 'Project page → Suppliers', needs: ['project_suppliers', 'project_blasts', 'project_costs'],
 }
 const B2B_ROWS: GapBase = {
-  key: 'b2b-rows', specNo: 16, title: 'Blasts missing on B2B surveys',
-  help: 'Delivered surveys filed as B2B with no blast recorded read $0 of cost. The dollars are an estimate at the middle blast cost per complete on the book, never added to a recorded figure. A survey far larger than any B2B survey that does record its blasts is listed but never sized.',
+  key: 'b2b-rows', specNo: 16, title: 'Blasts missing on B2B studies',
+  help: 'Delivered studies filed as B2B with no blast recorded read $0 of cost. The dollars are an estimate at the middle blast cost per complete on the book, never added to a recorded figure. A study far larger than any B2B study that does record its blasts is listed but never sized.',
   who: 'Ops', when: 'When each blast goes out — log it, or import the blast platform’s CSV.',
   where: 'Project page → Blasts', needs: ['project_blasts', 'project_suppliers', 'project_costs'],
 }
@@ -1194,9 +1198,9 @@ function gapRouteRows(ctx: Ctx, base: GapBase, type: 'PS' | 'B2B'): Gap {
   const route = type === 'PS' ? 'panel' : 'blast'
   const rowWord = type === 'PS' ? 'panel purchases' : 'blasts'
   const filed = ctx.delivered.filter(it => it.p.project_type === type)
-  if (!filed.length) return resolved(base, `No delivered survey in view is filed as ${type}.`)
+  if (!filed.length) return resolved(base, `No delivered study in view is filed as ${type}.`)
   const hits = filed.filter(it => !(own.get(it.p.id)?.length))
-  if (!hits.length) return resolved(base, `Every delivered ${type} survey in view has its ${rowWord} recorded.`)
+  if (!hits.length) return resolved(base, `Every delivered ${type} study in view has its ${rowWord} recorded.`)
   const misfiled = hits.filter(it => (other.get(it.p.id)?.length ?? 0) > 0)
   const median = ctx.medians()[route]
   const otherWord = type === 'PS' ? 'blast' : 'panel'
@@ -1217,7 +1221,7 @@ function gapRouteRows(ctx: Ctx, base: GapBase, type: 'PS' | 'B2B'): Gap {
       outsized++
       return {
         it, amount: null,
-        detail: `${fmtNum(n)} completes, larger than ${pctText(OUTSIZED_ABOVE)} of the ${fmtNum(cap.n)} ${type} surveys that do record their ${rowWord} (${fmtNum(cap.value)} and under): not sized — check how it was fielded (a client list?)`,
+        detail: `${fmtNum(n)} completes, larger than ${pctText(OUTSIZED_ABOVE)} of the ${fmtNum(cap.n)} ${type} studies that do record their ${rowWord} (${fmtNum(cap.value)} and under): not sized — check how it was fielded (a client list?)`,
       }
     }
     const est = median ? n * median.median : null
@@ -1228,26 +1232,26 @@ function gapRouteRows(ctx: Ctx, base: GapBase, type: 'PS' | 'B2B'): Gap {
   const completes = sum(sized, s => s.n)
   // Checked against coverage.ts — a different coding of the same question.
   const expectedIds = ctx.popCoverage()[type === 'PS' ? 'psPanelRows' : 'b2bBlastRows'].missingIds
-  let what = `${fmtNum(hits.length)} of ${fmtNum(filed.length)} delivered ${type} surveys have no ${rowWord} recorded, so their cost reads $0 here.`
+  let what = `${fmtNum(hits.length)} of ${fmtNum(filed.length)} delivered ${type} studies have no ${rowWord} recorded, so their cost reads $0 here.`
   if (median && est != null && est > 0) {
     // "the middle survey", not "the median": hub.ts takes the upper of the two
     // middle values on an even sample, which is not quite a median.
     const whose = sized.length === hits.length
       ? `their ${fmtNum(completes)} completes`
       : `the ${fmtNum(completes)} completes on ${fmtNum(sized.length)} of them`
-    what += ` At ${money(median.median)} per complete — the middle of the ${pl(median.n, `${route} survey`)} the book can rate — ${whose} cost about ${money(est)}.`
+    what += ` At ${money(median.median)} per complete — the middle of the ${pl(median.n, `${route} study`, `${route} studies`)} the book can rate — ${whose} cost about ${money(est)}.`
     const top = sized.slice().sort((a, b) => b.est - a.est)[0]
     if (sized.length > 1 && top.est >= CONCENTRATION_SHARE * est) {
-      what += ` ${top.it.p.project_code ?? 'One survey'} alone is about ${money(top.est)} of that.`
+      what += ` ${top.it.p.project_code ?? 'One study'} alone is about ${money(top.est)} of that.`
     }
   } else if (!median) {
-    what += ` The book has no ${route} surveys to size them against, so the cost cannot be estimated.`
+    what += ` The book has no ${route} studies to size them against, so the cost cannot be estimated.`
   }
   if (outsized) {
-    what += ` ${pl(outsized, 'survey')} ${verb(outsized, 'is', 'are')} too large to size this way and ${verb(outsized, 'is', 'are')} left out of the estimate: check how ${verb(outsized, 'it was', 'they were')} fielded.`
+    what += ` ${pl(outsized, 'study', 'studies')} ${verb(outsized, 'is', 'are')} too large to size this way and ${verb(outsized, 'is', 'are')} left out of the estimate: check how ${verb(outsized, 'it was', 'they were')} fielded.`
   }
   if (misfiled.length) {
-    what += ` ${pl(misfiled.length, 'survey')} ${verb(misfiled.length, 'is', 'are')} filed as ${type} but fielded by ${otherWord}: correct the type instead.`
+    what += ` ${pl(misfiled.length, 'study', 'studies')} ${verb(misfiled.length, 'is', 'are')} filed as ${type} but fielded by ${otherWord}: correct the type instead.`
   }
   const ids = idsOf(hits)
   return {
@@ -1257,9 +1261,9 @@ function gapRouteRows(ctx: Ctx, base: GapBase, type: 'PS' | 'B2B'): Gap {
     dollarsWords: `of ${route} cost not recorded (estimated)`,
     what, link: oneLink(hits),
     drill: gapDrill(ctx, {
-      key: base.key, title: `${type} surveys with no ${rowWord} · ${pl(hits.length, 'survey')}`, rows,
-      expectedTotal: null, expectedIds, totalLabel: 'Estimated, so only the survey list is checked',
-      amountHeader: 'Estimated cost', amountTip: `Completes × the middle ${route} cost per complete on the book. Not a recorded figure, and blank on a survey too large to size this way.`,
+      key: base.key, title: `${type} studies with no ${rowWord} · ${pl(hits.length, 'study', 'studies')}`, rows,
+      expectedTotal: null, expectedIds, totalLabel: 'Estimated, so only the study list is checked',
+      amountHeader: 'Estimated cost', amountTip: `Completes × the middle ${route} cost per complete on the book. Not a recorded figure, and blank on a study too large to size this way.`,
       detailHeader: 'What is known', detailTip: 'Completes bought (or delivered, when that is all there is).',
       where: base.where, rule: DELIVERED_RULE,
     }),
@@ -1269,8 +1273,8 @@ function gapRouteRows(ctx: Ctx, base: GapBase, type: 'PS' | 'B2B'): Gap {
 /* 4 ─ route split on surveys fielded both ways ────────────────────────────── */
 
 const SPLIT: GapBase = {
-  key: 'route-split', specNo: 4, title: 'Surveys fielded both ways, not split by route',
-  help: 'A survey fielded through both blasts and panels only counts toward cost per respondent once its delivered N is split by route and every cost line names a route. Until then its whole cost is held out of both cards.',
+  key: 'route-split', specNo: 4, title: 'Studies fielded both ways, not split by route',
+  help: 'A study fielded through both blasts and panels only counts toward cost per respondent once its delivered N is split by route and every cost line names a route. Until then its whole cost is held out of both cards.',
   who: 'Analyst', when: 'At delivery: join the deliverable’s transaction IDs to the PureSpectrum export to count each route.',
   where: 'N actual by route (panel and blast), set through the connector’s update_project', needs: ['project_blasts', 'project_suppliers', 'project_costs'],
 }
@@ -1289,14 +1293,14 @@ function gapSplit(ctx: Ctx): Gap {
   const b = checkBlocked(ctx, SPLIT)
   if (b) return b
   const both = ctx.delivered.filter(it => it.route === 'both')
-  if (!both.length) return resolved(SPLIT, 'No delivered survey in view was fielded both ways.')
+  if (!both.length) return resolved(SPLIT, 'No delivered study in view was fielded both ways.')
   const hits = both
     .map(it => {
       const l = legsOf(it.p, ctx.raw.blasts, ctx.raw.suppliers, ctx.raw.costs, ctx.ix)
       return { it, reason: l.reason !== 'ok' ? l.reason : l.splitReason }
     })
     .filter(x => x.reason !== 'ok')
-  if (!hits.length) return resolved(SPLIT, `All ${pl(both.length, 'survey')} fielded both ways in view ${verb(both.length, 'is', 'are')} split by route.`)
+  if (!hits.length) return resolved(SPLIT, `All ${pl(both.length, 'study', 'studies')} fielded both ways in view ${verb(both.length, 'is', 'are')} split by route.`)
   const ids = hits.map(x => x.it.p.id)
   const dollars = spendIds(ctx, ids)
   const counts = new Map<string, number>()
@@ -1314,13 +1318,13 @@ function gapSplit(ctx: Ctx): Gap {
     ...blankGap(SPLIT),
     count: hits.length, surveys: hits.length, ids, dollars, dollarsKind: 'spend',
     dollarsWords: 'of cost held out of both cost-per-respondent cards',
-    what: `${fmtNum(hits.length)} of ${fmtNum(both.length)} delivered surveys fielded through both blasts and panels cannot be split by route, so ${money(dollars)} is held out of both cost-per-respondent cards.`,
+    what: `${fmtNum(hits.length)} of ${fmtNum(both.length)} delivered studies fielded through both blasts and panels cannot be split by route, so ${money(dollars)} is held out of both cost-per-respondent cards.`,
     details, link: oneLink(items),
     drill: gapDrill(ctx, {
-      key: 'route-split', title: `Fielded both ways, not split · ${pl(hits.length, 'survey')}`, rows,
-      expectedTotal: dollars, expectedIds: ids, totalLabel: 'Recorded cost on these surveys',
-      amountHeader: 'Recorded cost', amountTip: 'The survey’s whole field cost, held out of both route cards until it is split.',
-      detailHeader: 'What blocks the split', detailTip: 'The first missing fact that stops the survey being split by route.',
+      key: 'route-split', title: `Fielded both ways, not split · ${pl(hits.length, 'study', 'studies')}`, rows,
+      expectedTotal: dollars, expectedIds: ids, totalLabel: 'Recorded cost on these studies',
+      amountHeader: 'Recorded cost', amountTip: 'The study’s whole field cost, held out of both route cards until it is split.',
+      detailHeader: 'What blocks the split', detailTip: 'The first missing fact that stops the study being split by route.',
       where: SPLIT.where, rule: DELIVERED_RULE,
     }),
   }
@@ -1330,7 +1334,7 @@ function gapSplit(ctx: Ctx): Gap {
 
 const POSTQA: GapBase = {
   key: 'post-qa-n', specNo: 5, title: 'N actual (after QA) missing on delivered work',
-  help: 'Only the N actual can be billed, and every per-respondent figure divides by it. A delivered survey without one has no revenue, no cost per respondent and no scrub.',
+  help: 'Only the N actual can be billed, and every per-respondent figure divides by it. A delivered study without one has no revenue, no cost per respondent and no scrub.',
   who: 'Captain', when: 'At Delivery — one field, from the QA’d deliverable.',
   where: 'Project page → N Actual', needs: ['project_segments', 'project_blasts', 'project_suppliers', 'project_costs'],
 }
@@ -1339,11 +1343,11 @@ function gapPostQa(ctx: Ctx): Gap {
   const b = checkBlocked(ctx, POSTQA)
   if (b) return b
   const hits = ctx.delivered.filter(it => deliveredNOf(it.p).n == null)
-  if (!hits.length) return resolved(POSTQA, 'Every delivered survey in view has its N actual.')
+  if (!hits.length) return resolved(POSTQA, 'Every delivered study in view has its N actual.')
   const ids = idsOf(hits)
   const dollars = spendIds(ctx, ids)
   const priced = ctx.priceBlock ? [] : hits.filter(it => hasPrice(it.p, ctx.rates.get(it.p.id)))
-  let what = `${pl(hits.length, 'delivered survey')} ${verb(hits.length, 'has', 'have')} no N actual, so ${verb(hits.length, 'it has', 'they have')} no revenue, cost per respondent or scrub: ${money(dollars)} of cost sits outside every per-respondent figure.`
+  let what = `${pl(hits.length, 'delivered study', 'delivered studies')} ${verb(hits.length, 'has', 'have')} no N actual, so ${verb(hits.length, 'it has', 'they have')} no revenue, cost per respondent or scrub: ${money(dollars)} of cost sits outside every per-respondent figure.`
   if (priced.length) what += ` ${fmtNum(priced.length)} of them ${verb(priced.length, 'is', 'are')} priced, so ${verb(priced.length, 'its', 'their')} client price cannot be computed until the N lands.`
   const rows: GapRowIn[] = hits.map(it => ({
     it, amount: ctx.spend(it.p).total,
@@ -1355,9 +1359,9 @@ function gapPostQa(ctx: Ctx): Gap {
     dollarsWords: 'of cost no revenue or per-respondent figure can use',
     what, link: oneLink(hits),
     drill: gapDrill(ctx, {
-      key: 'post-qa-n', title: `Delivered with no N actual · ${pl(hits.length, 'survey')}`, rows,
-      expectedTotal: dollars, expectedIds: ctx.popCoverage().postQaN.missingIds, totalLabel: 'Recorded cost on these surveys',
-      amountHeader: 'Recorded cost', amountTip: 'Field cost recorded on the survey.',
+      key: 'post-qa-n', title: `Delivered with no N actual · ${pl(hits.length, 'study', 'studies')}`, rows,
+      expectedTotal: dollars, expectedIds: ctx.popCoverage().postQaN.missingIds, totalLabel: 'Recorded cost on these studies',
+      amountHeader: 'Recorded cost', amountTip: 'Field cost recorded on the study.',
       detailHeader: 'What is known', detailTip: 'The N collected (before QA), which is never billed.',
       where: POSTQA.where, rule: DELIVERED_RULE,
     }),
@@ -1367,8 +1371,8 @@ function gapPostQa(ctx: Ctx): Gap {
 /* 6 ─ no date ─────────────────────────────────────────────────────────────── */
 
 const NODATE: GapBase = {
-  key: 'no-date', specNo: 6, title: 'Delivered surveys with no date',
-  help: 'A survey is placed in a month by its deliver date, else launch date, else submitted date. With none of the three it drops out of every date range. Counted here whatever dates are picked, because no range can reach them.',
+  key: 'no-date', specNo: 6, title: 'Delivered studies with no date',
+  help: 'A study is placed in a month by its deliver date, else launch date, else submitted date. With none of the three it drops out of every date range. Counted here whatever dates are picked, because no range can reach them.',
   who: 'Captain', when: 'At Delivery — the deliver date from the delivery email.',
   where: 'Project page → Delivery date', needs: ['project_blasts', 'project_suppliers', 'project_costs'],
 }
@@ -1381,7 +1385,7 @@ function gapNoDate(ctx: Ctx, grid: CoverageGrid): Gap {
     it.cls === 'delivered' && it.date == null
     && (!f.account || it.p.client_id === f.account)
     && (f.route === 'all' || it.route === f.route))
-  if (!hits.length) return resolved(NODATE, 'Every delivered survey in view has a date.')
+  if (!hits.length) return resolved(NODATE, 'Every delivered study in view has a date.')
   const ids = idsOf(hits)
   const dollars = spendIds(ctx, ids)
   const rule: TabRule = { ...DELIVERED_RULE, date: false, ignoredNote: 'All dates (these have none)' }
@@ -1394,13 +1398,13 @@ function gapNoDate(ctx: Ctx, grid: CoverageGrid): Gap {
     ...blankGap(NODATE),
     count: hits.length, surveys: hits.length, ids, dollars, dollarsKind: 'spend',
     dollarsWords: 'of cost that appears in no date range',
-    what: `${pl(hits.length, 'delivered survey')} ${verb(hits.length, 'has', 'have')} no deliver, launch or submitted date, so ${verb(hits.length, 'it falls', 'they fall')} out of every date range, carrying ${money(dollars)}. Counted here whatever dates are picked.`,
+    what: `${pl(hits.length, 'delivered study', 'delivered studies')} ${verb(hits.length, 'has', 'have')} no deliver, launch or submitted date, so ${verb(hits.length, 'it falls', 'they fall')} out of every date range, carrying ${money(dollars)}. Counted here whatever dates are picked.`,
     link: oneLink(hits),
     drill: gapDrill(ctx, {
-      key: 'no-date', title: `Delivered with no date · ${pl(hits.length, 'survey')}`, rows,
-      expectedTotal: dollars, expectedIds: undated?.missingIds ?? [], totalLabel: 'Recorded cost on these surveys',
-      amountHeader: 'Recorded cost', amountTip: 'Field cost recorded on the survey.',
-      detailHeader: 'What is known', detailTip: 'The system’s delivered-at stamp is not a date to place the survey by: it was bulk-stamped.',
+      key: 'no-date', title: `Delivered with no date · ${pl(hits.length, 'study', 'studies')}`, rows,
+      expectedTotal: dollars, expectedIds: undated?.missingIds ?? [], totalLabel: 'Recorded cost on these studies',
+      amountHeader: 'Recorded cost', amountTip: 'Field cost recorded on the study.',
+      detailHeader: 'What is known', detailTip: 'The system’s delivered-at stamp is not a date to place the study by: it was bulk-stamped.',
       where: NODATE.where, rule,
     }),
   }
@@ -1410,7 +1414,7 @@ function gapNoDate(ctx: Ctx, grid: CoverageGrid): Gap {
 
 const RECOVER: GapBase = {
   key: 'recoveries', specNo: 7, title: 'Reward recoveries not booked',
-  help: 'Unclaimed blast rewards come back and are booked as negative cost lines, in batches. Until a survey’s recoveries are booked it reads dearer than it was. The dollars are an estimate at the share of rewards already recovered on the surveys that have been swept. A survey whose rewards were all claimed stays listed: there is no field yet for "nothing came back".',
+  help: 'Unclaimed blast rewards come back and are booked as negative cost lines, in batches. Until a study’s recoveries are booked it reads dearer than it was. The dollars are an estimate at the share of rewards already recovered on the studies that have been swept. A study whose rewards were all claimed stays listed: there is no field yet for "nothing came back".',
   who: 'Ops', when: 'A monthly sweep of unclaimed rewards on the blast platform.',
   where: 'Project page → Cost lines (a negative line for what came back)', needs: ['project_blasts', 'project_costs'],
 }
@@ -1420,9 +1424,9 @@ function gapRecoveries(ctx: Ctx): Gap {
   if (b) return b
   const credited = (it: FinItem) => (ctx.ix.costs.get(it.p.id) ?? []).some(isCredit)
   const rewarded = ctx.delivered.filter(it => ctx.spend(it.p).reward > 0)
-  if (!rewarded.length) return resolved(RECOVER, 'No delivered survey in view paid blast rewards.')
+  if (!rewarded.length) return resolved(RECOVER, 'No delivered study in view paid blast rewards.')
   const hits = rewarded.filter(it => !credited(it))
-  if (!hits.length) return resolved(RECOVER, 'Every delivered survey in view that paid rewards has its recoveries booked.')
+  if (!hits.length) return resolved(RECOVER, 'Every delivered study in view that paid rewards has its recoveries booked.')
   // The recovery rate on surveys already swept: the view's, else the book's.
   const rateOn = (xs: FinItem[]) => {
     const swept = xs.filter(it => ctx.spend(it.p).reward > 0 && credited(it))
@@ -1443,10 +1447,10 @@ function gapRecoveries(ctx: Ctx): Gap {
   const details = [...byMonth.entries()].filter(([, e]) => e.missing > 0)
     .sort((a, c) => (a[0] === 'undated' ? 1 : c[0] === 'undated' ? -1 : c[0].localeCompare(a[0])))
     .map(([k, e]) => `${monthLabel(k)}: ${fmtNum(e.missing)} of ${fmtNum(e.of)} not booked`)
-  let what = `${fmtNum(hits.length)} of ${fmtNum(rewarded.length)} delivered surveys that paid blast rewards have no recovered-reward line yet (${money(gross)} of rewards).`
+  let what = `${fmtNum(hits.length)} of ${fmtNum(rewarded.length)} delivered studies that paid blast rewards have no recovered-reward line yet (${money(gross)} of rewards).`
   what += measured
-    ? ` At the ${pctText(measured.rate)} recovered on the ${pl(measured.n, 'survey')} already swept, about ${money(est ?? 0)} may come back.`
-    : ' No survey has had its recoveries booked yet, so the amount cannot be sized.'
+    ? ` At the ${pctText(measured.rate)} recovered on the ${pl(measured.n, 'study', 'studies')} already swept, about ${money(est ?? 0)} may come back.`
+    : ' No study has had its recoveries booked yet, so the amount cannot be sized.'
   const rows: GapRowIn[] = hits.map(it => ({
     it, amount: measured ? ctx.spend(it.p).reward * measured.rate : null,
     detail: `${money(ctx.spend(it.p).reward)} of rewards paid; nothing recovered booked`,
@@ -1459,13 +1463,13 @@ function gapRecoveries(ctx: Ctx): Gap {
     dollarsWords: 'of unclaimed rewards that may come back (estimated)',
     what, details, link: oneLink(hits),
     drill: gapDrill(ctx, {
-      key: 'recoveries', title: `Rewards with no recovery booked · ${pl(hits.length, 'survey')}`, rows,
+      key: 'recoveries', title: `Rewards with no recovery booked · ${pl(hits.length, 'study', 'studies')}`, rows,
       // The amount is an estimate, so only the survey list is checked — and
       // against coverage.ts's own rewarded-but-uncredited list, not `ids`,
       // which is the same array the rows were built from.
       expectedTotal: null, expectedIds: recoveriesMissing(ctx.popMonths()),
-      totalLabel: 'Estimated, so only the survey list is checked',
-      amountHeader: 'May come back (about)', amountTip: 'Rewards paid × the share recovered on surveys already swept. Not a recorded figure.',
+      totalLabel: 'Estimated, so only the study list is checked',
+      amountHeader: 'May come back (about)', amountTip: 'Rewards paid × the share recovered on studies already swept. Not a recorded figure.',
       detailHeader: 'Rewards', detailTip: 'Blast rewards paid (bid × completes).',
       where: RECOVER.where, rule: DELIVERED_RULE,
     }),
@@ -1477,7 +1481,7 @@ function gapRecoveries(ctx: Ctx): Gap {
 const BUDGET: GapBase = {
   key: 'budgets', specNo: 8, title: 'Budgets missing',
   help: `A budget is the most we plan to spend — a cost ceiling, not revenue. Without one, an overrun cannot be seen. Suggested at ${pctText(1 - KEEP_GOAL)} of price × N sold: a guide, not a rule.`,
-  who: 'Captain, or finance at intake', when: 'At intake, when the survey is sold.',
+  who: 'Captain, or finance at intake', when: 'At intake, when the study is sold.',
   where: 'Project page → Money → Budget', needs: ['project_blasts', 'project_suppliers', 'project_costs'], price: true,
 }
 
@@ -1491,8 +1495,8 @@ function gapBudgets(ctx: Ctx): Gap {
   const a = marginSet.filter(it => !hasBudget(it.p))
   const l = liveSpending.filter(it => !hasBudget(it.p))
   const hits = [...a, ...l]
-  if (!marginSet.length && !liveSpending.length) return resolved(BUDGET, 'No margin-set or live spending survey in view.')
-  if (!hits.length) return resolved(BUDGET, 'Every margin-set and live spending survey in view has a budget.')
+  if (!marginSet.length && !liveSpending.length) return resolved(BUDGET, 'No margin-set or live spending study in view.')
+  if (!hits.length) return resolved(BUDGET, 'Every margin-set and live spending study in view has a budget.')
   const ids = idsOf(hits)
   const dollars = spendIds(ctx, ids)
   const suggest = (p: FinProject) => suggestedBudget(ctx.rates.get(p.id), p.n_target)
@@ -1505,18 +1509,18 @@ function gapBudgets(ctx: Ctx): Gap {
     }
   })
   const details = suggested.length
-    ? [`Suggested budgets (${pctText(1 - KEEP_GOAL)} of price × N sold) come to ${money(sum(suggested, x => x))} across the ${pl(suggested.length, 'survey')} that ${verb(suggested.length, 'carries', 'carry')} a price and a target.`]
+    ? [`Suggested budgets (${pctText(1 - KEEP_GOAL)} of price × N sold) come to ${money(sum(suggested, x => x))} across the ${pl(suggested.length, 'study', 'studies')} that ${verb(suggested.length, 'carries', 'carry')} a price and a target.`]
     : []
   return {
     ...blankGap(BUDGET),
     count: hits.length, surveys: hits.length, ids, dollars, dollarsKind: 'spend',
     dollarsWords: 'of cost with no budget to check it against',
-    what: `${fmtNum(a.length)} of the ${pl(marginSet.length, 'survey')} in the margin set ${verb(a.length, 'has', 'have')} no budget, and ${fmtNum(l.length)} of ${pl(liveSpending.length, 'live survey')} ${verb(l.length, 'is', 'are')} spending with none — ${money(dollars)} of cost with no ceiling to check it against.`,
+    what: `${fmtNum(a.length)} of the ${pl(marginSet.length, 'study', 'studies')} in the margin set ${verb(a.length, 'has', 'have')} no budget, and ${fmtNum(l.length)} of ${pl(liveSpending.length, 'live study', 'live studies')} ${verb(l.length, 'is', 'are')} spending with none — ${money(dollars)} of cost with no ceiling to check it against.`,
     details, link: oneLink(hits),
     drill: gapDrill(ctx, {
-      key: 'budgets', title: `No budget · ${pl(hits.length, 'survey')}`, rows,
-      expectedTotal: dollars, expectedIds: ids, totalLabel: 'Recorded cost on these surveys',
-      amountHeader: 'Recorded cost', amountTip: 'Field cost recorded on the survey so far.',
+      key: 'budgets', title: `No budget · ${pl(hits.length, 'study', 'studies')}`, rows,
+      expectedTotal: dollars, expectedIds: ids, totalLabel: 'Recorded cost on these studies',
+      amountHeader: 'Recorded cost', amountTip: 'Field cost recorded on the study so far.',
       detailHeader: 'Status', detailTip: `Live or delivered, and the suggested budget (${pctText(1 - KEEP_GOAL)} of price × N sold) where there is a price and a target.`,
       where: BUDGET.where,
     }),
@@ -1527,7 +1531,7 @@ function gapBudgets(ctx: Ctx): Gap {
 
 const BLOCKEDP: GapBase = {
   key: 'priced-blocked', specNo: 9, title: 'Priced, but the margin cannot count it yet',
-  help: 'A priced delivered survey enters the margin only when it also has a recorded cost, an N actual and an N target. Where the N is missing, the dollars are what an N near the N collected would book — an estimate, so check the rate first when it is far from the route’s usual price.',
+  help: 'A priced delivered study enters the margin only when it also has a recorded cost, an N actual and an N target. Where the N is missing, the dollars are what an N near the N collected would book — an estimate, so check the rate first when it is far from the route’s usual price.',
   who: 'Captain (the N) or ops (the cost)', when: 'At Delivery.',
   where: 'Project page → N Actual, or Blasts / Suppliers / Cost lines', needs: ['project_blasts', 'project_suppliers', 'project_costs'], price: true,
 }
@@ -1546,7 +1550,7 @@ function gapPricedBlocked(ctx: Ctx): Gap {
   const detail = priced.map(it => ({ it, rv: revenueDetail(it.p, ctx.rates.get(it.p.id)), sp: ctx.spend(it.p).total }))
   const noCost = detail.filter(x => x.rv.revenue != null && x.sp <= 0)
   const noN = detail.filter(x => x.rv.revenue == null)
-  if (!noCost.length && !noN.length) return resolved(BLOCKEDP, 'Every priced delivered survey in view is in the margin.')
+  if (!noCost.length && !noN.length) return resolved(BLOCKEDP, 'Every priced delivered study in view is in the margin.')
   // The usual price per route, on the book's single-route delivered work.
   const rateSample: Record<'blast' | 'panel', number[]> = { blast: [], panel: [] }
   for (const it of ctx.input.items) {
@@ -1566,7 +1570,7 @@ function gapPricedBlocked(ctx: Ctx): Gap {
   for (const x of noCost) {
     const o = outlier(x.it, x.rv.rate)
     rows.push({ it: x.it, amount: x.rv.revenue, detail: `No cost recorded${o ? ` · ${o}` : ''}`, where: 'Project page → Blasts, Suppliers or Cost lines' })
-    if (o) details.push(`${x.it.p.project_code ?? 'A survey'}: ${o}.`)
+    if (o) details.push(`${x.it.p.project_code ?? 'A study'}: ${o}.`)
   }
   for (const x of noN) {
     const collected = Number(x.it.p.n_collected ?? 0)
@@ -1588,7 +1592,7 @@ function gapPricedBlocked(ctx: Ctx): Gap {
       where: x.rv.reason === 'no-cap' ? 'Project page → N Target'
         : capN == null ? 'Project page → N Actual and N Target' : 'Project page → N Actual',
     })
-    if (o) details.push(`${x.it.p.project_code ?? 'A survey'}: ${o}, before its N is entered.`)
+    if (o) details.push(`${x.it.p.project_code ?? 'A study'}: ${o}, before its N is entered.`)
   }
   const revNoCost = sum(noCost, x => x.rv.revenue ?? 0)
   // Recorded client price only. What the missing Ns might be worth is an
@@ -1598,8 +1602,8 @@ function gapPricedBlocked(ctx: Ctx): Gap {
     details.push(`Entering the N actual on ${fmtNum(estOn)} of them would book about ${money(est)} more — at the N collected, capped by the N sold. An estimate, not a price on file.`)
   }
   const parts: string[] = []
-  if (noCost.length) parts.push(`${pl(noCost.length, 'priced survey')} ${verb(noCost.length, 'has', 'have')} no recorded cost (${money(revNoCost)} of client price)`)
-  if (noN.length) parts.push(`${pl(noN.length, 'priced survey')} ${verb(noN.length, 'has', 'have')} no N actual or no N target yet`)
+  if (noCost.length) parts.push(`${pl(noCost.length, 'priced study', 'priced studies')} ${verb(noCost.length, 'has', 'have')} no recorded cost (${money(revNoCost)} of client price)`)
+  if (noN.length) parts.push(`${pl(noN.length, 'priced study', 'priced studies')} ${verb(noN.length, 'has', 'have')} no N actual or no N target yet`)
   // Checked against the hub's own margin set: the surveys it could not admit.
   const m = marginOf(ctx.delivered.map(it => it.p), ctx.rates, ctx.raw.blasts, ctx.raw.suppliers, ctx.raw.costs)
   const items = [...noCost, ...noN].map(x => x.it)
@@ -1612,14 +1616,14 @@ function gapPricedBlocked(ctx: Ctx): Gap {
     what: `${parts.join(', and ')}. Until both sides are recorded, the margin leaves ${verb(items.length, 'it', 'them')} out.`,
     details, link: oneLink(items),
     drill: gapDrill(ctx, {
-      key: 'priced-blocked', title: `Priced, not in the margin · ${pl(items.length, 'survey')}`, rows,
+      key: 'priced-blocked', title: `Priced, not in the margin · ${pl(items.length, 'study', 'studies')}`, rows,
       // Every row's amount is a price on file, so the rows add back to the
       // hub's own figure for priced work with no cost — a check, not a mirror.
       expectedTotal: m.pricedNoCostRevenue,
       expectedIds: [...m.pricedNoCostIds, ...m.pricedBlockedIds],
-      totalLabel: 'Client price on these surveys',
+      totalLabel: 'Client price on these studies',
       amountHeader: 'Client price', amountTip: 'The client price the margin cannot count yet. Blank where the N actual is missing: there is no price to count until the N lands.',
-      detailHeader: 'What is missing', detailTip: 'The field that keeps the survey out of the margin.',
+      detailHeader: 'What is missing', detailTip: 'The field that keeps the study out of the margin.',
       where: BLOCKEDP.where, rule: DELIVERED_RULE,
     }),
   }
@@ -1629,7 +1633,7 @@ function gapPricedBlocked(ctx: Ctx): Gap {
 
 const ZERO: GapBase = {
   key: 'zero-price', specNo: 10, title: '$0 prices to confirm',
-  help: 'A $0 price is a real price — work given away on purpose. One at an account that pays on other surveys is worth a second look; one at an account that pays on none (internal work, a trial) looks deliberate and is only noted.',
+  help: 'A $0 price is a real price — work given away on purpose. One at an account that pays on other studies is worth a second look; one at an account that pays on none (internal work, a trial) looks deliberate and is only noted.',
   who: 'Finance (David or Vineet)', when: 'When the price is entered.',
   where: 'Project page → Money → Price / N', needs: ['project_blasts', 'project_suppliers', 'project_costs'], price: true,
 }
@@ -1638,14 +1642,14 @@ function gapZero(ctx: Ctx): Gap {
   const b = checkBlocked(ctx, ZERO)
   if (b) return b
   const zeros = ctx.pop.filter(it => ctx.rates.get(it.p.id) === 0)
-  if (!zeros.length) return resolved(ZERO, 'No survey in view is priced at $0.')
+  if (!zeros.length) return resolved(ZERO, 'No study in view is priced at $0.')
   const paying = new Set(ctx.input.items
     .filter(it => (ctx.rates.get(it.p.id) ?? 0) > 0 && it.p.client_id)
     .map(it => it.p.client_id as string))
   const check = zeros.filter(it => it.p.client_id && paying.has(it.p.client_id))
   const deliberate = zeros.length - check.length
   const tail = deliberate
-    ? `${pl(deliberate, 'more $0 price')} ${verb(deliberate, 'sits', 'sit')} at accounts that pay on no survey, which looks deliberate (internal work or trials).`
+    ? `${pl(deliberate, 'more $0 price')} ${verb(deliberate, 'sits', 'sit')} at accounts that pay on no study, which looks deliberate (internal work or trials).`
     : ''
   if (!check.length) return resolved(ZERO, tail)
   const ids = idsOf(check)
@@ -1653,18 +1657,18 @@ function gapZero(ctx: Ctx): Gap {
   const setOn = new Map(ctx.raw.financials.map(r => [r.project_id, etDay(String(r.updated_at ?? r.created_at ?? '') || null)]))
   const rows: GapRowIn[] = check.map(it => ({
     it, amount: ctx.spend(it.p).total,
-    detail: `${it.cls === 'active' ? 'Live' : 'Delivered'}; $0 set${setOn.get(it.p.id) ? ` ${setOn.get(it.p.id)}` : ''}; the account pays on other surveys`,
+    detail: `${it.cls === 'active' ? 'Live' : 'Delivered'}; $0 set${setOn.get(it.p.id) ? ` ${setOn.get(it.p.id)}` : ''}; the account pays on other studies`,
   }))
   return {
     ...blankGap(ZERO),
     count: check.length, surveys: check.length, ids, dollars, dollarsKind: dollars > 0 ? 'spend' : 'none',
     dollarsWords: 'of cost given away at $0',
-    what: `${pl(check.length, 'survey')} ${verb(check.length, 'is', 'are')} priced at $0 at accounts that pay on other surveys, giving away ${money(dollars)} of cost. Confirm each is deliberate, or enter the real price.${tail ? ` ${tail}` : ''}`,
+    what: `${pl(check.length, 'study', 'studies')} ${verb(check.length, 'is', 'are')} priced at $0 at accounts that pay on other studies, giving away ${money(dollars)} of cost. Confirm each is deliberate, or enter the real price.${tail ? ` ${tail}` : ''}`,
     link: oneLink(check),
     drill: gapDrill(ctx, {
-      key: 'zero-price', title: `$0 prices to confirm · ${pl(check.length, 'survey')}`, rows,
-      expectedTotal: dollars, expectedIds: ids, totalLabel: 'Recorded cost on these surveys',
-      amountHeader: 'Cost given away', amountTip: 'Field cost recorded on the survey — what giving it away cost so far.',
+      key: 'zero-price', title: `$0 prices to confirm · ${pl(check.length, 'study', 'studies')}`, rows,
+      expectedTotal: dollars, expectedIds: ids, totalLabel: 'Recorded cost on these studies',
+      amountHeader: 'Cost given away', amountTip: 'Field cost recorded on the study — what giving it away cost so far.',
       detailHeader: 'Price', detailTip: 'When the $0 price was set, and why it is worth confirming.',
       where: ZERO.where,
     }),
@@ -1677,7 +1681,7 @@ const PLACEHOLDER: GapBase = {
   key: 'placeholder-flag', specNo: 11, title: 'Placeholder flag on real work',
   help: 'The rerun spawner creates empty "placeholder" waves ahead of time. One that has started collecting is real work, and the flag makes other screens treat it as an empty shell.',
   who: 'Ops (whoever runs the rerun series)', when: 'When a placeholder wave starts fielding.',
-  where: 'The survey’s placeholder flag. No screen edits it yet, so it is a one-off data fix.',
+  where: 'The study’s placeholder flag. No screen edits it yet, so it is a one-off data fix.',
   needs: ['project_blasts', 'project_suppliers', 'project_costs'],
 }
 
@@ -1686,7 +1690,7 @@ function gapPlaceholder(ctx: Ctx): Gap {
   if (b) return b
   // `items` never holds an EMPTY placeholder, so every flagged item holds data.
   const hits = ctx.pop.filter(it => it.p.is_placeholder === true)
-  if (!hits.length) return resolved(PLACEHOLDER, 'No survey in view carries the placeholder flag over real work.')
+  if (!hits.length) return resolved(PLACEHOLDER, 'No study in view carries the placeholder flag over real work.')
   const ids = idsOf(hits)
   const dollars = spendIds(ctx, ids)
   const rows: GapRowIn[] = hits.map(it => ({
@@ -1701,11 +1705,11 @@ function gapPlaceholder(ctx: Ctx): Gap {
     ...blankGap(PLACEHOLDER),
     count: hits.length, surveys: hits.length, ids, dollars, dollarsKind: dollars > 0 ? 'spend' : 'none',
     dollarsWords: 'of cost under a placeholder flag',
-    what: `${pl(hits.length, 'survey')} ${verb(hits.length, 'is', 'are')} still flagged as an empty rerun placeholder but ${verb(hits.length, 'carries', 'carry')} real work (${money(dollars)} of cost). Clear the flag so ${verb(hits.length, 'it reads', 'they read')} as real work everywhere.`,
+    what: `${pl(hits.length, 'study', 'studies')} ${verb(hits.length, 'is', 'are')} still flagged as an empty rerun placeholder but ${verb(hits.length, 'carries', 'carry')} real work (${money(dollars)} of cost). Clear the flag so ${verb(hits.length, 'it reads', 'they read')} as real work everywhere.`,
     link: oneLink(hits),
     drill: gapDrill(ctx, {
-      key: 'placeholder-flag', title: `Placeholder flag on real work · ${pl(hits.length, 'survey')}`, rows,
-      expectedTotal: dollars, expectedIds: ids, totalLabel: 'Recorded cost on these surveys',
+      key: 'placeholder-flag', title: `Placeholder flag on real work · ${pl(hits.length, 'study', 'studies')}`, rows,
+      expectedTotal: dollars, expectedIds: ids, totalLabel: 'Recorded cost on these studies',
       amountHeader: 'Recorded cost', amountTip: 'Field cost recorded under the flag.',
       detailHeader: 'What it holds', detailTip: 'The data that makes it real work, not an empty shell.',
       where: PLACEHOLDER.where,
@@ -1716,18 +1720,18 @@ function gapPlaceholder(ctx: Ctx): Gap {
 /* 12 ─ segments that disagree with the survey ─────────────────────────────── */
 
 const SEGMENTS: GapBase = {
-  key: 'segments', specNo: 12, title: 'Segments that disagree with the survey',
-  help: 'The bill uses the survey’s own N actual and rate (David, 2026-09-27), so none of this changes revenue. But segment N actuals should add up to the survey’s, and a segment edit rolls them up on save — so a mismatch can change the bill later. When the survey’s N actual is only the sum of the counted segments, its cost per respondent is held out until every segment is counted.',
+  key: 'segments', specNo: 12, title: 'Segments that disagree with the study',
+  help: 'The bill uses the study’s own N actual and rate (David, 2026-09-27), so none of this changes revenue. But segment N actuals should add up to the study’s, and a segment edit rolls them up on save — so a mismatch can change the bill later. When the study’s N actual is only the sum of the counted segments, its cost per respondent is held out until every segment is counted.',
   who: 'Captain', when: 'At Delivery.', where: 'Project page → N segments',
   needs: ['project_segments', 'project_blasts', 'project_suppliers', 'project_costs'],
 }
 
 function segmentDetail(p: FinProject): string {
   const s = segmentCheck(p)
-  if (s.partialRollUp) return `${fmtNum(s.missing)} of ${fmtNum(s.segments)} segments ${verb(s.missing, 'has', 'have')} no N actual; the survey N actual adds up only the others`
+  if (s.partialRollUp) return `${fmtNum(s.missing)} of ${fmtNum(s.segments)} segments ${verb(s.missing, 'has', 'have')} no N actual; the study N actual adds up only the others`
   if (s.missing > 0) return `${fmtNum(s.missing)} of ${fmtNum(s.segments)} segments ${verb(s.missing, 'has', 'have')} no N actual`
-  if (s.surveyN == null) return 'The survey’s own N actual is blank'
-  return `Segments add up to ${fmtNum(s.segmentSum ?? 0)}; the survey says ${fmtNum(s.surveyN)}`
+  if (s.surveyN == null) return 'The study’s own N actual is blank'
+  return `Segments add up to ${fmtNum(s.segmentSum ?? 0)}; the study says ${fmtNum(s.surveyN)}`
 }
 
 function gapSegments(ctx: Ctx): Gap {
@@ -1738,37 +1742,37 @@ function gapSegments(ctx: Ctx): Gap {
   const prices = ctx.priceBlock ? [] : ctx.pop.filter(it => segmentPriceDiffers(it.p, ctx.rates.get(it.p.id)))
   const seen = new Set<string>()
   const hits = [...counts, ...prices].filter(it => (seen.has(it.p.id) ? false : (seen.add(it.p.id), true)))
-  if (!hits.length) return resolved(SEGMENTS, 'Every segmented survey in view adds up to its survey figure, and no segment is priced differently from its survey.')
+  if (!hits.length) return resolved(SEGMENTS, 'Every segmented study in view adds up to its study figure, and no segment is priced differently from its study.')
   const partialIds = idsOf(partial)
   const dollars = partial.length ? spendIds(ctx, partialIds) : 0
   const countIds = new Set(idsOf(counts))
   const priceIds = new Set(idsOf(prices))
   const rows: GapRowIn[] = hits.map(it => ({
     it, amount: segmentCheck(it.p).partialRollUp && countIds.has(it.p.id) ? ctx.spend(it.p).total : 0,
-    detail: [countIds.has(it.p.id) ? segmentDetail(it.p) : null, priceIds.has(it.p.id) ? 'A segment is priced differently from the survey rate' : null]
+    detail: [countIds.has(it.p.id) ? segmentDetail(it.p) : null, priceIds.has(it.p.id) ? 'A segment is priced differently from the study rate' : null]
       .filter(Boolean).join(' · '),
   }))
   const parts: string[] = []
   if (counts.length) {
-    let s = `${pl(counts.length, 'delivered survey')} ${verb(counts.length, 'has', 'have')} segment N actuals that do not add up to the survey’s`
+    let s = `${pl(counts.length, 'delivered study', 'delivered studies')} ${verb(counts.length, 'has', 'have')} segment N actuals that do not add up to the study’s`
     if (partial.length) s += `; ${fmtNum(partial.length)} of them ${verb(partial.length, 'is', 'are')} only the sum of the counted segments, which holds ${money(dollars)} out of cost per respondent`
     parts.push(s)
   }
-  if (prices.length) parts.push(`${pl(prices.length, 'survey')} ${verb(prices.length, 'has', 'have')} a segment priced differently from the survey rate`)
+  if (prices.length) parts.push(`${pl(prices.length, 'study', 'studies')} ${verb(prices.length, 'has', 'have')} a segment priced differently from the study rate`)
   if (ctx.priceBlock) parts.push(`segment prices cannot be checked (${ctx.priceBlock})`)
   const ids = idsOf(hits)
   return {
     ...blankGap(SEGMENTS),
     count: hits.length, surveys: hits.length, ids,
     dollars: partial.length ? dollars : 0, dollarsKind: partial.length ? 'spend' : 'none',
-    dollarsWords: partial.length ? 'of cost held out of cost per respondent' : 'no dollars hidden: the bill uses the survey’s figures',
-    what: `${parts.join('. ')}. The bill uses the survey’s N actual and rate either way.`,
+    dollarsWords: partial.length ? 'of cost held out of cost per respondent' : 'no dollars hidden: the bill uses the study’s figures',
+    what: `${parts.join('. ')}. The bill uses the study’s N actual and rate either way.`,
     link: oneLink(hits),
     drill: gapDrill(ctx, {
-      key: 'segments', title: `Segments that disagree · ${pl(hits.length, 'survey')}`, rows,
+      key: 'segments', title: `Segments that disagree · ${pl(hits.length, 'study', 'studies')}`, rows,
       expectedTotal: partial.length ? dollars : 0, expectedIds: ids, totalLabel: 'Cost held out of cost per respondent',
-      amountHeader: 'Held out', amountTip: 'Cost a per-respondent figure leaves out because the survey’s N actual covers only some segments. $0 where the bill and rates are unaffected.',
-      detailHeader: 'What disagrees', detailTip: 'How the segments and the survey differ.',
+      amountHeader: 'Held out', amountTip: 'Cost a per-respondent figure leaves out because the study’s N actual covers only some segments. $0 where the bill and rates are unaffected.',
+      detailHeader: 'What disagrees', detailTip: 'How the segments and the study differ.',
       where: SEGMENTS.where,
     }),
   }
@@ -1778,7 +1782,7 @@ function gapSegments(ctx: Ctx): Gap {
 
 const STALE: GapBase = {
   key: 'stale-phase', specNo: 13, title: 'Phase still says Scoping on work being fielded',
-  help: 'A survey that is buying respondents (or already delivered) is counted as real work here whatever its phase says, but the board and pipeline read the phase.',
+  help: 'A study that is buying respondents (or already delivered) is counted as real work here whatever its phase says, but the board and pipeline read the phase.',
   who: 'Captain', when: 'When fielding starts.', where: 'Project page → Phase (advance it on the board)',
   needs: ['project_blasts', 'project_suppliers', 'project_costs'],
 }
@@ -1789,7 +1793,7 @@ function gapStale(ctx: Ctx): Gap {
   // The population holds only delivered and live work, so a Scoping phase here
   // is a survey the classifier already moved on because it has field rows.
   const hits = ctx.pop.filter(it => it.p.phase === 'Scoping')
-  if (!hits.length) return resolved(STALE, 'No survey in view is being fielded under a Scoping phase.')
+  if (!hits.length) return resolved(STALE, 'No study in view is being fielded under a Scoping phase.')
   const ids = idsOf(hits)
   const dollars = spendIds(ctx, ids)
   const rows: GapRowIn[] = hits.map(it => ({
@@ -1800,12 +1804,12 @@ function gapStale(ctx: Ctx): Gap {
     ...blankGap(STALE),
     count: hits.length, surveys: hits.length, ids, dollars, dollarsKind: dollars > 0 ? 'spend' : 'none',
     dollarsWords: 'of cost on work the board still calls Scoping',
-    what: `${pl(hits.length, 'survey')} still ${verb(hits.length, 'says', 'say')} Scoping but ${verb(hits.length, 'is', 'are')} already being fielded or delivered (${money(dollars)} of cost). Move the phase on so the board and the pipeline count ${verb(hits.length, 'it', 'them')}.`,
+    what: `${pl(hits.length, 'study', 'studies')} still ${verb(hits.length, 'says', 'say')} Scoping but ${verb(hits.length, 'is', 'are')} already being fielded or delivered (${money(dollars)} of cost). Move the phase on so the board and the pipeline count ${verb(hits.length, 'it', 'them')}.`,
     link: oneLink(hits),
     drill: gapDrill(ctx, {
-      key: 'stale-phase', title: `Scoping phase on live work · ${pl(hits.length, 'survey')}`, rows,
-      expectedTotal: dollars, expectedIds: ids, totalLabel: 'Recorded cost on these surveys',
-      amountHeader: 'Recorded cost', amountTip: 'Field cost recorded on the survey.',
+      key: 'stale-phase', title: `Scoping phase on live work · ${pl(hits.length, 'study', 'studies')}`, rows,
+      expectedTotal: dollars, expectedIds: ids, totalLabel: 'Recorded cost on these studies',
+      amountHeader: 'Recorded cost', amountTip: 'Field cost recorded on the study.',
       detailHeader: 'Where it sits', detailTip: 'Its class here and its board column.',
       where: STALE.where,
     }),
@@ -1816,7 +1820,7 @@ function gapStale(ctx: Ctx): Gap {
 
 const TERM: GapBase = {
   key: 'empty-term', specNo: 14, title: 'Empty contract terms',
-  help: 'A contract term with no credit pool, no dates and no surveys drawing on it tells the credit strip nothing, and reads as a contract that exists.',
+  help: 'A contract term with no credit pool, no dates and no studies drawing on it tells the credit strip nothing, and reads as a contract that exists.',
   who: 'Finance', when: 'When the contract is signed.', where: 'Client page → Contracts',
   unit: 'contract term', needs: ['client_terms', 'survey_projects'],
 }
@@ -1829,7 +1833,7 @@ function gapTerms(ctx: Ctx): Gap {
   const terms = ctx.raw.terms.filter(t => !f.account || t.client_id === f.account)
   const empty = terms.filter(t =>
     (t.credits_total == null || Number(t.credits_total) === 0) && !t.starts_on && !t.renews_on && !used.has(t.id))
-  if (!empty.length) return resolved(TERM, terms.length ? 'Every contract term in view has a credit pool, dates or surveys.' : 'No contract terms in view.')
+  if (!empty.length) return resolved(TERM, terms.length ? 'Every contract term in view has a credit pool, dates or studies.' : 'No contract terms in view.')
   const accounts: GapAccount[] = empty.map(t => ({
     id: t.client_id, name: ctx.input.accountName(t.client_id), count: 1, dollars: null,
     note: `“${t.name ?? '(unnamed)'}”`, href: t.client_id ? `/clients/${t.client_id}` : undefined,
@@ -1838,7 +1842,7 @@ function gapTerms(ctx: Ctx): Gap {
   return {
     ...blankGap(TERM),
     count: empty.length, surveys: 0, ids: [], dollars: null, dollarsKind: 'none', dollarsWords: 'no dollars on it',
-    what: `${pl(empty.length, 'contract term')} ${verb(empty.length, 'has', 'have')} no credit pool, no dates and no surveys: ${names.join(', ')}. Fill ${verb(empty.length, 'it', 'them')} in, or remove ${verb(empty.length, 'it', 'them')}.`,
+    what: `${pl(empty.length, 'contract term')} ${verb(empty.length, 'has', 'have')} no credit pool, no dates and no studies: ${names.join(', ')}. Fill ${verb(empty.length, 'it', 'them')} in, or remove ${verb(empty.length, 'it', 'them')}.`,
     accounts,
     link: empty.length === 1 && empty[0].client_id ? { href: `/clients/${empty[0].client_id}`, label: `Open ${ctx.input.accountName(empty[0].client_id)}` } : null,
   }
@@ -1886,13 +1890,13 @@ function gapWaves(ctx: Ctx): Gap {
     ...blankGap(WAVES),
     count: waves.length, surveys: ids.length, ids, dollars, dollarsKind: dollars > 0 ? 'spend' : 'none',
     dollarsWords: 'of panel cost the Goal check cannot see',
-    what: `${pl(waves.length, 'wave')} on ${pl(ids.length, 'survey')} ${verb(waves.length, 'has', 'have')} no target, carrying ${money(dollars)} of panel cost that the “set the PureSpectrum Goal” check cannot see.`,
+    what: `${pl(waves.length, 'wave')} on ${pl(ids.length, 'study', 'studies')} ${verb(waves.length, 'has', 'have')} no target, carrying ${money(dollars)} of panel cost that the “set the PureSpectrum Goal” check cannot see.`,
     link: oneLink(hitItems),
     drill: gapDrill(ctx, {
-      key: 'wave-target', title: `Waves with no target · ${pl(ids.length, 'survey')}`, rows,
+      key: 'wave-target', title: `Waves with no target · ${pl(ids.length, 'study', 'studies')}`, rows,
       expectedTotal: dollars, expectedIds: ids, totalLabel: 'Panel cost on waves with no target',
       amountHeader: 'Panel cost', amountTip: 'Price per complete × completes, on the waves with no target only.',
-      detailHeader: 'Waves', detailTip: 'How many of the survey’s waves have no target.',
+      detailHeader: 'Waves', detailTip: 'How many of the study’s waves have no target.',
       where: WAVES.where,
     }),
   }
@@ -1919,8 +1923,8 @@ function blockedData(ctx: Ctx): BlockedDatum[] {
   const b1 = b1Block
     ? `${blockedText(b1Block)}, so the contact-list lines cannot be counted.`
     : blastSurveys.length
-      ? `${fmtNum(blastSurveys.length - withList.length)} of ${fmtNum(blastSurveys.length)} blast surveys in view carry no contact-list cost line, so the list they went to costs $0 here.`
-      : 'No blast survey in view.'
+      ? `${fmtNum(blastSurveys.length - withList.length)} of ${fmtNum(blastSurveys.length)} blast studies in view carry no contact-list cost line, so the list they went to costs $0 here.`
+      : 'No blast study in view.'
   const revs = ctx.priceBlock ? [] : ctx.delivered.map(it => revenueDetail(it.p, ctx.rates.get(it.p.id))).filter(r => r.revenue != null)
   const invoiced = revs.filter(r => r.source === 'invoiced').length
   const b5 = ctx.priceBlock
@@ -1930,7 +1934,7 @@ function blockedData(ctx: Ctx): BlockedDatum[] {
     {
       key: 'B1', title: 'B2B contact-list cost', what: b1,
       needs: 'The source and the number of contacts in each list pull, so its cost can be computed.',
-      help: 'What the contact list behind a blast cost to build. Nothing records it, so a B2B survey’s cost here is its sends and rewards only — the real cost of reaching those people is higher, by an amount this page will not guess.',
+      help: 'What the contact list behind a blast cost to build. Nothing records it, so a B2B study’s cost here is its sends and rewards only — the real cost of reaching those people is higher, by an amount this page will not guess.',
     },
     {
       key: 'B2', title: 'QA yield and cost per qualified respondent by panel',
@@ -1951,8 +1955,8 @@ function blockedData(ctx: Ctx): BlockedDatum[] {
       help: 'Cost and delivery by country. Free text cannot be added up safely, so this page shows no country total rather than one that silently splits a country in two.',
     },
     {
-      key: 'B5', title: 'Invoiced amount per survey', what: b5,
-      needs: 'The amount actually invoiced per survey (finance only), to reconcile against the computed price.',
+      key: 'B5', title: 'Invoiced amount per study', what: b5,
+      needs: 'The amount actually invoiced per study (finance only), to reconcile against the computed price.',
       help: 'What the client was actually billed. Every price on this page is computed (rate × billed N), so nothing here can be checked against the invoice until the invoiced amount is recorded.',
     },
     {
@@ -2029,8 +2033,8 @@ export function buildImproveModel(input: ImproveInput): ImproveModel {
     const hasDollars = top.dollars != null && top.dollars > 0
     const size = hasDollars
       ? `hides ${top.dollarsKind === 'estimate' ? 'about ' : ''}${money(top.dollars as number)} ${top.dollarsWords}`
-      : `covers ${pl(top.count, top.unit)}`
-    const on = top.surveys > 0 && (hasDollars || top.unit !== 'survey') ? ` on ${pl(top.surveys, 'survey')}` : ''
+      : `covers ${pl(top.count, top.unit, units(top.unit))}`
+    const on = top.surveys > 0 && (hasDollars || top.unit !== 'study') ? ` on ${pl(top.surveys, 'study', 'studies')}` : ''
     verdict = `Start with “${top.title}”: it ${size}${on}. ${pl(open.length, 'gap')} ${verb(open.length, 'is', 'are')} open${done.length ? ` and ${fmtNum(done.length)} resolved` : ''}.`
   } else if (blocked.length) {
     verdict = `Nothing fixable is open, but ${pl(blocked.length, 'check')} could not run: see the blocked rows.`
@@ -2043,7 +2047,7 @@ export function buildImproveModel(input: ImproveInput): ImproveModel {
     status: g.status === 'open' ? 'Open' : g.status === 'blocked' ? 'Blocked' : 'Resolved',
     gap: g.title,
     count: g.count,
-    unit: g.count === 1 ? g.unit : `${g.unit}s`,
+    unit: g.count === 1 ? g.unit : units(g.unit),
     surveys: g.surveys,
     dollars: g.dollars == null ? null : Math.round(g.dollars * 100) / 100,
     dollars_kind: DOLLARS_KIND_LABEL[g.dollarsKind],
@@ -2063,7 +2067,7 @@ export function buildImproveModel(input: ImproveInput): ImproveModel {
         { key: 'gap', header: 'Gap' },
         { key: 'count', header: 'Count' },
         { key: 'unit', header: 'Of' },
-        { key: 'surveys', header: 'Surveys' },
+        { key: 'surveys', header: 'Studies' },
         { key: 'dollars', header: 'Dollars hidden' },
         { key: 'dollars_kind', header: 'Kind of dollars' },
         { key: 'dollars_meaning', header: 'What the dollars are' },

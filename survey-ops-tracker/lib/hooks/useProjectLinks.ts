@@ -27,7 +27,7 @@ export function useProjectLinks(projectId: string | null | undefined) {
     queryFn: async (): Promise<LinkedSurvey[]> => {
       const res = await fetch(`/api/projects/links?projectId=${encodeURIComponent(projectId as string)}`)
       const json = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(json.error || 'Could not load related surveys.')
+      if (!res.ok) throw new Error(json.error || 'Could not load related studies.')
       return (json.links ?? []) as LinkedSurvey[]
     },
     staleTime: 30_000,

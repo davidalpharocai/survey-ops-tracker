@@ -59,8 +59,8 @@ export function RelatedSurveys({ project }: { project: P }) {
         <p className="text-xs text-muted-foreground/50">Loading…</p>
       ) : links.length === 0 ? (
         <p className="text-[12px] text-muted-foreground/70">
-          Nothing linked yet. Use this for surveys that belong together without one being a repeat wave of the other — a
-          soft launch and its full launch, two halves of one study, a replacement for a cancelled survey.
+          Nothing linked yet. Use this for studies that belong together without one being a repeat wave of the other — a
+          soft launch and its full launch, two halves of one piece of research, a replacement for a cancelled study.
         </p>
       ) : (
         <ul className="flex flex-col gap-1">
@@ -100,7 +100,7 @@ export function RelatedSurveys({ project }: { project: P }) {
 
       {!picking ? (
         <button onClick={() => setPicking(true)} className="text-[13px] text-primary hover:underline self-start">
-          ＋ Link another survey
+          ＋ Link another study
         </button>
       ) : (
         <div className="rounded-lg border border-border bg-muted/40 p-2 flex flex-col gap-1.5">
@@ -110,7 +110,7 @@ export function RelatedSurveys({ project }: { project: P }) {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search by keyword or PR number…"
-            aria-label="Search surveys to link"
+            aria-label="Search studies to link"
             className={`w-full ${inputCls}`}
           />
           <input

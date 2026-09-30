@@ -156,25 +156,25 @@ describe('the chrome', () => {
   it('computes the header, marks the current tab, and hands the tab its population', () => {
     renderPage()
     expect(screen.getByRole('heading', { name: 'Finance' })).toBeInTheDocument()
-    expect(screen.getByText('6 delivered surveys · From 1 Jun 2026')).toBeInTheDocument()
+    expect(screen.getByText('6 delivered studies · From 1 Jun 2026')).toBeInTheDocument()
     const tabs = within(screen.getByRole('navigation', { name: 'Finance sections' })).getAllByRole('link')
     expect(tabs.map(t => t.textContent)).toEqual(['Results', 'This week', 'Per respondent', 'Improve'])
     expect(tabs[0]).toHaveAttribute('aria-current', 'page')
     expect(tabs[0]).toHaveAttribute('href', '/finance')
     expect(tabs[1]).toHaveAttribute('href', '/finance?tab=this-week')
     expect(tabs[1]).not.toHaveAttribute('aria-current')
-    expect(screen.getByTestId('tab')).toHaveTextContent('ResultsTab|6|0|Delivered · From 1 Jun 2026 · 6 surveys')
+    expect(screen.getByTestId('tab')).toHaveTextContent('ResultsTab|6|0|Delivered · From 1 Jun 2026 · 6 studies')
   })
 
   it('computes the banner and the integrity line from the load', () => {
     renderPage()
     const banner = screen.getByRole('region', { name: 'How complete the finance data is' })
     expect(banner).toHaveTextContent('Costs are reliable from Jun 2026.')
-    expect(banner).toHaveTextContent('In this view 6 of 6 delivered surveys (100%) carry a recorded cost, and 2 carry a client price.')
+    expect(banner).toHaveTextContent('In this view 6 of 6 delivered studies (100%) carry a recorded cost, and 2 carry a client price.')
     // June and July each have 1 of 3 priced, over the 25% bar, so there is no
     // "still thin" line — but the link to Improve is always offered.
     expect(within(banner).getByRole('link', { name: /Improve tab/ })).toHaveAttribute('href', '/finance?tab=improve')
-    expect(screen.getByText(/^Loaded 9 surveys · 6 blasts · 0 panel rows · 0 cost lines · 2 prices · recomputed spend = stored on 9 of 9/)).toBeInTheDocument()
+    expect(screen.getByText(/^Loaded 9 studies · 6 blasts · 0 panel rows · 0 cost lines · 2 prices · recomputed spend = stored on 9 of 9/)).toBeInTheDocument()
   })
 
   it('turns the integrity line red and names the table when a read failed', () => {
@@ -211,7 +211,7 @@ describe('the filter bar', () => {
     // June. There is now one claim, in two places, from one number.
     const helpOf = () => screen.getByLabelText(/Filters by delivery date/).getAttribute('aria-label') ?? ''
     const { unmount } = renderPage()
-    expect(helpOf()).toContain('Costs are recorded on most delivered surveys from Jun 2026.')
+    expect(helpOf()).toContain('Costs are recorded on most delivered studies from Jun 2026.')
     expect(screen.getByRole('region', { name: 'How complete the finance data is' }))
       .toHaveTextContent('Costs are reliable from Jun 2026.')
     expect(helpOf()).not.toMatch(/most reliable window/i)
@@ -223,7 +223,7 @@ describe('the filter bar', () => {
     load.raw.blasts = []
     data.value = ok(load)
     renderPage()
-    expect(helpOf()).toContain('No month yet has a recorded cost on most of its delivered surveys.')
+    expect(helpOf()).toContain('No month yet has a recorded cost on most of its delivered studies.')
     expect(helpOf()).not.toContain('Jun 2026')
   })
 
@@ -233,7 +233,7 @@ describe('the filter bar', () => {
     const date = screen.getByLabelText('Date') as HTMLSelectElement
     expect(date).toBeDisabled()
     expect(date.options[0].textContent).toBe('Live work — all dates')
-    expect(screen.getByText('1 live survey · 1 on hold · Live work — all dates')).toBeInTheDocument()
+    expect(screen.getByText('1 live study · 1 on hold · Live work — all dates')).toBeInTheDocument()
     expect(screen.getByTestId('tab')).toHaveTextContent('ThisWeekTab|1|1|')
   })
 
@@ -282,7 +282,7 @@ describe('Export what you see', () => {
     expect(lines).toContain('"As of: 27 Sep 2026, 6:40 PM Eastern"')
     expect(lines).toContain('Tab: Results')
     expect(lines).toContain('Rows: 6')
-    expect(lines).toContain('Surveys in view: 6')
+    expect(lines).toContain('Studies in view: 6')
     expect(lines).toContain('Scoping work: not included')
     const at = lines.indexOf('Survey,Name')
     expect(lines.slice(at + 1)).toEqual(['PR00001,Study 1', 'PR00002,Study 2', 'PR00003,Study 3', 'PR00004,Study 4', 'PR00005,Study 5', 'PR00006,Study 6'])

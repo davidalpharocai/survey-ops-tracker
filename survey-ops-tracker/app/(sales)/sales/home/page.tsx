@@ -157,7 +157,7 @@ export default async function SalesHomePage() {
   if (failed) {
     return (
       <div role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-        <p>Couldn&apos;t load your surveys.</p>
+        <p>Couldn&apos;t load your studies.</p>
         <p className="mt-1 text-xs">
           <a href="/sales/home" className="font-medium underline underline-offset-2 hover:opacity-80">Try again</a>
           <span className="text-destructive/80"> · If it keeps happening, contact your AlphaROC administrator.</span>
@@ -289,7 +289,7 @@ export default async function SalesHomePage() {
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-medium">{q.client}</span>
                     <span className="block truncate text-xs text-muted-foreground">
-                      {fmtNum(q.delivered)} survey{q.delivered === 1 ? '' : 's'} delivered, nothing in flight
+                      {fmtNum(q.delivered)} {q.delivered === 1 ? 'study' : 'studies'} delivered, nothing in flight
                     </span>
                   </span>
                   <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{fmtNum(q.daysSince)}d</span>

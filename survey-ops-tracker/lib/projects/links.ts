@@ -128,8 +128,8 @@ export async function addProjectLink(
   note: string | null,
   actor: string
 ): Promise<{ link_id: string; created: boolean }> {
-  if (!projectId || !otherId) throw new LinkOpError('Both surveys are required.')
-  if (projectId === otherId) throw new LinkOpError('A survey cannot be linked to itself.')
+  if (!projectId || !otherId) throw new LinkOpError('Both studies are required.')
+  if (projectId === otherId) throw new LinkOpError('A study cannot be linked to itself.')
 
   const { data: found, error: pErr } = await admin
     .from('survey_projects')
@@ -143,7 +143,7 @@ export async function addProjectLink(
     const have = new Set((found ?? []).map((p) => p.id))
     const missing = [projectId, otherId].filter((id) => !have.has(id))
     throw new LinkOpError(
-      missing.length === 2 ? 'Neither survey was found.' : 'The survey you picked was not found.',
+      missing.length === 2 ? 'Neither study was found.' : 'The study you picked was not found.',
       404
     )
   }
@@ -208,6 +208,6 @@ export async function removeProjectLinkByPair(
     .eq('b_id', b)
     .maybeSingle()
   if (error) throw new Error(error.message)
-  if (!row) throw new LinkOpError('Those two surveys are not linked.', 404)
+  if (!row) throw new LinkOpError('Those two studies are not linked.', 404)
   return removeProjectLink(admin, row.id)
 }

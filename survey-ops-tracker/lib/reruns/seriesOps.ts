@@ -330,7 +330,7 @@ export async function promotionFamilyConflict(
   },
   members?: FamilyMemberRow[]
 ): Promise<PromotionConflict | null> {
-  const label = project.project_code ?? project.project_name ?? 'this survey'
+  const label = project.project_code ?? project.project_name ?? 'this study'
 
   // The project itself, kept separate from the family case below: the family
   // query INCLUDES the project, and "PR00207 is linked to it" reads as nonsense
@@ -807,7 +807,7 @@ export async function attachProjectToSeries(
     .is('deleted_at', null)
     .maybeSingle()
   if (pErr) throw new Error(pErr.message)
-  if (!project) throw new SeriesOpError('Survey not found.', 404)
+  if (!project) throw new SeriesOpError('Study not found.', 404)
 
   const label = project.project_code ?? project.project_name
 
@@ -830,7 +830,7 @@ export async function attachProjectToSeries(
   // else's account.
   if (series.client_id && project.client_id && series.client_id !== project.client_id) {
     throw new SeriesOpError(
-      `${label} belongs to ${project.client ?? 'another client'}, but this series is ${series.client ?? 'a different client'}. Move the survey to the right client first.`,
+      `${label} belongs to ${project.client ?? 'another client'}, but this series is ${series.client ?? 'a different client'}. Move the study to the right client first.`,
       409
     )
   }
@@ -985,7 +985,7 @@ export async function detachProjectFromSeries(
     .is('deleted_at', null)
     .maybeSingle()
   if (pErr) throw new Error(pErr.message)
-  if (!project) throw new SeriesOpError('Survey not found.', 404)
+  if (!project) throw new SeriesOpError('Study not found.', 404)
 
   const label = project.project_code ?? project.project_name
   const seriesId = project.series_id
@@ -1005,7 +1005,7 @@ export async function detachProjectFromSeries(
   //
   if (series?.origin_project_id === projectId) {
     throw new SeriesOpError(
-      `${label} is Wave 1 — the series is anchored to it. Add another survey to the series first, or end the series instead.`,
+      `${label} is Wave 1 — the series is anchored to it. Add another study to the series first, or end the series instead.`,
       409
     )
   }
@@ -1029,7 +1029,7 @@ export async function detachProjectFromSeries(
   if (cErr) throw new Error(cErr.message)
   if ((liveWaves ?? 0) <= 1) {
     throw new SeriesOpError(
-      `${label} is the only wave left in this series, and a series cannot be left with none. Add another survey to the series first, or end the series instead.`,
+      `${label} is the only wave left in this series, and a series cannot be left with none. Add another study to the series first, or end the series instead.`,
       409
     )
   }

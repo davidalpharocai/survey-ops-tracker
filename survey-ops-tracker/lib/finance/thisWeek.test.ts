@@ -144,7 +144,7 @@ describe('STOP BUYING: past the route’s buy multiple', () => {
     expect(ids(at, 'stop')).toEqual([])
     const past = model({ projects: [P({ id: 'a', n_target: 100, n_collected: 141 })], blasts: [B('a', 141)] })
     expect(ids(past, 'stop')).toEqual(['a'])
-    expect(rowsOf(past, 'stop')[0].action).toBe('Stop buying: send no more blasts on this survey.')
+    expect(rowsOf(past, 'stop')[0].action).toBe('Stop buying: send no more blasts on this study.')
   })
 
   it('both routes use the more generous panel multiple', () => {
@@ -174,8 +174,8 @@ describe('STOP BUYING: past the route’s buy multiple', () => {
     expect(ids(at, 'stop')).toEqual([])
     const past = model({ projects: [...done, P({ id: 'a', n_target: 100, n_collected: 126 })], suppliers: [...doneRows, S('a', 1, 126)] })
     expect(ids(past, 'stop')).toEqual(['a'])
-    expect(rowsOf(past, 'stop')[0].happened).toContain('past 1.25× (125), the panel buy multiple, measured on 8 delivered panel surveys')
-    expect(past.groups.find(g => g.verb === 'stop')!.meta.rule).toContain('1.25× panel (measured on 8 delivered panel surveys)')
+    expect(rowsOf(past, 'stop')[0].happened).toContain('past 1.25× (125), the panel buy multiple, measured on 8 delivered panel studies')
+    expect(past.groups.find(g => g.verb === 'stop')!.meta.rule).toContain('1.25× panel (measured on 8 delivered panel studies)')
     expect(past.groups.find(g => g.verb === 'stop')!.meta.rule).toContain('1.4× blast (the default')
   })
 
@@ -319,7 +319,7 @@ describe('Scoping is counted and never in the pipeline', () => {
     expect(m.header.pricedWithTarget).toBe(1)
     expect(m.header.pricedIds).toEqual(['live'])
     expect(m.groups.flatMap(g => g.rows).some(r => r.id === 'quote')).toBe(false)
-    expect(m.header.sentence).toContain('Unsold scoping: 1 survey, not counted.')
+    expect(m.header.sentence).toContain('Unsold scoping: 1 study, not counted.')
   })
 })
 
@@ -367,8 +367,8 @@ describe('CONVERT THE TRIAL: delivered at $0, nothing paid since', () => {
     expect(ids(m, 'trial')).toEqual(['t'])
     const r = rowsOf(m, 'trial')[0]
     expect(r.stake).toBe(3430)
-    expect(r.happened).toContain('UBS got 1,200 respondents free on 1 survey')
-    expect(r.happened).toContain('never bought a priced survey')
+    expect(r.happened).toContain('UBS got 1,200 respondents free on 1 study')
+    expect(r.happened).toContain('never bought a priced study')
   })
 
   it('rolls several trials at one account into one row', () => {
@@ -379,7 +379,7 @@ describe('CONVERT THE TRIAL: delivered at $0, nothing paid since', () => {
     expect(rowsOf(m, 'trial')).toHaveLength(1)
     expect(rowsOf(m, 'trial')[0].id).toBe('t') // the latest
     expect(rowsOf(m, 'trial')[0].also.map(a => a.id)).toEqual(['t2'])
-    expect(rowsOf(m, 'trial')[0].happened).toContain('2,423 respondents free on 2 surveys')
+    expect(rowsOf(m, 'trial')[0].happened).toContain('2,423 respondents free on 2 studies')
   })
 
   it('a paid survey delivered after it, or any live paid work, means it converted', () => {
@@ -390,7 +390,7 @@ describe('CONVERT THE TRIAL: delivered at $0, nothing paid since', () => {
     const before = P({ id: 'paid', client_id: 'acc3', board_column: 'Delivery', status: 'Closed', deliver_date: '2026-08-01' })
     const m = model({ projects: [trial(), before], rates: [['t', 0], ['paid', 5]] })
     expect(ids(m, 'trial')).toEqual(['t'])
-    expect(rowsOf(m, 'trial')[0].happened).toContain('last paid survey was delivered 1 Aug')
+    expect(rowsOf(m, 'trial')[0].happened).toContain('last paid study was delivered 1 Aug')
   })
 
   it('an unpriced delivered survey is not a trial', () => {
@@ -406,7 +406,7 @@ describe('CONVERT THE TRIAL: delivered at $0, nothing paid since', () => {
     expect(rowsOf(m, 'trial')).toEqual([])
     expect(m.groups.find(g => g.verb === 'trial')!.note).toContain('our own work is not a trial')
     expect(rowsOf(m, 'price')).toEqual([])
-    expect(m.groups.find(g => g.verb === 'price')!.note).toContain('1 live AlphaROC survey is left out')
+    expect(m.groups.find(g => g.verb === 'price')!.note).toContain('1 live AlphaROC study is left out')
     expect(ids(m, 'budget')).toEqual(['ownlive']) // it still needs a ceiling
   })
 })
@@ -444,7 +444,7 @@ describe('TOP UP THE CONTRACT and the credit pools', () => {
     expect(m.pools[0].perCredit).toMatchObject({ source: 'implied', value: 200, n: 1 })
     expect(r.stake).toBe(30 * 200)
     expect(r.stakeText).toContain('derived')
-    expect(r.stakeText).toContain('implied by 1 priced survey')
+    expect(r.stakeText).toContain('implied by 1 priced study')
     expect(r.id).toBe('b') // the most recent survey drawing on it
   })
 
@@ -641,15 +641,15 @@ describe('Header, verdict, export and drills', () => {
   it('writes the header from the figures', () => {
     const m = model(book)
     expect(m.header.sentence).toBe(
-      '2 live surveys · $930 spent so far · 1 has a price and a target, worth $1,000 if each lands on target · ' +
-      'the other 1 has no price or no target · 1 on hold, counted on their own. Unsold scoping: 0 surveys, not counted.')
+      '2 live studies · $930 spent so far · 1 has a price and a target, worth $1,000 if each lands on target · ' +
+      'the other 1 has no price or no target · 1 on hold, counted on their own. Unsold scoping: 0 studies, not counted.')
   })
 
   it('ends in a verdict with a verb', () => {
     const m = model(book)
-    expect(m.verdict).toContain('1 live survey still buying has spent more than half its price. Freeze the bid on PR00448 today: it has spent 88% of its price.')
+    expect(m.verdict).toContain('1 live study still buying has spent more than half its price. Freeze the bid on PR00448 today: it has spent 88% of its price.')
     expect(m.holdVerdict).toContain('Resume or cancel PR00450 first.')
-    expect(model({ projects: [] }).verdict).toBe('No live survey needs a decision this week. Keep pricing new work as it is sold.')
+    expect(model({ projects: [] }).verdict).toBe('No live study needs a decision this week. Keep pricing new work as it is sold.')
   })
 
   it('speaks about money and the contract before the records to fix', () => {
@@ -801,7 +801,7 @@ describe('Every note describes the same surveys the card shows', () => {
     const m = model({ projects: [P({ id: 'a', n_target: 100, n_collected: 161 })], suppliers: [S('a', 1, 161)] })
     expect(ids(m, 'stop')).toEqual(['a'])
     expect(ids(m, 'budget')).toEqual(['a'])
-    expect(m.overlapNote).toContain('1 survey needs more than one decision')
+    expect(m.overlapNote).toContain('1 study needs more than one decision')
     expect(m.exportColumns.find(c => c.key === 'stake')!.header).toContain('do not sum this column')
     const one = model({ projects: [P({ id: 'a', n_target: 100, budget: 500 })], blasts: [B('a', 10)], rates: [['a', 10]] })
     expect(one.overlapNote).toBeNull()

@@ -37,7 +37,7 @@ export function CreditPools({ pools, today, onOpen }: {
     { key: 'd', label: 'Drawn on delivered work', color: 'var(--chart-cost)' },
     { key: 'l', label: 'Drawn on live work', color: 'color-mix(in oklab, var(--chart-cost) 50%, var(--chart-surface))' },
     ...(anyOver ? [{ key: 'o', label: 'Past the pool', color: 'var(--chart-loss)' }] : []),
-    ...(anyHold ? [{ key: 'h', label: 'On held surveys (not counted)', shape: 'hatch' as const }] : []),
+    ...(anyHold ? [{ key: 'h', label: 'On held studies (not counted)', shape: 'hatch' as const }] : []),
     ...(anyQueued ? [{ key: 'q', label: 'Queued priced work with no credits (derived)', color: 'var(--chart-cost)', shape: 'dash' as const }] : []),
     { key: 'p', label: 'The pool', color: 'var(--chart-price)', shape: 'tick' as const },
     { key: 'e', label: 'Even pace for the term gone', color: 'var(--chart-goal)', shape: 'tick' as const, description: 'Where the drawdown would be if the pool were used evenly over the term.' },
@@ -50,12 +50,12 @@ export function CreditPools({ pools, today, onOpen }: {
       { key: 'p', label: 'Pool', align: 'right', title: 'Credits the contract carries (a count, not dollars)' },
       { key: 'd', label: 'Delivered', align: 'right', title: 'Credits drawn on delivered work' },
       { key: 'l', label: 'Live', align: 'right', title: 'Credits drawn on live work' },
-      { key: 'h', label: 'On hold', align: 'right', title: 'Credits on held surveys, not counted as drawn' },
+      { key: 'h', label: 'On hold', align: 'right', title: 'Credits on held studies, not counted as drawn' },
       { key: 'o', label: 'Over', align: 'right', title: 'Delivered + live credits past the pool' },
-      { key: 'q', label: 'Queued, no credits', align: 'right', title: 'Live surveys at this account priced per N but carrying no credits, valued at price × N sold' },
+      { key: 'q', label: 'Queued, no credits', align: 'right', title: 'Live studies at this account priced per N but carrying no credits, valued at price × N sold' },
       { key: 't', label: 'Term gone', align: 'right', title: 'Share of the contract term elapsed' },
       { key: 'r', label: 'Renews', title: 'The renewal date on file' },
-      { key: 'v', label: '$ per credit', align: 'right', title: 'Derived: from the contract value on file, else implied by the contract’s own priced surveys. A dash means no value could be derived — never $0.' },
+      { key: 'v', label: '$ per credit', align: 'right', title: 'Derived: from the contract value on file, else implied by the contract’s own priced studies. A dash means no value could be derived — never $0.' },
     ],
     rows: pools.map(p => ({
       key: p.termId,
@@ -101,18 +101,18 @@ function PoolBar({ p, today, onOpen }: { p: CreditPool; today: string; onOpen: (
   const summary = `${p.account}, ${p.name}: ${p.sentence}`
   const renews = p.renewsOn ? ` · renews ${dayText(p.renewsOn, today)}` : ''
   const perCredit = p.perCredit
-    ? ` · ≈${money(p.perCredit.value)} per credit, derived ${p.perCredit.source === 'agreed' ? 'from the contract value on file' : `from ${p.perCredit.n} of its own priced ${p.perCredit.n === 1 ? 'survey' : 'surveys'}`}`
+    ? ` · ≈${money(p.perCredit.value)} per credit, derived ${p.perCredit.source === 'agreed' ? 'from the contract value on file' : `from ${p.perCredit.n} of its own priced ${p.perCredit.n === 1 ? 'study' : 'studies'}`}`
     : ''
   const queuedText = p.queued.ids.length
-    ? ` ${p.queued.ids.length} live priced ${p.queued.ids.length === 1 ? 'survey carries' : 'surveys carry'} no credits (${money(p.queued.value)} at target${p.queued.creditsEquiv != null ? `, ≈${creditsText(p.queued.creditsEquiv)} credits derived` : ''}).`
+    ? ` ${p.queued.ids.length} live priced ${p.queued.ids.length === 1 ? 'study carries' : 'studies carry'} no credits (${money(p.queued.value)} at target${p.queued.creditsEquiv != null ? `, ≈${creditsText(p.queued.creditsEquiv)} credits derived` : ''}).`
     : ''
   return (
     <li>
       <button
         type="button"
         onClick={onOpen}
-        aria-label={`${summary} Open the surveys drawing on it.`}
-        title="Open the surveys drawing on this contract"
+        aria-label={`${summary} Open the studies drawing on it.`}
+        title="Open the studies drawing on this contract"
         className="block w-full rounded-md p-1 text-left hover:bg-muted/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--chart-price)]"
       >
         <div className="flex flex-wrap items-baseline justify-between gap-x-3 text-xs">

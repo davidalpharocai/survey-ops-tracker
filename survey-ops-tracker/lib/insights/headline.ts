@@ -127,11 +127,11 @@ export function buildHeadline(h: HeadlineInput): string {
   const qualifiers = `${kindAfter}${forAcct}${unowned}`
 
   if (n === 0) {
-    return `No ${kind}surveys${qualifiers} ${h.runsToToday ? 'have been' : 'were'} delivered ${when}.`
+    return `No ${kind}studies${qualifiers} ${h.runsToToday ? 'have been' : 'were'} delivered ${when}.`
   }
 
   const verb = h.runsToToday ? 'has delivered' : 'delivered'
-  let first = `${who} ${verb} ${fmtNum(n)} ${kind}survey${n === 1 ? '' : 's'}${qualifiers} ${when}`
+  let first = `${who} ${verb} ${fmtNum(n)} ${kind}${n === 1 ? 'study' : 'studies'}${qualifiers} ${when}`
 
   // A rank claim for a single calendar month; otherwise the previous period.
   let clause = ''

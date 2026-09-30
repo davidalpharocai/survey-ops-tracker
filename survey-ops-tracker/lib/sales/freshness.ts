@@ -60,7 +60,7 @@ export function freshness(last: string | undefined, today: string, available: bo
       text: 'responses never counted',
       stale: true,
       title:
-        'No response count has ever been recorded for this survey, so the figure beside it is not a ' +
+        'No response count has ever been recorded for this study, so the figure beside it is not a ' +
         'measurement — it is the value the row was created with.',
     }
   }
@@ -71,6 +71,6 @@ export function freshness(last: string | undefined, today: string, available: bo
   return {
     text: `responses last counted ${day}${clock ? `, ${clock} ET` : ''} · ${ago}`,
     stale: d > STALE_AFTER_DAYS,
-    title: `The response count on this survey last changed ${day}${clock ? ` at ${clock} Eastern` : ''}.`,
+    title: `The response count on this study last changed ${day}${clock ? ` at ${clock} Eastern` : ''}.`,
   }
 }

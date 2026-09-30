@@ -162,8 +162,8 @@ describe('the N columns', () => {
     ] })
     const note = (p: FinProject) => FIN_COLUMNS.find(c => c.header === 'Segment check')!.value(pnlOf([p])[0], p)
     expect(note(missing)).toBe('1 of 2 segments has no N actual')
-    expect(note(off)).toBe('Segments add up to 100; the survey says 110')
-    expect(note(rolled)).toBe('Survey N actual blank; rolled up from the segments')
+    expect(note(off)).toBe('Segments add up to 100; the study says 110')
+    expect(note(rolled)).toBe('Study N actual blank; rolled up from the segments')
     expect(note(P())).toBeNull()
     // Counts, not prices: open to every reader.
     expect(finColumnsFor(false).map(c => c.header)).toContain('Segment check')
@@ -184,10 +184,10 @@ describe('the N columns', () => {
     expect(get('Billed N')).toBe(100)
     expect(get('Revenue')).toBe(500)
     expect(get('Cost per complete')).toBe(2)
-    expect(get('Segment check')).toBe('1 of 2 segments has no N actual; the survey N actual adds up only the others; CPQR and Scrub N left blank')
+    expect(get('Segment check')).toBe('1 of 2 segments has no N actual; the study N actual adds up only the others; CPQR and Scrub N left blank')
     // The file writes the note without quoting: no commas in it.
     const line = buildFinanceCsv(rows, FIN_COLUMNS, new Map([['p1', p]])).split('\r\n')[1]
-    expect(line).toContain(',1 of 2 segments has no N actual; the survey N actual adds up only the others; CPQR and Scrub N left blank,')
+    expect(line).toContain(',1 of 2 segments has no N actual; the study N actual adds up only the others; CPQR and Scrub N left blank,')
   })
 
   it('names a segment priced differently in the restricted price status, and bills the survey rate', () => {
@@ -195,10 +195,10 @@ describe('the N columns', () => {
     const rows = pnlOf([p], new Map([['p1', 5]]))
     const get = (h: string) => FIN_COLUMNS.find(c => c.header === h)!.value(rows[0], p)
     expect(get('Revenue')).toBe(500)
-    expect(get('Price status')).toBe('Priced; a segment is priced differently and the bill uses the survey rate')
+    expect(get('Price status')).toBe('Priced; a segment is priced differently and the bill uses the study rate')
     const unpriced = pnlOf([p])
     expect(FIN_COLUMNS.find(c => c.header === 'Price status')!.value(unpriced[0], p))
-      .toBe('No price; only a segment carries one. Set the survey rate')
+      .toBe('No price; only a segment carries one. Set the study rate')
   })
 
   it('leaves a derived N BLANK rather than 0 when an input is missing', () => {
@@ -309,7 +309,7 @@ describe('drill files', () => {
 
   it('writes the code, the columns and the contribution to the cent', () => {
     const t = drillTable(spec)
-    expect(t.columns.map(c => c.header)).toEqual(['Survey', 'Account', 'We keep'])
+    expect(t.columns.map(c => c.header)).toEqual(['Study', 'Account', 'We keep'])
     expect(t.rows[0]).toEqual({ code: 'PR00001', c0: 'BAM', contribution: 100 })
     expect(t.rows[1].code).toBe('(no code)')
     expect(buildTableCsv(t).split('\r\n')[2]).toBe("(no code),'=evil,50")

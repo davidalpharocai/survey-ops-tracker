@@ -118,8 +118,8 @@ function multipleWords(route: 'panel' | 'blast', rule: BuyRule): string {
   const n = route === 'panel' ? rule.panelN : rule.blastN
   const x = times(route === 'panel' ? rule.panel : rule.blast)
   return n != null
-    ? `${x} ${route} (measured on ${fmtNum(n)} delivered ${route} surveys)`
-    : `${x} ${route} (the default: too few delivered ${route} surveys to measure one)`
+    ? `${x} ${route} (measured on ${fmtNum(n)} delivered ${route} studies)`
+    : `${x} ${route} (the default: too few delivered ${route} studies to measure one)`
 }
 
 /** Board columns where buying has stopped and the survey is being checked. The
@@ -180,7 +180,7 @@ const COST_TABLES: FinanceTable[] = ['project_blasts', 'project_suppliers', 'pro
  * `capOf`). Wherever a survey carries a range, the card prints both ends.
  */
 const RANGE_HELP =
-  'Where a survey sold a range (an N target and a maximum), the contract value and the 50% goal are measured at the bottom of the range — the N we are sure of — and the bill can run to the top.'
+  'Where a study sold a range (an N target and a maximum), the contract value and the 50% goal are measured at the bottom of the range — the N we are sure of — and the bill can run to the top.'
 
 export const VERB_META: Record<Verb, VerbMeta> = {
   freeze: {
@@ -198,12 +198,12 @@ export const VERB_META: Record<Verb, VerbMeta> = {
   stop: {
     label: 'STOP BUYING',
     rule: 'Still buying, and has collected more than the route’s buy multiple × the N sold.',
-    help: 'The buy multiple is how many completes we buy per respondent the client needs, because QA removes some. Past it, extra completes are very unlikely to be billed. At stake is those extra completes at this survey’s cost per complete. Where a range was sold, the multiple is measured against the TOP of the range, so a survey is never told to stop while it could still legitimately be short.',
+    help: 'The buy multiple is how many completes we buy per respondent the client needs, because QA removes some. Past it, extra completes are very unlikely to be billed. At stake is those extra completes at this study’s cost per complete. Where a range was sold, the multiple is measured against the TOP of the range, so a study is never told to stop while it could still legitimately be short.',
     bullets: true, bucket: 'Live', needs: ['project_blasts', 'project_suppliers'],
   },
   cap: {
     label: 'CAP THE WAVE',
-    rule: 'A PureSpectrum wave on a survey still buying has collected more than its own wave target.',
+    rule: 'A PureSpectrum wave on a study still buying has collected more than its own wave target.',
     help: 'SOCC’s supplier cap is a record, not a limit: nothing reads it to stop a supplier. Only the survey Goal in PureSpectrum stops a wave. At stake is the completes past the wave target, at that wave’s cost per complete.',
     bullets: true, bucket: 'Live', needs: ['project_suppliers', 'project_launches'],
   },
@@ -216,24 +216,24 @@ export const VERB_META: Record<Verb, VerbMeta> = {
   price: {
     label: 'PRICE IT',
     rule: 'Live with no client price per N, or no N target.',
-    help: 'Without both, the survey has no contract value, so its margin can never be measured. Ranked by what it has spent so far.',
+    help: 'Without both, the study has no contract value, so its margin can never be measured. Ranked by what it has spent so far.',
     bullets: true, bucket: 'Live', needs: ['project_financials', ...COST_TABLES],
   },
   topup: {
     label: 'TOP UP THE CONTRACT',
     rule: 'A credit contract has more credits drawn on delivered and live work than its pool.',
-    help: 'Credits are counts. Their dollar value is derived: from the contract value on file where there is one, else from the rate the contract’s own priced surveys imply. Credits on held surveys are shown apart and not counted as drawn.',
+    help: 'Credits are counts. Their dollar value is derived: from the contract value on file where there is one, else from the rate the contract’s own priced studies imply. Credits on held studies are shown apart and not counted as drawn.',
     bullets: false, bucket: 'Credit contract', needs: ['client_terms'],
   },
   trial: {
     label: 'CONVERT THE TRIAL',
     rule: 'Delivered at a $0 price, and the account has bought nothing priced since.',
-    help: 'A $0 price is work given away on purpose, usually to win the account. At stake is our field cost on the free surveys.',
+    help: 'A $0 price is work given away on purpose, usually to win the account. At stake is our field cost on the free studies.',
     bullets: false, bucket: 'Delivered (free trial)', needs: ['project_financials', ...COST_TABLES],
   },
   series: {
     label: 'CHECK THE SERIES',
-    rule: `A recurring survey is due within ${SERIES_DUE_WITHIN_DAYS} days or overdue with no wave buying yet, or its next wave’s target fell.`,
+    rule: `A recurring study is due within ${SERIES_DUE_WITHIN_DAYS} days or overdue with no wave buying yet, or its next wave’s target fell.`,
     help: 'Due is computed from the last DELIVERED wave plus the series cadence (from the latest resume, if it was paused and resumed) — never from a spawned wave nobody launched. At stake is one wave at its price per N.',
     bullets: false, bucket: 'Recurring series', needs: [],
   },
@@ -657,7 +657,7 @@ function ownerOf(p: WeekProject, owners: Extra<Map<string, string>>): { owner: s
   if (owners.state === 'loading') return { owner: '…', ownerNote: 'Loading the team list' }
   if (owners.state === 'blocked') return { owner: '—', ownerNote: `${owners.table} did not load` }
   const id = p.captain_id ?? null
-  if (!id) return { owner: 'No captain', ownerNote: 'Nobody is set as captain on this survey' }
+  if (!id) return { owner: 'No captain', ownerNote: 'Nobody is set as captain on this study' }
   return { owner: owners.value.get(id) ?? '(unknown member)', ownerNote: null }
 }
 
@@ -719,7 +719,7 @@ const FREEZE_ACTION: Record<Route, string> = {
 }
 
 const STOP_ACTION: Record<Route, string> = {
-  blast: 'Stop buying: send no more blasts on this survey.',
+  blast: 'Stop buying: send no more blasts on this study.',
   panel: 'Stop buying: set the PureSpectrum Goal to the N already collected and close any open wave.',
   both: 'Stop buying: send no more blasts, and set the PureSpectrum Goal to the N already collected.',
   none: 'Stop buying.',
@@ -729,7 +729,7 @@ const STOP_ACTION: Record<Route, string> = {
 function multSource(route: Route, rule: BuyRule): string {
   const which: 'panel' | 'blast' = route === 'blast' ? 'blast' : route === 'panel' ? 'panel' : rule.panel >= rule.blast ? 'panel' : 'blast'
   const n = which === 'panel' ? rule.panelN : rule.blastN
-  return n != null ? `, measured on ${fmtNum(n)} delivered ${which} surveys` : ' (the default: too few delivered surveys to measure one)'
+  return n != null ? `, measured on ${fmtNum(n)} delivered ${which} studies` : ' (the default: too few delivered studies to measure one)'
 }
 
 const ROUTE_WORD: Record<Route, string> = { blast: 'blast', panel: 'panel', both: 'mixed-route', none: '' }
@@ -769,7 +769,7 @@ export function spendBlockedText(blocked: FinanceTable[]): string | null {
  */
 export function termDollarsNote(termDollars: Extra<unknown>): string | null {
   if (termDollars.state === 'blocked') {
-    return `Blocked: ${termDollars.table} did not load, so any dollar value here is implied by the contract’s own priced surveys, not agreed.`
+    return `Blocked: ${termDollars.table} did not load, so any dollar value here is implied by the contract’s own priced studies, not agreed.`
   }
   if (termDollars.state === 'loading') return 'Reading the agreed contract values; any dollar value of credits is held back until they are in.'
   return null
@@ -992,16 +992,16 @@ export function buildThisWeekModel(input: ThisWeekInput): ThisWeekModel {
     const queued = pool.queued.ids.length
       ? ` ${codeList(pool.queued.codes)} (${money(pool.queued.value)} at target) ${pool.queued.ids.length === 1 ? 'is' : 'are'} queued with no credits.`
       : ''
-    const heldNote = pool.hold > 0 ? ` Another ${credits(pool.hold)} sit on held surveys.` : ''
+    const heldNote = pool.hold > 0 ? ` Another ${credits(pool.hold)} sit on held studies.` : ''
     const left = pool.elapsed != null && pool.elapsed < 1 ? ` with ${pctText(1 - pool.elapsed)} of the term left` : ''
     byVerb.topup.push({
       ...rowBase('topup', p, latest.cls, input),
       key: `topup:${pool.termId}`,
       also: [],
-      happened: `“${pool.name}”: ${credits(pool.used)} of ${credits(pool.pool)} credits drawn on ${plural(pool.deliveredSurveys + pool.liveSurveys, 'survey')} — ${credits(pool.over)} over the pool${gone}.${queued}${heldNote}`,
+      happened: `“${pool.name}”: ${credits(pool.used)} of ${credits(pool.pool)} credits drawn on ${plural(pool.deliveredSurveys + pool.liveSurveys, 'study', 'studies')} — ${credits(pool.over)} over the pool${gone}.${queued}${heldNote}`,
       stake: pool.overDollars,
       stakeText: pool.perCredit && pool.overDollars != null
-        ? `≈${money(pool.overDollars)} derived: ${credits(pool.over)} credits × ${money(pool.perCredit.value)} per credit ${pool.perCredit.source === 'agreed' ? 'from the contract value on file' : `implied by ${plural(pool.perCredit.n, 'priced survey')} on this contract`}`
+        ? `≈${money(pool.overDollars)} derived: ${credits(pool.over)} credits × ${money(pool.perCredit.value)} per credit ${pool.perCredit.source === 'agreed' ? 'from the contract value on file' : `implied by ${plural(pool.perCredit.n, 'priced study', 'priced studies')} on this contract`}`
         : `${credits(pool.over)} credits over (${pool.perCreditNote})`,
       derived: pool.overDollars != null,
       action: `Open the renewal with ${pool.account}: the pool is ${credits(pool.over)} credits short${left}.` +
@@ -1085,7 +1085,7 @@ export function buildThisWeekModel(input: ThisWeekInput): ThisWeekModel {
     if (v === 'cap') return capNote(liveFacts, launchesBy)
     if (v === 'price') {
       return ownFirmUnpriced
-        ? `${plural(ownFirmUnpriced, 'live AlphaROC survey')} ${ownFirmUnpriced === 1 ? 'is' : 'are'} left out: our own work has no client to price.`
+        ? `${plural(ownFirmUnpriced, 'live AlphaROC study', 'live AlphaROC studies')} ${ownFirmUnpriced === 1 ? 'is' : 'are'} left out: our own work has no client to price.`
         : null
     }
     if (v === 'trial') return trials?.note ?? null
@@ -1114,7 +1114,7 @@ export function buildThisWeekModel(input: ThisWeekInput): ThisWeekModel {
   })
   const hold = group('hold', byVerb.hold, {
     keepOrder: true,
-    note: spendBlocked ? `${spendBlocked}. Every survey below is still a decision; only the dollars are missing.` : null,
+    note: spendBlocked ? `${spendBlocked}. Every study below is still a decision; only the dollars are missing.` : null,
   })
   // A check that found nothing but could not see part of its population (CAP
   // THE WAVE on waves with no target) keeps its note on screen and is not
@@ -1152,7 +1152,7 @@ function overlapNoteOf(groups: WeekGroup[]): string | null {
   for (const g of groups) for (const r of g.rows) seen.set(r.id, (seen.get(r.id) ?? 0) + 1)
   const n = [...seen.values()].filter(c => c > 1).length
   if (!n) return null
-  return `${plural(n, 'survey')} ${n === 1 ? 'needs' : 'need'} more than one decision, so the “at stake” totals above cover some of the same money twice. Read each group on its own; do not add them together.`
+  return `${plural(n, 'study', 'studies')} ${n === 1 ? 'needs' : 'need'} more than one decision, so the “at stake” totals above cover some of the same money twice. Read each group on its own; do not add them together.`
 }
 
 /** How many live waves the CAP THE WAVE rule cannot judge (no wave target). */
@@ -1167,13 +1167,13 @@ function capNote(facts: Facts[], launchesBy: Map<string, WeekLaunch[]>): string 
     }
   }
   if (!blind) return null
-  return `${fmtNum(blind)} of ${plural(all, 'wave')} on surveys still buying ${blind === 1 ? 'has' : 'have'} no wave target, so ${blind === 1 ? 'it' : 'they'} cannot be checked. Record a target on every wave.`
+  return `${fmtNum(blind)} of ${plural(all, 'wave')} on studies still buying ${blind === 1 ? 'has' : 'have'} no wave target, so ${blind === 1 ? 'it' : 'they'} cannot be checked. Record a target on every wave.`
 }
 
 /* ── HEADER SENTENCE ───────────────────────────────────────────────────── */
 
 function headerSentence(h: ThisWeekHeader): string {
-  const parts = [`${plural(h.live, 'live survey')}`, h.spendBlocked ?? `${money(h.spent)} spent so far`]
+  const parts = [`${plural(h.live, 'live study', 'live studies')}`, h.spendBlocked ?? `${money(h.spent)} spent so far`]
   if (h.priceBlocked) {
     parts.push(`${h.priceBlocked}, so what they are worth is not shown`)
   } else {
@@ -1182,7 +1182,7 @@ function headerSentence(h: ThisWeekHeader): string {
     if (rest > 0) parts.push(`the other ${fmtNum(rest)} ${rest === 1 ? 'has' : 'have'} no price or no target`)
   }
   parts.push(`${fmtNum(h.holds)} on hold, counted on their own`)
-  return `${parts.join(' · ')}. Unsold scoping: ${plural(h.scoping, 'survey')}, not counted.`
+  return `${parts.join(' · ')}. Unsold scoping: ${plural(h.scoping, 'study', 'studies')}, not counted.`
 }
 
 /* ── CREDIT POOLS ───────────────────────────────────────────────────────── */
@@ -1335,17 +1335,17 @@ export function trialRows(input: ThisWeekInput): { rows: WeekRow[]; note: string
     const unknownN = ns.filter(n => n == null).length
     const account = input.accountName(acct)
     const when = head.date ? ` (latest ${dayText(head.date, input.today)})` : ''
-    const nText = unknownN ? `${fmtNum(freeN)} respondents (${plural(unknownN, 'survey')} with no N actual yet)` : `${fmtNum(freeN)} respondents`
-    const since = lastPaid ? ` Its last paid survey was delivered ${dayText(lastPaid, input.today)}.` : ' It has never bought a priced survey.'
+    const nText = unknownN ? `${fmtNum(freeN)} respondents (${plural(unknownN, 'study', 'studies')} with no N actual yet)` : `${fmtNum(freeN)} respondents`
+    const since = lastPaid ? ` Its last paid study was delivered ${dayText(lastPaid, input.today)}.` : ' It has never bought a priced study.'
     out.push({
       ...rowBase('trial', p, head.cls, input),
       key: `trial:${k}`,
       also: open.slice(1).map(it => ({ id: it.p.id, code: it.p.project_code })),
-      happened: `${account} got ${nText} free on ${plural(open.length, 'survey')} at a $0 price${when}, and has bought nothing priced since.${since}`,
+      happened: `${account} got ${nText} free on ${plural(open.length, 'study', 'studies')} at a $0 price${when}, and has bought nothing priced since.${since}`,
       stake: cost,
       stakeText: `${money(cost)} of our field cost given away`,
       derived: false,
-      action: `Send ${account} a priced proposal for the next survey — the free work cost us ${money(cost)}.`,
+      action: `Send ${account} a priced proposal for the next study — the free work cost us ${money(cost)}.`,
       headline: `send ${account} a priced proposal: ${nText} went free`,
       spend: cost,
       bullet: null,
@@ -1353,7 +1353,7 @@ export function trialRows(input: ThisWeekInput): { rows: WeekRow[]; note: string
   }
   return {
     rows: out,
-    note: own ? `${plural(own, 'AlphaROC survey')} delivered at $0 ${own === 1 ? 'is' : 'are'} left out: our own work is not a trial.` : null,
+    note: own ? `${plural(own, 'AlphaROC study', 'AlphaROC studies')} delivered at $0 ${own === 1 ? 'is' : 'are'} left out: our own work is not a trial.` : null,
   }
 }
 
@@ -1511,7 +1511,7 @@ function verdictOf(groups: WeekGroup[], pools: CreditPool[]): string {
     const n = g.rows.length
     const more = n > 1 ? ` (${plural(n - 1, 'more', 'more')} under ${g.meta.label.toLowerCase()})` : ''
     if (v === 'freeze') {
-      say.push(`${plural(n, 'live survey')} still buying ${n === 1 ? 'has' : 'have'} spent more than half ${n === 1 ? 'its' : 'their'} price. ${cap1(g.rows[0].headline)}.`)
+      say.push(`${plural(n, 'live study', 'live studies')} still buying ${n === 1 ? 'has' : 'have'} spent more than half ${n === 1 ? 'its' : 'their'} price. ${cap1(g.rows[0].headline)}.`)
     } else if (v === 'topup') {
       const over = pools.filter(p => p.over > 0).length
       say.push(`${cap1(g.rows[0].headline)}${over > 1 ? ` (${plural(over - 1, 'other contract')} over too)` : ''}.`)
@@ -1522,12 +1522,12 @@ function verdictOf(groups: WeekGroup[], pools: CreditPool[]): string {
   }
   const blocked = groups.filter(g => g.blocked.length).length
   if (blocked) say.push(`${plural(blocked, 'check')} could not run because a table did not load.`)
-  if (!say.length) return 'No live survey needs a decision this week. Keep pricing new work as it is sold.'
+  if (!say.length) return 'No live study needs a decision this week. Keep pricing new work as it is sold.'
   return say.join(' ')
 }
 
 function holdVerdictOf(hold: WeekGroup, h: ThisWeekHeader, input: ThisWeekInput): string {
-  if (!hold.rows.length) return 'No survey is on hold. Keep it that way: decide to resume or cancel as soon as work pauses.'
+  if (!hold.rows.length) return 'No study is on hold. Keep it that way: decide to resume or cancel as soon as work pauses.'
   const top = hold.rows[0]
   const known = input.holdSince.state === 'ok'
     ? hold.rows.filter(r => input.holdSince.state === 'ok' && input.holdSince.value.get(r.id)?.why === 'recorded').length
@@ -1538,8 +1538,8 @@ function holdVerdictOf(hold: WeekGroup, h: ThisWeekHeader, input: ThisWeekInput)
   // With every cost table missing the sunk spend is not $0, it is unknown, and
   // the verdict says which (rule 6).
   const money_ = h.spendBlocked
-    ? `${plural(h.holds, 'survey')} on hold, none of them in the live figures. ${h.spendBlocked}, so what is sunk in them cannot be shown.`
-    : `${plural(h.holds, 'survey')} on hold with ${money(h.holdSpend)} spent, none of it in the live figures.`
+    ? `${plural(h.holds, 'study', 'studies')} on hold, none of them in the live figures. ${h.spendBlocked}, so what is sunk in them cannot be shown.`
+    : `${plural(h.holds, 'study', 'studies')} on hold with ${money(h.holdSpend)} spent, none of it in the live figures.`
   return `${money_}${age} ${cap1(top.headline)} first.`
 }
 
@@ -1548,7 +1548,7 @@ function holdVerdictOf(hold: WeekGroup, h: ThisWeekHeader, input: ThisWeekInput)
 const EXPORT_COLUMNS: { key: string; header: string }[] = [
   { key: 'decision', header: 'Decision' },
   { key: 'bucket', header: 'Bucket' },
-  { key: 'survey', header: 'Survey' },
+  { key: 'survey', header: 'Study' },
   { key: 'also', header: 'Also named' },
   { key: 'account', header: 'Account' },
   { key: 'owner', header: 'Owner (captain)' },
@@ -1556,7 +1556,7 @@ const EXPORT_COLUMNS: { key: string; header: string }[] = [
   // The warning lives in the header because the file is opened in a
   // spreadsheet, where a column of dollars invites a SUM: one survey can carry
   // two or three decisions, so the column does not add up to anything real.
-  { key: 'stake', header: 'At stake ($) — one survey can need several decisions; do not sum this column' },
+  { key: 'stake', header: 'At stake ($) — one study can need several decisions; do not sum this column' },
   { key: 'stakeText', header: 'At stake' },
   { key: 'derived', header: 'Dollars derived from credits' },
   { key: 'action', header: 'What to do' },
@@ -1611,11 +1611,11 @@ export function creditPoolDrill(
   return {
     key: `this-week-pool-${pool.termId}`,
     title: `Credits drawn on “${pool.name}”`,
-    population: `${pool.account} · delivered and live work on this contract · held surveys not counted · every route`,
+    population: `${pool.account} · delivered and live work on this contract · held studies not counted · every route`,
     columns: [
       { key: 'bucket', header: 'Where it is', value: r => (r as PoolDrillRow).bucket, tip: 'Delivered work has drawn its credits; live work is drawing them now.' },
-      { key: 'stage', header: 'Stage', value: r => (r as PoolDrillRow).stage, tip: 'The board column the survey is in now.' },
-      { key: 'contribution', header: 'Credits', value: r => r.contribution, tip: 'The credits this survey draws from the pool. A count, not dollars.', num: true },
+      { key: 'stage', header: 'Stage', value: r => (r as PoolDrillRow).stage, tip: 'The board column the study is in now.' },
+      { key: 'contribution', header: 'Credits', value: r => r.contribution, tip: 'The credits this study draws from the pool. A count, not dollars.', num: true },
     ],
     rows,
     expectedTotal: check.reduce((t, p) => t + (num(p.credits) as number), 0),
@@ -1661,7 +1661,7 @@ export function thisWeekDrills(input: ThisWeekInput, model: ThisWeekModel, popul
   }
   const base = [
     col('account', 'Account', r => r.account),
-    col('stage', 'Stage', r => r.stage, 'The board column the survey is in now.'),
+    col('stage', 'Stage', r => r.stage, 'The board column the study is in now.'),
   ]
   const spendCol = col('spend', 'Spent so far', r => r.spend, 'Recorded field cost: blast rewards and sends, panel CPI × completes, vendor lines, less rewards recovered.', true)
   const spentRows = live.map(it => rowOf(it, f => f.sp.total)).sort((a, b) => b.contribution - a.contribution)
@@ -1673,13 +1673,13 @@ export function thisWeekDrills(input: ThisWeekInput, model: ThisWeekModel, popul
     const back = backlog(live.map(it => it.p), input.rates, input.blasts, input.suppliers, input.costs)
     worth = {
       key: 'this-week-worth',
-      title: 'Live surveys with a price and a target, at target',
+      title: 'Live studies with a price and a target, at target',
       population,
       columns: [
         ...base,
         col('rate', 'Price per N', r => r.rate, 'The client’s price per respondent.', true),
         col('target', 'N sold', r => r.target, 'The N target: what the client bought. Where a range was sold, this is the bottom of it — the N we are sure of; the bill can run to the maximum.', true),
-        col('contribution', 'Worth at target', r => r.contribution, 'Price per N × N sold. An upper bound: surveys often land short. Measured at the bottom of a sold range.', true),
+        col('contribution', 'Worth at target', r => r.contribution, 'Price per N × N sold. An upper bound: studies often land short. Measured at the bottom of a sold range.', true),
         spendCol,
       ],
       rows: live.filter(it => priced.has(it.p.id)).map(it => rowOf(it, f => f.contract as number))
@@ -1693,7 +1693,7 @@ export function thisWeekDrills(input: ThisWeekInput, model: ThisWeekModel, popul
   return {
     spent: {
       key: 'this-week-spent',
-      title: 'Spent so far on live surveys',
+      title: 'Spent so far on live studies',
       population,
       columns: [...base, col('contribution', 'Spent so far', r => r.contribution, spendCol.tip, true)],
       rows: spentRows,
@@ -1705,13 +1705,13 @@ export function thisWeekDrills(input: ThisWeekInput, model: ThisWeekModel, popul
     worth,
     hold: {
       key: 'this-week-hold',
-      title: 'Surveys on hold — their own bucket',
-      population: `On hold · all dates · never in a live figure · ${plural(held.length, 'survey')}`,
+      title: 'Studies on hold — their own bucket',
+      population: `On hold · all dates · never in a live figure · ${plural(held.length, 'study', 'studies')}`,
       columns: [...base, col('contribution', 'Spent so far', r => r.contribution, spendCol.tip, true)],
       rows: heldRows,
       expectedTotal: heldCheck.spend,
       expectedIds: heldCheck.ids,
-      totalLabel: 'Spent on held surveys',
+      totalLabel: 'Spent on held studies',
       format: 'money',
     },
   }

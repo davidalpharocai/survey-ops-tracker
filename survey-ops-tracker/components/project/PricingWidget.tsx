@@ -45,7 +45,7 @@ const TIP = {
   contract:
     'Contract value = Σ(rate × N target min) .. Σ(rate × N target max). Two numbers, not one, because the N target is a range: the low end is what we earn delivering the minimum we committed to, the high end if the client takes the full range. It reads each segment’s own price where one is set; the bill itself uses the project’s one Price / N (see Billable below).',
   profit:
-    'What this survey has actually MADE: what the client is billable for — Price / N × min(N actual, top of the N range), on the survey as a whole — minus Actual $, the trigger-computed spend (blasts + suppliers + flat vendor fees). Billable N is capped at the top of the range the client bought, because delivery above it is never charged, and it uses the cleaned N actual — never the raw N collected — because the cleaned figure is what gets invoiced. Segments do not split the bill: the invoice is the survey’s. The same number the Finance page uses for this survey.',
+    'What this study has actually MADE: what the client is billable for — Price / N × min(N actual, top of the N range), on the study as a whole — minus Actual $, the trigger-computed spend (blasts + suppliers + flat vendor fees). Billable N is capped at the top of the range the client bought, because delivery above it is never charged, and it uses the cleaned N actual — never the raw N collected — because the cleaned figure is what gets invoiced. Segments do not split the bill: the invoice is the study’s. The same number the Finance page uses for this study.',
   profitNoN:
     'Nothing is billable until the cleaned (post-QA) N actual is entered — the raw N collected is never billed. Any spend already incurred is shown as the hole it currently is, which is the honest reading before delivery.',
   profitNoCost:
@@ -53,19 +53,19 @@ const TIP = {
   profitPartialCost:
     'Some of this project’s cost is not recorded yet: a blast is missing either its completes (the reward half) or its sent count (the send half), and a blast only counts toward Actual $ once it has them. So the cost being subtracted is short and this profit is OVERSTATED. Fill in the blanks on the blast lines above and it settles.',
   overage:
-    'Cleaned N delivered ABOVE the top of the N range, and what it would have been worth at this project’s rate. The client is never charged for it — over-delivery is a courtesy (new clients are sometimes over-delivered on purpose the first time) — but we paid the reward and the send cost to collect it. Measured on the survey as a whole, the way it is billed: a segment over its own target while another is under is not over-delivery when the survey is inside its range. Nothing in SOCC showed this figure before.',
+    'Cleaned N delivered ABOVE the top of the N range, and what it would have been worth at this project’s rate. The client is never charged for it — over-delivery is a courtesy (new clients are sometimes over-delivered on purpose the first time) — but we paid the reward and the send cost to collect it. Measured on the study as a whole, the way it is billed: a segment over its own target while another is under is not over-delivery when the study is inside its range. Nothing in SOCC showed this figure before.',
   segmentCounts:
-    'The segments’ N actuals should add up to the survey’s N actual. Nothing is held back when they do not — the bill uses the survey’s N actual — but a segment edit rolls the segments up into the survey’s figure on save, so a mismatch here can change the bill later. Fix whichever one is wrong.',
+    'The segments’ N actuals should add up to the study’s N actual. Nothing is held back when they do not — the bill uses the study’s N actual — but a segment edit rolls the segments up into the study’s figure on save, so a mismatch here can change the bill later. Fix whichever one is wrong.',
   segmentRolledUp:
-    'The survey’s own N actual is blank, so the bill uses the segments’ total instead — every segment has one. Enter the survey’s N actual to make it the survey’s own figure.',
+    'The study’s own N actual is blank, so the bill uses the segments’ total instead — every segment has one. Enter the study’s N actual to make it the study’s own figure.',
   segmentPrice:
-    'The invoice uses one rate per survey — Price / N above. A segment priced differently changes nothing that is billed; it is shown so the two can be made to agree. The contract value and blended rate above still read the segment prices.',
+    'The invoice uses one rate per study — Price / N above. A segment priced differently changes nothing that is billed; it is shown so the two can be made to agree. The contract value and blended rate above still read the segment prices.',
   profitUnpriced:
     'No price per N is set, so there is no revenue side and no profit to compute. Set the rate above.',
   forecast:
     'What the job would be worth if it delivers to its N TARGET — contract value minus Actual $ — shown as a range because the target is a range. This is a PROJECTION, not a result: it assumes an N that has not been collected yet. The Profit row above is the actual position.',
   invoiced:
-    'Price / N × min(N actual, top of the N range), on the survey as a whole — what the client is billable for on what has actually been delivered, before cost. The first of the two numbers behind Profit above. Two deliberate caps: the CLEANED N actual, not the raw N collected, and never more than the top of the range, because N delivered above it is not charged.',
+    'Price / N × min(N actual, top of the N range), on the study as a whole — what the client is billable for on what has actually been delivered, before cost. The first of the two numbers behind Profit above. Two deliberate caps: the CLEANED N actual, not the raw N collected, and never more than the top of the range, because N delivered above it is not charged.',
   unpriced:
     'N belonging to segments with no rate — neither their own nor a project default. It is excluded from the blended rate and from the contract value, so both figures understate the job until it is priced.',
   ceiling:
@@ -294,10 +294,10 @@ export function PricingWidget({ projectId, budget, actualSpend }: PricingWidgetP
     ? null
     : (segCheck.missing > 0
         ? `${fmtNum(segCheck.missing)} of ${fmtNum(segCheck.segments)} segments ${segCheck.missing === 1 ? 'has' : 'have'} no N actual`
-        : `The segments add up to ${fmtNum(segCheck.segmentSum ?? 0)} N, the survey says ${fmtNum(segCheck.surveyN ?? 0)}`) +
+        : `The segments add up to ${fmtNum(segCheck.segmentSum ?? 0)} N, the study says ${fmtNum(segCheck.surveyN ?? 0)}`) +
       (segCheck.surveyN == null
-        ? ', and the survey’s own N actual is blank.'
-        : ' — the bill uses the survey’s.')
+        ? ', and the study’s own N actual is blank.'
+        : ' — the bill uses the study’s.')
 
   // Totals across ALL lines (priced or not) — this is the N the client is being
   // quoted, which is not the same as the N that has a price on it.
@@ -569,7 +569,7 @@ export function PricingWidget({ projectId, budget, actualSpend }: PricingWidgetP
             <span className="flex items-center text-[11px] text-muted-foreground">
               Billable at N {fmtNum(nBillableTotal)}
               <InfoTooltip text={TIP.invoiced} />
-              <CalcMark from="Price / N × min(N actual, top of N range), whole survey" />
+              <CalcMark from="Price / N × min(N actual, top of N range), whole study" />
             </span>
             <span className="text-xs tabular-nums text-muted-foreground">
               {money(invoiced)} − {hasRecordedCost(actualSpend) ? money(actualSpend) : '$0.00'} spent
@@ -586,7 +586,7 @@ export function PricingWidget({ projectId, budget, actualSpend }: PricingWidgetP
             <span className="flex items-center text-[11px] text-muted-foreground">
               Over target by {fmtNum(over.n)} N — not billable
               <InfoTooltip text={TIP.overage} />
-              <CalcMark from="max(0, N actual − top of N range), whole survey" />
+              <CalcMark from="max(0, N actual − top of N range), whole study" />
             </span>
             <span className="text-xs font-medium tabular-nums text-amber-600 dark:text-amber-400">
               {over.dollars > 0 ? `${money(over.dollars)} given away` : 'unpriced'}
@@ -599,7 +599,7 @@ export function PricingWidget({ projectId, budget, actualSpend }: PricingWidgetP
             and the survey agree (the Finance page lists them under Improve). */}
         {billed.nSource === 'segments' && (
           <p className="flex items-center pl-3 text-[11px] text-muted-foreground">
-            Billed on the segments’ total of {fmtNum(nDeliveredTotal)} N: the survey’s own N actual is blank.
+            Billed on the segments’ total of {fmtNum(nDeliveredTotal)} N: the study’s own N actual is blank.
             <InfoTooltip text={TIP.segmentRolledUp} />
           </p>
         )}

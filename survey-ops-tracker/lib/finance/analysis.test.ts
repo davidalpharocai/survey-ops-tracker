@@ -346,7 +346,7 @@ describe('exceptions: one row per survey, every badge, ranked in dollars', () =>
     const e = exceptions(pnl, budgetVariance(rows, blasts, [], [], ACC), med, FIN)
     expect(e[0].id).toBe('out')
     expect(e[0].amount).toBeCloseTo(9000)
-    expect(e[0].headline).toContain('$9,000 more than a typical blast survey')
+    expect(e[0].headline).toContain('$9,000 more than a typical blast study')
   })
 
   it('flags a CPQR outlier only when the survey reconciles', () => {
@@ -377,7 +377,7 @@ describe('exceptions: one row per survey, every badge, ranked in dollars', () =>
     expect(e[0].verb).toBe('Make the segment N actuals add up')
     expect(e[0].headline).toBe('PR00001: 1 of 2 segments has no N actual')
     // 500 is the counted segment's sum: the reader is told what that costs them.
-    expect(e[0].detail).toContain('Cost per respondent and scrub leave this survey out')
+    expect(e[0].detail).toContain('Cost per respondent and scrub leave this study out')
     // Nothing is at stake in dollars, so it ranks below anything that is.
     expect(e[0].amount).toBe(0)
     // It is counts, not prices: an analyst gets it too.
@@ -390,8 +390,8 @@ describe('exceptions: one row per survey, every badge, ranked in dollars', () =>
       { id: 'b', project_id: 'y', n_target: 500, n_actual: 400 },
     ] })
     const e = exceptions(surveyPnl([p], new Map(), [B('y', 1, 1000)], [], [], ACC), NONE, med, FIN)
-    expect(e[0].headline).toBe('PR00001: the segments add up to 900 N, the survey says 950')
-    expect(e[0].detail).toContain("Correct the segments, or the survey's N actual")
+    expect(e[0].headline).toBe('PR00001: the segments add up to 900 N, the study says 950')
+    expect(e[0].detail).toContain("Correct the segments, or the study's N actual")
   })
 
   it('tells a reader to check the count before acting on a cost outlier whose segments disagree', () => {

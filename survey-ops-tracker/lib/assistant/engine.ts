@@ -100,7 +100,7 @@ export async function commitWrite(
 
 /** Trimmed, in-app-flavored system prompt. Reuses the connector's guidance verbatim. */
 export function buildSystemPrompt(opts: { today: string; context?: { pr?: string; cl?: string } }): string {
-  let prompt = `You are the AlphaRoc Study Ops ✦ Assistant, embedded in the team's survey project tracker web app and talking to a logged-in AlphaRoc team member. Today's date: ${opts.today}.
+  let prompt = `You are the AlphaRoc Study Ops ✦ Assistant, embedded in the team's study project tracker web app and talking to a logged-in AlphaRoc team member. Today's date: ${opts.today}.
 
 ${MCP_INSTRUCTIONS}
 

@@ -380,7 +380,7 @@ export function buildPerRespondentModel(input: PerRespondentInput): PerResponden
     'What one respondent costs us, by route, and what that means for the next quote. ' +
     'Panel (PureSpectrum) and blast (B2B email and text) are different products' +
     (routeRatio != null ? ` — a qualified blast respondent costs about ${fmtNum(Math.round(routeRatio))}× a panel one here —` : ',') +
-    ' so they are never averaged. Quote from the typical survey; use the pooled figure to understand the book.'
+    ' so they are never averaged. Quote from the typical study; use the pooled figure to understand the book.'
 
   const footnote = tile4Footnote(cov.mixed, cov.partialRollUp, byId)
   const unplacedPriced = pricesOk ? unplacedPricedOf(rows, cards, raw.rates, routeOfId) : null
@@ -452,7 +452,7 @@ function routeCard(
       route, title, cpqr: null, thin: true, qaRemoved: null, rows: [], quote: null, priceNote: null, buy: null,
       concentration: null, waveSpread: null,
       lines: {
-        coverage: `No delivered ${route} survey in view has both a recorded cost and a post-QA count whose records add up.`,
+        coverage: `No delivered ${route} study in view has both a recorded cost and a post-QA count whose records add up.`,
         recovered: null, quote: null, quotePriced: null, buy: null, concentration: null,
       },
     }
@@ -566,8 +566,8 @@ function routeCard(
 
   // ── the sentences ─────────────────────────────────────────────────────────
   const bits: string[] = []
-  bits.push(`${fmtNum(c.ids.length)} ${plural(c.ids.length, 'survey')} whose records add up`)
-  if (c.mixed > 0) bits.push(`${fmtNum(c.mixed)} of them one side of a survey fielded both ways, counted on its own money`)
+  bits.push(`${fmtNum(c.ids.length)} ${plural(c.ids.length, 'study', 'studies')} whose records add up`)
+  if (c.mixed > 0) bits.push(`${fmtNum(c.mixed)} of them one side of a study fielded both ways, counted on its own money`)
   if (c.excluded > 0) bits.push(`${fmtNum(c.excluded)} left out because their field rows do not cover the N they claim`)
   if (c.partialHeldOut > 0) bits.push(`${fmtNum(c.partialHeldOut)} left out because the N actual counts only some segments`)
   const coverage = bits.join('; ') + '.'
@@ -577,21 +577,21 @@ function routeCard(
     : null
 
   const tooFewHere = (what: string) =>
-    `${TOO_FEW.charAt(0).toUpperCase() + TOO_FEW.slice(1)}: ${what} needs ${fmtNum(MIN_CLASS_N)} surveys with a delivered N, and this card has ${fmtNum(c.n)}.`
+    `${TOO_FEW.charAt(0).toUpperCase() + TOO_FEW.slice(1)}: ${what} needs ${fmtNum(MIN_CLASS_N)} studies with a delivered N, and this card has ${fmtNum(c.n)}.`
   // money2 on all four: a unit rate the sentence multiplies keeps its cents
   // (roundCents), or the multiplication printed beside it does not work out.
   const quoteLine = thin ? tooFewHere('a quote floor') : quote
-    ? `Quote at least ${money2(quote.floor)} per billed respondent — ${timesText(quote.multiple)} the typical ${money2(quote.typical)} it costs us (${fmtNum(quote.n)} ${plural(quote.n, 'survey')}). ` +
+    ? `Quote at least ${money2(quote.floor)} per billed respondent — ${timesText(quote.multiple)} the typical ${money2(quote.typical)} it costs us (${fmtNum(quote.n)} ${plural(quote.n, 'study', 'studies')}). ` +
       `At the ${pctText(KEEP_GOAL)} goal, that is the floor. To be safe on ${fmtNum(quote.safeCovers)} of ${fmtNum(quote.n)}, quote ${money2(quote.safeFloor)} (${timesText(quote.multiple)} the dearer quarter’s ${money2(quote.p75)}).`
-    : `No survey on this card has a billed N (a delivered N and an N sold), so there is no quote floor.`
+    : `No study on this card has a billed N (a delivered N and an N sold), so there is no quote floor.`
   const quotePriced = !thin && quote && quote.priced != null
     ? (quote.priced === 0
-      ? `No ${route} survey in view is priced above $0 to compare with the floor.`
-      : `${fmtNum(quote.below ?? 0)} of ${fmtNum(quote.priced)} ${route} ${plural(quote.priced, 'survey')} priced above $0 in view ${quote.priced === 1 ? 'was' : 'were'} quoted below the floor, and ${fmtNum(quote.belowSafe ?? 0)} below the safer one.`)
+      ? `No ${route} study in view is priced above $0 to compare with the floor.`
+      : `${fmtNum(quote.below ?? 0)} of ${fmtNum(quote.priced)} ${route} ${plural(quote.priced, 'study', 'studies')} priced above $0 in view ${quote.priced === 1 ? 'was' : 'were'} quoted below the floor, and ${fmtNum(quote.belowSafe ?? 0)} below the safer one.`)
     : null
 
   const buyLine = thin ? tooFewHere('a buy multiple') : buy
-    ? `Buy ${timesText(buy.multiple)} the target — that covers ${fmtNum(buy.covered)} of ${fmtNum(buy.of)} past surveys. (A quarter of surveys kept ${pctText(buy.keepP25)} or less of what we bought; 1 ÷ that is the multiple.)`
+    ? `Buy ${timesText(buy.multiple)} the target — that covers ${fmtNum(buy.covered)} of ${fmtNum(buy.of)} past studies. (A quarter of studies kept ${pctText(buy.keepP25)} or less of what we bought; 1 ÷ that is the multiple.)`
     : null
 
   // "Panel spend here" alone is ambiguous: the SAME sentence is printed by the
@@ -607,7 +607,7 @@ function routeCard(
   // The comparison with what clients were quoted is missing, not absent: say
   // why, in place of the line it would have printed.
   const priceNote = !ctx.pricesOk && !thin && quote && ctx.priceBlock
-    ? `${ctx.priceBlock}. Client prices are missing, not zero, so no ${route} survey here can be checked against the floor.`
+    ? `${ctx.priceBlock}. Client prices are missing, not zero, so no ${route} study here can be checked against the floor.`
     : null
 
   return {
@@ -664,7 +664,7 @@ function tile4Footnote(mixed: MixedCoverage, partial: PartialRollUpNote, byId: M
   const bothWays = out > 0
     ? {
       surveys: out, spend: mixed.blockedSpend,
-      text: `${fmtNum(out)} ${plural(out, 'survey')} fielded both ways (${money(mixed.blockedSpend)}) ${out === 1 ? 'is' : 'are'} in neither card until ${out === 1 ? 'its' : 'their'} delivered N can be split by route` +
+      text: `${fmtNum(out)} ${plural(out, 'study', 'studies')} fielded both ways (${money(mixed.blockedSpend)}) ${out === 1 ? 'is' : 'are'} in neither card until ${out === 1 ? 'its' : 'their'} delivered N can be split by route` +
         (reasons.length ? `: ${reasons.join('; ')}.` : '.'),
     }
     : null
@@ -716,7 +716,7 @@ export function unplacedPricedOf(
   if (noFloor) bits.push(`${fmtNum(noFloor)} on a route with no quote floor in this view`)
   return {
     surveys, mixed, noRows, noFloor,
-    text: `${surveys === 1 ? 'One more' : `Another ${fmtNum(surveys)}`} priced ${plural(surveys, 'survey')} in view could not be checked against a route floor: ${bits.join(', ')}.`,
+    text: `${surveys === 1 ? 'One more' : `Another ${fmtNum(surveys)}`} priced ${plural(surveys, 'study', 'studies')} in view could not be checked against a route floor: ${bits.join(', ')}.`,
   }
 }
 
@@ -730,9 +730,9 @@ function verdictTile4(cards: RouteCard[], priceBlock: string | null, unplaced: U
     })
   if (!parts.length) {
     if (cards.some(c => c.cpqr)) {
-      return `${TOO_FEW.charAt(0).toUpperCase() + TOO_FEW.slice(1)}: neither route has ${fmtNum(MIN_CLASS_N)} surveys behind a quote floor in this view — widen the date range or clear a filter.`
+      return `${TOO_FEW.charAt(0).toUpperCase() + TOO_FEW.slice(1)}: neither route has ${fmtNum(MIN_CLASS_N)} studies behind a quote floor in this view — widen the date range or clear a filter.`
     }
-    return 'No delivered survey in view has a recorded cost and a post-QA count that add up, so there is nothing to price from yet — record the N actual at delivery.'
+    return 'No delivered study in view has a recorded cost and a post-QA count that add up, so there is nothing to price from yet — record the N actual at delivery.'
   }
   const first = parts.join('; ')
   const priced = called.reduce((t, c) => t + (c.quote?.priced ?? 0), 0)
@@ -743,13 +743,13 @@ function verdictTile4(cards: RouteCard[], priceBlock: string | null, unplaced: U
   // to read as an unpriced book (load.ts priceBlockText).
   const tail = !havePrices
     ? (priceBlock
-      ? ` ${priceBlock}. Client prices are missing, not zero, so no survey in view can be checked against the floor.`
+      ? ` ${priceBlock}. Client prices are missing, not zero, so no study in view can be checked against the floor.`
       : '')
     : priced === 0
-      ? ' No survey in view is priced above $0 to check against the floor.'
+      ? ' No study in view is priced above $0 to check against the floor.'
       : below > 0
-        ? ` ${fmtNum(below)} of ${fmtNum(priced)} priced ${plural(priced, 'survey')} in view ${priced === 1 ? 'was' : 'were'} quoted below ${below === 1 ? 'its' : 'their'} route’s floor — re-price those accounts’ next waves.`
-        : ` All ${fmtNum(priced)} priced ${plural(priced, 'survey')} in view ${priced === 1 ? 'was' : 'were'} quoted at or above the floor — keep quoting from it.`
+        ? ` ${fmtNum(below)} of ${fmtNum(priced)} priced ${plural(priced, 'study', 'studies')} in view ${priced === 1 ? 'was' : 'were'} quoted below ${below === 1 ? 'its' : 'their'} route’s floor — re-price those accounts’ next waves.`
+        : ` All ${fmtNum(priced)} priced ${plural(priced, 'study', 'studies')} in view ${priced === 1 ? 'was' : 'were'} quoted at or above the floor — keep quoting from it.`
   // The denominator above counts only the routes it could place; the rest are
   // named rather than dropped.
   const rest = havePrices && unplaced ? ` ${unplaced.text}` : ''
@@ -759,14 +759,14 @@ function verdictTile4(cards: RouteCard[], priceBlock: string | null, unplaced: U
 /* ── levers ─────────────────────────────────────────────────────────────── */
 
 const NULL_REASON: Record<LeverKey, string> = {
-  'bid-premium': 'No survey in this view ran more than one bid level.',
+  'bid-premium': 'No study in this view ran more than one bid level.',
   'sms-rate': 'No text blasts in this view.',
   'wave-spread': 'No wave in this view bought from two panels at different prices.',
-  'dead-streak': 'No survey in this view kept sending after two dead blasts.',
+  'dead-streak': 'No study in this view kept sending after two dead blasts.',
   'launch-overrun': 'No PureSpectrum wave in this view ran past its target.',
-  'sell-range': 'No repeat survey priced above $0 was delivered past the N sold in this view.',
-  'top-up': 'No survey priced above $0 came in short of the N sold in this view.',
-  'price-gap': 'Needs two accounts fielded the same way, each with priced surveys, to compare.',
+  'sell-range': 'No repeat study priced above $0 was delivered past the N sold in this view.',
+  'top-up': 'No study priced above $0 came in short of the N sold in this view.',
+  'price-gap': 'Needs two accounts fielded the same way, each with priced studies, to compare.',
 }
 
 function nullReason(
@@ -780,7 +780,7 @@ function nullReason(
   return `No wave with a target ran past it here; ${fmtNum(cover.blind)} of ${fmtNum(cover.waves)} waves carry no target, so the lever cannot see ${cover.blind === 1 ? 'that one' : 'those'}.`
 }
 
-export const TOO_FEW = 'too few surveys here to call'
+export const TOO_FEW = 'too few studies here to call'
 
 function slotFor(key: LeverKey, side: 'save' | 'earn', lever: Lever | null, reasonIfNull: string): LeverSlot {
   if (!lever) {
@@ -818,8 +818,8 @@ function verdictTile5(t: LeverTile): string {
   const earn = t.earn.find(s => s.callable)
   if (!save && !earn) {
     return t.population.length
-      ? 'Nothing here has enough surveys behind it to act on yet — widen the date range or clear a filter to see the levers.'
-      : 'No delivered or live survey is in this view — widen the date range or clear a filter.'
+      ? 'Nothing here has enough studies behind it to act on yet — widen the date range or clear a filter to see the levers.'
+      : 'No delivered or live study is in this view — widen the date range or clear a filter.'
   }
   const bits: string[] = []
   if (save) bits.push(`Start on cost with “${save.title}” (${save.range})`)
@@ -897,14 +897,14 @@ function rejectedRules(ctx: {
   if (rp.tested > 0) {
     const ms = rp.multiples.map(x => `${timesText(x.multiple)} on ${x.route}`).join(' and ')
     capNow.push(
-      `Replayed survey by survey on the ${fmtNum(rp.tested)} ${plural(rp.tested, 'survey')} in this view with an N sold, a cap at ${ms} (the target ÷ the typical keep rate) ` +
+      `Replayed study by study on the ${fmtNum(rp.tested)} ${plural(rp.tested, 'study', 'studies')} in this view with an N sold, a cap at ${ms} (the target ÷ the typical keep rate) ` +
       `would have stopped ${fmtNum(rp.capped)} early and saved ${money(rp.saved)} — and left ${fmtNum(rp.broken)} ${plural(rp.broken, 'delivery', 'deliveries')} short of the N sold` +
       (ctx.pricesOk && rp.broken > rp.brokenUnpriced
         ? `, ${money(rp.brokenWorth)} of client price on the priced ones, with ${money(rp.brokenLost)} less on the bill.`
         : '.'),
     )
   } else {
-    capNow.push('No survey in this view has a reconciled cost, a keep rate and an N sold, so the replay cannot be run here.')
+    capNow.push('No study in this view has a reconciled cost, a keep rate and an N sold, so the replay cannot be run here.')
   }
   // Nor can the keep be forecast from the account: the widest spread in view.
   const byAccount = new Map<string, number[]>()
@@ -924,13 +924,13 @@ function rejectedRules(ctx: {
     if (!widest || median - p25 > widest.median - widest.p25) widest = { acc, p25, median }
   }
   capNow.push(widest
-    ? `Nor can the keep rate be forecast from the account: at ${ctx.nameOf(widest.acc)}, a quarter of surveys kept ${pctText(widest.p25)} or less of what we bought, against a median of ${pctText(widest.median)}.`
-    : `No account in this view has ${fmtNum(MIN_CLASS_N)} or more surveys with a keep rate, so the spread within an account cannot be shown here.`)
+    ? `Nor can the keep rate be forecast from the account: at ${ctx.nameOf(widest.acc)}, a quarter of studies kept ${pctText(widest.p25)} or less of what we bought, against a median of ${pctText(widest.median)}.`
+    : `No account in this view has ${fmtNum(MIN_CLASS_N)} or more studies with a keep rate, so the spread within an account cannot be shown here.`)
 
   // 2 ── move blast work onto the panel
   const [panel, blast] = [ctx.cards[0].cpqr, ctx.cards[1].cpqr]
   const moveNow = panel && blast && panel.median > 0
-    ? [`Here a qualified blast respondent costs about ${fmtNum(Math.round(blast.median / panel.median))}× a panel one on the typical survey — and that gap is what the routes reach, not how well they are bought.`]
+    ? [`Here a qualified blast respondent costs about ${fmtNum(Math.round(blast.median / panel.median))}× a panel one on the typical study — and that gap is what the routes reach, not how well they are bought.`]
     : ['This view does not hold both routes, so the gap between them cannot be shown here.']
 
   // 3 ── switch text blasts to email
@@ -954,10 +954,10 @@ function rejectedRules(ctx: {
   const emailRate = eP > 0 ? eC / eP : 0, textRate = tP > 0 ? tC / tP : 0
   const smsNow: string[] = both.length && emailRate > 0 && textRate > 0
     ? [
-      `Inside the same survey, email answered about ${fmtNum(Math.round(textRate / emailRate))}× worse than text (${fmtNum(both.length)} ${plural(both.length, 'survey')} in this view sent both). ` +
+      `Inside the same study, email answered about ${fmtNum(Math.round(textRate / emailRate))}× worse than text (${fmtNum(both.length)} ${plural(both.length, 'study', 'studies')} in this view sent both). ` +
       `Replacing the ${fmtNum(textCompletes)} text completes here by email would need about ${aboutText(textCompletes / emailRate)} addresses, against ${fmtNum(emailsSent)} emails sent in this view.`,
     ]
-    : ['No survey in this view sent both email and text blasts with a response, so the comparison cannot be recomputed here.']
+    : ['No study in this view sent both email and text blasts with a response, so the comparison cannot be recomputed here.']
 
   return [
     {
@@ -967,7 +967,7 @@ function rejectedRules(ctx: {
         'The obvious rule, and the one three separate analyses reached for first. It has no input: the QA keep rate is written at delivery, after the money is spent.',
         ...capNow,
       ],
-      dated: 'the keep rate had landed before a survey’s last blast on 11 of 412 surveys. That timing needs the change history, so it is not recomputed here.',
+      dated: 'the keep rate had landed before a study’s last blast on 11 of 412 studies. That timing needs the change history, so it is not recomputed here.',
     },
     {
       key: 'blast-to-panel',
@@ -1007,18 +1007,18 @@ export function routeDrill(card: RouteCard, raw: Pick<PerRespondentRaw, 'blasts'
   if (!c) return null
   const columns: DrillColumn[] = [
     { key: 'account', header: 'Account', tip: 'The client account.', value: r => cell(r, 'account') },
-    { key: 'spend', header: 'Spend', num: true, tip: 'Recorded field cost on this route for the survey, net of rewards that came back.', value: r => moneyCell(r, 'spend') },
+    { key: 'spend', header: 'Spend', num: true, tip: 'Recorded field cost on this route for the study, net of rewards that came back.', value: r => moneyCell(r, 'spend') },
     { key: 'paid', header: 'Bought', num: true, tip: 'Completes we paid for on this route.', value: r => numCell(r, 'paid') },
     { key: 'delivered', header: 'Delivered', num: true, tip: 'Qualified respondents the client received from this route, after QA.', value: r => numCell(r, 'delivered') },
     { key: 'perComplete', header: 'Per complete', num: true, tip: 'Spend ÷ completes bought.', value: r => moneyCell(r, 'perComplete') },
     { key: 'cpqr', header: 'CPQR', num: true, tip: 'Cost per qualified respondent: spend ÷ delivered.', value: r => moneyCell(r, 'cpqr') },
     { key: 'keep', header: 'Kept', num: true, tip: 'Delivered ÷ bought: the share of what we paid for that survived QA.', value: r => pctCell(r, 'keep') },
-    { key: 'aboveTypical', header: 'Above typical', num: true, tip: `(This survey’s CPQR − the typical ${moneyAuto(c.median)}) × its delivered N: what it cost above a typical survey. Negative means cheaper than typical.`, value: r => moneyCell(r, 'aboveTypical') },
+    { key: 'aboveTypical', header: 'Above typical', num: true, tip: `(This study’s CPQR − the typical ${moneyAuto(c.median)}) × its delivered N: what it cost above a typical study. Negative means cheaper than typical.`, value: r => moneyCell(r, 'aboveTypical') },
   ]
   return {
     key: `per-respondent-${card.route}`,
-    title: `${card.title}: surveys ranked by cost above the typical survey`,
-    population: `${chip} · the ${fmtNum(c.ids.length)} surveys behind the ${card.route} rate, ranked by (their cost per qualified respondent − the typical ${moneyAuto(c.median)}) × delivered N`,
+    title: `${card.title}: studies ranked by cost above the typical study`,
+    population: `${chip} · the ${fmtNum(c.ids.length)} studies behind the ${card.route} rate, ranked by (their cost per qualified respondent − the typical ${moneyAuto(c.median)}) × delivered N`,
     columns,
     rows: card.rows.map(r => ({ ...r, contribution: r.spend })),
     expectedTotal: routeSpendOfIds(c.ids, card.route, raw.blasts, raw.suppliers, raw.costs),
@@ -1054,11 +1054,11 @@ export function belowFloorDrill(card: RouteCard, model: Pick<PerRespondentModel,
   return {
     key: `per-respondent-${card.route}-below-floor`,
     title: `${card.title}: priced below the ${money2(q.floor)} floor`,
-    population: `${chip} · ${card.route} surveys priced above $0 whose price per N is under ${timesText(q.multiple)} the typical cost per billed respondent`,
+    population: `${chip} · ${card.route} studies priced above $0 whose price per N is under ${timesText(q.multiple)} the typical cost per billed respondent`,
     columns: [
       { key: 'account', header: 'Account', tip: 'The client account.', value: r => cell(r, 'account') },
-      { key: 'rate', header: 'Price / N', num: true, tip: 'The client’s price per respondent on this survey.', value: r => moneyCell(r, 'rate') },
-      { key: 'gapPer', header: 'Below floor by', num: true, tip: `The floor (${money2(q.floor)}) minus this survey’s price per N.`, value: r => moneyCell(r, 'gapPer') },
+      { key: 'rate', header: 'Price / N', num: true, tip: 'The client’s price per respondent on this study.', value: r => moneyCell(r, 'rate') },
+      { key: 'gapPer', header: 'Below floor by', num: true, tip: `The floor (${money2(q.floor)}) minus this study’s price per N.`, value: r => moneyCell(r, 'gapPer') },
       { key: 'billableN', header: 'Billed N', num: true, tip: 'min(delivered, the top of the N sold) — the N the price applies to.', value: r => numCell(r, 'billableN') },
       { key: 'revenue', header: 'Client price', num: true, tip: 'Price per N × billed N.', value: r => moneyCell(r, 'revenue') },
       { key: 'marginPct', header: 'We keep', num: true, tip: 'What is left after field cost, before salaries and overhead, as a share of client price.', value: r => pctCell(r, 'marginPct') },
@@ -1066,7 +1066,7 @@ export function belowFloorDrill(card: RouteCard, model: Pick<PerRespondentModel,
     rows,
     expectedTotal: expected,
     expectedIds: q.belowIds,
-    totalLabel: 'Client price on these surveys',
+    totalLabel: 'Client price on these studies',
     format: 'money',
   }
 }
@@ -1096,7 +1096,7 @@ export function leverDrill(
   const costCols: DrillColumn[] = [
     ...base,
     { key: 'collected', header: 'Bought', num: true, tip: 'Completes collected (before QA).', value: r => numCell(r, 'collected') },
-    { key: 'cost', header: 'Recorded cost', num: true, tip: 'Everything recorded against the survey, net of rewards that came back.', value: r => moneyCell(r, 'cost') },
+    { key: 'cost', header: 'Recorded cost', num: true, tip: 'Everything recorded against the study, net of rewards that came back.', value: r => moneyCell(r, 'cost') },
   ]
   const pnl = new Map(model.pnl.map(r => [r.id, r]))
   const ladder = model.levers.ladder
@@ -1104,18 +1104,18 @@ export function leverDrill(
   if (l.side === 'save') {
     const rows = leverRows(l, model.pnl)
     const extra = l.key === 'bid-premium' && ladder && ladder.headToHead > 0
-      ? ` · Head to head (500+ sends at each bid), the higher bid got a worse response on ${fmtNum(ladder.worseAfterRaise)} of ${fmtNum(ladder.headToHead)} surveys; ` +
-        `per complete it paid ${moneyAuto(ladder.raised.costPer)} against ${moneyAuto(ladder.base.costPer)} at each survey’s own lowest bid`
+      ? ` · Head to head (500+ sends at each bid), the higher bid got a worse response on ${fmtNum(ladder.worseAfterRaise)} of ${fmtNum(ladder.headToHead)} studies; ` +
+        `per complete it paid ${moneyAuto(ladder.raised.costPer)} against ${moneyAuto(ladder.base.costPer)} at each study’s own lowest bid`
       : ''
     return {
       key: `lever-${l.key}`,
       title: l.title + tooFew,
-      population: `${chip} · ${l.population}${extra}. Rows are each survey’s full recorded cost, not the saving`,
+      population: `${chip} · ${l.population}${extra}. Rows are each study’s full recorded cost, not the saving`,
       columns: costCols,
       rows,
       expectedTotal: spendOfIds(l.ids, raw.blasts, raw.suppliers, raw.costs),
       expectedIds: l.ids,
-      totalLabel: 'Recorded cost on these surveys — the saving is a slice of it, not all of it',
+      totalLabel: 'Recorded cost on these studies — the saving is a slice of it, not all of it',
       format: 'money',
     }
   }
@@ -1138,10 +1138,10 @@ export function leverDrill(
     return {
       key: `lever-${l.key}`,
       title: l.title + tooFew,
-      population: `${chip} · ${l.population}. ${l.note ?? ''} Rows are the surveys weighed, at each client’s own price — no pair could be called, so no figure is claimed`,
+      population: `${chip} · ${l.population}. ${l.note ?? ''} Rows are the studies weighed, at each client’s own price — no pair could be called, so no figure is claimed`,
       columns: [
         ...base,
-        { key: 'rate', header: 'Price / N', num: true, tip: 'The client’s price per respondent on this survey.', value: r => moneyCell(r, 'rate') },
+        { key: 'rate', header: 'Price / N', num: true, tip: 'The client’s price per respondent on this study.', value: r => moneyCell(r, 'rate') },
         { key: 'billableN', header: 'Billed N', num: true, tip: 'min(delivered, the top of the N sold).', value: r => numCell(r, 'billableN') },
         { key: 'revenue', header: 'Client price', num: true, tip: 'Price per N × billed N.', value: r => moneyCell(r, 'revenue') },
         { key: 'costPerBilled', header: 'Cost / billed N', num: true, tip: 'Recorded cost ÷ billed N — the same denominator as the price, which is what the comparison needs.', value: r => moneyCell(r, 'costPerBilled') },
@@ -1149,7 +1149,7 @@ export function leverDrill(
       rows,
       expectedTotal: null,
       expectedIds: l.ids,
-      totalLabel: 'Client price on the surveys weighed — no pair could be called, so no figure is claimed',
+      totalLabel: 'Client price on the studies weighed — no pair could be called, so no figure is claimed',
       format: 'money',
     }
   }
@@ -1196,7 +1196,7 @@ export function leverDrill(
         { key: 'actual', header: 'Delivered', num: true, tip: 'The N actual the client received.', value: r => numCell(r, 'actual') },
         { key: 'shortN', header: 'Short by', num: true, tip: 'N sold minus N delivered.', value: r => numCell(r, 'shortN') },
         { key: 'rate', header: 'Price / N', num: true, tip: 'The client’s own price per respondent.', value: r => moneyCell(r, 'rate') },
-        { key: 'cpqr', header: 'Its CPQR', num: true, tip: 'What one qualified respondent cost on this survey.', value: r => moneyCell(r, 'cpqr') },
+        { key: 'cpqr', header: 'Its CPQR', num: true, tip: 'What one qualified respondent cost on this study.', value: r => moneyCell(r, 'cpqr') },
       ],
       rows,
       // hub.ts foregone: the same shortfall at the same price, summed off the
@@ -1221,7 +1221,7 @@ export function leverDrill(
     population: `${chip} · ${l.population}. Each row: what it would have brought at ${nameOf(b.accountId)}’s ${moneyAuto(b.rate)} per billed respondent, less what it did bring`,
     columns: [
       ...base,
-      { key: 'rate', header: 'Price / N', num: true, tip: 'The client’s price per respondent on this survey.', value: r => moneyCell(r, 'rate') },
+      { key: 'rate', header: 'Price / N', num: true, tip: 'The client’s price per respondent on this study.', value: r => moneyCell(r, 'rate') },
       { key: 'billableN', header: 'Billed N', num: true, tip: 'min(delivered, the top of the N sold).', value: r => numCell(r, 'billableN') },
       { key: 'costPerBilled', header: 'Cost / billed N', num: true, tip: 'Recorded cost ÷ billed N — the same denominator as the price.', value: r => moneyCell(r, 'costPerBilled') },
       { key: 'revenue', header: 'Client price', num: true, tip: 'Price per N × billed N.', value: r => moneyCell(r, 'revenue') },
@@ -1238,7 +1238,7 @@ export function leverDrill(
 
 export const TILE4_EXPORT_COLUMNS: { key: string; header: string }[] = [
   { key: 'route', header: 'Route' },
-  { key: 'code', header: 'Survey' },
+  { key: 'code', header: 'Study' },
   { key: 'account', header: 'Account' },
   { key: 'mixed', header: 'Fielded both ways' },
   { key: 'spend', header: 'Spend on this route (net)' },
@@ -1248,7 +1248,7 @@ export const TILE4_EXPORT_COLUMNS: { key: string; header: string }[] = [
   { key: 'perComplete', header: 'Cost per complete bought' },
   { key: 'cpqr', header: 'Cost per qualified respondent' },
   { key: 'keep', header: 'Kept after QA' },
-  { key: 'aboveTypical', header: 'Cost above the typical survey' },
+  { key: 'aboveTypical', header: 'Cost above the typical study' },
   { key: 'billedN', header: 'Billed N' },
   { key: 'costPerBilledN', header: 'Cost per billed respondent' },
   { key: 'rate', header: 'Price per N' },

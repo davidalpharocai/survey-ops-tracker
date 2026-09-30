@@ -60,12 +60,12 @@ interface Col {
 }
 
 const COLS: Col[] = [
-  { id: 'client', label: 'Client', title: 'The account this survey belongs to.', sort: r => r.client ?? null },
+  { id: 'client', label: 'Client', title: 'The account this study belongs to.', sort: r => r.client ?? null },
   { id: 'requested', label: 'Requested by', title: 'The client contact who asked for it.', sort: r => r.requested_by_name ?? null },
   { id: 'stage', label: 'Stage', title: 'Where it is: its pipeline position while it is running, or how it ended — Delivered, On hold, Cancelled, Archived.', sort: r => stageOf(r) },
   { id: 'target', label: 'Target', title: 'The agreed number of responses, as a range where one was agreed. The same N field the product team sees.', numeric: true, sort: r => r.n_target ?? null },
-  { id: 'final', label: 'Final', title: 'Responses delivered after quality review, and how that compares with the target. Only an unmarked figure is a final one: “so far” is a count still coming in, “~ … est.” is projected while a survey is in quality review, and “not final” is a field count on a survey whose delivered figure was never recorded.', numeric: true, sort: r => r.n_actual ?? r.n_collected },
-  { id: 'credits', label: 'Credits', title: 'What this survey costs the client in credits. Blank means it has not been priced yet — not that it is free.', numeric: true, sort: r => r.credits ?? null },
+  { id: 'final', label: 'Final', title: 'Responses delivered after quality review, and how that compares with the target. Only an unmarked figure is a final one: “so far” is a count still coming in, “~ … est.” is projected while a study is in quality review, and “not final” is a field count on a study whose delivered figure was never recorded.', numeric: true, sort: r => r.n_actual ?? r.n_collected },
+  { id: 'credits', label: 'Credits', title: 'What this study costs the client in credits. Blank means it has not been priced yet — not that it is free.', numeric: true, sort: r => r.credits ?? null },
   { id: 'submitted', label: 'Submitted', title: 'When the request came in.', sort: r => r.submitted_date ?? null },
   { id: 'deliver', label: 'Deliver', title: 'The delivery date — the promised one, or the actual one once delivered.', sort: r => r.deliver_date ?? null },
 ]
@@ -330,7 +330,7 @@ export function SalesPipeline(
         <button
           type="button"
           onClick={() => setOne('g', 'all')}
-          title="Every survey on your accounts, whatever its state."
+          title="Every study on your accounts, whatever its state."
           className={`rounded-lg border px-3 py-2 text-left transition-colors ${
             bucket === 'all' ? 'border-primary bg-primary/10' : 'border-border bg-card hover:border-ring'
           }`}
@@ -344,7 +344,7 @@ export function SalesPipeline(
         <input
           value={q}
           onChange={e => setQ(e.target.value)}
-          placeholder="Search survey, code, client or contact…"
+          placeholder="Search study, code, client or contact…"
           className="min-w-[15rem] flex-1 rounded-lg border border-border bg-card px-3 py-1.5 text-sm focus:border-ring focus:outline-none"
         />
         <div className="relative">
@@ -401,7 +401,7 @@ export function SalesPipeline(
           href={`/sales/surveys/print?${params.toString()}`}
           target="_blank"
           rel="noopener"
-          title="Print the surveys on screen — same group, filters and search. The printed list has every column unless you, or your saved default, turn one off in its own “What prints” box. The columns chosen here do not carry over."
+          title="Print the studies on screen — same group, filters and search. The printed list has every column unless you, or your saved default, turn one off in its own “What prints” box. The columns chosen here do not carry over."
           className="rounded-lg border border-border bg-card px-3 py-1.5 text-sm text-muted-foreground hover:border-ring hover:text-foreground"
         >
           ⎙ Export
@@ -427,7 +427,7 @@ export function SalesPipeline(
                 sp.delete('c')
                 if (e.target.value) sp.append('c', e.target.value)
               })}
-              title="Filter to one account. Accounts are grouped by their real record, so every BAM survey appears under BAM whatever the old label on the row says."
+              title="Filter to one account. Accounts are grouped by their real record, so every BAM study appears under BAM whatever the old label on the row says."
               className="rounded-lg border border-border bg-card px-2.5 py-1 text-xs text-foreground focus:border-ring focus:outline-none"
             >
               <option value="">All accounts ({accountOpts.length})</option>
@@ -477,17 +477,17 @@ export function SalesPipeline(
         <div className="rounded-lg border border-border bg-card px-4 py-4 text-sm">
           {rows.length === 0 ? (
             <>
-              <p className="font-medium text-foreground">No surveys on your accounts yet.</p>
+              <p className="font-medium text-foreground">No studies on your accounts yet.</p>
               <p className="mt-1 text-muted-foreground">
                 Either nothing has been run for them, or your accounts have not been assigned to
-                you. Ask David to check — this page shows every survey on the clients you own.
+                you. Ask David to check — this page shows every study on the clients you own.
               </p>
             </>
           ) : hasFilters ? (
             <>
               <p className="font-medium text-foreground">Nothing matches these filters.</p>
               <p className="mt-1 text-muted-foreground">
-                {fmtNum(rows.length)} surveys are on your accounts;{' '}
+                {fmtNum(rows.length)} studies are on your accounts;{' '}
                 {bucket !== 'all' && <>the <strong>{BUCKETS.find(b => b.id === bucket)?.label ?? bucket}</strong> group, </>}
                 {clients.length > 0 && <>{clients.length} account filter{clients.length === 1 ? '' : 's'}, </>}
                 {stages.length > 0 && <>{stages.length} stage filter{stages.length === 1 ? '' : 's'}, </>}
@@ -508,7 +508,7 @@ export function SalesPipeline(
                 Nothing is {(BUCKETS.find(b => b.id === bucket)?.label ?? bucket).toLowerCase()} right now.
               </p>
               <p className="mt-1 text-muted-foreground">
-                You have {fmtNum(rows.length)} surveys in other groups — pick another tile above, or All.
+                You have {fmtNum(rows.length)} studies in other groups — pick another tile above, or All.
               </p>
             </>
           )}
@@ -522,7 +522,7 @@ export function SalesPipeline(
                     the Survey name stays put across nine columns. Without the pin
                     you scroll right and lose which row you are reading. */}
                 <th className="sticky left-0 top-0 z-20 border-b border-border bg-card px-4 py-2.5 text-[11px] font-normal uppercase tracking-widest text-muted-foreground">
-                  Survey
+                  Study
                 </th>
                 {cols.map(c => (
                   <th
@@ -573,7 +573,7 @@ export function SalesPipeline(
       )}
 
       <p className="mt-3 text-xs text-muted-foreground/70">
-        {shown.length} of {rows.length} {rows.length === 1 ? 'survey' : 'surveys'} shown.
+        {shown.length} of {rows.length} {rows.length === 1 ? 'study' : 'studies'} shown.
       </p>
     </div>
   )

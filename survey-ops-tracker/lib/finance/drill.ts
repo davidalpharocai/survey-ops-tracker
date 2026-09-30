@@ -198,7 +198,7 @@ export function reconcileText(
     return {
       ok: true,
       text: r.expectedTotal == null
-        ? (one ? 'The one survey this figure counted is listed below.' : `All ${n} surveys this figure counted are listed below.`)
+        ? (one ? 'The one study this figure counted is listed below.' : `All ${n} studies this figure counted are listed below.`)
         : (one
           ? `The row below adds up to ${fmt(r.rowSum)}, which matches the figure.`
           : `The ${n} rows below add up to ${fmt(r.rowSum)}, which matches the figure.`),
@@ -208,10 +208,10 @@ export function reconcileText(
   if (!r.sumAgrees && r.expectedTotal != null) {
     parts.push(`These rows add up to ${fmt(r.rowSum)} but the figure says ${fmt(r.expectedTotal)} — a gap of ${fmt(r.gap ?? 0)}.`)
   }
-  if (r.missingIds.length) parts.push(`${fmtNum(r.missingIds.length)} of the surveys the figure counted are missing from this list.`)
+  if (r.missingIds.length) parts.push(`${fmtNum(r.missingIds.length)} of the studies the figure counted are missing from this list.`)
   if (r.extraIds.length) parts.push(`${fmtNum(r.extraIds.length)} rows here were not in the figure.`)
   if (!r.missingIds.length && !r.extraIds.length && r.rowCount !== r.expectedCount) {
-    parts.push('A survey appears more than once.')
+    parts.push('A study appears more than once.')
   }
   parts.push('Do not rely on either number until this is explained.')
   return { ok: false, text: parts.join(' ') }

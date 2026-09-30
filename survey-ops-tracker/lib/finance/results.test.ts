@@ -89,13 +89,13 @@ describe('Tile 1 on the margin set (default view: since 1 Jun 2026)', () => {
   })
 
   it('writes the four figures in the house format', () => {
-    expect(t1.text.price).toEqual({ value: '$86,540', sub: 'On 31 surveys with both a client price and a recorded cost.' })
+    expect(t1.text.price).toEqual({ value: '$86,540', sub: 'On 31 studies with both a client price and a recorded cost.' })
     expect(t1.text.cost).toEqual({ value: '$46,021', sub: '53¢ of every $1 of client price. Field cost only.' })
     expect(t1.text.kept.value).toBe('$40,519 · 47%')
-    expect(t1.text.kept.sub).toBe('48% on paid work — excludes 1 survey given away at $0 (−$660). Goal: 50%.')
+    expect(t1.text.kept.sub).toBe('48% on paid work — excludes 1 study given away at $0 (−$660). Goal: 50%.')
     expect(t1.text.budget).toEqual({
       value: '56¢ per $1',
-      sub: 'Median of 5 surveys with a budget and a price above $0. Of the 6 surveys with a budget, 5 went over it; 3 of those still made money.',
+      sub: 'Median of 5 studies with a budget and a price above $0. Of the 6 studies with a budget, 5 went over it; 3 of those still made money.',
     })
   })
 
@@ -125,10 +125,10 @@ describe('the coverage line, the waterfall and what is not in the figures', () =
     expect(c.pricedBlocked).toEqual({ surveys: 1, spend: 2250, ids: ['priced-no-n'] })
     expect(c.pricedNoCost.surveys).toBe(1)
     expect(partsText(c.parts)).toBe(
-      'These 31 surveys hold 91% of the $50,371 spent on delivered work in this view. ' +
-      '$2,100 of it is on 1 survey with no client price — price it from the Improve tab. ' +
-      'Another $2,250 is on 1 priced survey that cannot be billed yet: no delivered N or no N target. ' +
-      '1 priced survey carries no recorded cost and is left out, so it does not read as 100% kept.')
+      'These 31 studies hold 91% of the $50,371 spent on delivered work in this view. ' +
+      '$2,100 of it is on 1 study with no client price — price it from the Improve tab. ' +
+      'Another $2,250 is on 1 priced study that cannot be billed yet: no delivered N or no N target. ' +
+      '1 priced study carries no recorded cost and is left out, so it does not read as 100% kept.')
     expect(c.parts.filter(p => p.kind === 'action').map(p => p.kind === 'action' && p.action))
       .toEqual(['waterfall', 'unpriced', 'improve'])
   })
@@ -146,7 +146,7 @@ describe('the coverage line, the waterfall and what is not in the figures', () =
     expect(w.lines.find(l => l.key === 'recovered')!.label).toBe('Rewards recovered (money back)')
     expect(w.sms.rates).toEqual([0.02])
     expect(w.sms.words).toContain('1,000 text messages on 1 blast, at $0.02 a message')
-    expect(w.note).toContain('$200 came back on 1 survey')
+    expect(w.note).toContain('$200 came back on 1 study')
   })
 
   it('names cancelled and archived spend at any date, in the same account and route', () => {
@@ -154,11 +154,11 @@ describe('the coverage line, the waterfall and what is not in the figures', () =
     // Dated April — outside the default range — and still counted.
     expect(model.notIn.archived).toEqual({ surveys: 1, spend: 200, ids: ['archived'], inClass: 1 })
     expect(partsText(model.notIn.parts)).toBe(
-      'Not in these figures: $50 spent by the 1 survey cancelled before delivery, and $200 spent by the 1 survey archived without delivery — at any date, in the same account and route.')
+      'Not in these figures: $50 spent by the 1 study cancelled before delivery, and $200 spent by the 1 study archived without delivery — at any date, in the same account and route.')
     const coa = build(F({ account: 'coa' })).model
     expect(coa.notIn.cancelled.surveys).toBe(1)
     expect(coa.notIn.archived.surveys).toBe(0)
-    expect(partsText(coa.notIn.parts)).toContain('and no survey archived without delivery')
+    expect(partsText(coa.notIn.parts)).toContain('and no study archived without delivery')
     expect(build(F({ route: 'panel' })).model.notIn.cancelled.surveys).toBe(0)
   })
 })
@@ -181,7 +181,7 @@ describe('chart C1 by month', () => {
     const { model } = build()
     const jul = model.months.find(m => m.key === '2026-07')!
     expect(jul.thin).toBe(true)
-    expect(jul.note).toBe('Only 1 survey with both a client price and a cost')
+    expect(jul.note).toBe('Only 1 study with both a client price and a cost')
     expect(model.months.find(m => m.key === '2026-06')!.thin).toBe(false)
     expect(model.months.find(m => m.key === '2026-09')!.recoveriesPending).toBe(true)
   })
@@ -205,10 +205,10 @@ describe('the verdict', () => {
   it('states the trend when both months have 10 surveys, and the paid-work variant', () => {
     const { model } = build()
     expect(partsText(model.verdict)).toBe(
-      'Aug 2026 45% → Sep 2026 41%, but Sep 2026 is 43% without the 1 survey given away at $0 — level with Aug 2026, ' +
+      'Aug 2026 45% → Sep 2026 41%, but Sep 2026 is 43% without the 1 study given away at $0 — level with Aug 2026, ' +
       'and Sep 2026 blast cost is still waiting on reward recoveries. ' +
-      "2 priced surveys lost money: LOSS −$1,400, PARTIAL −$60. Re-price those accounts' next waves. " +
-      '13 of 30 priced surveys spent more than half their price.')
+      "2 priced studies lost money: LOSS −$1,400, PARTIAL −$60. Re-price those accounts' next waves. " +
+      '13 of 30 priced studies spent more than half their price.')
     const surveys = model.verdict.filter(p => p.kind === 'survey')
     expect(surveys.map(p => p.kind === 'survey' && p.id)).toEqual(['loss', 'partial'])
   })
@@ -216,10 +216,10 @@ describe('the verdict', () => {
   it('says "too few surveys to call" when a side has fewer than 10', () => {
     const { model } = build(F({ account: 'bam' }))
     const text = partsText(model.verdict)
-    expect(text).toContain('Too few surveys to call a trend: Aug 2026 has 0 and Sep 2026 has 3')
+    expect(text).toContain('Too few studies to call a trend: Aug 2026 has 0 and Sep 2026 has 3')
     expect(text).not.toContain('→')
-    expect(text).toContain("1 priced survey lost money: PARTIAL −$60. Re-price that account's next waves.")
-    expect(text).toContain('1 of 7 priced surveys spent more than half their price.')
+    expect(text).toContain("1 priced study lost money: PARTIAL −$60. Re-price that account's next waves.")
+    expect(text).toContain('1 of 7 priced studies spent more than half their price.')
   })
 
   it('names at most four losses, then "and N more"', () => {
@@ -227,14 +227,14 @@ describe('the verdict', () => {
     // Make every September bulk survey a loss.
     for (const b of load.raw.blasts) if (/^s\d+$/.test(b.project_id)) b.bid = 200
     const text = partsText(buildResultsModel(resultsInputOf(load, F(), TODAY)).verdict)
-    expect(text).toMatch(/12 priced surveys lost money: [A-Z0-9]+ −\$[\d,]+, [A-Z0-9]+ −\$[\d,]+, [A-Z0-9]+ −\$[\d,]+, [A-Z0-9]+ −\$[\d,]+, and 8 more\./)
+    expect(text).toMatch(/12 priced studies lost money: [A-Z0-9]+ −\$[\d,]+, [A-Z0-9]+ −\$[\d,]+, [A-Z0-9]+ −\$[\d,]+, [A-Z0-9]+ −\$[\d,]+, and 8 more\./)
   })
 
   it('has nothing to call on an empty margin set, and says what to do', () => {
     const { model } = build(F({ range: { preset: 'custom', from: '2025-01-01', to: '2025-01-31' } }))
     expect(model.tile1.surveys).toBe(0)
     expect(partsText(model.verdict)).toBe(
-      'No delivered survey in this view carries both a client price and a recorded cost, so there is nothing to call yet. Add the missing prices from the Improve tab.')
+      'No delivered study in this view carries both a client price and a recorded cost, so there is nothing to call yet. Add the missing prices from the Improve tab.')
   })
 })
 
@@ -275,8 +275,8 @@ describe('a survey priced above $0 that billed no respondents', () => {
   it('is named in the "We keep" sub-line, so "on paid work" says what it excludes', () => {
     const { model } = build(F(), 'account', zeroBilled())
     expect(model.tile1.text.kept.sub).toBe(
-      '50% on paid work — excludes 1 survey given away at $0 (−$660) ' +
-      'and 1 survey that billed no respondents (−$2,400). Goal: 50%.')
+      '50% on paid work — excludes 1 study given away at $0 (−$660) ' +
+      'and 1 study that billed no respondents (−$2,400). Goal: 50%.')
   })
 
   it('is tagged LOST MONEY and named in the verdict, because its whole cost is a loss', () => {
@@ -363,7 +363,7 @@ describe('Tile 2 groupings', () => {
     expect(sig.tooFew).toBe(true)
     expect(model.tile2.tooFew).toBe(2)
     expect(partsText(model.tile2.verdict)).toBe(
-      'Coatue kept the most: $23,659, 47% on 22 surveys. 1 account has fewer than 3 surveys and is too few to judge. ' +
+      'Coatue kept the most: $23,659, 47% on 22 studies. 1 account has fewer than 3 studies and is too few to judge. ' +
       'UBS (−$660) had only work given away at $0; confirm the $0 price was meant. ' +
       'SIG lost money: −$1,400. Start the re-pricing with SIG.')
   })
@@ -435,7 +435,7 @@ describe('Tile 2 groupings', () => {
     expect(nocost.kept).toBeNull()
     expect(nocost.keptPct).toBeNull()
     expect(partsText(model.tile2.verdict)).toBe(
-      'Of 34 surveys, 2 lost money, 5 went over budget, 1 was given away at $0 and 1 carries no price. ' +
+      'Of 34 studies, 2 lost money, 5 went over budget, 1 was given away at $0 and 1 carries no price. ' +
       'Price the unpriced ones first: they hold $2,100 of spend that no margin figure can see.')
   })
 
@@ -457,7 +457,7 @@ describe('filters move every figure', () => {
     const { model } = build(F({ account: 'coa' }))
     expect(model.ledger.every(l => l.accountId === 'coa')).toBe(true)
     expect(cents(model.tile1.clientPrice)).toBe(cents(50700))
-    expect(model.scope.chip).toBe('Delivered · From 1 Jun 2026 · Coatue · 23 surveys')
+    expect(model.scope.chip).toBe('Delivered · From 1 Jun 2026 · Coatue · 23 studies')
   })
 })
 

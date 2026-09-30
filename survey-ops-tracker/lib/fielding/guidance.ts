@@ -185,7 +185,7 @@ export function excessRate(i: GuidanceInput, route: ReturnType<typeof measuredRo
   const median = (blastN * ROUTE_COST.blast.median + panelN * ROUTE_COST.panel.median) / total
   return {
     median,
-    label: `this survey's own mix (${num(blastN)} blast / ${num(panelN)} panel completes)`,
+    label: `this study's own mix (${num(blastN)} blast / ${num(panelN)} panel completes)`,
   }
 }
 
@@ -226,15 +226,15 @@ export function fieldingGuidance(i: GuidanceInput): GuidanceItem[] {
       detail:
         `Buying ${num(raw)} raw completes (${BUY_MULTIPLE}× target) to land ${num(target)} clean, at ` +
         `${money(r.p25)}–${money(r.p75)} per complete. That multiple is the MEDIAN and it is too ` +
-        `little on 46% of past surveys — a quarter of them needed ${BUY_MULTIPLE_P75}× ` +
+        `little on 46% of past studies — a quarter of them needed ${BUY_MULTIPLE_P75}× ` +
         `(${num(Math.ceil(target * BUY_MULTIPLE_P75))} raw) and one in ten needed ${BUY_MULTIPLE_P90}×. ` +
         `QA loss is not knowable before fielding, so treat this as a budget range, not a cap. ` +
         `This is a ${i.project_type} study, so ${label} is the route — the other route is cheaper ` +
         `per complete but does not reach this audience, which is most of why the two look so far apart.`,
       evidence:
         `${money(r.median)}/complete median on the ${intended} route (p25 ${money(r.p25)}, p75 ` +
-        `${money(r.p75)}, n=${r.n}), ${EVIDENCE_DATE}, measured only on surveys whose recorded ` +
-        `completes cover their N. 108 of the 123 surveys with field rows use the route matching their type.`,
+        `${money(r.p75)}, n=${r.n}), ${EVIDENCE_DATE}, measured only on studies whose recorded ` +
+        `completes cover their N. 108 of the 123 studies with field rows use the route matching their type.`,
     })
   }
 
@@ -253,7 +253,7 @@ export function fieldingGuidance(i: GuidanceInput): GuidanceItem[] {
         `If the blast route could not reach the audience, that reason belongs on the record — and ` +
         `the screeners belong in the questionnaire before the next launch.`,
       evidence:
-        `Five B2B-typed surveys have been fielded through panel (${EVIDENCE_DATE}). PR00230 collected ` +
+        `Five B2B-typed studies have been fielded through panel (${EVIDENCE_DATE}). PR00230 collected ` +
         `1,865 panel completes against a 1,180 B2B target. Panel completes cost ${money(ROUTE_COST.panel.median)} ` +
         `against ${money(ROUTE_COST.blast.median)} on blasts, so the saving is real and so is the risk.`,
     })
@@ -290,7 +290,7 @@ export function fieldingGuidance(i: GuidanceInput): GuidanceItem[] {
       level: 'watch',
       headline: `SMS converts about ${SMS_ADVANTAGE.ratio}× better than email on the same audience`,
       detail:
-        `${emails} email blast${emails === 1 ? '' : 's'} on this survey. On matched segments — same ` +
+        `${emails} email blast${emails === 1 ? '' : 's'} on this study. On matched segments — same ` +
         `project, same named audience — SMS returned 0.049% against email's 0.010%. Email still has ` +
         `no send cost, so it is cheap to try; it is not cheap to rely on.`,
       evidence:
@@ -322,7 +322,7 @@ export function fieldingGuidance(i: GuidanceInput): GuidanceItem[] {
         `rate × min(delivered, target). Two-thirds of this kind of waste is scrub that never reaches the ` +
         `deliverable, not delivery above target — so the fix is the buy, not the stop.`,
       evidence:
-        `${BUY_MULTIPLE}× measured on delivered surveys carrying target, collected and actual N; ` +
+        `${BUY_MULTIPLE}× measured on delivered studies carrying target, collected and actual N; ` +
         `priced at ${rate.label} — ${money(rate.median)}/complete — ${EVIDENCE_DATE}.`,
     })
   }

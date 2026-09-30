@@ -106,7 +106,7 @@ export function RequestedByRow({ clientId, contactId, snapshotName, tooltip, onC
                         href={`/contacts/${current.id}`}
                         onClick={() => setMode('closed')}
                         className="text-primary hover:underline"
-                        title={`Open ${contactName(current)}'s page — every survey they requested`}
+                        title={`Open ${contactName(current)}'s page — every study they requested`}
                       >
                         {contactName(current)}
                       </Link>

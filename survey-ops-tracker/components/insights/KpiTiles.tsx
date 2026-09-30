@@ -40,7 +40,7 @@ function Kpi({
         <button
           type="button"
           onClick={onOpen}
-          title={openTitle ?? 'Show the surveys behind this number'}
+          title={openTitle ?? 'Show the studies behind this number'}
           className={`${big} self-start text-left underline-offset-4 hover:underline focus-visible:underline focus-visible:outline-none`}
         >
           {value}
@@ -152,13 +152,13 @@ export function KpiTiles({ model: m, open }: { model: InsightsModel; open: OpenD
   const undatedLine = undated > 0 && !allTime ? (
     <>
       <OpenCount
-        title="Show every delivered survey with no deliver date"
+        title="Show every delivered study with no deliver date"
         onOpen={() => open({
           key: 'kpi-undated-all', title: 'Delivered, with no deliver date', population: `Delivered · no deliver date · any time${words}`,
           query: { kind: 'delivered', undated: 'all' }, expected: undated, expectedWhere: 'in the tile',
         })}
       >
-        {s(undated, 'delivered survey')}
+        {s(undated, 'delivered study', 'delivered studies')}
       </OpenCount>
       {` ${undated === 1 ? 'has' : 'have'} no deliver date, so no date range can include ${them(undated)}.`}
       {inRangeUndated > 0 && (
@@ -195,35 +195,35 @@ export function KpiTiles({ model: m, open }: { model: InsightsModel; open: OpenD
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
       <Kpi
-        label="Surveys delivered"
-        help="Surveys in the Delivery column whose deliver date falls in the dates you picked. A survey is placed by its deliver date (the day the client had it), not by when it was submitted or created. Empty rerun placeholders the system made ahead of time are left out. A delivered survey with no deliver date cannot be placed; when enough of them probably belong to either period (going by their due, launch or submitted date) to change the answer, the comparison with the period before is left out, and an earlier count missing some reads “at least”."
+        label="Studies delivered"
+        help="Studies in the Delivery column whose deliver date falls in the dates you picked. A study is placed by its deliver date (the day the client had it), not by when it was submitted or created. Empty rerun placeholders the system made ahead of time are left out. A delivered study with no deliver date cannot be placed; when enough of them probably belong to either period (going by their due, launch or submitted date) to change the answer, the comparison with the period before is left out, and an earlier count missing some reads “at least”."
         value={fmtNum(c.delivered)}
         onOpen={() => open({
-          key: 'kpi-delivered', title: 'Surveys delivered', population: scope,
+          key: 'kpi-delivered', title: 'Studies delivered', population: scope,
           query: { kind: 'delivered' }, expected: c.delivered, expectedWhere: 'in the tile',
         })}
         lines={[
           undated > 0 && allTime
-            ? `Includes ${s(undated, 'survey')} with no deliver date — counted here, but no monthly chart can place ${them(undated)}.`
+            ? `Includes ${s(undated, 'study', 'studies')} with no deliver date — counted here, but no monthly chart can place ${them(undated)}.`
             : undatedLine,
         ]}
         compare={m.compare.delivered}
       >
-        <TileTrend ariaLabel="Surveys delivered per month" months={m.months} values={m.months.map(x => x.total)} boundary={boundary} />
+        <TileTrend ariaLabel="Studies delivered per month" months={m.months} values={m.months.map(x => x.total)} boundary={boundary} />
       </Kpi>
 
       <Kpi
         label="Respondents delivered"
-        help="The post-QA N (the respondents that passed quality checks) summed across the delivered surveys. A survey with no post-QA N recorded is counted as missing, never as zero."
+        help="The post-QA N (the respondents that passed quality checks) summed across the delivered studies. A study with no post-QA N recorded is counted as missing, never as zero."
         value={c.withN ? fmtNum(c.respondents) : '—'}
         onOpen={() => open({
-          key: 'kpi-respondents', title: 'Delivered surveys with respondents recorded', population: scope,
+          key: 'kpi-respondents', title: 'Delivered studies with respondents recorded', population: scope,
           query: { kind: 'delivered', withN: true }, expected: c.withN, expectedWhere: 'behind the tile',
         })}
-        openTitle="Show the surveys whose respondents make up this number"
+        openTitle="Show the studies whose respondents make up this number"
         lines={[
-          c.withN ? `From ${s(c.withN, 'survey')}` : 'No respondent counts recorded here',
-          c.withoutN > 0 ? `${s(c.withoutN, 'delivered survey has', 'delivered surveys have')} no respondent count recorded yet` : null,
+          c.withN ? `From ${s(c.withN, 'study', 'studies')}` : 'No respondent counts recorded here',
+          c.withoutN > 0 ? `${s(c.withoutN, 'delivered study has', 'delivered studies have')} no respondent count recorded yet` : null,
         ]}
         compare={m.compare.respondents}
       >
@@ -238,18 +238,18 @@ export function KpiTiles({ model: m, open }: { model: InsightsModel; open: OpenD
 
       <Kpi
         label="On time"
-        help={`On time: the deliver date is on or before the due date (our internal deadline). Late: delivered one or more days after it. Surveys with no due date are left out of the percentage, and counted below. The goal line is ${pctText(ON_TIME_GOAL)} — a goal, not a rule.`}
+        help={`On time: the deliver date is on or before the due date (our internal deadline). Late: delivered one or more days after it. Studies with no due date are left out of the percentage, and counted below. The goal line is ${pctText(ON_TIME_GOAL)} — a goal, not a rule.`}
         value={pctText(c.onTimePct)}
         valueClass={c.onTimePct == null ? 'text-foreground' : onTimeGood ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400'}
         onOpen={() => open({
-          key: 'kpi-ontime', title: 'Delivered surveys with a due date', population: scope,
+          key: 'kpi-ontime', title: 'Delivered studies with a due date', population: scope,
           query: { kind: 'delivered', judgedOnly: true }, expected: c.judged, expectedWhere: 'behind the percentage',
         })}
-        openTitle="Show the surveys this percentage is measured on, with each one's on-time result"
+        openTitle="Show the studies this percentage is measured on, with each one's on-time result"
         lines={[
-          c.judged ? `${fmtNum(c.onTime)} of ${s(c.judged, 'survey')} with a due date · ${fmtNum(c.late)} late` : 'No delivered survey here has a due date',
-          c.noDue > 0 ? `${s(c.noDue, 'survey')} with no due date left out` : null,
-          c.noDeliverDate > 0 ? `${s(c.noDeliverDate, 'survey')} with no deliver date left out` : null,
+          c.judged ? `${fmtNum(c.onTime)} of ${s(c.judged, 'study', 'studies')} with a due date · ${fmtNum(c.late)} late` : 'No delivered study here has a due date',
+          c.noDue > 0 ? `${s(c.noDue, 'study', 'studies')} with no due date left out` : null,
+          c.noDeliverDate > 0 ? `${s(c.noDeliverDate, 'study', 'studies')} with no deliver date left out` : null,
           `Goal ${fmtPct(ON_TIME_GOAL)}`,
         ]}
         compare={m.compare.onTime}
@@ -268,18 +268,18 @@ export function KpiTiles({ model: m, open }: { model: InsightsModel; open: OpenD
 
       <Kpi
         label="Median cycle time"
-        help={`Calendar days from the submitted date to the deliver date — the middle survey's figure, so one very slow or very fast survey cannot drag it. Surveys missing either date, or whose dates run backwards (a data error), are left out and counted below. The goal line is ${daysText(CYCLE_DAYS_GOAL)} — a goal, not a rule.`}
+        help={`Calendar days from the submitted date to the deliver date — the middle study's figure, so one very slow or very fast study cannot drag it. Studies missing either date, or whose dates run backwards (a data error), are left out and counted below. The goal line is ${daysText(CYCLE_DAYS_GOAL)} — a goal, not a rule.`}
         value={daysText(c.cycleMedian)}
         valueClass={c.cycleMedian == null ? 'text-foreground' : cycleGood ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400'}
         onOpen={() => open({
-          key: 'kpi-cycle', title: 'Delivered surveys with a cycle time', population: scope,
+          key: 'kpi-cycle', title: 'Delivered studies with a cycle time', population: scope,
           query: { kind: 'delivered', cycleOnly: true }, expected: c.cycleN, expectedWhere: 'behind the median',
         })}
-        openTitle="Show the surveys this median is taken from, with each one's days"
+        openTitle="Show the studies this median is taken from, with each one's days"
         lines={[
-          c.cycleN ? `Submitted to delivered · ${s(c.cycleN, 'survey')}` : 'No survey here has both a submitted and a deliver date',
-          c.cycleMissing > 0 ? `${s(c.cycleMissing, 'survey')} missing a submitted or deliver date left out` : null,
-          c.cycleBackwards > 0 ? `${s(c.cycleBackwards, 'survey')} delivered before ${c.cycleBackwards === 1 ? 'its' : 'their'} submitted date left out — worth fixing` : null,
+          c.cycleN ? `Submitted to delivered · ${s(c.cycleN, 'study', 'studies')}` : 'No study here has both a submitted and a deliver date',
+          c.cycleMissing > 0 ? `${s(c.cycleMissing, 'study', 'studies')} missing a submitted or deliver date left out` : null,
+          c.cycleBackwards > 0 ? `${s(c.cycleBackwards, 'study', 'studies')} delivered before ${c.cycleBackwards === 1 ? 'its' : 'their'} submitted date left out — worth fixing` : null,
           `Goal ${daysText(CYCLE_DAYS_GOAL)} or less`,
         ]}
         compare={m.compare.cycle}
@@ -297,7 +297,7 @@ export function KpiTiles({ model: m, open }: { model: InsightsModel; open: OpenD
 
       <Kpi
         label="In flight now"
-        help="Surveys sold and running today: not delivered, not on hold, not cancelled, not still being scoped. Right now, whatever the dates above; the type, captain and account filters still apply. On-hold and scoping surveys are counted beside it, never inside it."
+        help="Studies sold and running today: not delivered, not on hold, not cancelled, not still being scoped. Right now, whatever the dates above; the type, captain and account filters still apply. On-hold and scoping studies are counted beside it, never inside it."
         value={fmtNum(m.now.inFlight)}
         onOpen={() => open({
           key: 'kpi-inflight', title: 'In flight now', population: `In flight · right now${words}`,
@@ -306,11 +306,11 @@ export function KpiTiles({ model: m, open }: { model: InsightsModel; open: OpenD
         lines={[
           `${m.now.overdue > 0 ? `${fmtNum(m.now.overdue)} overdue` : 'None overdue'} · ${fmtNum(m.now.dueSoon)} due this week`,
           <>
-            <OpenCount title="Show the surveys on hold" onOpen={() => open(sideBucketRequest(m, 'hold', 'in the tile'))}>
+            <OpenCount title="Show the studies on hold" onOpen={() => open(sideBucketRequest(m, 'hold', 'in the tile'))}>
               {fmtNum(m.now.hold)} on hold
             </OpenCount>
             {' · '}
-            <OpenCount title="Show the surveys still being scoped" onOpen={() => open(sideBucketRequest(m, 'scoping', 'in the tile'))}>
+            <OpenCount title="Show the studies still being scoped" onOpen={() => open(sideBucketRequest(m, 'scoping', 'in the tile'))}>
               {fmtNum(m.now.scoping)} still scoping
             </OpenCount>
             {' — not counted'}
@@ -321,7 +321,7 @@ export function KpiTiles({ model: m, open }: { model: InsightsModel; open: OpenD
 
       <Kpi
         label="Reruns delivered"
-        help="Repeat waves of a recurring study: surveys in a rerun series, a later wave, or filed under the older Rerun type. Placed by deliver date like every other delivery."
+        help="Repeat waves of a recurring study: studies in a rerun series, a later wave, or filed under the older Rerun type. Placed by deliver date like every other delivery."
         value={fmtNum(c.reruns)}
         onOpen={() => open({
           key: 'kpi-reruns', title: 'Reruns delivered', population: scope,

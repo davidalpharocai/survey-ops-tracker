@@ -33,8 +33,8 @@ import { CreditPools } from '../thisweek/CreditPools'
 import { useHoldSince, useOwners, useSeriesRecords, useTermDollars } from '../thisweek/useThisWeekExtras'
 
 const GUIDANCE =
-  'Live work only: started, not yet delivered, plus surveys on hold. Each row is one decision — what happened, what is at stake, what to do. ' +
-  'The date range does not apply here, because an overspending survey matters whenever it launched.'
+  'Live work only: started, not yet delivered, plus studies on hold. Each row is one decision — what happened, what is at stake, what to do. ' +
+  'The date range does not apply here, because an overspending study matters whenever it launched.'
 
 export function ThisWeekTab(props: FinanceTabProps) {
   const { load, ix, items, population, side, filter, today, scope, accountName, openDrill, registerExport } = props
@@ -103,7 +103,7 @@ export function ThisWeekTab(props: FinanceTabProps) {
       <FinanceCard
         id="this-week-decisions"
         title="Decisions this week"
-        help="Every live survey that needs a decision, grouped by what to do and ranked by the dollars at stake. Delivered free trials, credit contracts and recurring series appear too when they need a decision this week. Surveys on hold have their own card below."
+        help="Every live study that needs a decision, grouped by what to do and ranked by the dollars at stake. Delivered free trials, credit contracts and recurring series appear too when they need a decision this week. Studies on hold have their own card below."
         scope={scope.chip}
         ignored={scope.ignored}
         needs={['survey_projects']}
@@ -115,44 +115,44 @@ export function ThisWeekTab(props: FinanceTabProps) {
         <p className="px-4 pt-3 text-sm leading-relaxed">{h.sentence}</p>
         <div className="grid grid-cols-2 lg:grid-cols-5">
           <Figure
-            label="Live surveys"
+            label="Live studies"
             help="Sold and running: not yet delivered, not on hold, not cancelled. The date filter does not apply."
             value={fmtNum(h.live)}
-            sub="Surveys on hold are not in this count"
+            sub="Studies on hold are not in this count"
           />
           <Figure
             label="Spent so far"
-            help="Recorded field cost on the live surveys: blast rewards and sends, panel CPI × completes, vendor lines, less rewards recovered. No salaries or overhead."
+            help="Recorded field cost on the live studies: blast rewards and sends, panel CPI × completes, vendor lines, less rewards recovered. No salaries or overhead."
             value={h.spendBlocked ? '—' : money(h.spent)}
-            sub={h.spendBlocked ?? costFloor ?? `On ${fmtNum(h.live)} live ${h.live === 1 ? 'survey' : 'surveys'}`}
+            sub={h.spendBlocked ?? costFloor ?? `On ${fmtNum(h.live)} live ${h.live === 1 ? 'study' : 'studies'}`}
             tone="cost"
             // With every cost table missing there is nothing to drill into: the
             // rows would all read $0 and the strip would call them reconciled.
             onOpen={h.spendBlocked ? undefined : () => openDrill(drills.spent)}
-            openLabel="Show the spend on each live survey"
+            openLabel="Show the spend on each live study"
           />
           <Figure
             label="Worth at target"
-            help="Price per N × the N sold, on the live surveys that have both. An upper bound: surveys often land short. Unsold scoping is never in it."
+            help="Price per N × the N sold, on the live studies that have both. An upper bound: studies often land short. Unsold scoping is never in it."
             value={h.priceBlocked ? '—' : money(h.worthAtTarget)}
             sub={h.priceBlocked
               ? h.priceBlocked
               : `${fmtNum(h.pricedWithTarget)} of ${fmtNum(h.live)} have a price and a target; ${fmtNum(h.noPrice)} have no price and ${fmtNum(h.noTarget)} no target`}
             tone="price"
             onOpen={drills.worth ? () => openDrill(drills.worth!) : undefined}
-            openLabel="Show each live survey's value at target"
+            openLabel="Show each live study's value at target"
           />
           <Figure
             label="On hold"
-            help="Paused surveys. Their own bucket: never in the live count, the spend or the value above."
+            help="Paused studies. Their own bucket: never in the live count, the spend or the value above."
             value={fmtNum(h.holds)}
             sub={h.spendBlocked ?? costFloor ?? `${money(h.holdSpend)} spent, kept out of the live figures`}
             onOpen={h.spendBlocked ? undefined : () => openDrill(drills.hold)}
-            openLabel="Show the spend on each held survey"
+            openLabel="Show the spend on each held study"
           />
           <Figure
             label="Unsold scoping"
-            help="Surveys still being scoped or priced and not buying respondents. Not sold, so they are counted here and valued nowhere."
+            help="Studies still being scoped or priced and not buying respondents. Not sold, so they are counted here and valued nowhere."
             value={fmtNum(h.scoping)}
             sub="Counted, never in the pipeline figure"
           />
@@ -164,12 +164,12 @@ export function ThisWeekTab(props: FinanceTabProps) {
         {!h.spendBlocked && costFloor && <Note tone="neg">{costFloor}</Note>}
         {shown.map(g => <DecisionGroup key={g.verb} group={g} />)}
         {model.overlapNote && (
-          <p className="border-t border-border px-4 py-2.5 text-xs text-muted-foreground" title="The same survey can appear under two or three verbs, so the group totals are not additive.">
+          <p className="border-t border-border px-4 py-2.5 text-xs text-muted-foreground" title="The same study can appear under two or three verbs, so the group totals are not additive.">
             {model.overlapNote}
           </p>
         )}
         {model.clear.length > 0 && (
-          <p className="border-t border-border px-4 py-2.5 text-xs text-muted-foreground" title="These checks ran on every live survey in view and found nothing to do">
+          <p className="border-t border-border px-4 py-2.5 text-xs text-muted-foreground" title="These checks ran on every live study in view and found nothing to do">
             Clear this week: {model.clear.map(v => VERB_META[v].label.toLowerCase()).join(', ')}.
           </p>
         )}
@@ -178,7 +178,7 @@ export function ThisWeekTab(props: FinanceTabProps) {
       <FinanceCard
         id="this-week-holds"
         title="On hold — its own bucket"
-        help="Every paused survey, with how long it has been paused where the change log records a real status change. None of these is counted in any live figure. Each one needs a decision: resume it or cancel it."
+        help="Every paused study, with how long it has been paused where the change log records a real status change. None of these is counted in any live figure. Each one needs a decision: resume it or cancel it."
         scope={holdScope.chip}
         ignored={holdScope.ignored}
         needs={['survey_projects']}
@@ -194,7 +194,7 @@ export function ThisWeekTab(props: FinanceTabProps) {
             no floor to state: each row says so in its own "At stake", and the
             group note below repeats it once. */}
         {!h.spendBlocked && costFloor && <Note tone="neg">{costFloor}</Note>}
-        {model.hold.rows.length ? <DecisionGroup group={model.hold} /> : <Empty>No survey is on hold.</Empty>}
+        {model.hold.rows.length ? <DecisionGroup group={model.hold} /> : <Empty>No study is on hold.</Empty>}
       </FinanceCard>
 
       <FinanceCard

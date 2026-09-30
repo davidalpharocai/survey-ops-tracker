@@ -88,7 +88,7 @@ describe('bidPremiumLever', () => {
   it('is NOT "costs nothing to try": a raise can be the only way to fill a hard survey', () => {
     const l = bidPremiumLever([P('a')], [B('a', { bid: 10 }), B('a', { bid: 12 })])!
     expect(l.free).toBe(false)
-    expect(l.riskTag).toBe('may leave a hard survey short')
+    expect(l.riskTag).toBe('may leave a hard study short')
     expect(l.forgoneCompletes).toBe(0)
   })
 })
@@ -255,7 +255,7 @@ describe('sellRangeLever (lever 6)', () => {
     // Without an older survey in the book, s0 is the account's first.
     expect(l.ids).not.toContain('s0')
     expect(l.high).toBeCloseTo(8 * 30 * 5)
-    expect(l.why).toContain('Another 30 on 1 first survey')
+    expect(l.why).toContain('Another 30 on 1 first study')
     expect(l.tooFew).toBe(false)
   })
 
@@ -286,7 +286,7 @@ describe('topUpLever (lever 7)', () => {
   it('nets the missing respondents against the route’s typical and dear cost per qualified respondent', () => {
     const l = topUpLever(rows, rates, cards, [], sups)!
     // 4 surveys 10 short, 4 surveys 9 short: 76 respondents at $4.
-    expect(l.why).toContain('76 respondents short on 8 surveys')
+    expect(l.why).toContain('76 respondents short on 8 studies')
     expect(l.high).toBeCloseTo(76 * (4 - 1.5))
     expect(l.low).toBeCloseTo(76 * (4 - 2.5))
     expect(l.evidence).toBe('depends')

@@ -408,7 +408,7 @@ export default function BoardPage() {
       {sections.unsorted.length > 0 && (
         <div className="bg-amber-500/10 border border-amber-500/40 rounded-xl px-3 py-2 text-xs text-amber-800 dark:text-amber-200">
           <p className="font-medium">
-            {fmtNum(sections.unsorted.length)} {sections.unsorted.length === 1 ? 'survey fits' : 'surveys fit'} no
+            {fmtNum(sections.unsorted.length)} {sections.unsorted.length === 1 ? 'study fits' : 'studies fit'} no
             board section, so {sections.unsorted.length === 1 ? 'it is' : 'they are'} listed here and included in the
             CSV. Open each one and fix what is named next to it.
           </p>

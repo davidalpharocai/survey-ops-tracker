@@ -201,7 +201,7 @@ export function deliveredN(
   if (target == null || target <= 0) {
     return {
       value: collected, estimated: true, low: null, high: null, basis: 'short-of-target',
-      note: `${fmt(collected)} collected and not yet through QA. No target is set on this survey, so there is nothing to project against.`,
+      note: `${fmt(collected)} collected and not yet through QA. No target is set on this study, so there is nothing to project against.`,
     }
   }
 
@@ -217,7 +217,7 @@ export function deliveredN(
       note:
         `Estimated. ${fmt(collected)} collected against a ${fmt(target)} target, but a study that ` +
         `over-collects delivers roughly what it sold, not everything it bought: across ${r.n} past ` +
-        `surveys the delivered N came in at a median ${r.median.toFixed(2)}x target ` +
+        `studies the delivered N came in at a median ${r.median.toFixed(2)}x target ` +
         `(${r.p25.toFixed(2)}–${r.p75.toFixed(2)}x). QA has not run yet.` + window,
     }
   }
@@ -249,9 +249,9 @@ export function deliveredN(
     basis: 'short-of-target',
     note:
       `Estimated. ${fmt(collected)} collected against a ${fmt(target)} target, and QA will still ` +
-      `take a share: across ${r.n} past surveys where the loss was actually recorded, the delivered ` +
+      `take a share: across ${r.n} past studies where the loss was actually recorded, the delivered ` +
       `N came in at a median ${r.median.toFixed(2)}x what was collected ` +
-      `(${r.p25.toFixed(2)}–${r.p75.toFixed(2)}x). This survey is short on BOTH counts — it has not ` +
+      `(${r.p25.toFixed(2)}–${r.p75.toFixed(2)}x). This study is short on BOTH counts — it has not ` +
       `collected enough and will lose some of what it has.` + window,
   }
 }

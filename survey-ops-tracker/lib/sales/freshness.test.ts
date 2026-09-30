@@ -11,7 +11,7 @@ describe('the in-field freshness stamp', () => {
     const f = freshness('2026-09-26T18:32:00Z', TODAY, true)
     expect(f?.text).toBe('responses last counted 2026-09-26, 2:32 PM ET · 2 days ago')
     expect(f?.stale).toBe(false)
-    expect(f?.title).toBe('The response count on this survey last changed 2026-09-26 at 2:32 PM Eastern.')
+    expect(f?.title).toBe('The response count on this study last changed 2026-09-26 at 2:32 PM Eastern.')
   })
 
   it('counts the day in Eastern, not on the server clock', () => {

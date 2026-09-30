@@ -16,7 +16,7 @@ import {
 
 const TIP = {
   header:
-    'The contracts this client has bought — each one an allowance of CREDITS with a start and a renewal date. A survey draws down its contract by the credits on the survey, so this is what a salesperson shows the client when they ask how much of their commitment is left.',
+    'The contracts this client has bought — each one an allowance of CREDITS with a start and a renewal date. A study draws down its contract by the credits on the study, so this is what a salesperson shows the client when they ask how much of their commitment is left.',
   credits:
     'How many credits the contract bought. Leave it blank if the contract does not state one — blank means "not recorded", which is different from a contract that bought zero.',
   dollars:
@@ -24,7 +24,7 @@ const TIP = {
   dates:
     'When the contract starts and when it renews. Both optional: 44 of the 48 contracts in the CCM export carry no date at all, so requiring one would make them unimportable.',
   used:
-    'Credits drawn down by the surveys attached to this contract. A survey with no credit figure is NOT counted as zero — it is unpriced, and the figure below says so, because a total that silently treats unpriced work as free is the wrong number to show a client.',
+    'Credits drawn down by the studies attached to this contract. A study with no credit figure is NOT counted as zero — it is unpriced, and the figure below says so, because a total that silently treats unpriced work as free is the wrong number to show a client.',
 }
 
 interface Draft {
@@ -324,7 +324,7 @@ export function ClientContracts({ clientId }: { clientId: string }) {
               Say so rather than let the numbers quietly under-report. */}
           {terms.length > 0 && unattached > 0 && (
             <p className="text-[11px] text-amber-600 dark:text-amber-400">
-              {unattached} of this client&apos;s {surveys.length} surveys are not attached to a contract, so they
+              {unattached} of this client&apos;s {surveys.length} studies are not attached to a contract, so they
               draw down nothing above.
             </p>
           )}

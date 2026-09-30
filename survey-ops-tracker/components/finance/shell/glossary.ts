@@ -36,7 +36,7 @@ export const GLOSSARY: GlossaryTerm[] = [
   {
     id: 'budget',
     term: 'Budget',
-    text: 'The most we planned to spend on a survey — a cost ceiling with a starting goal of about half the price, and never revenue.',
+    text: 'The most we planned to spend on a study — a cost ceiling with a starting goal of about half the price, and never revenue.',
   },
   {
     id: 'complete',
@@ -66,6 +66,6 @@ export const GLOSSARY: GlossaryTerm[] = [
   {
     id: 'route',
     term: 'Route',
-    text: 'How a survey was actually fielded, read from its cost records rather than how it was filed: blast (B2B email or text), panel (PureSpectrum), or both.',
+    text: 'How a study was actually fielded, read from its cost records rather than how it was filed: blast (B2B email or text), panel (PureSpectrum), or both.',
   },
 ]

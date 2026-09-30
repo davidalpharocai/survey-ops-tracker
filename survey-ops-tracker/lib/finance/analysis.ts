@@ -638,11 +638,11 @@ export const BADGE_LABEL: Record<Badge, string> = {
 }
 
 export const BADGE_HELP: Record<Badge, string> = {
-  'lost-money': 'Our field cost was more than the client price on a survey priced above $0.',
+  'lost-money': 'Our field cost was more than the client price on a study priced above $0.',
   'given-away': 'Priced at $0 on purpose (a trial or internal work). The cost is real; there is no revenue.',
-  'cost-outlier': 'Cost per qualified respondent was more than twice the typical survey on the same route.',
-  'over-budget': 'Spent past its budget. Not the same as losing money: a survey can go over budget and still make money.',
-  'segment-counts': "The segments' N actuals do not add up to the survey's N actual. The bill still uses the survey's N actual. When that N only adds up the segments that have a count, the survey is left out of cost per respondent and scrub until the missing count is entered.",
+  'cost-outlier': 'Cost per qualified respondent was more than twice the typical study on the same route.',
+  'over-budget': 'Spent past its budget. Not the same as losing money: a study can go over budget and still make money.',
+  'segment-counts': "The segments' N actuals do not add up to the study's N actual. The bill still uses the study's N actual. When that N only adds up the segments that have a count, the study is left out of cost per respondent and scrub until the missing count is entered.",
 }
 
 /** Which badge leads a row when several apply: the most serious first. */
@@ -664,7 +664,7 @@ export function segmentWords(s: Pick<SurveyPnl, 'code' | 'actual' | 'actualSourc
   if (s.segmentsMissingN > 0) {
     return `${s.code}: ${fmtNum(s.segmentsMissingN)} of ${fmtNum(s.segments)} segments ${s.segmentsMissingN === 1 ? 'has' : 'have'} no N actual`
   }
-  return `${s.code}: the segments add up to ${fmtNum(s.segmentSum ?? 0)} N, the survey says ${fmtNum(s.actual ?? 0)}`
+  return `${s.code}: the segments add up to ${fmtNum(s.segmentSum ?? 0)} N, the study says ${fmtNum(s.actual ?? 0)}`
 }
 
 export interface QueueItem { badge: Badge; amount: number; headline: string; detail: string }
@@ -755,8 +755,8 @@ export function exceptions(
         badge: 'segment-counts', amount: 0,
         headline: segmentWords(s),
         detail: s.partialRollUp
-          ? "The bill uses the survey's N actual, which only adds up the segments that have one. Cost per respondent and scrub leave this survey out until every segment has its N actual."
-          : "The bill and every figure here use the survey's own N actual. Correct the segments, or the survey's N actual, so the two agree.",
+          ? "The bill uses the study's N actual, which only adds up the segments that have one. Cost per respondent and scrub leave this study out until every segment has its N actual."
+          : "The bill and every figure here use the study's own N actual. Correct the segments, or the study's N actual, so the two agree.",
       })
     }
     const med = m.book.get(s.route)
@@ -765,7 +765,7 @@ export function exceptions(
       const slice = m.slice?.get(s.route)
       entry(s).items.push({
         badge: 'cost-outlier', amount: excess,
-        headline: `${s.code} cost ${money(excess)} more than a typical ${ROUTE_WORD[s.route]} survey`,
+        headline: `${s.code} cost ${money(excess)} more than a typical ${ROUTE_WORD[s.route]} study`,
         detail: `${moneyAuto(s.cpqr)} per qualified respondent against a book median of ${moneyAuto(med)}` +
           ` (${(s.cpqr / med).toFixed(1)}×)` +
           (slice != null && Math.abs(slice - med) >= 0.005 ? `; the median in this view is ${moneyAuto(slice)}` : '') +

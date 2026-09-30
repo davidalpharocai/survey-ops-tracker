@@ -51,12 +51,12 @@ export function NowTab({ exposure, variance, queue, back, holds, canFinance, blo
         tone={exposure.length > 0 ? 'alert' : undefined}
         title="Live exposure — money still moving"
         tip={canFinance
-          ? 'Live surveys that have already passed their budget or their N target. The date filter does not apply here — an overspend matters whenever the survey launched. Surveys on hold are counted separately below, never in this list.'
-          : 'Live surveys that have already collected more than their N target. The date filter does not apply here — an overspend matters whenever the survey launched. Surveys on hold are counted separately below, never in this list.'}
+          ? 'Live studies that have already passed their budget or their N target. The date filter does not apply here — an overspend matters whenever the study launched. Studies on hold are counted separately below, never in this list.'
+          : 'Live studies that have already collected more than their N target. The date filter does not apply here — an overspend matters whenever the study launched. Studies on hold are counted separately below, never in this list.'}
         floor={blocks.costs}
       >
         {exposure.length === 0 ? (
-          <Empty>{canFinance ? 'No live survey is past its budget or its target.' : 'No live survey is past its target.'}</Empty>
+          <Empty>{canFinance ? 'No live study is past its budget or its target.' : 'No live study is past its target.'}</Empty>
         ) : (
           <>
             <div className="divide-y divide-border/60">
@@ -88,7 +88,7 @@ export function NowTab({ exposure, variance, queue, back, holds, canFinance, blo
             </div>
             <Note tone="neg">
               <Drillable onOpen={() => onDrill('exposure')}>
-                {fmtNum(exposure.length)} survey{exposure.length === 1 ? '' : 's'} in flight
+                {fmtNum(exposure.length)} stud{exposure.length === 1 ? 'y' : 'ies'} in flight
               </Drillable>{' '}
               {exposure.length > 8 && <> — {fmtNum(exposure.length - 8)} more behind this figure</>}.
               Every dollar here is being spent now, against a limit somebody already set.
@@ -98,7 +98,7 @@ export function NowTab({ exposure, variance, queue, back, holds, canFinance, blo
         {holds && holds.surveys > 0 && (
           <Note>
             <span className="font-medium text-foreground">
-              {fmtNum(holds.surveys)} survey{holds.surveys === 1 ? ' is' : 's are'} on hold
+              {fmtNum(holds.surveys)} stud{holds.surveys === 1 ? 'y is' : 'ies are'} on hold
             </span>{holds.spend > 0 && <> with {money(holds.spend)} already spent</>}. Kept out of every live
             figure on this page. Resume or cancel each one.
           </Note>
@@ -107,20 +107,20 @@ export function NowTab({ exposure, variance, queue, back, holds, canFinance, blo
 
       {canFinance && <Card
         title="Budget variance"
-        tip="survey_projects.budget is a COST CEILING — the most we intend to spend — not client revenue. Overrun and headroom are shown side by side and never netted: headroom on one survey cannot pay for an overrun on another, and subtracting them reports roughly zero and hides both."
+        tip="survey_projects.budget is a COST CEILING — the most we intend to spend — not client revenue. Overrun and headroom are shown side by side and never netted: headroom on one study cannot pay for an overrun on another, and subtracting them reports roughly zero and hides both."
         floor={blocks.costs}
       >
         <div className="grid grid-cols-2 divide-x divide-border/60">
-          <Drillable onOpen={() => onDrill('breach')} title="Show the surveys that blew their ceiling">
+          <Drillable onOpen={() => onDrill('breach')} title="Show the studies that blew their ceiling">
             <Figure
               value={money(variance.overrun)} label="spent past a ceiling"
-              sub={`${fmtNum(variance.breaches.length)} of ${fmtNum(variance.measurable)} surveys that carry both a ceiling and a cost`}
+              sub={`${fmtNum(variance.breaches.length)} of ${fmtNum(variance.measurable)} studies that carry both a ceiling and a cost`}
               tone="neg"
             />
           </Drillable>
           <Figure
             value={money(variance.headroom)} label="unused headroom"
-            sub={`${fmtNum(variance.underSurveys)} surveys came in under. NOT an offset — it is on different surveys.`}
+            sub={`${fmtNum(variance.underSurveys)} studies came in under. NOT an offset — it is on different studies.`}
             size="md"
           />
         </div>
@@ -142,7 +142,7 @@ export function NowTab({ exposure, variance, queue, back, holds, canFinance, blo
         )}
         <Note>
           {variance.noCost > 0 && <>
-            {fmtNum(variance.noCost)} more surveys carry a ceiling but no recorded cost, so they are
+            {fmtNum(variance.noCost)} more studies carry a ceiling but no recorded cost, so they are
             unmeasurable rather than compliant.{' '}
           </>}
           {variance.breaches.length > 0 && (() => {
@@ -157,13 +157,13 @@ export function NowTab({ exposure, variance, queue, back, holds, canFinance, blo
       <Card
         title="What to look at"
         tip={canFinance
-          ? "One row per survey, carrying every badge that applies — losing money and going over budget are different events and are never merged. Ranked by dollars at stake: a cost outlier counts the total it cost above a typical survey on its route (the whole book's median, so the yardstick does not move with the filter). Each row ends with what to do."
-          : "One row per survey: cost outliers and surveys whose segment counts do not add up to the survey's N actual. Ranked by dollars at stake: a cost outlier counts the total it cost above a typical survey on its route (the whole book's median, so the yardstick does not move with the filter). Each row ends with what to do."}
+          ? "One row per study, carrying every badge that applies — losing money and going over budget are different events and are never merged. Ranked by dollars at stake: a cost outlier counts the total it cost above a typical study on its route (the whole book's median, so the yardstick does not move with the filter). Each row ends with what to do."
+          : "One row per study: cost outliers and studies whose segment counts do not add up to the study's N actual. Ranked by dollars at stake: a cost outlier counts the total it cost above a typical study on its route (the whole book's median, so the yardstick does not move with the filter). Each row ends with what to do."}
         floor={blocks.costs}
       >
         {canFinance && blocks.prices && (
           <Note tone="neg">
-            {blocks.prices}, so surveys that lost money or were given away at $0 cannot be flagged
+            {blocks.prices}, so studies that lost money or were given away at $0 cannot be flagged
             here. The list below is missing them, not clear of them.
           </Note>
         )}
@@ -220,18 +220,18 @@ export function NowTab({ exposure, variance, queue, back, holds, canFinance, blo
         <Card
           wide
           title="Backlog — sold, not yet delivered"
-          tip="Live surveys that carry a client price, valued at the N sold. An UPPER bound: it assumes every one lands exactly on target, and surveys regularly come in short. Surveys on hold and in scoping are not included."
+          tip="Live studies that carry a client price, valued at the N sold. An UPPER bound: it assumes every one lands exactly on target, and studies regularly come in short. Studies on hold and in scoping are not included."
           floor={blocks.prices ? null : blocks.costs}
         >
           {blocks.prices ? <BlockedFigure text={blocks.prices} /> : <>
           <div className="grid grid-cols-2 divide-x divide-border/60">
             <Figure
               value={money(back.revenueAtTarget)} label="if every one lands on target"
-              sub={`${fmtNum(back.surveys)} live surveys carrying a price · ${money(back.spentSoFar)} spent against it so far`}
+              sub={`${fmtNum(back.surveys)} live studies carrying a price · ${money(back.spentSoFar)} spent against it so far`}
               tone="pos"
             />
             <Figure
-              value={fmtNum(back.unpriced)} label="live surveys with no price or no target"
+              value={fmtNum(back.unpriced)} label="live studies with no price or no target"
               sub="invisible to this figure — the pipeline is larger than the number beside it"
               size="md"
             />

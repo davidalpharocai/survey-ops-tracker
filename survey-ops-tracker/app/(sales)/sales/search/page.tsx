@@ -35,7 +35,7 @@ export default async function SalesSearchPage({
         <p className="mt-2 text-sm text-muted-foreground">
           {q.trim()
             ? `Type at least ${MIN_QUERY} characters.`
-            : 'Search your surveys, accounts, contacts, contracts and files.'}
+            : 'Search your studies, accounts, contacts, contracts and files.'}
         </p>
         <p className="mt-4 text-xs text-muted-foreground/70">
           Use the box in the top bar, or press ⌘K. Enter searches everything on your book.

@@ -79,11 +79,11 @@ export const RANGE_PRESETS: { id: RangePreset; label: string; help: string }[] =
   { id: 'last-month', label: 'Last month', help: 'The whole of last calendar month.' },
   { id: 'this-quarter', label: 'This quarter', help: 'From the first day of this quarter on. Live work due after today is included, because it is being worked on now.' },
   { id: 'custom', label: 'Custom', help: 'Pick your own start and end dates.' },
-  { id: 'all', label: 'All time', help: 'Every survey, including those from before costs were recorded and those with no date.' },
+  { id: 'all', label: 'All time', help: 'Every study, including those from before costs were recorded and those with no date.' },
 ]
 
 export const ROUTE_OPTIONS: { id: RouteFilter; label: string; help: string }[] = [
-  { id: 'all', label: 'All routes', help: 'Every survey, however it was fielded.' },
+  { id: 'all', label: 'All routes', help: 'Every study, however it was fielded.' },
   { id: 'blast', label: 'Blast only', help: 'Fielded only through B2B email or text blasts.' },
   { id: 'panel', label: 'Panel only', help: 'Fielded only through PureSpectrum panels.' },
   { id: 'both', label: 'Both', help: 'Fielded through blasts and panels together.' },
@@ -510,7 +510,7 @@ export function describe(
   const route = ROUTE_OPTIONS.find(o => o.id === f.route)
   const account = f.account ? (ctx.accountName ?? 'One account') : null
   const dateText = rule.date ? formatRange(range) : (rule.ignoredNote ?? 'All dates')
-  const surveys = `${fmtNum(ctx.count)} survey${ctx.count === 1 ? '' : 's'}`
+  const surveys = `${fmtNum(ctx.count)} ${ctx.count === 1 ? 'study' : 'studies'}`
   const chip = [
     rule.word,
     dateText,
@@ -524,13 +524,13 @@ export function describe(
     'SOCC finance export',
     ...(ctx.asOf ? [`As of: ${ctx.asOf}`] : []),
     `Tab: ${TAB_LABEL[ctx.tab]}`,
-    `Surveys: ${rule.classes.map(c => CLASS_LABEL[c]).join(' and ')}` +
+    `Studies: ${rule.classes.map(c => CLASS_LABEL[c]).join(' and ')}` +
       (rule.side.length ? ` (${rule.side.map(c => CLASS_LABEL[c]).join(', ')} listed separately)` : ''),
     rule.date
       ? `Date: ${formatRange(range)} (placed by deliver date, then launch date, then submitted date)`
       : `Date: not applied — ${rule.ignoredNote ?? 'all dates'}`,
     `Account: ${account ?? 'All accounts'}`,
-    `Route: ${route?.label ?? 'All routes'} (measured from each survey's own rows)`,
+    `Route: ${route?.label ?? 'All routes'} (measured from each study's own rows)`,
     `Rows: ${fmtNum(ctx.count)}`,
   ]
   const audit: FilterDescription['audit'] = {

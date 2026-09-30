@@ -37,18 +37,18 @@ export function MonthChart({ months, costReliableFrom, onSelect }: {
   const crossesYear = spansYears(months.map(m => m.key))
   return (
     <ColumnChart
-      ariaLabel="Client price against our cost by delivery month, on surveys with both"
+      ariaLabel="Client price against our cost by delivery month, on studies with both"
       title="By delivery month"
-      info="Client price (teal) and our cost (navy) on the same surveys: the ones with both a price and a recorded cost. The hatched bar is spend on delivered surveys with no client price. We keep % sits in the strip above; the count under each month is surveys with a price and a cost, out of all delivered. Click a month to see its surveys."
+      info="Client price (teal) and our cost (navy) on the same studies: the ones with both a price and a recorded cost. The hatched bar is spend on delivered studies with no client price. We keep % sits in the strip above; the count under each month is studies with a price and a cost, out of all delivered. Click a month to see its studies."
       data={months}
       x={m => m.label}
       xShort={m => monthShort(m.key, crossesYear)}
       xKey={m => m.key}
       xLabel="Month"
       series={[
-        { key: 'price', label: 'Client price', value: m => m.price, color: 'var(--chart-price)', description: 'What clients pay on the month’s surveys that have both a price and a recorded cost.' },
-        { key: 'cost', label: 'Our cost', value: m => m.cost, color: 'var(--chart-cost)', description: 'Recorded field cost on the same surveys, net of rewards recovered.' },
-        { key: 'noprice', label: 'Spend with no price', value: m => m.spendNoPrice, hatch: true, description: 'Spend on the month’s delivered surveys that carry no client price. No margin figure can see it.' },
+        { key: 'price', label: 'Client price', value: m => m.price, color: 'var(--chart-price)', description: 'What clients pay on the month’s studies that have both a price and a recorded cost.' },
+        { key: 'cost', label: 'Our cost', value: m => m.cost, color: 'var(--chart-cost)', description: 'Recorded field cost on the same studies, net of rewards recovered.' },
+        { key: 'noprice', label: 'Spend with no price', value: m => m.spendNoPrice, hatch: true, description: 'Spend on the month’s delivered studies that carry no client price. No margin figure can see it.' },
       ]}
       valueFormat={v => fmtMoney(v)}
       axisFormat={v => fmtMoneyCompact(v)}
@@ -57,21 +57,21 @@ export function MonthChart({ months, costReliableFrom, onSelect }: {
         value: m => m.keptPct,
         format: v => fmtPct(v),
         color: 'var(--chart-keep)',
-        description: `Client price minus our cost, as a share of the price, on the month’s surveys with both. The goal is ${goalKeptWords()}.`,
+        description: `Client price minus our cost, as a share of the price, on the month’s studies with both. The goal is ${goalKeptWords()}.`,
       }}
       subLabel={{
         name: 'Priced of delivered',
         text: m => `${fmtCount(m.surveys)} of ${fmtCount(m.delivered)}`,
-        description: 'Surveys with both a client price and a recorded cost, out of every delivered survey in the month.',
+        description: 'Studies with both a client price and a recorded cost, out of every delivered study in the month.',
       }}
       opacity={m => (m.beforeReliable ? OPACITY_BEFORE : m.thin ? OPACITY_THIN : 1)}
-      opacityNote={anyBefore ? 'costs not recorded yet, or few priced surveys' : 'few priced surveys this month'}
-      note={m => [m.note, m.recoveriesPending ? `Reward recoveries still pending: ${fmtCount(m.creditedSurveys)} of ${fmtCount(m.rewardedSurveys)} blast surveys have theirs booked` : null].filter(Boolean).join('. ') || null}
+      opacityNote={anyBefore ? 'costs not recorded yet, or few priced studies' : 'few priced studies this month'}
+      note={m => [m.note, m.recoveriesPending ? `Reward recoveries still pending: ${fmtCount(m.creditedSurveys)} of ${fmtCount(m.rewardedSurveys)} blast studies have theirs booked` : null].filter(Boolean).join('. ') || null}
       rules={anyBefore && costReliableFrom && firstReliable?.key === costReliableFrom
         ? [{ at: costReliableFrom, label: `costs recorded from ${monthLabel(costReliableFrom)}` }]
         : []}
       onSelect={onSelect}
-      emptyMessage="No delivered survey in this view has a date to place it in a month."
+      emptyMessage="No delivered study in this view has a date to place it in a month."
     />
   )
 }

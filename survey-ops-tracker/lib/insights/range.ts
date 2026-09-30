@@ -57,7 +57,7 @@ export const RANGE_PRESETS: { id: RangePreset; label: string; help: string }[] =
   },
   { id: 'last-12-months', label: 'Last 12 months', help: 'This month so far and the 11 whole months before it.' },
   { id: 'custom', label: 'Custom', help: 'Pick your own start and end dates.' },
-  { id: 'all', label: 'All time', help: 'Every delivered survey, including those with no deliver date (they are counted but cannot go on a monthly chart).' },
+  { id: 'all', label: 'All time', help: 'Every delivered study, including those with no deliver date (they are counted but cannot go on a monthly chart).' },
 ]
 
 export const PRESET_IDS = new Set<string>(RANGE_PRESETS.map(p => p.id))

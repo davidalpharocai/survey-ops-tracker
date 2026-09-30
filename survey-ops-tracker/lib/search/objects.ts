@@ -93,7 +93,7 @@ function fileSize(r: Row): string | null {
 const ANALYST: SearchObject[] = [
   {
     id: 'surveys',
-    label: 'Surveys',
+    label: 'Studies',
     from: 'survey_projects',
     // survey_tool_id is searched even though it is a COMMA-SEPARATED LIST of
     // ids: ilike over the whole string is exactly right for it, where an
@@ -101,7 +101,7 @@ const ANALYST: SearchObject[] = [
     select: 'id, project_code, project_name, client, client_id, requested_by_name, survey_tool_id, board_column, status, phase, scoping_stage',
     columns: ['project_code', 'project_name', 'client', 'requested_by_name', 'survey_tool_id'],
     liveWhen: { column: 'deleted_at', is: 'null' },
-    title: r => [s(r, 'project_code'), s(r, 'project_name')].filter(Boolean).join(' · ') || 'Untitled survey',
+    title: r => [s(r, 'project_code'), s(r, 'project_name')].filter(Boolean).join(' · ') || 'Untitled study',
     subtitle: (r, c) => s(r, 'client') ?? clientLabel(r, c),
     href: r => `/projects/${id(r)}`,
     // stageOf, NOT the raw status. `status !== 'Open' ? status : board_column`
@@ -242,11 +242,11 @@ const ANALYST: SearchObject[] = [
 const SALES: SearchObject[] = [
   {
     id: 'surveys',
-    label: 'Surveys',
+    label: 'Studies',
     from: 'sales_projects',
     select: 'id, project_code, project_name, client, client_id, requested_by_name, board_column, status, scoping_stage, phase',
     columns: ['project_code', 'project_name', 'client', 'requested_by_name'],
-    title: r => [s(r, 'project_code'), s(r, 'project_name')].filter(Boolean).join(' · ') || 'Untitled survey',
+    title: r => [s(r, 'project_code'), s(r, 'project_name')].filter(Boolean).join(' · ') || 'Untitled study',
     subtitle: r => s(r, 'client'),
     href: r => `/sales/surveys/${id(r)}`,
     tag: r => stageOf({

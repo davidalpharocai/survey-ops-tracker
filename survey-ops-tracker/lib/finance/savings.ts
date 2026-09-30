@@ -105,7 +105,7 @@ export const LEVER_TITLE: Record<LeverKey, string> = {
   'dead-streak': 'Stop sending after two dead blasts',
   'launch-overrun': 'Set the PureSpectrum survey Goal, not SOCC’s cap',
   'sell-range': 'Sell a range on repeat work',
-  'top-up': 'Top up short surveys',
+  'top-up': 'Top up short studies',
   'price-gap': 'Bring low prices up to the best payer on the same route',
 }
 
@@ -142,8 +142,8 @@ export interface Lever {
   /** What it costs to be wrong. */
   risk: string
   evidence: Evidence
-  /** Fewer than MIN_CLASS_N surveys behind it — the figure is withheld and the
-   *  lever reads "too few surveys here to call". */
+  /** Fewer than MIN_CLASS_N studies behind it — the figure is withheld and the
+   *  lever reads "too few studies here to call". */
   tooFew: boolean
   /** Why there is no figure, when the plain "too few" count would mislead (the
    *  price-gap lever counts two sides) or the lever found nothing to act on. */
@@ -219,7 +219,7 @@ export function smsRateLever(
     forgoneCompletes: 0,
     givesUp: 'nothing — no effect on quality, speed or any client',
     free: true,
-    population: `${n(sends)} messages across ${n(sms.length)} text blasts on ${n(surveys.length)} surveys, ` +
+    population: `${n(sends)} messages across ${n(sms.length)} text blasts on ${n(surveys.length)} studies, ` +
       (flat ? `every one at ${money2(rates[0])} a message` : `${n(rates.length)} different rates`),
     rule: 'Get one carrier invoice to confirm the per-message rate, then ask the carrier for a volume tier.',
     why: (flat
@@ -286,12 +286,12 @@ export function deadStreakLever(
     givesUp: completes > 0 ? `about ${n(completes)} completes, bought dear` : 'no completes — those sends produced none',
     free: false,
     riskTag: completes > 0 ? `gives up ${n(completes)} completes` : undefined,
-    population: `${n(blastRows)} blasts across ${n(surveys)} surveys sent after two sends in a row returned nothing`,
+    population: `${n(blastRows)} blasts across ${n(surveys)} studies sent after two sends in a row returned nothing`,
     rule: 'After two blasts in a row return no completes, buy more list instead of sending to the same one again.',
-    why: `${n(blastRows)} ${s(blastRows, 'blast')} on ${n(surveys)} ${s(surveys, 'survey')} went out after two sends in a row returned nothing. ` +
-      `They cost ${money(spend)} and produced ${n(completes)} completes — ${moneyAuto(actual)} each, against a typical ${moneyAuto(bookCostPerComplete)} per complete on blast surveys here. ` +
+    why: `${n(blastRows)} ${s(blastRows, 'blast')} on ${n(surveys)} ${s(surveys, 'study', 'studies')} went out after two sends in a row returned nothing. ` +
+      `They cost ${money(spend)} and produced ${n(completes)} completes — ${moneyAuto(actual)} each, against a typical ${moneyAuto(bookCostPerComplete)} per complete on blast studies here. ` +
       'They are not worthless, they are expensive, so the lever is the premium over the typical rate and not the whole spend.',
-    risk: `Acting on it gives up ${n(completes)} completes. On a survey already short of target that is a delivery risk, so this is a warning and never an automatic cap.`,
+    risk: `Acting on it gives up ${n(completes)} completes. On a study already short of target that is a delivery risk, so this is a warning and never an automatic cap.`,
     evidence: 'depends',
     tooFew: surveys < MIN_CLASS_N,
     ids,
@@ -343,12 +343,12 @@ export function bidPremiumLever(
     low: 0,
     high: premium,
     forgoneCompletes: 0,
-    givesUp: 'no completes, but a hard survey may finish short without the raise',
+    givesUp: 'no completes, but a hard study may finish short without the raise',
     free: false,
-    riskTag: 'may leave a hard survey short',
-    population: `${n(surveys)} surveys that ran more than one bid level; ${money(premium)} of rewards paid above each survey's own opening bid (as issued, before recoveries)`,
+    riskTag: 'may leave a hard study short',
+    population: `${n(surveys)} studies that ran more than one bid level; ${money(premium)} of rewards paid above each study's own opening bid (as issued, before recoveries)`,
     rule: 'Hold the opening bid, and when a raise is genuinely needed, record why.',
-    why: `${n(surveys)} ${s(surveys, 'survey')} ran more than one bid level and paid ${money(premium)} of rewards above each survey's own opening bid (as issued, before any came back). ` +
+    why: `${n(surveys)} ${s(surveys, 'study', 'studies')} ran more than one bid level and paid ${money(premium)} of rewards above each study's own opening bid (as issued, before any came back). ` +
       'The premium is only worth paying when the audience is provably thin, and today nothing on record tells that case apart from habit.',
     risk: 'Real. On a hard audience the raise may be the only thing that fills the study, which is why the low end of this range is zero. Use it as a prompt to record a reason, not as a cap.',
     evidence: 'depends',
@@ -586,12 +586,12 @@ export function sellRangeLever(
     forgoneCompletes: 0,
     givesUp: 'nothing in the field — the quote carries a range instead of one number',
     free: false,
-    population: `${n(ids.length)} repeat ${s(ids.length, 'survey')} priced above $0, delivered past the top of the N sold`,
+    population: `${n(ids.length)} repeat ${s(ids.length, 'study', 'studies')} priced above $0, delivered past the top of the N sold`,
     rule: 'On repeat work, quote a range — the N the client needs up to the N we usually deliver — and price the cushion into the quote.',
-    why: `${n(overN)} ${s(overN, 'respondent')} went past the top of the N sold on ${n(ids.length)} repeat ${s(ids.length, 'survey')} priced above $0 — ${money(value)} at each client's own price. ` +
+    why: `${n(overN)} ${s(overN, 'respondent')} went past the top of the N sold on ${n(ids.length)} repeat ${s(ids.length, 'study', 'studies')} priced above $0 — ${money(value)} at each client's own price. ` +
       'Over-delivery is a courtesy and is never charged for afterwards, so the next quote is the only place this can be earned.' +
       (firstSurveys > 0
-        ? ` Another ${n(firstN)} on ${n(firstSurveys)} first ${s(firstSurveys, 'survey')} for an account are left out: over-delivering a new client the first time is deliberate.`
+        ? ` Another ${n(firstN)} on ${n(firstSurveys)} first ${s(firstSurveys, 'study', 'studies')} for an account are left out: over-delivering a new client the first time is deliberate.`
         : ''),
     risk: 'Most of this is QA cushion bought on purpose, so the figure is the most a range could earn, not a promise. Keep over-delivering a new client the first time.',
     evidence: 'direction',
@@ -646,15 +646,15 @@ export function topUpLever(
     givesUp: 'time — fielding the rest can push the delivery date',
     free: false,
     riskTag: 'may delay delivery',
-    population: `${n(ids.length)} delivered ${s(ids.length, 'survey')} priced above $0 that came in short of the N sold`,
-    rule: 'When a survey is heading for fewer respondents than it sold and its price per respondent is above what one costs us on that route, field the rest before delivery.',
-    why: `${n(shortN)} ${s(shortN, 'respondent')} short on ${n(ids.length)} ${s(ids.length, 'survey')} priced above $0, worth ${money(gross)} at the client's own price. ` +
+    population: `${n(ids.length)} delivered ${s(ids.length, 'study', 'studies')} priced above $0 that came in short of the N sold`,
+    rule: 'When a study is heading for fewer respondents than it sold and its price per respondent is above what one costs us on that route, field the rest before delivery.',
+    why: `${n(shortN)} ${s(shortN, 'respondent')} short on ${n(ids.length)} ${s(ids.length, 'study', 'studies')} priced above $0, worth ${money(gross)} at the client's own price. ` +
       (typical
-        ? `Net of fielding them at the route's typical cost per qualified respondent (${typical}), that is ${money(netHigh)}; at a dear survey's cost, ${money(netLow)}.`
+        ? `Net of fielding them at the route's typical cost per qualified respondent (${typical}), that is ${money(netHigh)}; at a dear study's cost, ${money(netLow)}.`
         : 'No route in view has a cost per qualified respondent to net against, so none of it is sized.') +
       (losing > 0 ? ` On ${n(losing)} of them the price is at or below the route's typical cost, so topping up would lose money.` : '') +
-      (unsized > 0 ? ` ${n(unsized)} ${s(unsized, 'survey')} (${money(unsizedGross)} at price) fielded both ways or on a route with no cost per respondent here ${unsized === 1 ? 'is' : 'are'} counted but not sized.` : ''),
-    risk: 'The audience may be exhausted — often why the survey came in short — so some of these cannot be filled at a sensible price, which is why the low end assumes a dear top-up.',
+      (unsized > 0 ? ` ${n(unsized)} ${s(unsized, 'study', 'studies')} (${money(unsizedGross)} at price) fielded both ways or on a route with no cost per respondent here ${unsized === 1 ? 'is' : 'are'} counted but not sized.` : ''),
+    risk: 'The audience may be exhausted — often why the study came in short — so some of these cannot be filled at a sensible price, which is why the low end assumes a dear top-up.',
     evidence: 'depends',
     tooFew: ids.length < MIN_CLASS_N,
     financeOnly: true,
@@ -766,7 +766,7 @@ export function priceGapLever(
     const ids = groups.flatMap(g => g.ids)
     const note = sized
       ? 'No account here pays less per billed respondent than another fielded the same way for work that costs us as much.'
-      : `No two accounts fielded the same way have enough priced surveys to compare: the one being re-priced needs ${n(MIN_CLASS_N)}, the one it is compared with ${n(MIN_BENCHMARK_N)}.`
+      : `No two accounts fielded the same way have enough priced studies to compare: the one being re-priced needs ${n(MIN_CLASS_N)}, the one it is compared with ${n(MIN_BENCHMARK_N)}.`
     return {
       ...common, title: LEVER_TITLE['price-gap'], low: 0, high: 0,
       population: `${n(groups.length)} account-and-route groups priced above $0`,
@@ -784,9 +784,9 @@ export function priceGapLever(
     low: gap / 2,
     high: gap,
     riskTag: 'the client may push back',
-    population: `${A}'s ${n(g.surveys)} ${g.route} surveys priced above $0, against ${B}'s ${n(b.surveys)}`,
+    population: `${A}'s ${n(g.surveys)} ${g.route} studies priced above $0, against ${B}'s ${n(b.surveys)}`,
     rule: `Re-price ${A}’s next ${g.route} quotes toward the ${moneyAuto(rate(b))} per billed respondent ${B} pays, because its work costs us as much or more.`,
-    why: `${A} pays ${moneyAuto(rate(g))} per billed respondent on ${n(g.surveys)} ${g.route} surveys; ${B} pays ${moneyAuto(rate(b))} on ${n(b.surveys)}. ` +
+    why: `${A} pays ${moneyAuto(rate(g))} per billed respondent on ${n(g.surveys)} ${g.route} studies; ${B} pays ${moneyAuto(rate(b))} on ${n(b.surveys)}. ` +
       `Per billed respondent, ${A}’s work cost us ${moneyAuto(costPer(g))} against ${moneyAuto(costPer(b))} for ${B}. ` +
       `At ${B}’s price, ${A}’s ${n(g.billedN)} billed respondents would have brought ${money(gap)} more; meeting halfway, ${money(gap / 2)}.` +
       (others > 0 ? ` ${n(others)} other ${s(others, 'account')} also ${others === 1 ? 'pays' : 'pay'} less than another fielded the same way, for work that costs as much.` : ''),

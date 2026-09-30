@@ -87,15 +87,15 @@ const RETIRED_COLS = ['collected'] as const
 
 // `hint` is each header's explainer (shown as its tooltip).
 export const ACCOUNT_COLS: { id: ColId; label: string; hint: string; numeric?: boolean }[] = [
-  { id: 'code', label: 'Code', hint: 'The survey’s AlphaROC reference code.' },
-  { id: 'survey', label: 'Survey', hint: 'The survey’s name, and the audience after the dash.' },
-  { id: 'requested', label: 'Requested by', hint: 'The person at the client who asked for this survey.' },
-  { id: 'stage', label: 'Stage', hint: 'Where the survey is in the pipeline today.' },
+  { id: 'code', label: 'Code', hint: 'The study’s AlphaROC reference code.' },
+  { id: 'survey', label: 'Study', hint: 'The study’s name, and the audience after the dash.' },
+  { id: 'requested', label: 'Requested by', hint: 'The person at the client who asked for this study.' },
+  { id: 'stage', label: 'Stage', hint: 'Where the study is in the pipeline today.' },
   { id: 'target', label: 'Target', numeric: true, hint: 'Responses agreed with the client. A range sold shows as lowest–highest.' },
-  { id: 'final', label: 'Final', numeric: true, hint: 'Responses delivered after quality review, as the PDF prints them. Only a delivered survey has a final count; “≈ … est.” is an estimate while a survey is in quality review, and a dash means none yet.' },
-  { id: 'credits', label: 'Credits', numeric: true, hint: 'Credits the survey is priced at. A dash means not priced yet, which is not the same as zero.' },
+  { id: 'final', label: 'Final', numeric: true, hint: 'Responses delivered after quality review, as the PDF prints them. Only a delivered study has a final count; “≈ … est.” is an estimate while a study is in quality review, and a dash means none yet.' },
+  { id: 'credits', label: 'Credits', numeric: true, hint: 'Credits the study is priced at. A dash means not priced yet, which is not the same as zero.' },
   { id: 'submitted', label: 'Submitted', hint: 'The day the request came in.' },
-  { id: 'deliver', label: 'Delivered', hint: 'The day a delivered survey went out, in US Eastern Time. A survey not yet delivered shows its due date, marked “due”.' },
+  { id: 'deliver', label: 'Delivered', hint: 'The day a delivered study went out, in US Eastern Time. A study not yet delivered shows its due date, marked “due”.' },
 ]
 
 // Target takes the slot Collected had. David asked for "the Final (ie
@@ -291,7 +291,7 @@ export function AccountDetail({
         {client.code && <span className="text-sm text-muted-foreground">{client.code}</span>}
       </div>
       <p className="mb-5 text-sm text-muted-foreground">
-        {fmtNum(projects.length)} survey{projects.length === 1 ? '' : 's'} all time
+        {fmtNum(projects.length)} {projects.length === 1 ? 'study' : 'studies'} all time
         {contacts.length > 0 && ` · ${contacts.length} contact${contacts.length === 1 ? '' : 's'}`}
       </p>
 
@@ -319,10 +319,10 @@ export function AccountDetail({
             {drawnFigure(inRange).kind === 'unknown'
               // Nothing priced has drawn in the range: "At least 0" would read
               // as "nothing used". The PDF says "Not yet priced" here too.
-              ? `Credits drawn by the surveys in this range are not known yet — ${inRange.unpricedDrawn} of them ${
+              ? `Credits drawn by the studies in this range are not known yet — ${inRange.unpricedDrawn} of them ${
                   inRange.unpricedDrawn === 1 ? 'has' : 'have'} drawn credits and ${inRange.unpricedDrawn === 1 ? 'is' : 'are'} not yet priced.`
               : <>
-                  {inRange.isFloor ? 'At least ' : ''}{fmtNum(inRange.used)} credit{inRange.used === 1 ? '' : 's'} drawn by the surveys in this range
+                  {inRange.isFloor ? 'At least ' : ''}{fmtNum(inRange.used)} credit{inRange.used === 1 ? '' : 's'} drawn by the studies in this range
                   {inRange.unpricedDrawn > 0 && ` — ${inRange.unpricedDrawn} of them not yet priced`}.
                 </>}
           </p>
@@ -387,7 +387,7 @@ export function AccountDetail({
           href={exportUrl}
           target="_blank"
           rel="noopener"
-          title="Opens the Survey Activity Statement for this account and date range, ready to save as a PDF. It prints every column unless you, or your saved default, turn one off in its own “What prints” box. The columns chosen here do not carry over."
+          title="Opens the Study Activity Statement for this account and date range, ready to save as a PDF. It prints every column unless you, or your saved default, turn one off in its own “What prints” box. The columns chosen here do not carry over."
           className="ml-auto rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90"
         >
           Export PDF
@@ -397,7 +397,7 @@ export function AccountDetail({
       {/* The filter, stated. A table whose row count moved without saying why is
           how somebody reports a quiet shortfall as a real one. */}
       <p className="mb-3 text-xs text-muted-foreground">
-        {describeRange(basis, range)} · {fmtNum(rows.length)} of {fmtNum(projects.length)} surveys
+        {describeRange(basis, range)} · {fmtNum(rows.length)} of {fmtNum(projects.length)} studies
         {excluded.map(x => (
           <span key={x.text} title={x.title}>{' '}· {x.text}</span>
         ))}
@@ -420,7 +420,7 @@ export function AccountDetail({
       {/* ---- Surveys ---- */}
       {rows.length === 0 ? (
         <p className="rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground">
-          No surveys match this range.
+          No studies match this range.
         </p>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-border">

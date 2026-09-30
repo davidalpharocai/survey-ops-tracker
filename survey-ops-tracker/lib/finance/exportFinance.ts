@@ -98,12 +98,12 @@ export const LIFECYCLE_LABEL: Record<FinClass, string> = {
  *  uses one rate — the survey's — so that price is a note, never the figure. */
 export function priceStatus(r: SurveyPnl): string {
   if (!r.priced) {
-    return r.segmentPriceDiffers ? 'No price; only a segment carries one. Set the survey rate' : 'No price'
+    return r.segmentPriceDiffers ? 'No price; only a segment carries one. Set the study rate' : 'No price'
   }
   const base = r.revenue == null
     ? (r.revenueReason === 'no-cap' ? 'Priced; no N target' : 'Priced; no delivered N yet')
     : r.free ? 'Given away at $0' : 'Priced'
-  return r.segmentPriceDiffers ? `${base}; a segment is priced differently and the bill uses the survey rate` : base
+  return r.segmentPriceDiffers ? `${base}; a segment is priced differently and the bill uses the study rate` : base
 }
 
 /** What the segments say about the survey's N, or blank for a survey without
@@ -113,13 +113,13 @@ export function priceStatus(r: SurveyPnl): string {
  *  thousands separator and no commas, so the cell never needs quoting. */
 export function segmentNote(r: SurveyPnl): string | null {
   if (r.segments === 0) return null
-  if (r.actualSource === 'segments') return 'Survey N actual blank; rolled up from the segments'
+  if (r.actualSource === 'segments') return 'Study N actual blank; rolled up from the segments'
   if (!r.segmentsDisagree) return 'Segments add up'
   const missing = `${r.segmentsMissingN} of ${r.segments} segments ${r.segmentsMissingN === 1 ? 'has' : 'have'} no N actual`
-  if (r.partialRollUp) return `${missing}; the survey N actual adds up only the others; CPQR and Scrub N left blank`
+  if (r.partialRollUp) return `${missing}; the study N actual adds up only the others; CPQR and Scrub N left blank`
   return r.segmentsMissingN > 0
     ? missing
-    : `Segments add up to ${r.segmentSum ?? 0}; the survey says ${r.actual ?? 0}`
+    : `Segments add up to ${r.segmentSum ?? 0}; the study says ${r.actual ?? 0}`
 }
 
 export const FIN_COLUMNS: FinCsvColumn[] = [
@@ -314,7 +314,7 @@ const drillFormat = (f: DrillSpec['format']) =>
  */
 export function drillTable(spec: DrillSpec): ExportTable {
   const cols = [
-    { key: 'code', header: 'Survey' },
+    { key: 'code', header: 'Study' },
     ...spec.columns.map((c, i) => ({ key: `c${i}`, header: c.header })),
     { key: 'contribution', header: spec.totalLabel },
   ]

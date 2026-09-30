@@ -27,8 +27,8 @@ import type { FinanceTabProps } from '@/components/finance/tabs/types'
 import { RejectedRules, REJECTED_ANCHOR } from './RejectedRules'
 
 const TILE_HELP =
-  'Levers a manager could pull next week, each with its range, how firm the range is, what it gives up, one rule and the surveys behind it. ' +
-  `Computed on delivered and live work in view. Save cost and earn more are different kinds of money, so they have separate axes and are never added; the levers overlap, so there is no total. A lever with fewer than ${MIN_CLASS_N} surveys behind it is not called.`
+  'Levers a manager could pull next week, each with its range, how firm the range is, what it gives up, one rule and the studies behind it. ' +
+  `Computed on delivered and live work in view. Save cost and earn more are different kinds of money, so they have separate axes and are never added; the levers overlap, so there is no total. A lever with fewer than ${MIN_CLASS_N} studies behind it is not called.`
 
 const SIDE = {
   save: {
@@ -185,7 +185,7 @@ function LeverRow({ slot, index, onOpen }: { slot: LeverSlot; index: number; onO
             <button
               type="button"
               onClick={onOpen}
-              title="Show the surveys behind this lever"
+              title="Show the studies behind this lever"
               className="rounded text-left underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--chart-price)]"
             >
               {slot.title}

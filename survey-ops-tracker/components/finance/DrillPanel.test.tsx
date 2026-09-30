@@ -150,7 +150,7 @@ describe('the check strip', () => {
     await openWith(spec({ expectedTotal: null }))
     const strip = screen.getByTestId('drill-check')
     expect(strip).toHaveAttribute('data-ok', 'true')
-    expect(strip).toHaveTextContent('only the list of surveys is checked')
+    expect(strip).toHaveTextContent('only the list of studies is checked')
   })
 })
 

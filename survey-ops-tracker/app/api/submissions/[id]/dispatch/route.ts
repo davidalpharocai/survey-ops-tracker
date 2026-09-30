@@ -87,7 +87,7 @@ export async function POST(
     }
 
     const email = submissionCreatedEmail({
-      projectName: project?.project_name ?? 'Survey project',
+      projectName: project?.project_name ?? 'Study project',
       version: claimed.version,
       questionCount,
       openTextCount,

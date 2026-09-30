@@ -57,12 +57,12 @@ export const DEFAULT_GROUP_BY: ResultsGroupBy = 'account'
 /** The Tile 2 picker, in the spec's order, with the words for its (i). */
 export const GROUP_BY_OPTIONS: { id: ResultsGroupBy; label: string; help: string }[] = [
   { id: 'account', label: 'Account', help: 'One row per client account, old name variants rolled together. An account fielded on more than one route splits into a row per route.' },
-  { id: 'route', label: 'Route', help: 'How each survey was actually fielded, read from its cost records: blast, panel or both.' },
-  { id: 'month', label: 'Month', help: 'The month each survey is placed in: its deliver date, else its launch date, else its submitted date.' },
-  { id: 'contact', label: 'Contact', help: 'Who at the account asked for the survey (Requested by on the project page).' },
-  { id: 'type', label: 'Type as filed', help: 'The type the survey was filed as (PS, B2B, Rerun). It can differ from how it was actually fielded; Route shows that.' },
-  { id: 'survey', label: 'Survey', help: 'Every survey on its own line, with its budget, spend ÷ budget and spend ÷ price, and a tag for each thing that went wrong.' },
-  { id: 'panel', label: 'Panel supplier', help: 'Panel spend by supplier, from the PureSpectrum rows of the surveys in view. Clients pay per survey, not per panel, so client price is not split by panel.' },
+  { id: 'route', label: 'Route', help: 'How each study was actually fielded, read from its cost records: blast, panel or both.' },
+  { id: 'month', label: 'Month', help: 'The month each study is placed in: its deliver date, else its launch date, else its submitted date.' },
+  { id: 'contact', label: 'Contact', help: 'Who at the account asked for the study (Requested by on the project page).' },
+  { id: 'type', label: 'Type as filed', help: 'The type the study was filed as (PS, B2B, Rerun). It can differ from how it was actually fielded; Route shows that.' },
+  { id: 'survey', label: 'Study', help: 'Every study on its own line, with its budget, spend ÷ budget and spend ÷ price, and a tag for each thing that went wrong.' },
+  { id: 'panel', label: 'Panel supplier', help: 'Panel spend by supplier, from the PureSpectrum rows of the studies in view. Clients pay per study, not per panel, so client price is not split by panel.' },
 ]
 
 const GROUP_IDS = new Set<string>(GROUP_BY_OPTIONS.map(o => o.id))
@@ -123,7 +123,7 @@ const act = (action: ResultsAction, text: string): Part => ({ kind: 'action', ac
 export const partsText = (parts: Part[]): string => parts.map(p => p.text).join('')
 
 const plural = (n: number, one: string, many = `${one}s`) => (n === 1 ? one : many)
-const surveysWord = (n: number) => `${fmtNum(n)} ${plural(n, 'survey')}`
+const surveysWord = (n: number) => `${fmtNum(n)} ${plural(n, 'study', 'studies')}`
 
 /* ── INPUT ────────────────────────────────────────────────────────────────── */
 
@@ -308,10 +308,10 @@ export const TAG_LABEL: Record<LedgerTag, string> = {
 }
 
 export const TAG_HELP: Record<LedgerTag, string> = {
-  'lost-money': 'Our field cost was more than the client price, on a survey priced above $0. A survey that billed no respondents counts: its whole cost is a loss.',
-  'over-budget': 'Spent more than its budget. Not the same as losing money: a survey can go over budget and still make money.',
+  'lost-money': 'Our field cost was more than the client price, on a study priced above $0. A study that billed no respondents counts: its whole cost is a loss.',
+  'over-budget': 'Spent more than its budget. Not the same as losing money: a study can go over budget and still make money.',
   'given-away': 'Priced at $0 on purpose (a trial or internal work). The cost is real and there is no revenue.',
-  'no-price': 'No client price is recorded, so this survey cannot appear in any margin figure. Price it on the project page.',
+  'no-price': 'No client price is recorded, so this study cannot appear in any margin figure. Price it on the project page.',
 }
 
 /** One survey — the three-way ledger's row, and the export's. */
@@ -493,7 +493,7 @@ function tile1Of(
   const goal = pctText(KEEP_GOAL)
   const over = bvp.overBudget === 0
     ? withBudgetInMargin === 1
-      ? 'The one survey with a budget stayed inside it.'
+      ? 'The one study with a budget stayed inside it.'
       : `None of the ${surveysWord(withBudgetInMargin)} with a budget went over it.`
     : `Of the ${surveysWord(withBudgetInMargin)} with a budget, ${fmtNum(bvp.overBudget)} went over it; ${fmtNum(bvp.overBudgetMadeMoney)} of those still made money.`
   // What "on paid work" leaves out, named from the surveys actually left out.
@@ -541,15 +541,15 @@ function tile1Of(
         value: margin.pct != null ? `${money(margin.margin)} · ${pctText(margin.pct)}` : money(margin.margin),
         sub: (leftOut.length > 0
           ? `${pctText(margin.paid.pct)} on paid work — excludes ${leftOut.join(' and ')}.`
-          : 'No survey here was given away at $0 or billed nothing.') + ` Goal: ${goal}.`,
+          : 'No study here was given away at $0 or billed nothing.') + ` Goal: ${goal}.`,
       },
       budget: {
         value: bvp.medianPerDollar != null ? `${centsText(bvp.medianPerDollar)} per $1` : '—',
         sub: bvp.n > 0
           ? `Median of ${surveysWord(bvp.n)} with a budget and a price above $0. ${over}`
           : withBudgetInMargin > 0
-            ? `No survey here has both a budget and a price above $0, so there is no median. ${over}`
-            : 'No survey here has both a budget and a price above $0, so there is no median.',
+            ? `No study here has both a budget and a price above $0, so there is no median. ${over}`
+            : 'No study here has both a budget and a price above $0, so there is no median.',
       },
     },
   }
@@ -566,12 +566,12 @@ function coverageOf(margin: ReturnType<typeof marginOf>, spends: Map<string, Spe
     parts.push(t('No spend is recorded on delivered work in this view.'))
   } else if (n === 0) {
     parts.push(
-      t('No delivered survey in this view has both a client price and a recorded cost. Delivered work here spent '),
+      t('No delivered study in this view has both a client price and a recorded cost. Delivered work here spent '),
       act('waterfall', money(margin.spend)), t('.'),
     )
   } else {
     parts.push(
-      t(`${n === 1 ? 'This survey holds' : `These ${surveysWord(n)} hold`} ${pctText(share)} of the `),
+      t(`${n === 1 ? 'This study holds' : `These ${surveysWord(n)} hold`} ${pctText(share)} of the `),
       act('waterfall', money(margin.spend)),
       t(' spent on delivered work in this view.'),
     )
@@ -583,13 +583,13 @@ function coverageOf(margin: ReturnType<typeof marginOf>, spends: Map<string, Spe
       act('improve', `price ${margin.surveysNoPrice === 1 ? 'it' : 'them'} from the Improve tab`), t('.'),
     )
   } else if (margin.spend > 0) {
-    parts.push(t(' Every delivered survey here that spent money carries a client price.'))
+    parts.push(t(' Every delivered study here that spent money carries a client price.'))
   }
   if (margin.pricedBlocked > 0) {
-    parts.push(t(` Another ${money(blockedSpend)} is on ${fmtNum(margin.pricedBlocked)} priced ${plural(margin.pricedBlocked, 'survey')} that cannot be billed yet: no delivered N or no N target.`))
+    parts.push(t(` Another ${money(blockedSpend)} is on ${fmtNum(margin.pricedBlocked)} priced ${plural(margin.pricedBlocked, 'study', 'studies')} that cannot be billed yet: no delivered N or no N target.`))
   }
   if (margin.pricedNoCost > 0) {
-    parts.push(t(` ${fmtNum(margin.pricedNoCost)} priced ${plural(margin.pricedNoCost, 'survey carries', 'surveys carry')} no recorded cost and ${margin.pricedNoCost === 1 ? 'is' : 'are'} left out, so ${margin.pricedNoCost === 1 ? 'it does' : 'they do'} not read as 100% kept.`))
+    parts.push(t(` ${fmtNum(margin.pricedNoCost)} priced ${plural(margin.pricedNoCost, 'study carries', 'studies carry')} no recorded cost and ${margin.pricedNoCost === 1 ? 'is' : 'are'} left out, so ${margin.pricedNoCost === 1 ? 'it does' : 'they do'} not read as 100% kept.`))
   }
   return {
     deliveredSurveys: margin.delivered,
@@ -622,7 +622,7 @@ function smsWordsOf(ids: Set<string>, input: ResultsInput): SmsWords {
   const unrecordedChannel = text.filter(b => b.channel == null).length
   let words: string
   if (!text.length) {
-    words = 'No text messages were charged on these surveys. Email sends are free.'
+    words = 'No text messages were charged on these studies. Email sends are free.'
   } else {
     words = `${fmtNum(messages)} text ${plural(messages, 'message')} on ${fmtNum(text.length)} ${plural(text.length, 'blast')}, ` +
       (rates.length === 1
@@ -652,7 +652,7 @@ function waterfallOf(rows: FinProject[], spends: Map<string, Spend>, input: Resu
   const note = 'Recovered rewards are their own negative line and are never folded into Other costs. ' +
     (split.recoveredSurveys > 0
       ? `${money(-split.recovered)} came back on ${surveysWord(split.recoveredSurveys)}; blast rewards net of it are ${money(split.rewardsNet)}.`
-      : 'No recovered rewards are booked on these surveys yet, so blast rewards are gross.')
+      : 'No recovered rewards are booked on these studies yet, so blast rewards are gross.')
   return {
     lines, total: split.total,
     recoveredSurveys: split.recoveredSurveys, recoveredLines: split.recoveredLines,
@@ -686,17 +686,17 @@ function notInOf(input: ResultsInput): NotInFigures {
   // "$721 spent by 1 of the 14 surveys cancelled before delivery": the drill
   // lists the ones that spent, and the count of all of them says how rare that is.
   const clause = (b: OutsideBucket, action: 'cancelled' | 'archived', what: string): Part[] => {
-    if (b.inClass === 0) return [t(`no survey ${what}`)]
-    const all = b.inClass === 1 ? `the 1 survey ${what}` : `the ${fmtNum(b.inClass)} surveys ${what}`
+    if (b.inClass === 0) return [t(`no study ${what}`)]
+    const all = b.inClass === 1 ? `the 1 study ${what}` : `the ${fmtNum(b.inClass)} studies ${what}`
     if (b.surveys === 0) return [t(`no spend on ${all}`)]
     const who = b.surveys === b.inClass
-      ? (b.inClass === 1 ? all : `all ${fmtNum(b.inClass)} surveys ${what}`)
+      ? (b.inClass === 1 ? all : `all ${fmtNum(b.inClass)} studies ${what}`)
       : `${fmtNum(b.surveys)} of ${all}`
     return [act(action, money(b.spend)), t(` spent by ${who}`)]
   }
   const parts: Part[] = [t('Not in these figures: ')]
   if (cancelled.surveys === 0 && archived.surveys === 0) {
-    parts.push(t('nothing. No cancelled survey, and none archived without delivery, has any recorded spend in this account and route.'))
+    parts.push(t('nothing. No cancelled study, and none archived without delivery, has any recorded spend in this account and route.'))
   } else {
     parts.push(
       ...clause(cancelled, 'cancelled', 'cancelled before delivery'),
@@ -736,16 +736,16 @@ function monthsOf(input: ResultsInput, rows: FinProject[]): {
     let thin = false
     if (beforeReliable) {
       note = costReliableFrom
-        ? `Costs not recorded: before ${monthLabel(costReliableFrom)} most delivered surveys carry no cost`
-        : 'Costs not recorded: no month yet has a cost on most delivered surveys'
+        ? `Costs not recorded: before ${monthLabel(costReliableFrom)} most delivered studies carry no cost`
+        : 'Costs not recorded: no month yet has a cost on most delivered studies'
     } else if (m.surveys < MIN_MONTH_SURVEYS) {
       thin = true
       note = m.surveys === 0
-        ? 'No survey this month has both a client price and a cost'
+        ? 'No study this month has both a client price and a cost'
         : `Only ${surveysWord(m.surveys)} with both a client price and a cost`
     } else if (pricedShare != null && pricedShare < threshold) {
       thin = true
-      note = `Only ${pctText(pricedShare)} of this month's delivered surveys carry a price`
+      note = `Only ${pctText(pricedShare)} of this month's delivered studies carry a price`
     }
     return {
       key: p.key,
@@ -805,7 +805,7 @@ function verdictOf(tile1: Tile1, months: MonthBar[], ledger: LedgerRow[], costFr
   const out: Part[] = []
   if (tile1.surveys === 0) {
     out.push(
-      t('No delivered survey in this view carries both a client price and a recorded cost, so there is nothing to call yet. '),
+      t('No delivered study in this view carries both a client price and a recorded cost, so there is nothing to call yet. '),
       act('improve', 'Add the missing prices from the Improve tab'), t('.'),
     )
     return out
@@ -830,19 +830,19 @@ function verdictOf(tile1: Tile1, months: MonthBar[], ledger: LedgerRow[], costFr
       if (b.recoveriesPending) out.push(t(`, and ${b.label} blast cost is still waiting on reward recoveries`))
       out.push(t('. '))
     } else {
-      out.push(t(`Too few surveys to call a trend: ${a.label} has ${fmtNum(a.surveys)} and ${b.label} has ${fmtNum(b.surveys)} with both a price and a cost, and each month needs ${fmtNum(TREND_MIN_N)}. `))
+      out.push(t(`Too few studies to call a trend: ${a.label} has ${fmtNum(a.surveys)} and ${b.label} has ${fmtNum(b.surveys)} with both a price and a cost, and each month needs ${fmtNum(TREND_MIN_N)}. `))
       if (b.recoveriesPending) out.push(t(`${b.label} blast cost is still waiting on reward recoveries. `))
     }
   } else if (b) {
     out.push(t(`Only ${b.label} is in view, so there is no month-over-month trend to call. `))
     if (b.recoveriesPending) out.push(t(`Its blast cost is still waiting on reward recoveries. `))
   } else if (costFrom == null) {
-    out.push(t('Costs are not yet recorded on most delivered surveys in any month, so there is no trend to call. '))
+    out.push(t('Costs are not yet recorded on most delivered studies in any month, so there is no trend to call. '))
   }
 
   const losers = ledger.filter(l => l.tags.includes('lost-money')).sort((x, y) => (x.kept ?? 0) - (y.kept ?? 0))
   if (losers.length) {
-    out.push(t(`${fmtNum(losers.length)} priced ${plural(losers.length, 'survey')} lost money: `))
+    out.push(t(`${fmtNum(losers.length)} priced ${plural(losers.length, 'study', 'studies')} lost money: `))
     losers.slice(0, LOSSES_NAMED).forEach((l, i) => {
       if (i > 0) out.push(t(', '))
       out.push({ kind: 'survey', id: l.id, text: l.code ?? '(no code)' }, t(` ${money(l.kept ?? 0)}`))
@@ -850,12 +850,12 @@ function verdictOf(tile1: Tile1, months: MonthBar[], ledger: LedgerRow[], costFr
     if (losers.length > LOSSES_NAMED) out.push(t(`, and ${fmtNum(losers.length - LOSSES_NAMED)} more`))
     out.push(t(`. Re-price ${losers.length === 1 ? "that account's" : "those accounts'"} next waves. `))
   } else if (tile1.paid.keptPct != null && tile1.paid.keptPct < KEEP_GOAL) {
-    out.push(t(`No survey priced above $0 lost money, but paid work keeps ${pctText(tile1.paid.keptPct)}, under the ${pctText(KEEP_GOAL)} goal. Price the next waves toward the goal. `))
+    out.push(t(`No study priced above $0 lost money, but paid work keeps ${pctText(tile1.paid.keptPct)}, under the ${pctText(KEEP_GOAL)} goal. Price the next waves toward the goal. `))
   } else {
-    out.push(t(`No survey priced above $0 lost money. Keep quoting at this level. `))
+    out.push(t(`No study priced above $0 lost money. Keep quoting at this level. `))
   }
   if (tile1.pricedAboveZero > 0) {
-    out.push(t(`${fmtNum(tile1.spentOverGoal)} of ${fmtNum(tile1.pricedAboveZero)} priced ${plural(tile1.pricedAboveZero, 'survey')} spent more than ${goalShareWords()}.`))
+    out.push(t(`${fmtNum(tile1.spentOverGoal)} of ${fmtNum(tile1.pricedAboveZero)} priced ${plural(tile1.pricedAboveZero, 'study', 'studies')} spent more than ${goalShareWords()}.`))
   }
   // Trim the trailing space a sentence left behind.
   const last = out[out.length - 1]
@@ -1049,7 +1049,7 @@ function tile2Of(by: ResultsGroupBy, pnl: SurveyPnl[], ledger: LedgerRow[], inpu
 
 const GROUP_NOUN: Record<ResultsGroupBy, [string, string]> = {
   account: ['account', 'accounts'], route: ['route', 'routes'], month: ['month', 'months'],
-  contact: ['contact', 'contacts'], type: ['type', 'types'], survey: ['survey', 'surveys'],
+  contact: ['contact', 'contacts'], type: ['type', 'types'], survey: ['study', 'studies'],
   panel: ['panel', 'panels'],
 }
 
@@ -1058,7 +1058,7 @@ function groupVerdict(by: ResultsGroupBy, rows: GroupRow[]): Part[] {
   const measured = rows.filter(r => r.measured > 0)
   if (!measured.length) {
     return [
-      t(`No ${one} here has a survey with both a client price and a recorded cost. `),
+      t(`No ${one} here has a study with both a client price and a recorded cost. `),
       act('improve', 'Add the missing prices from the Improve tab'), t('.'),
     ]
   }
@@ -1089,7 +1089,7 @@ function groupVerdict(by: ResultsGroupBy, rows: GroupRow[]): Part[] {
   ]
   const tooFew = paid.filter(r => r.tooFew).length
   if (tooFew > 0) {
-    out.push(t(`${fmtNum(tooFew)} ${plural(tooFew, one, many)} ${tooFew === 1 ? 'has' : 'have'} fewer than ${fmtNum(GROUP_MIN_N)} surveys and ${tooFew === 1 ? 'is' : 'are'} too few to judge. `))
+    out.push(t(`${fmtNum(tooFew)} ${plural(tooFew, one, many)} ${tooFew === 1 ? 'has' : 'have'} fewer than ${fmtNum(GROUP_MIN_N)} studies and ${tooFew === 1 ? 'is' : 'are'} too few to judge. `))
   }
   out.push(...awayWords())
   const every = givenAway.length ? `Every other ${one}` : `Every ${one}`
@@ -1104,7 +1104,7 @@ function groupVerdict(by: ResultsGroupBy, rows: GroupRow[]): Part[] {
   if (lowest.keptPct != null && lowest.keptPct < KEEP_GOAL) {
     out.push(t(`${every} kept money; the lowest is ${name(lowest)} at ${pctText(lowest.keptPct)}, under the ${pctText(KEEP_GOAL)} goal. Look at ${name(lowest)}'s pricing first.`))
   } else {
-    out.push(t(`${every} kept money and ${judged.length ? `every one with ${fmtNum(GROUP_MIN_N)} or more surveys` : 'each'} is at or above the ${pctText(KEEP_GOAL)} goal. Hold these prices.`))
+    out.push(t(`${every} kept money and ${judged.length ? `every one with ${fmtNum(GROUP_MIN_N)} or more studies` : 'each'} is at or above the ${pctText(KEEP_GOAL)} goal. Hold these prices.`))
   }
   return out
 }
@@ -1113,7 +1113,7 @@ function surveyVerdict(ledger: LedgerRow[]): Part[] {
   const has = (tag: LedgerTag) => ledger.filter(l => l.tags.includes(tag))
   const lost = has('lost-money'), over = has('over-budget'), free = has('given-away'), none = has('no-price')
   const noPriceSpend = none.reduce((s, l) => s + (l.cost > 0 ? l.cost : 0), 0)
-  if (!ledger.length) return [t('No delivered survey is in this view. Widen the date range to see the ledger.')]
+  if (!ledger.length) return [t('No delivered study is in this view. Widen the date range to see the ledger.')]
   const out: Part[] = [
     t(`Of ${surveysWord(ledger.length)}, ${fmtNum(lost.length)} lost money, ${fmtNum(over.length)} went over budget, ${fmtNum(free.length)} ${free.length === 1 ? 'was' : 'were'} given away at $0 and ${fmtNum(none.length)} ${none.length === 1 ? 'carries' : 'carry'} no price. `),
   ]
@@ -1154,13 +1154,13 @@ function priceText(r: DrillRow): string {
 
 const COL = {
   account: { key: 'account', header: 'Account', tip: 'The client account, old name variants rolled together.', value: (r: DrillRow) => String(r.account ?? '—') },
-  route: { key: 'route', header: 'Route', tip: 'How the survey was actually fielded, read from its cost records.', value: (r: DrillRow) => ROUTE_WORD[(r.route as Route) ?? 'none'] ?? '—' },
-  rate: { key: 'rate', header: 'Price per N', tip: "The survey's price per respondent. A real $0 counts as a price.", num: true, value: (r: DrillRow) => { const v = num(r, 'rate'); return v == null ? 'no price' : money(v) } },
+  route: { key: 'route', header: 'Route', tip: 'How the study was actually fielded, read from its cost records.', value: (r: DrillRow) => ROUTE_WORD[(r.route as Route) ?? 'none'] ?? '—' },
+  rate: { key: 'rate', header: 'Price per N', tip: "The study's price per respondent. A real $0 counts as a price.", num: true, value: (r: DrillRow) => { const v = num(r, 'rate'); return v == null ? 'no price' : money(v) } },
   billedN: { key: 'billedN', header: 'Billed N', tip: 'Respondents we can bill: delivered after QA, never more than the N sold.', num: true, value: (r: DrillRow) => fmtNum(num(r, 'billedN')) },
   price: { key: 'price', header: 'Client price', tip: 'Price per N × billed N.', num: true, value: priceText },
   cost: { key: 'cost', header: 'Our cost', tip: 'Recorded field cost, net of rewards recovered. No salaries or overhead.', num: true, value: (r: DrillRow) => money(num(r, 'cost') ?? 0) },
   kept: { key: 'margin', header: 'We keep', tip: 'Client price minus our cost, before salaries and overhead.', num: true, value: (r: DrillRow) => { const v = num(r, 'margin'); return v == null ? '—' : money(v) } },
-  keptPct: { key: 'marginPct', header: 'Kept %', tip: 'We keep ÷ client price. Surveys given away at $0 have no percentage: $0 never divides.', num: true, value: (r: DrillRow) => r.free ? 'given away' : pctText(num(r, 'marginPct')) },
+  keptPct: { key: 'marginPct', header: 'Kept %', tip: 'We keep ÷ client price. Studies given away at $0 have no percentage: $0 never divides.', num: true, value: (r: DrillRow) => r.free ? 'given away' : pctText(num(r, 'marginPct')) },
   perPrice: { key: 'spendPerPrice', header: 'Spend ÷ price', tip: 'Cents of our cost per $1 of client price. $0 prices read "given away" and never divide.', num: true, value: (r: DrillRow) => r.free ? 'given away' : r.priced === false ? 'no price' : centsText(num(r, 'spendPerPrice')) },
   budget: { key: 'budget', header: 'Budget', tip: 'The most we planned to spend: a cost ceiling, never revenue.', num: true, value: (r: DrillRow) => { const v = num(r, 'budget'); return v == null ? '—' : money(v) } },
   perBudget: { key: 'spendPerBudget', header: 'Spend ÷ budget', tip: 'Our cost as a share of the budget. Over 100% went over budget, which is not the same as losing money.', num: true, value: (r: DrillRow) => pctText(num(r, 'spendPerBudget')) },
@@ -1215,7 +1215,7 @@ export function resultsDrill(input: ResultsInput, model: ResultsModel, req: Resu
   switch (req.kind) {
     case 'price':
       return {
-        key: 'results-price', title: 'Client price, survey by survey',
+        key: 'results-price', title: 'Client price, study by study',
         population: `${chip}. Only ${MARGIN_WORDS}.`,
         columns: [COL.account, COL.route, COL.rate, COL.billedN, COL.price, COL.cost],
         rows: [...inMargin].sort((a, b) => (b.revenue ?? 0) - (a.revenue ?? 0)).map(l => ledgerRow(l, l.revenue ?? 0)),
@@ -1224,7 +1224,7 @@ export function resultsDrill(input: ResultsInput, model: ResultsModel, req: Resu
       }
     case 'cost':
       return {
-        key: 'results-cost', title: 'Our cost on the same surveys',
+        key: 'results-cost', title: 'Our cost on the same studies',
         population: `${chip}. Only ${MARGIN_WORDS}.`,
         columns: [COL.account, COL.route, COL.price, COL.cost, COL.perPrice],
         rows: [...inMargin].sort((a, b) => b.cost - a.cost).map(l => ledgerRow(l, l.cost)),
@@ -1236,7 +1236,7 @@ export function resultsDrill(input: ResultsInput, model: ResultsModel, req: Resu
     case 'kept':
       return {
         key: 'results-kept', title: 'What we keep, worst first',
-        population: `${chip}. Only ${MARGIN_WORDS}. A survey given away at $0 shows its whole cost as a loss.`,
+        population: `${chip}. Only ${MARGIN_WORDS}. A study given away at $0 shows its whole cost as a loss.`,
         columns: [COL.account, COL.route, COL.price, COL.cost, COL.kept, COL.keptPct],
         rows: marginRows(model.pnl),
         expectedTotal: model.tile1.kept, expectedIds: model.tile1.ids,
@@ -1246,15 +1246,15 @@ export function resultsDrill(input: ResultsInput, model: ResultsModel, req: Resu
       // The ids straight off the survey records, not off the ledger.
       const ids = projects.filter(p => Number(p.budget ?? 0) > 0).map(p => p.id)
       return {
-        key: 'results-budget', title: 'Every delivered survey with a budget',
-        population: `${chip}. Every delivered survey in view that carries a budget. The median in "Budget set at" uses the ones in the margin set priced above $0.`,
+        key: 'results-budget', title: 'Every delivered study with a budget',
+        population: `${chip}. Every delivered study in view that carries a budget. The median in "Budget set at" uses the ones in the margin set priced above $0.`,
         columns: [COL.account, COL.budget, COL.cost, COL.perBudget, COL.price, COL.perPrice, COL.budgetPerPrice, COL.inMedian],
         rows: model.ledger.filter(l => l.budget != null)
           .sort((a, b) => (b.spendPerBudget ?? -1) - (a.spendPerBudget ?? -1))
           .map(l => ledgerRow(l, l.cost)),
         expectedTotal: spendOfIds(ids, raw.blasts, raw.suppliers, raw.costs),
         expectedIds: ids,
-        totalLabel: 'Spend on these surveys (summed from the raw cost records)', format: 'money',
+        totalLabel: 'Spend on these studies (summed from the raw cost records)', format: 'money',
       }
     }
     case 'line': {
@@ -1270,8 +1270,8 @@ export function resultsDrill(input: ResultsInput, model: ResultsModel, req: Resu
           return { ...ledgerRow(l, x.v), line: x.v }
         })
       return {
-        key: `results-line-${req.line}`, title: `${line?.label ?? 'Spend'}, survey by survey`,
-        population: `${chip}. Every delivered survey in view with an amount on this line. ${line?.help ?? ''}`.trim(),
+        key: `results-line-${req.line}`, title: `${line?.label ?? 'Spend'}, study by study`,
+        population: `${chip}. Every delivered study in view with an amount on this line. ${line?.help ?? ''}`.trim(),
         columns: [COL.account, COL.route, {
           key: 'line', header: line?.label ?? 'Amount', tip: line?.help, num: true,
           value: (r: DrillRow) => money(num(r, 'line') ?? 0),
@@ -1289,7 +1289,7 @@ export function resultsDrill(input: ResultsInput, model: ResultsModel, req: Resu
       const positive = spent.ids.filter(id => (spent.byId.get(id) ?? 0) > 0)
       return {
         key: 'results-unpriced', title: 'Delivered spend with no client price',
-        population: `${chip}. Delivered surveys that spent money and carry no client price, so no margin figure can see them. Price them on the project page.`,
+        population: `${chip}. Delivered studies that spent money and carry no client price, so no margin figure can see them. Price them on the project page.`,
         columns: [COL.account, COL.route, COL.cost],
         rows: unpricedRows(model.pnl),
         expectedTotal: model.coverage.noPrice.spend, expectedIds: positive,
@@ -1306,7 +1306,7 @@ export function resultsDrill(input: ResultsInput, model: ResultsModel, req: Resu
       const expected = rawLineOfIds(all.map(p => p.id), 'total', raw)
       return {
         key: `results-${req.kind}`,
-        title: req.kind === 'cancelled' ? 'Spend on cancelled surveys' : 'Spend on surveys archived without delivery',
+        title: req.kind === 'cancelled' ? 'Spend on cancelled studies' : 'Spend on studies archived without delivery',
         population: `${req.kind === 'cancelled' ? 'Cancelled before delivery' : 'Archived without delivery'} · any date · the same account and route as the page. None of this is in the Results figures.`,
         columns: [COL.account, COL.route, COL.cost],
         rows: pnl.map(s => ({ id: s.id, code: s.code, account: s.account, route: s.route, cost: s.cost, contribution: s.cost }))
@@ -1319,8 +1319,8 @@ export function resultsDrill(input: ResultsInput, model: ResultsModel, req: Resu
       const m = model.months.find(x => x.key === req.key)
       const ids = m?.ids ?? []
       return {
-        key: `results-month-${req.key}`, title: `${monthLabel(req.key)}: delivered surveys`,
-        population: `${chip} · ${monthLabel(req.key)}. Every delivered survey placed in the month; client price and kept only where the survey is in the margin set.`,
+        key: `results-month-${req.key}`, title: `${monthLabel(req.key)}: delivered studies`,
+        population: `${chip} · ${monthLabel(req.key)}. Every delivered study placed in the month; client price and kept only where the study is in the margin set.`,
         columns: [COL.account, COL.route, COL.price, COL.cost, COL.kept, COL.keptPct],
         rows: rowsOf(ids).sort((a, b) => b.cost - a.cost).map(l => ledgerRow(l, l.cost)),
         // The month table's own spend for the month.
@@ -1352,7 +1352,7 @@ export function resultsDrill(input: ResultsInput, model: ResultsModel, req: Resu
       const positive = spent.ids.filter(id => (spent.byId.get(id) ?? 0) > 0)
       return {
         key: `results-group-unpriced-${req.key}`, title: `${label}: spend with no client price`,
-        population: `${chip} · ${label}. Delivered surveys that spent money and carry no client price.`,
+        population: `${chip} · ${label}. Delivered studies that spent money and carry no client price.`,
         columns: [COL.account, COL.route, COL.cost],
         rows: unpricedRows(pnl),
         expectedTotal: spendOfIds(positive, raw.blasts, raw.suppliers, raw.costs), expectedIds: positive,
@@ -1372,8 +1372,8 @@ export interface ResultsExport {
 }
 
 export const RESULTS_EXPORT_COLUMNS: { key: string; header: string }[] = [
-  { key: 'code', header: 'Survey' },
-  { key: 'name', header: 'Survey name' },
+  { key: 'code', header: 'Study' },
+  { key: 'name', header: 'Study name' },
   { key: 'account', header: 'Account' },
   { key: 'route', header: 'Route (as fielded)' },
   { key: 'date', header: 'Placed on (deliver, else launch, else submitted date)' },

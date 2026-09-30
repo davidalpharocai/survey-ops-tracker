@@ -86,7 +86,7 @@ describe('the reliability dates come from coverage, not from the copy', () => {
 
   it('keeps raising the gap while any reliable-cost month is under the price bar', () => {
     const half = model(book({ junPriced: 1 }))
-    expect(half.priceGap).toMatch(/still thin in Jul 2026: 0 of 4 delivered surveys/)
+    expect(half.priceGap).toMatch(/still thin in Jul 2026: 0 of 4 delivered studies/)
     expect(half.priceGap).toContain('25%')
   })
 
@@ -99,7 +99,7 @@ describe('the reliability dates come from coverage, not from the copy', () => {
       raw: { rates: new Map(), blasts: [], suppliers: [], costs: [] }, ix, blocked: [], pricesReturned: 1,
     })
     expect(m.dates.cost.month).toBeNull()
-    expect(m.reliability[0]).toBe('Costs are not yet recorded on most delivered surveys in any month.')
+    expect(m.reliability[0]).toBe('Costs are not yet recorded on most delivered studies in any month.')
     expect(m.tone).toBe('amber')
   })
 })
@@ -108,8 +108,8 @@ describe('the view', () => {
   it('counts the delivered surveys in view, and says the price-against-cost figures cover only some', () => {
     const m = model(book())
     // Since 1 June: 16 delivered (Jun–Sep), 15 costed, 4 priced.
-    expect(m.view[0]).toBe('In this view 15 of 16 delivered surveys (94%) carry a recorded cost, and 4 carry a client price.')
-    expect(m.view[1]).toMatch(/^So the price-against-cost figures cover 4 surveys holding 27% of the spend/)
+    expect(m.view[0]).toBe('In this view 15 of 16 delivered studies (94%) carry a recorded cost, and 4 carry a client price.')
+    expect(m.view[1]).toMatch(/^So the price-against-cost figures cover 4 studies holding 27% of the spend/)
     expect(m.tone).toBe('plain')
     expect(m.mixed).toBeNull()
   })
@@ -118,11 +118,11 @@ describe('the view', () => {
     const m = model(book(), { filter: ALL })
     expect(m.tone).toBe('amber')
     // May's 4 surveys plus the undated one.
-    expect(m.mixed).toMatch(/^This view mixes two eras\. It adds 5 delivered surveys from before Jun 2026 or with no date: 24% of the surveys/)
+    expect(m.mixed).toMatch(/^This view mixes two eras\. It adds 5 delivered studies from before Jun 2026 or with no date: 24% of the studies/)
     expect(m.mixed).toContain('1 of them carries any cost, so coverage and medians read worse than the business did.')
     expect(m.offerDefault).toBe(true)
     // The undated survey only reaches an unbounded view, and the sentence says so.
-    expect(model(book()).view.join(' ')).toContain('1 delivered survey has no date and appears in no date range.')
+    expect(model(book()).view.join(' ')).toContain('1 delivered study has no date and appears in no date range.')
   })
 
   it('does not apply the date on This week, and never goes amber there', () => {
@@ -151,7 +151,7 @@ describe('the view', () => {
 describe('the (i)', () => {
   it('explains each date month by month, from the data', () => {
     const m = model(book())
-    expect(m.help).toContain('Why Jun 2026 for costs: 25% of delivered surveys carried a recorded cost in May 2026 and 75% in Jun 2026.')
+    expect(m.help).toContain('Why Jun 2026 for costs: 25% of delivered studies carried a recorded cost in May 2026 and 75% in Jun 2026.')
     expect(m.help).toContain('Client prices by month: Jun 0%, Jul 0%, Aug 50%, Sep 50%')
     // Every blast in the book (May's one included), not only those in view.
     expect(m.help).toContain('Many field records were entered in bulk: 16 of 16 blast rows were written in Sep 2026.')

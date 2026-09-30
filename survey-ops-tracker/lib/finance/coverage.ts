@@ -40,13 +40,13 @@ export type CoverageMetric = typeof COVERAGE_METRICS[number]
 
 /** Row labels and explainers for the heatmap, in its order. */
 export const METRIC_LABEL: Record<CoverageMetric, { label: string; help: string }> = {
-  cost: { label: 'Any recorded cost', help: 'The survey has at least one blast, panel purchase or cost line with money on it.' },
+  cost: { label: 'Any recorded cost', help: 'The study has at least one blast, panel purchase or cost line with money on it.' },
   price: { label: 'Client price', help: 'A price per N is recorded (a price of $0 counts — it is a real price).' },
   budget: { label: 'Budget', help: 'A budget (the most we planned to spend) is recorded.' },
-  postQaN: { label: 'Delivered N (after QA)', help: 'The number of respondents the client received after QA is recorded (on a segmented survey whose own figure is blank, every segment has one).' },
-  psPanelRows: { label: 'Panel rows on PS surveys', help: 'Of the surveys filed as PureSpectrum (PS), the share with at least one panel purchase recorded.' },
-  b2bBlastRows: { label: 'Blast rows on B2B surveys', help: 'Of the surveys filed as B2B, the share with at least one blast recorded.' },
-  date: { label: 'A date', help: 'The survey has a deliver, launch or submitted date, so it can be placed in a month.' },
+  postQaN: { label: 'Delivered N (after QA)', help: 'The number of respondents the client received after QA is recorded (on a segmented study whose own figure is blank, every segment has one).' },
+  psPanelRows: { label: 'Panel rows on PS studies', help: 'Of the studies filed as PureSpectrum (PS), the share with at least one panel purchase recorded.' },
+  b2bBlastRows: { label: 'Blast rows on B2B studies', help: 'Of the studies filed as B2B, the share with at least one blast recorded.' },
+  date: { label: 'A date', help: 'The study has a deliver, launch or submitted date, so it can be placed in a month.' },
 }
 
 export interface CoverageCell {
@@ -90,7 +90,7 @@ export const RECOVERY_PENDING_BELOW = 0.75
  * regularly from", not "complete from".
  */
 export const RELIABILITY = {
-  cost: { metric: 'cost' as CoverageMetric, threshold: 0.6, words: 'costs are recorded on most delivered surveys' },
+  cost: { metric: 'cost' as CoverageMetric, threshold: 0.6, words: 'costs are recorded on most delivered studies' },
   price: { metric: 'price' as CoverageMetric, threshold: 0.25, words: 'client prices are entered regularly' },
   budget: { metric: 'budget' as CoverageMetric, threshold: 0.2, words: 'budgets are set regularly' },
 }

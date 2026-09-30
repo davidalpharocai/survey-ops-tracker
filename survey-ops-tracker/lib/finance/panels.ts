@@ -596,10 +596,10 @@ export function buildPanelsModel(input: PanelsInput): PanelsModel {
   const verdict = verdictOf(rows, total, top)
   const leverNote = leverNoteOf(total)
   const note =
-    'Clients pay per survey, not per panel, so client price is not split by panel. ' +
+    'Clients pay per study, not per panel, so client price is not split by panel. ' +
     (completes > 0
-      ? `How many of these ${fmtNum(completes)} completes from ${fmtNum(rows.length)} panel${rows.length === 1 ? '' : 's'} passed QA is recorded per survey, not per panel, `
-      : 'QA-passed respondents are recorded per survey, not per panel, ') +
+      ? `How many of these ${fmtNum(completes)} completes from ${fmtNum(rows.length)} panel${rows.length === 1 ? '' : 's'} passed QA is recorded per study, not per panel, `
+      : 'QA-passed respondents are recorded per study, not per panel, ') +
     'so there is no per-panel cost per qualified respondent yet.'
   const floorNote = unpricedCompletes > 0
     ? `Spend is a floor: ${fmtNum(unpricedCompletes)} completes from ${fmtNum(unpricedPanels)} panel${unpricedPanels === 1 ? '' : 's'} have no price recorded, so their cost is missing, not zero.`
@@ -738,13 +738,13 @@ function checkText(r: Reconciliation, count: number, stored: StoredCheck): strin
   if (r.ok) {
     parts.push(count === 0
       ? `No panel purchases in this view, and the Panel (PureSpectrum) line of the spend breakdown is ${money(r.expectedTotal ?? 0)} too.`
-      : `The ${fmtNum(count)} panel${count === 1 ? '' : 's'} below ${count === 1 ? 'adds' : 'add'} up to ${money(r.rowSum)} — the same purchases the Panel (PureSpectrum) line of the spend breakdown counts, summed survey by survey instead of panel by panel.`)
+      : `The ${fmtNum(count)} panel${count === 1 ? '' : 's'} below ${count === 1 ? 'adds' : 'add'} up to ${money(r.rowSum)} — the same purchases the Panel (PureSpectrum) line of the spend breakdown counts, summed study by study instead of panel by panel.`)
   } else {
     if (!r.sumAgrees && r.expectedTotal != null) {
       parts.push(`These panels add up to ${money(r.rowSum)} but the Panel (PureSpectrum) line of the spend breakdown says ${money(r.expectedTotal)} — a gap of ${money(r.gap ?? 0)}.`)
     }
     if (r.missingIds.length) {
-      parts.push(`${fmtNum(r.missingIds.length)} panel${r.missingIds.length === 1 ? '' : 's'} that bought on these surveys ${r.missingIds.length === 1 ? 'is' : 'are'} missing from the list.`)
+      parts.push(`${fmtNum(r.missingIds.length)} panel${r.missingIds.length === 1 ? '' : 's'} that bought on these studies ${r.missingIds.length === 1 ? 'is' : 'are'} missing from the list.`)
     }
     if (r.extraIds.length) {
       parts.push(`${fmtNum(r.extraIds.length)} panel${r.extraIds.length === 1 ? '' : 's'} listed here ${r.extraIds.length === 1 ? 'is' : 'are'} not in the spend breakdown.`)
@@ -761,26 +761,26 @@ function checkText(r: Reconciliation, count: number, stored: StoredCheck): strin
  *  which are different and must not both read as "nothing to check". */
 function storedText(s: StoredCheck, count: number): string {
   if (s.unavailable) {
-    return 'The blast rows did not load, so which surveys bought from panels alone is not known and the total could not be checked against the spend the database recorded.'
+    return 'The blast rows did not load, so which studies bought from panels alone is not known and the total could not be checked against the spend the database recorded.'
   }
   if (s.mismatches.length > 0) {
     const named = s.mismatches.slice(0, 4).map(m => m.code ?? '(no code)').join(', ')
     const rest = s.mismatches.length > 4 ? `, and ${fmtNum(s.mismatches.length - 4)} more` : ''
-    return `${fmtNum(s.mismatches.length)} of the ${fmtNum(s.checked)} survey${s.checked === 1 ? '' : 's'} here that bought only from panels ` +
+    return `${fmtNum(s.mismatches.length)} of the ${fmtNum(s.checked)} ${s.checked === 1 ? 'study' : 'studies'} here that bought only from panels ` +
       `${s.mismatches.length === 1 ? 'does' : 'do'} not agree with the spend the database recorded for ${s.mismatches.length === 1 ? 'it' : 'them'} (${named}${rest}).`
   }
   if (s.checked > 0) {
     const skipped = s.skipped > 0
       ? ` ${fmtNum(s.skipped)} more ${s.skipped === 1 ? 'records' : 'record'} no spend of ${s.skipped === 1 ? 'its' : 'their'} own and ${s.skipped === 1 ? 'was' : 'were'} left out.`
       : ''
-    return `On the ${fmtNum(s.checked)} survey${s.checked === 1 ? '' : 's'} here that bought only from panels, it also agrees with the spend the database recorded for ${s.checked === 1 ? 'it' : 'them'}, which nothing on this page computes.${skipped}`
+    return `On the ${fmtNum(s.checked)} ${s.checked === 1 ? 'study' : 'studies'} here that bought only from panels, it also agrees with the spend the database recorded for ${s.checked === 1 ? 'it' : 'them'}, which nothing on this page computes.${skipped}`
   }
   if (count === 0) return ''
   // Nothing was checked. Say WHICH kind of nothing: no survey qualified, or
   // the ones that did carry no spend of their own to check against.
   return s.skipped > 0
-    ? `None of the ${fmtNum(s.skipped)} survey${s.skipped === 1 ? '' : 's'} here that bought only from panels records a spend of its own, so nothing outside this page confirmed the total.`
-    : 'No survey here bought from panels alone, so nothing outside this page could confirm the total.'
+    ? `None of the ${fmtNum(s.skipped)} ${s.skipped === 1 ? 'study' : 'studies'} here that bought only from panels records a spend of its own, so nothing outside this page confirmed the total.`
+    : 'No study here bought from panels alone, so nothing outside this page could confirm the total.'
 }
 
 /**
@@ -832,7 +832,7 @@ function detailVerdict(row: PanelRow, waves: WaveRow[], shared: number): string 
     const worst = waves[0] // sorted by cost above the cheapest, largest first
     // Labels are recorded as "52470052" or "PS 52470052"; say "PS Survey#" once.
     const survey = worst.label?.replace(/^PS\s*/i, '').trim()
-    const where = survey ? `${worst.code ?? 'a survey'} (PS Survey# ${survey})` : (worst.code ?? 'one survey')
+    const where = survey ? `${worst.code ?? 'a study'} (PS Survey# ${survey})` : (worst.code ?? 'one study')
     return `${name} was paid ${money(row.above)} above the cheapest panel on ${fmtNum(row.aboveWaves)} of its ${wavesText}; ` +
       `the largest gap was ${money(worst.above)} on ${where}. ` +
       `Before topping up from ${name} again, check whether the cheaper panel in those waves still had room.`

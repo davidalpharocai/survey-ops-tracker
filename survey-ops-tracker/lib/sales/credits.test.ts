@@ -118,25 +118,25 @@ describe('describeConsumption', () => {
 
   it('says the figure is a floor when an unpriced survey has fielded', () => {
     const t = describeConsumption(rollUp([s('a', 350), s('b', null)], 1000))
-    expect(t).toBe('350 of 1,000 credits used (35%), 650 remaining. 1 survey that has fielded is not priced yet, so the used figure is a floor.')
+    expect(t).toBe('350 of 1,000 credits used (35%), 650 remaining. 1 study that has fielded is not priced yet, so the used figure is a floor.')
   })
 
   it('does NOT call it a floor for unpriced surveys that have not fielded, but names them', () => {
     const t = describeConsumption(rollUp([s('a', 350), unfielded('b', null), unfielded('c', null)], 1000))
     expect(t).not.toContain('floor')
-    expect(t).toBe('350 of 1,000 credits used (35%), 650 remaining. 2 surveys are not priced and have not fielded, so they have drawn nothing.')
+    expect(t).toBe('350 of 1,000 credits used (35%), 650 remaining. 2 studies are not priced and have not fielded, so they have drawn nothing.')
   })
 
   it('counts the not-fielded ones as "more" when the floor sentence came first', () => {
     const t = describeConsumption(rollUp([s('a', 350), s('b', null), unfielded('c', null)], 1000))
-    expect(t).toContain('1 survey that has fielded is not priced yet, so the used figure is a floor.')
+    expect(t).toContain('1 study that has fielded is not priced yet, so the used figure is a floor.')
     expect(t).toContain(' 1 more is not priced and has not fielded, so it has drawn nothing.')
   })
 
   it('says "0 used" plainly when nothing at all has drawn', () => {
     // Priced nothing, drawn nothing: 0 is the true answer, not "not recorded".
     const t = describeConsumption(rollUp([unfielded('a', null)], 1000))
-    expect(t).toBe('0 of 1,000 credits used (0%), 1,000 remaining. 1 survey is not priced and has not fielded, so it has drawn nothing.')
+    expect(t).toBe('0 of 1,000 credits used (0%), 1,000 remaining. 1 study is not priced and has not fielded, so it has drawn nothing.')
   })
 
   it('distinguishes "nothing used" from "nothing recorded"', () => {
@@ -158,12 +158,12 @@ describe('describeConsumption', () => {
 
   it('with no allowance, counts only the unpriced surveys that fielded as the shortfall', () => {
     expect(describeConsumption(rollUp([s('a', 100), s('b', null), unfielded('c', null)], null)))
-      .toBe('100 credits used across 1 survey, with 1 more that has fielded but is not yet priced. No term allowance recorded to measure it against. 1 more is not priced and has not fielded, so it has drawn nothing.')
+      .toBe('100 credits used across 1 study, with 1 more that has fielded but is not yet priced. No term allowance recorded to measure it against. 1 more is not priced and has not fielded, so it has drawn nothing.')
   })
 
   it('handles the completely empty case without asserting anything false', () => {
     const t = describeConsumption(rollUp([], null))
-    expect(t).toBe('No term recorded, and none of these surveys is priced in credits yet.')
+    expect(t).toBe('No term recorded, and none of these studies is priced in credits yet.')
   })
 })
 

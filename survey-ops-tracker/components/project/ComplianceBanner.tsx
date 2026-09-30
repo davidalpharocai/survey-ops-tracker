@@ -67,12 +67,12 @@ export function ComplianceBanner({ project }: { project: SurveyProject }) {
         <ul className="text-muted-foreground mt-0.5 leading-relaxed list-disc pl-4">
           {beforeOutstanding && (
             <li>
-              <span className="text-foreground">Before fielding:</span> the questionnaire must be approved before this survey can be fielded.
+              <span className="text-foreground">Before fielding:</span> the questionnaire must be approved before this study can be fielded.
             </li>
           )}
           {afterOutstanding && (
             <li>
-              <span className="text-foreground">Before delivery:</span> the questions + results must be approved before this survey can be delivered.
+              <span className="text-foreground">Before delivery:</span> the questions + results must be approved before this study can be delivered.
             </li>
           )}
         </ul>

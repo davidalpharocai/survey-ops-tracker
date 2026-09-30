@@ -65,7 +65,7 @@ export function SupplierDetail(props: FinanceTabProps & {
         actions={close}
       >
         <Empty>
-          {name} delivered no completes on the surveys in this view. Change the filters, or pick another panel from the table above.
+          {name} delivered no completes on the studies in this view. Change the filters, or pick another panel from the table above.
         </Empty>
       </FinanceCard>
     )
@@ -115,7 +115,7 @@ export function SupplierDetail(props: FinanceTabProps & {
       <p className="px-4 pt-3 text-[13px] leading-relaxed text-muted-foreground">
         <span className="font-medium text-foreground">{money(r.spend)}</span> for {fmtNum(r.completes)} completes at{' '}
         <span className="font-medium text-foreground">{cpiText(r.cpc)}</span> each{vsPhrase(r.vsAll)} ·{' '}
-        {fmtNum(r.surveys)} survey{r.surveys === 1 ? '' : 's'} · {fmtNum(r.waves)} wave{r.waves === 1 ? '' : 's'} ·{' '}
+        {fmtNum(r.surveys)} stud{r.surveys === 1 ? 'y' : 'ies'} · {fmtNum(r.waves)} wave{r.waves === 1 ? '' : 's'} ·{' '}
         <span className="font-medium text-foreground">{money(r.above)}</span> above the cheapest panel in the same wave
         {r.idleWaves > 0 && <> · set up on {fmtNum(r.idleWaves)} more wave{r.idleWaves === 1 ? '' : 's'} where it delivered nothing</>}
       </p>

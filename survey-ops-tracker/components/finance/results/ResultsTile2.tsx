@@ -28,7 +28,7 @@ import { Parts } from './Parts'
 import { SurveyLedger } from './SurveyLedger'
 import { TILE1_NEEDS } from './ResultsTile1'
 
-const HELP = 'Who and what the margin comes from. Price and cost are both per billed respondent, so subtracting them gives what we keep per respondent. Every figure counts only the surveys with both a client price and a recorded cost; spend on the rest is in the last column.'
+const HELP = 'Who and what the margin comes from. Price and cost are both per billed respondent, so subtracting them gives what we keep per respondent. Every figure counts only the studies with both a client price and a recorded cost; spend on the rest is in the last column.'
 
 export function ResultsTile2({ props, model, open }: {
   props: FinanceTabProps
@@ -77,14 +77,14 @@ function GroupView({ model, open }: { model: ResultsModel; open: (req: ResultsDr
   const rows = model.tile2.rows
   const drawn = rows.filter(r => r.measured > 0)
   const option = GROUP_BY_OPTIONS.find(o => o.id === model.groupBy)
-  if (!rows.length) return <Empty>No delivered survey is in this view.</Empty>
+  if (!rows.length) return <Empty>No delivered study is in this view.</Empty>
   return (
     <>
       <div className="px-4 py-3">
         <BarChart<GroupRow>
           ariaLabel={`What we keep by ${(option?.label ?? 'group').toLowerCase()}`}
           title={`Kept by ${(option?.label ?? 'group').toLowerCase()}`}
-          info={`What we keep per ${(option?.label ?? 'group').toLowerCase()}, on its surveys with both a client price and a recorded cost: teal kept, red lost. Each bar reads kept $ · kept % · surveys. Faded bars have fewer than ${fmtNum(GROUP_MIN_N)} such surveys and are too few to judge. Click a bar to see its surveys, worst first.`}
+          info={`What we keep per ${(option?.label ?? 'group').toLowerCase()}, on its studies with both a client price and a recorded cost: teal kept, red lost. Each bar reads kept $ · kept % · studies. Faded bars have fewer than ${fmtNum(GROUP_MIN_N)} such studies and are too few to judge. Click a bar to see its studies, worst first.`}
           data={drawn}
           label={r => (r.sub ? `${r.label} · ${r.sub}` : r.label)}
           labelHeader={option?.label ?? 'Group'}
@@ -92,9 +92,9 @@ function GroupView({ model, open }: { model: ResultsModel; open: (req: ResultsDr
           valueName="Kept $"
           valueFormat={v => fmtMoney(v)}
           valueLabel={{
-            name: 'Kept $ · kept % · surveys',
+            name: 'Kept $ · kept % · studies',
             text: r => `${fmtMoneyCompact(r.kept)} · ${pctText(r.keptPct)} · ${fmtNum(r.measured)}`,
-            description: 'Kept dollars, kept as a share of the client price, and the surveys with a price and a cost behind them.',
+            description: 'Kept dollars, kept as a share of the client price, and the studies with a price and a cost behind them.',
           }}
           diverging
           positiveLabel="Kept"
@@ -102,11 +102,11 @@ function GroupView({ model, open }: { model: ResultsModel; open: (req: ResultsDr
           muted={r => r.tooFew}
           mutedNote="too few to judge"
           onSelect={r => open({ kind: 'group', key: r.key })}
-          emptyMessage="No group here has a survey with both a client price and a recorded cost."
+          emptyMessage="No group here has a study with both a client price and a recorded cost."
         />
         {model.tile2.unmeasured > 0 && (
           <p className="mt-2 text-xs text-muted-foreground">
-            {fmtNum(model.tile2.unmeasured)} more {model.tile2.unmeasured === 1 ? 'group has' : 'groups have'} no survey with both a price and a
+            {fmtNum(model.tile2.unmeasured)} more {model.tile2.unmeasured === 1 ? 'group has' : 'groups have'} no study with both a price and a
             cost, so {model.tile2.unmeasured === 1 ? 'it is' : 'they are'} only in the table, under Spend with no price.
           </p>
         )}
@@ -123,17 +123,17 @@ function GroupView({ model, open }: { model: ResultsModel; open: (req: ResultsDr
 
 function SurveyView({ model }: { model: ResultsModel }) {
   const measured = model.ledger.filter(l => l.inMargin)
-  if (!model.ledger.length) return <Empty>No delivered survey is in this view.</Empty>
+  if (!model.ledger.length) return <Empty>No delivered study is in this view.</Empty>
   return (
     <>
       <div className="max-h-[520px] overflow-y-auto px-4 py-3">
         <BarChart<LedgerRow>
-          ariaLabel="What we keep on each survey, worst first"
-          title="Kept by survey"
-          info="What we keep on each survey with both a client price and a recorded cost, worst first: teal kept, red lost. A survey given away at $0 shows its whole cost as a loss. Click a bar to open the project."
+          ariaLabel="What we keep on each study, worst first"
+          title="Kept by study"
+          info="What we keep on each study with both a client price and a recorded cost, worst first: teal kept, red lost. A study given away at $0 shows its whole cost as a loss. Click a bar to open the project."
           data={measured}
           label={l => l.code ?? '(no code)'}
-          labelHeader="Survey"
+          labelHeader="Study"
           value={l => l.kept}
           valueName="Kept $"
           valueFormat={v => fmtMoney(v)}
@@ -145,7 +145,7 @@ function SurveyView({ model }: { model: ResultsModel }) {
           positiveLabel="Kept"
           negativeLabel="Lost"
           href={l => `/projects/${l.id}`}
-          emptyMessage="No survey here has both a client price and a recorded cost."
+          emptyMessage="No study here has both a client price and a recorded cost."
         />
       </div>
       <SurveyLedger rows={model.ledger} />

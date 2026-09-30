@@ -51,7 +51,7 @@ export function BookTab({
       <Card
         wide
         title="Month by month"
-        tip="Cost per N is split by route and computed on surveys that carry both a recorded cost and a delivered N — one population for the top and bottom of the division. Coverage is the share of surveys in the month with any recorded cost. The line marks the month costs became reliable across the whole book, whatever this view is filtered to."
+        tip="Cost per N is split by route and computed on studies that carry both a recorded cost and a delivered N — one population for the top and bottom of the division. Coverage is the share of studies in the month with any recorded cost. The line marks the month costs became reliable across the whole book, whatever this view is filtered to."
         floor={blocks.costs}
       >
         {rowsShown.length === 0 ? (
@@ -60,10 +60,10 @@ export function BookTab({
           <>
             <div className="grid grid-cols-[auto_1fr_auto_auto_auto_auto] gap-x-4 border-b border-border/60 px-4 py-1.5 text-[11px] uppercase tracking-wider text-muted-foreground">
               <span>Period</span><span>Recorded spend</span>
-              <span className="text-right" title="Delivered N, after QA, on surveys that have one">Delivered N</span>
-              <span className="text-right" title="Blast cost per delivered respondent, on blast-only surveys with a cost and a delivered N">Blast $/N</span>
-              <span className="text-right" title="Panel cost per delivered respondent, on panel-only surveys with a cost and a delivered N">Panel $/N</span>
-              <span className="text-right" title="Share of the period's surveys with any recorded cost">Coverage</span>
+              <span className="text-right" title="Delivered N, after QA, on studies that have one">Delivered N</span>
+              <span className="text-right" title="Blast cost per delivered respondent, on blast-only studies with a cost and a delivered N">Blast $/N</span>
+              <span className="text-right" title="Panel cost per delivered respondent, on panel-only studies with a cost and a delivered N">Panel $/N</span>
+              <span className="text-right" title="Share of the period's studies with any recorded cost">Coverage</span>
             </div>
             <div className="divide-y divide-border/60">
               {[...rowsShown, months.total].map(p => (
@@ -75,7 +75,7 @@ export function BookTab({
                       {p.key !== 'total' && <Bar value={p.spend} max={maxSpend} tone={p.spend > 0 ? 'primary' : 'muted'} />}
                     </span>
                     <span className="tabular-nums text-right"
-                      title={p.nMissing > 0 ? `${fmtNum(p.nMissing)} delivered surveys have no delivered N yet` : undefined}>
+                      title={p.nMissing > 0 ? `${fmtNum(p.nMissing)} delivered studies have no delivered N yet` : undefined}>
                       {fmtNum(p.n)}{p.nMissing > 0 && <span className="text-xs text-muted-foreground"> +{fmtNum(p.nMissing)}?</span>}
                     </span>
                     <span className="tabular-nums text-right">{perN(p.byRoute.blast.costPerN)}</span>
@@ -91,7 +91,7 @@ export function BookTab({
                     <div className="mt-0.5 text-[11px] text-muted-foreground"
                       title="Unclaimed blast rewards come back in batches. Until this period's are booked, its blast cost reads high.">
                       Recoveries pending: {fmtNum(p.creditedSurveys)} of {fmtNum(p.rewardedSurveys)} blast
-                      surveys have their unclaimed rewards booked, so this spend will come down.
+                      studies have their unclaimed rewards booked, so this spend will come down.
                     </div>
                   )}
                   {reliableFrom === p.key && (
@@ -104,12 +104,12 @@ export function BookTab({
             </div>
             <Note>
               {reliableFrom
-                ? <>Costs are recorded on most delivered surveys from {monthLabel(reliableFrom)}. Months before
+                ? <>Costs are recorded on most delivered studies from {monthLabel(reliableFrom)}. Months before
                   it show real delivered N against little recorded spend, so read them against the coverage
                   column — a month under 25% coverage is an estimate, not a measurement.</>
-                : <>Costs are not yet recorded on most delivered surveys in any month, so read every row
+                : <>Costs are not yet recorded on most delivered studies in any month, so read every row
                   against its coverage column.</>}{' '}
-              {months.undated && <>The Undated row holds surveys with no deliver, launch or submitted date,
+              {months.undated && <>The Undated row holds studies with no deliver, launch or submitted date,
                 which no date range can place.</>}
             </Note>
           </>
@@ -140,8 +140,8 @@ export function BookTab({
           <Row k={<span className="font-medium">Total field cost</span>}
             v={<span className="font-medium">{money(totalSplit)}</span>}
             sub={split.recovered < 0
-              ? `Net of ${money(-split.recovered)} of rewards recovered on ${fmtNum(split.recoveredSurveys)} surveys. Blast rewards net of recoveries: ${money(split.rewardsNet)}.`
-              : 'No recovered rewards are booked on these surveys yet.'} />
+              ? `Net of ${money(-split.recovered)} of rewards recovered on ${fmtNum(split.recoveredSurveys)} studies. Blast rewards net of recoveries: ${money(split.rewardsNet)}.`
+              : 'No recovered rewards are booked on these studies yet.'} />
           <Note>
             <span className="font-medium text-foreground">{money(split.sends)} of this is a modelled number.</span>{' '}
             SMS send cost uses the per-message rate recorded on each blast, which was backfilled rather
@@ -153,41 +153,41 @@ export function BookTab({
 
       <Card
         title="N we cannot bill"
-        tip="Three different things that all cost money, deliberately not summed. Scrub and over-delivery are cash that left, priced at each survey's own cost per complete. Revenue foregone is an invoice never raised, priced at the client rate."
+        tip="Three different things that all cost money, deliberately not summed. Scrub and over-delivery are cash that left, priced at each study's own cost per complete. Revenue foregone is an invoice never raised, priced at the client rate."
         floor={blocks.costs}
       >
         <div className="divide-y divide-border/60">
           <Row
-            k={<Drillable onOpen={() => onDrill('scrub')} title={`Show the ${lost.scrub.surveys} scrubbed surveys`}>
+            k={<Drillable onOpen={() => onDrill('scrub')} title={`Show the ${lost.scrub.surveys} scrubbed studies`}>
               Lost in QA <span className="text-muted-foreground">(scrub)</span>
             </Drillable>}
             v={money(lost.scrub.dollars)} tone="neg"
-            sub={`${fmtNum(lost.scrub.n)} completes bought and never delivered, across ${fmtNum(lost.scrub.surveys)} surveys`} />
+            sub={`${fmtNum(lost.scrub.n)} completes bought and never delivered, across ${fmtNum(lost.scrub.surveys)} studies`} />
           <Row
-            k={<Drillable onOpen={() => onDrill('over')} title={`Show the ${lost.overTarget.surveys} over-delivered surveys`}>
+            k={<Drillable onOpen={() => onDrill('over')} title={`Show the ${lost.overTarget.surveys} over-delivered studies`}>
               Delivered above the N sold
             </Drillable>}
             v={money(lost.overTarget.dollars)} tone="neg"
             sub={`${fmtNum(lost.overTarget.n)} completes past the promised N`} />
           {lost.cancelled.dollars > 0 && (
             <Row k="Cancelled before delivery" v={money(lost.cancelled.dollars)} tone="neg"
-              sub={`${fmtNum(lost.cancelled.surveys)} survey${lost.cancelled.surveys === 1 ? '' : 's'} called off after spending began`} />
+              sub={`${fmtNum(lost.cancelled.surveys)} stud${lost.cancelled.surveys === 1 ? 'y' : 'ies'} called off after spending began`} />
           )}
           {canFinance && (
             <Row k={blocks.prices
               ? <>Revenue foregone <span className="text-xs text-muted-foreground">(at the client price)</span></>
-              : <Drillable onOpen={() => onDrill('foregone')} title="Show the surveys that came up short">
+              : <Drillable onOpen={() => onDrill('foregone')} title="Show the studies that came up short">
                 Revenue foregone <span className="text-xs text-muted-foreground">(at the client price)</span>
               </Drillable>}
               v={blocks.prices ? '—' : money(gone.dollars)} tone={blocks.prices ? undefined : 'neg'}
               sub={blocks.prices
                 ? `${blocks.prices}. This figure is missing, not zero.`
-                : `${fmtNum(gone.n)} N short of target on ${fmtNum(gone.surveys)} priced surveys${gone.unpricedN > 0 ? ` · ${fmtNum(gone.unpricedN)} more N short on ${fmtNum(gone.unpricedSurveys)} unpriced surveys` : ''}`} />
+                : `${fmtNum(gone.n)} N short of target on ${fmtNum(gone.surveys)} priced studies${gone.unpricedN > 0 ? ` · ${fmtNum(gone.unpricedN)} more N short on ${fmtNum(gone.unpricedSurveys)} unpriced studies` : ''}`} />
           )}
           <Note>
             {lost.scrub.surveys > 0 && <>
               <span className="font-medium text-foreground">
-                {fmtNum(lost.scrubStillHitTarget)} of {fmtNum(lost.scrub.surveys)} scrubbed surveys still cleared their target
+                {fmtNum(lost.scrubStillHitTarget)} of {fmtNum(lost.scrub.surveys)} scrubbed studies still cleared their target
               </span>, so that scrub cost cash and cost no revenue at all — a buying problem, not a
               billing one.{' '}
             </>}
@@ -200,7 +200,7 @@ export function BookTab({
       <Card
         wide
         title="Spend by account"
-        tip="One row per account, resolved through clients.id — BAM's nine legacy labels roll into one line instead of splitting the largest account nine ways. 'costed' says how many of an account's surveys carry a cost record at all."
+        tip="One row per account, resolved through clients.id — BAM's nine legacy labels roll into one line instead of splitting the largest account nine ways. 'costed' says how many of an account's studies carry a cost record at all."
         floor={blocks.costs}
       >
         {byAccount.clients.length === 0 ? (
@@ -217,7 +217,7 @@ export function BookTab({
                   </span>
                 </div>
                 <div className="mt-0.5 text-xs text-muted-foreground">
-                  {fmtNum(c.costed)} of {fmtNum(c.surveys)} surveys costed
+                  {fmtNum(c.costed)} of {fmtNum(c.surveys)} studies costed
                 </div>
                 <Bar value={c.total} max={maxClient} />
               </div>
@@ -230,14 +230,14 @@ export function BookTab({
         <Card
           wide
           title="Spend that can never reach a margin"
-          tip="Recorded cost on surveys with no client rate. Nothing here can ever appear in a margin figure, so this is a data-entry worklist ranked by how much it is worth fixing."
+          tip="Recorded cost on studies with no client rate. Nothing here can ever appear in a margin figure, so this is a data-entry worklist ranked by how much it is worth fixing."
           floor={blocks.prices ? null : blocks.costs}
         >
           {/* With no prices read, every dollar would read as unpriced — 100% of
               the spend, all of it false. */}
           {blocks.prices ? <BlockedFigure text={blocks.prices} /> : <>
           <div className="px-4 py-3">
-            <Drillable onOpen={() => onDrill('unpriced')} title="Show every costed survey with no rate">
+            <Drillable onOpen={() => onDrill('unpriced')} title="Show every costed study with no rate">
               <div className="tabular-nums text-2xl font-semibold text-red-600 dark:text-red-400">
                 {money(unpriced.total)}
               </div>
@@ -249,7 +249,7 @@ export function BookTab({
           <div className="divide-y divide-border/60 border-t border-border/60">
             {unpriced.accounts.slice(0, 8).map(a => (
               <Row key={a.accountId ?? a.account} k={a.account} v={money(a.spend)}
-                sub={`${fmtNum(a.surveys)} survey${a.surveys === 1 ? '' : 's'}`} />
+                sub={`${fmtNum(a.surveys)} stud${a.surveys === 1 ? 'y' : 'ies'}`} />
             ))}
           </div>
           <Note>
@@ -271,10 +271,10 @@ export function BookTab({
       <Card wide title="What these numbers cannot tell you"
         tip="The standing caveats, computed rather than written, so they cannot go stale.">
         <div className="divide-y divide-border/60">
-          <Row k="Delivered surveys with any recorded cost"
+          <Row k="Delivered studies with any recorded cost"
             v={`${fmtNum(cover.deliveredCosted)} of ${fmtNum(cover.delivered)}`}
             sub={`${cover.deliveredPct}% — every total on this page is a floor, not a total`} />
-          <Row k="Surveys collecting more N than their records account for"
+          <Row k="Studies collecting more N than their records account for"
             v={fmtNum(cover.unreconciled)}
             sub={`${fmtNum(cover.unattributedCompletes)} completes with no cost attached to them`} />
           <Note>

@@ -14,17 +14,17 @@ const wrap = (body: string) => `
   <div style="max-width: 560px; margin: 0 auto; background: #ffffff; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden;">
     <div style="background: #0f172a; padding: 18px 32px;">
       <span style="font-size: 16px; font-weight: bold; color: #ffffff; letter-spacing: 0.5px;">AlphaRoc</span>
-      <span style="font-size: 12px; color: #94a3b8; margin-left: 10px; letter-spacing: 1px; text-transform: uppercase;">Survey Compliance</span>
+      <span style="font-size: 12px; color: #94a3b8; margin-left: 10px; letter-spacing: 1px; text-transform: uppercase;">Study Compliance</span>
     </div>
     <div style="padding: 28px 32px; color: #1f2937;">
       ${body}
     </div>
     <div style="border-top: 1px solid #e5e7eb; padding: 16px 32px; background: #f9fafb;">
       <p style="font-size: 12px; color: #9ca3af; margin: 0; line-height: 1.6;">
-        This is an automated notification from the AlphaRoc survey compliance system.<br/>
+        This is an automated notification from the AlphaRoc study compliance system.<br/>
         Questions or access issues? Email
         <a href="mailto:info@alpharoc.ai?subject=Survey%20Compliance%20Link" style="color: #6b7280;">info@alpharoc.ai</a>
-        with the subject &ldquo;Survey Compliance Link&rdquo;.
+        with the subject &ldquo;Study Compliance Link&rdquo;.
       </p>
     </div>
   </div>
@@ -52,11 +52,11 @@ export function submissionCreatedEmail(args: {
       </div>`
     : ''
   return {
-    subject: `${args.projectName} — survey questions awaiting your approval`,
+    subject: `${args.projectName} — study questions awaiting your approval`,
     html: wrap(`
       <h2 style="font-size: 19px; color: #0f172a; margin: 0 0 6px;">${esc(args.projectName)}</h2>
       <p style="font-size: 14px; color: #475569; margin: 0 0 20px; line-height: 1.65;">
-        AlphaRoc has submitted a survey question list for your compliance review and approval.
+        AlphaRoc has submitted a study question list for your compliance review and approval.
       </p>
       <table cellpadding="0" cellspacing="0" style="margin: 0 0 4px;">
         ${detailRow('Submission', `Version ${args.version}`)}
@@ -95,7 +95,7 @@ export function decisionEmail(args: {
       </div>`
     : ''
   return {
-    subject: `${args.projectName} — survey questions ${verb} by compliance`,
+    subject: `${args.projectName} — study questions ${verb} by compliance`,
     html: wrap(`
       <h2 style="font-size: 19px; color: #0f172a; margin: 0 0 6px;">${esc(args.projectName)}</h2>
       <p style="font-size: 14px; color: #475569; margin: 0 0 16px; line-height: 1.65;">
@@ -108,7 +108,7 @@ export function decisionEmail(args: {
       <p style="font-size: 14px; color: #475569; margin: 16px 0 0; line-height: 1.65;">
         ${args.decision === 'rejected'
           ? 'Revise the questions and submit a new version from the project page.'
-          : 'The survey is cleared to launch.'}
+          : 'The study is cleared to launch.'}
       </p>
     `),
   }

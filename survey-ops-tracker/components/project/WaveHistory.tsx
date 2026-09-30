@@ -66,7 +66,7 @@ function FirstClassWaveHistory({ project, seriesId }: { project: P; seriesId: st
       {!isOrigin && <RemoveFromSeries project={project} />}
       {isOrigin && data.waves.length <= 1 && (
         <p className="text-[11px] text-muted-foreground/50">
-          The only wave in this series can&apos;t be removed — add another survey first.
+          The only wave in this series can&apos;t be removed — add another study first.
         </p>
       )}
       {isOrigin && data.waves.length > 1 && (
@@ -109,7 +109,7 @@ function AddWaveToSeries({ seriesId, client }: { seriesId: string; client: strin
       {
         onSuccess: (res) => {
           const n = res?.attached?.length ?? 1
-          toast(n > 1 ? `Added ${label} and ${n - 1} linked survey(s).` : `Added ${label}.`, 'success')
+          toast(n > 1 ? `Added ${label} and ${n - 1} linked ${n - 1 === 1 ? 'study' : 'studies'}.` : `Added ${label}.`, 'success')
           setPicking(false)
         },
         onError: (e) => toast((e as Error).message),
@@ -122,9 +122,9 @@ function AddWaveToSeries({ seriesId, client }: { seriesId: string; client: strin
       <button
         onClick={() => setPicking(true)}
         className="text-[12px] text-primary hover:underline self-start"
-        title="Add an existing survey to this series as another wave"
+        title="Add an existing study to this series as another wave"
       >
-        ＋ Add a wave from an existing survey
+        ＋ Add a wave from an existing study
       </button>
     )
   }
@@ -134,7 +134,7 @@ function AddWaveToSeries({ seriesId, client }: { seriesId: string; client: strin
   return (
     <div className="rounded-lg border border-border bg-muted/40 p-2 flex flex-col gap-1">
       <p className="text-[12px] text-muted-foreground">
-        Pick a {firm} survey to add as a wave. Anything linked to it as a rerun comes too, and the
+        Pick a {firm} study to add as a wave. Anything linked to it as a rerun comes too, and the
         series is renumbered by date afterwards.
       </p>
       {all.length > 8 && (
@@ -143,7 +143,7 @@ function AddWaveToSeries({ seriesId, client }: { seriesId: string; client: strin
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Filter by keyword or PR number…"
-          aria-label="Filter surveys to add as a wave"
+          aria-label="Filter studies to add as a wave"
           className="w-full rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:ring-1 focus:ring-primary/40"
         />
       )}
@@ -152,8 +152,8 @@ function AddWaveToSeries({ seriesId, client }: { seriesId: string; client: strin
       ) : candidates.length === 0 ? (
         <p className="text-xs text-muted-foreground/60">
           {needle
-            ? `No unassigned ${firm} survey matches “${q.trim()}”.`
-            : `No unassigned ${firm} surveys to add — every one is already in a series.`}
+            ? `No unassigned ${firm} study matches “${q.trim()}”.`
+            : `No unassigned ${firm} studies to add — every one is already in a series.`}
         </p>
       ) : (
         <div className="max-h-[12rem] overflow-y-auto flex flex-col thin-scroll">
@@ -213,7 +213,7 @@ function RemoveFromSeries({ project }: { project: P }) {
         onClick={() => setConfirming(true)}
         className="text-[12px] text-muted-foreground hover:text-red-600 dark:hover:text-red-400 self-start transition-colors"
       >
-        Remove this survey from the series
+        Remove this study from the series
       </button>
     )
   }
@@ -279,7 +279,7 @@ function LegacyWaveHistory({ project }: { project: P }) {
           <ParentPicker project={project} onPick={linkTo} onCancel={() => setPicking(false)} busy={link.isPending} />
         ) : (
           <button onClick={() => setPicking(true)} className="text-[13px] text-primary hover:underline self-start">
-            ↻ Link this as a rerun of another survey
+            ↻ Link this as a rerun of another study
           </button>
         )}
         {/* The two options are genuinely different and the difference has bitten
@@ -350,20 +350,20 @@ function ParentPicker({
         autoFocus
         value={q}
         onChange={(e) => setQ(e.target.value)}
-        placeholder="Search every survey by keyword or PR number…"
-        aria-label="Search surveys to link"
+        placeholder="Search every study by keyword or PR number…"
+        aria-label="Search studies to link"
         className="w-full rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:ring-1 focus:ring-primary/40"
       />
       <p className="text-[12px] text-muted-foreground">
         {searching
-          ? 'Searching every survey — any client.'
-          : `Nearest ${firm} surveys. Type to search all of them, by name or PR number.`}
+          ? 'Searching every study — any client.'
+          : `Nearest ${firm} studies. Type to search all of them, by name or PR number.`}
       </p>
       {isLoading ? (
         <p className="text-xs text-muted-foreground/50">Loading…</p>
       ) : rows.length === 0 ? (
         <p className="text-xs text-muted-foreground/60">
-          {searching ? `Nothing matches “${q.trim()}”.` : `No other ${firm} surveys found to link to.`}
+          {searching ? `Nothing matches “${q.trim()}”.` : `No other ${firm} studies found to link to.`}
         </p>
       ) : (
         <div className="max-h-[12rem] overflow-y-auto flex flex-col thin-scroll">
@@ -425,7 +425,7 @@ function AddToSeries({ project }: { project: P }) {
           // takes thirteen siblings with it — saying "Added to X" there would
           // understate the action by an order of magnitude.
           const n = res?.attached?.length ?? 1
-          toast(n > 1 ? `Added ${n} linked surveys to ${label}.` : `Added to ${label}.`, 'success')
+          toast(n > 1 ? `Added ${n} linked studies to ${label}.` : `Added to ${label}.`, 'success')
           setPicking(false)
         },
         onError: (e) => toast((e as Error).message),
@@ -438,9 +438,9 @@ function AddToSeries({ project }: { project: P }) {
       <button
         onClick={() => setPicking(true)}
         className="text-[13px] text-primary hover:underline self-start"
-        title="Add this survey to an existing rerun series, so it groups with the other waves on the client page"
+        title="Add this study to an existing rerun series, so it groups with the other waves on the client page"
       >
-        ＋ Add this survey to an existing series
+        ＋ Add this study to an existing series
       </button>
     )
   }
@@ -448,7 +448,7 @@ function AddToSeries({ project }: { project: P }) {
   return (
     <div className="rounded-lg border border-border bg-muted/40 p-2 flex flex-col gap-1">
       <p className="text-[12px] text-muted-foreground">
-        Add this survey as a wave of an existing series. Any surveys linked to it as reruns come
+        Add this study as a wave of an existing series. Any studies linked to it as reruns come
         too, and the series is renumbered by date afterwards.
       </p>
       {isLoading ? (

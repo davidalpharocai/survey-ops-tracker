@@ -59,10 +59,10 @@ export default async function PrintPage({
         {/* Header */}
         <div className="mb-8 border-b border-slate-200 pb-6 print:pb-4">
           <p className="text-xs font-semibold tracking-widest uppercase text-slate-400 mb-2">
-            AlphaRoc — Survey Compliance
+            AlphaRoc — Study Compliance
           </p>
           <h1 className="text-2xl font-bold text-slate-900 mb-2">
-            {project?.project_name ?? 'Survey project'}
+            {project?.project_name ?? 'Study project'}
           </h1>
           <p className="text-sm text-slate-500">
             Version {submission.version} &middot; submitted {formatDate(submission.submitted_at)} &middot;{' '}

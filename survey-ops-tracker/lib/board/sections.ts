@@ -208,7 +208,7 @@ export function boardExportHelp<T>(parts: BoardPartition<T>, mode: 'full' | 'ope
       : 'everything in the Operations Pipeline (Archived is not in this view’s file)'
   const unsorted =
     parts.unsorted.length > 0
-      ? ` It also holds the ${plural(parts.unsorted.length, 'survey', 'surveys')} listed above that fit no section.`
+      ? ` It also holds the ${plural(parts.unsorted.length, 'study', 'studies')} listed above that fit no section.`
       : ''
   const ignores =
     mode === 'full'

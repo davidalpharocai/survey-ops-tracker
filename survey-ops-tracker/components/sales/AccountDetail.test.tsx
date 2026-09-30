@@ -65,7 +65,7 @@ describe('AccountDetail columns', () => {
   it('shows Target and Final, and no Collected, by default', () => {
     show()
     expect(headers()).toEqual([
-      'Code', 'Survey', 'Requested by', 'Stage', 'Target', 'Final', 'Credits', 'Delivered',
+      'Code', 'Study', 'Requested by', 'Stage', 'Target', 'Final', 'Credits', 'Delivered',
     ])
     expect(headers()).not.toContain('Collected')
   })
@@ -86,7 +86,7 @@ describe('AccountDetail: a column choice saved when Collected existed', () => {
   it('replaces Collected with Final in a v2 choice', () => {
     localStorage.setItem(V2, JSON.stringify(['code', 'survey', 'collected']))
     show()
-    expect(headers()).toEqual(['Code', 'Survey', 'Final'])
+    expect(headers()).toEqual(['Code', 'Study', 'Final'])
   })
 
   // v1 is the older key, where "collected" WAS the final figure on a delivered
@@ -94,7 +94,7 @@ describe('AccountDetail: a column choice saved when Collected existed', () => {
   it('replaces Collected with Final in a v1 choice', () => {
     localStorage.setItem(V1, JSON.stringify(['code', 'survey', 'collected', 'credits']))
     show()
-    expect(headers()).toEqual(['Code', 'Survey', 'Final', 'Credits'])
+    expect(headers()).toEqual(['Code', 'Study', 'Final', 'Credits'])
   })
 
   it('never leaves the table columnless, even when Collected was the only tick', () => {
@@ -133,7 +133,7 @@ describe('AccountDetail: a column choice saved when Collected existed', () => {
     // through the migration changes nothing.
     cleanup()
     show()
-    expect(headers()).toEqual(['Code', 'Survey', 'Final', 'Credits'])
+    expect(headers()).toEqual(['Code', 'Study', 'Final', 'Credits'])
   })
 
   // A private window, or blocked site data: the read throws outright rather
@@ -142,7 +142,7 @@ describe('AccountDetail: a column choice saved when Collected existed', () => {
     vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('blocked') })
     show()
     expect(headers()).toEqual([
-      'Code', 'Survey', 'Requested by', 'Stage', 'Target', 'Final', 'Credits', 'Delivered',
+      'Code', 'Study', 'Requested by', 'Stage', 'Target', 'Final', 'Credits', 'Delivered',
     ])
   })
 

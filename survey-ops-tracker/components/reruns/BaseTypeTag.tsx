@@ -32,8 +32,8 @@ export function BaseTypeTag({
     <span
       title={
         rerunService
-          ? 'Tagged Rerun Service — base survey type not set yet'
-          : 'Base survey type not set yet (came in as Rerun Service)'
+          ? 'Tagged Rerun Service — base study type not set yet'
+          : 'Base study type not set yet (came in as Rerun Service)'
       }
       className={cn(
         'inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[11px] font-medium border border-border text-muted-foreground bg-transparent whitespace-nowrap',

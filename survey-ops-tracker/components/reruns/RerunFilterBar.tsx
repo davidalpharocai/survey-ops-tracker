@@ -72,11 +72,11 @@ export function RerunFilterBar({
           ref={searchRef}
           value={value.search}
           onChange={(e) => set('search', e.target.value)}
-          placeholder="Search reruns — client, survey, owner, template, project code, survey ID…  ( / )"
-          aria-label="Search reruns by client, survey, owner, template, project code or survey ID"
+          placeholder="Search reruns — client, study, owner, template, project code, survey ID…  ( / )"
+          aria-label="Search reruns by client, study, owner, template, project code or survey ID"
           className="flex-1 min-w-[14rem] max-w-md bg-muted border border-border text-foreground text-sm rounded-lg px-3 py-1.5 focus:outline-none focus:border-ring"
         />
-        <InfoTooltip text="Deep search: a case-insensitive substring match across each series' client, survey name, template, owner, base-type label, and every wave's project code, name and survey ID. Every word you type must match somewhere." />
+        <InfoTooltip text="Deep search: a case-insensitive substring match across each series' client, study name, template, owner, base-type label, and every wave's project code, name and survey ID. Every word you type must match somewhere." />
       </div>
 
       <div className="flex items-center gap-2 flex-wrap">

@@ -36,11 +36,11 @@ Rules:
 
 export const PICK_SURVEY_TOOL = {
   name: 'pick_survey',
-  description: 'Record which survey project the deliverable belongs to (or that it is unclear).',
+  description: 'Record which study project the deliverable belongs to (or that it is unclear).',
   input_schema: {
     type: 'object' as const,
     properties: {
-      projectCode: { type: ['string', 'null'], description: 'Chosen survey code from the candidate list, or null if unclear' },
+      projectCode: { type: ['string', 'null'], description: 'Chosen study code from the candidate list, or null if unclear' },
       confidence: { type: 'number', description: '0..1 confidence' },
       reasoning: { type: 'string', description: 'One sentence justification' },
       corroboratingSignal: { type: ['string', 'null'], enum: ['filename', 'subject', 'sender_domain', 'history', null] },
@@ -62,7 +62,7 @@ function renderUser(input: AiMatchInput): string {
     `Attachment filename(s): ${input.filename}`,
     `Body snippet: ${input.bodySnippet}`,
     ``,
-    `Candidate surveys:\n${cands}`,
+    `Candidate studies:\n${cands}`,
     ``,
     `Recent filings by client (learn the pattern):\n${hist}`,
   ].join('\n')

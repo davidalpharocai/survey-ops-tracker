@@ -317,7 +317,7 @@ export function priceBlockText(
   if (!opts.canViewFinancials) return null
   if (isBlocked(load.blocked, 'project_financials')) return blockedText('project_financials')
   if (isBlocked(load.blocked, 'project_segments')) {
-    return `${blockedText('project_segments')}, so segmented surveys cannot be checked`
+    return `${blockedText('project_segments')}, so segmented studies cannot be checked`
   }
   if (load.integrity.pricesReturned === 0) return 'Blocked: project_financials returned no prices'
   return null
@@ -378,7 +378,7 @@ export function integrityWarnings(
   }
   const s = load.integrity.spendRecomputedMatches
   if (s.of > 0 && s.matches < s.of) {
-    out.push(`Recomputed spend differs from the stored figure on ${fmtNum(s.of - s.matches)} of ${fmtNum(s.of)} surveys.`)
+    out.push(`Recomputed spend differs from the stored figure on ${fmtNum(s.of - s.matches)} of ${fmtNum(s.of)} studies.`)
   }
   if (opts.canViewFinancials && !load.blocked.some(b => b.table === 'project_financials') && load.integrity.pricesReturned === 0) {
     out.push('No client prices came back. Revenue and margin figures are missing, not zero — this is a read problem, not an empty book.')
@@ -402,7 +402,7 @@ export function integrityLine(
   // the loader — so this agrees with the "of N" in the spend check beside it.
   const surveys = Math.max(0, (i.loadedCounts.survey_projects ?? 0) - i.demoDropped)
   const parts = [
-    `Loaded ${f(surveys)} surveys` + (i.demoDropped > 0 ? ` (${f(i.demoDropped)} demo left out)` : ''),
+    `Loaded ${f(surveys)} studies` + (i.demoDropped > 0 ? ` (${f(i.demoDropped)} demo left out)` : ''),
     `${f(i.loadedCounts.project_blasts ?? 0)} blasts`,
     `${f(i.loadedCounts.project_suppliers ?? 0)} panel rows`,
     `${f(i.loadedCounts.project_costs ?? 0)} cost lines`,

@@ -103,7 +103,7 @@ export default async function ClientStatementPage({
   if (!client) notFound()
   // A failed read is not an empty account. A statement whose contract silently
   // did not load reads "No contract in force" to a client who has one.
-  if (projectsRes.error) return <Blocked what="the surveys" />
+  if (projectsRes.error) return <Blocked what="the studies" />
   if (termsRes.error) return <Blocked what="the contract terms" />
 
   const allRows = (projectsRes.data ?? []) as unknown as AccountProject[]

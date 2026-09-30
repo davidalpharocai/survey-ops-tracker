@@ -72,7 +72,7 @@ export function NewClientModal({ initialName = '', onCreated, onClose }: NewClie
         <div className="flex flex-col gap-2 text-sm border-t border-border pt-3">
           <span className="text-xs text-muted-foreground uppercase tracking-widest font-medium flex items-center">
             Compliance
-            <InfoTooltip text="When set, this client's surveys are blocked from being fielded (before) or delivered (after) until the matching compliance review is approved. Leave both off if this client has no compliance requirement." />
+            <InfoTooltip text="When set, this client's studies are blocked from being fielded (before) or delivered (after) until the matching compliance review is approved. Leave both off if this client has no compliance requirement." />
           </span>
           <label className="flex items-center gap-2 cursor-pointer">
             <input
@@ -110,7 +110,7 @@ export function NewClientModal({ initialName = '', onCreated, onClose }: NewClie
               <input
                 value={notes}
                 onChange={e => setNotes(e.target.value)}
-                placeholder="e.g. only if the survey contains open-text questions"
+                placeholder="e.g. only if the study contains open-text questions"
                 className={inputClass}
               />
             </label>

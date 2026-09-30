@@ -23,17 +23,17 @@ const FIRST = 50
 
 const COLS: { key: string; label: string; tip: string; num?: boolean }[] = [
   { key: 'account', label: 'Account', tip: 'The client account, old name variants rolled together.' },
-  { key: 'route', label: 'Route', tip: 'How the survey was actually fielded, read from its cost records.' },
+  { key: 'route', label: 'Route', tip: 'How the study was actually fielded, read from its cost records.' },
   { key: 'price', label: 'Client price', tip: 'Price per N × billed N. "no price" when none is recorded; a real $0 prints $0.', num: true },
   { key: 'cost', label: 'Our cost', tip: 'Recorded field cost, net of rewards recovered. No salaries or overhead.', num: true },
-  { key: 'kept', label: 'Kept $', tip: 'Client price minus our cost — only where the survey has both a price and a recorded cost.', num: true },
+  { key: 'kept', label: 'Kept $', tip: 'Client price minus our cost — only where the study has both a price and a recorded cost.', num: true },
   { key: 'pct', label: 'Kept %', tip: 'Kept $ ÷ client price. A $0 price reads "given away": $0 never divides.', num: true },
   { key: 'budget', label: 'Budget', tip: 'The most we planned to spend: a cost ceiling, never revenue.', num: true },
   { key: 'spb', label: 'Spend ÷ budget', tip: 'Our cost as a share of the budget. Over 100% went over budget, which is not the same as losing money.', num: true },
   { key: 'spp', label: 'Spend ÷ price', tip: `Cents of our cost per $1 of client price. The goal is at most ${goalCostWords()}.`, num: true },
   { key: 'ppn', label: 'Price per billed N', tip: 'Client price ÷ billed N.', num: true },
-  { key: 'cpn', label: 'Cost per billed N', tip: 'Our cost ÷ billed N. Blank when the survey’s N actual only adds up some of its segments.', num: true },
-  { key: 'tags', label: 'Tags', tip: 'What went wrong. A survey can carry more than one.' },
+  { key: 'cpn', label: 'Cost per billed N', tip: 'Our cost ÷ billed N. Blank when the study’s N actual only adds up some of its segments.', num: true },
+  { key: 'tags', label: 'Tags', tip: 'What went wrong. A study can carry more than one.' },
 ]
 
 const TAG_TONE: Record<LedgerTag, string> = {
@@ -64,7 +64,7 @@ export function SurveyLedger({ rows }: { rows: LedgerRow[] }) {
           <thead>
             <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
               <th scope="col" className="px-3 py-1.5 text-left font-medium">
-                <span className="inline-flex items-center">Survey<InfoTooltip text="The survey code. It opens the project page, where prices and budgets are edited." /></span>
+                <span className="inline-flex items-center">Study<InfoTooltip text="The study code. It opens the project page, where prices and budgets are edited." /></span>
               </th>
               {COLS.map(c => (
                 <th key={c.key} scope="col" className={'px-3 py-1.5 font-medium ' + (c.num ? 'text-right' : 'text-left')}>

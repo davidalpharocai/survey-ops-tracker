@@ -23,7 +23,7 @@ import { ResultsTile2 } from '../results/ResultsTile2'
 import { GroupByPicker } from '../results/GroupByPicker'
 
 const GUIDANCE =
-  "Finished work only. The top card answers “did we make money” on the surveys where we know both what the client pays and what we spent. The card below shows where it came from, by account, route, month, contact, survey or panel. Click any bar or row to see the surveys behind it."
+  "Finished work only. The top card answers “did we make money” on the studies where we know both what the client pays and what we spent. The card below shows where it came from, by account, route, month, contact, study or panel. Click any bar or row to see the studies behind it."
 
 export function ResultsTab(props: FinanceTabProps) {
   const params = useSearchParams()

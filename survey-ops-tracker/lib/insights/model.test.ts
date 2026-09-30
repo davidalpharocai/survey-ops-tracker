@@ -327,7 +327,7 @@ describe('the headline claims only what the numbers carry', () => {
       ...many(12, { deliver_date: '2026-09-10', due_date: '2026-09-12', n_actual: 100 }),
     ])
     expect(m.headline).toBe(
-      'The team has delivered 12 surveys so far in September, already the most since June. ' +
+      'The team has delivered 12 studies so far in September, already the most since June. ' +
       'That is 1,200 respondents, and 100% of those with a due date arrived on or before it.')
   })
   it('says "at least" when some counts are missing, and "compared with" for a fall', () => {
@@ -340,18 +340,18 @@ describe('the headline claims only what the numbers carry', () => {
     expect(m.headline).toContain('at least 110 respondents')
   })
   it('says so plainly when nothing was delivered', () => {
-    expect(model([]).headline).toBe('No surveys have been delivered so far in September.')
-    expect(model([], { filter: F({ captain: NO_CAPTAIN }) }).headline).toBe('No surveys without a captain have been delivered so far in September.')
+    expect(model([]).headline).toBe('No studies have been delivered so far in September.')
+    expect(model([], { filter: F({ captain: NO_CAPTAIN }) }).headline).toBe('No studies without a captain have been delivered so far in September.')
   })
   it('reads a missing or older type naturally', () => {
     const none = model([P({ deliver_date: '2026-09-10', project_type: null })], { filter: F({ type: 'none' }) })
-    expect(none.headline).toBe('The team has delivered 1 survey with no type set so far in September.')
+    expect(none.headline).toBe('The team has delivered 1 study with no type set so far in September.')
     const old = model([P({ deliver_date: '2026-09-10', project_type: 'Rerun' })], { filter: F({ type: 'Rerun' }) })
-    expect(old.headline).toBe('The team has delivered 1 survey filed under the older Rerun type so far in September.')
+    expect(old.headline).toBe('The team has delivered 1 study filed under the older Rerun type so far in September.')
   })
   it('names the captain and the account when filtered', () => {
     const m = model([P({ deliver_date: '2026-09-10', client_id: 'bam' })], { filter: F({ captain: 'alex', account: 'bam' }) })
-    expect(m.headline).toBe('Alex has delivered 1 survey for BAM so far in September.')
+    expect(m.headline).toBe('Alex has delivered 1 study for BAM so far in September.')
   })
   it('keeps the headline input self-contained', () => {
     const h = buildHeadline({
@@ -361,7 +361,7 @@ describe('the headline claims only what the numbers carry', () => {
       allMonthCounts: new Map(), undatedMonths: { byMonth: new Map(), unplaced: 0 },
       captainName: null, accountName: null, typeKey: 'PS', runsToToday: false,
     })
-    expect(h).toBe('No PS surveys were delivered in August.')
+    expect(h).toBe('No PS studies were delivered in August.')
   })
 })
 
@@ -392,15 +392,15 @@ describe('undated deliveries: a period missing them is never compared as if comp
     expect(m.undated.inPrev).toBe(12)
     expect(m.compare.delivered.state).toBe('unsure')
     expect(m.compare.delivered.text).toBe(
-      'Not compared with 2 Feb–31 May 2026: 12 delivered surveys from then have no deliver date — enough to change the answer')
-    expect(m.headline).toBe('The team has delivered 20 surveys since 1 June.')
+      'Not compared with 2 Feb–31 May 2026: 12 delivered studies from then have no deliver date — enough to change the answer')
+    expect(m.headline).toBe('The team has delivered 20 studies since 1 June.')
   })
 
   it('states a rise that holds even if every undated survey belongs to the earlier period, with "at least"', () => {
     const m = model([...many(40, { deliver_date: '2026-07-10' }), ...many(12, { deliver_date: '2026-04-10' }), ...undatedDue(5, '2026-04-20')], { filter: SINCE })
     expect(m.compare.delivered.state).toBe('up')
     expect(m.compare.delivered.text).toBe('Up from at least 12 in 2 Feb–31 May 2026')
-    expect(m.headline).toBe('The team has delivered 40 surveys since 1 June, up from at least 12 in 2 Feb–31 May 2026.')
+    expect(m.headline).toBe('The team has delivered 40 studies since 1 June, up from at least 12 in 2 Feb–31 May 2026.')
   })
 
   it('this period\'s own undated deliveries can turn a fall into a rise, so it is not called a fall', () => {
@@ -408,8 +408,8 @@ describe('undated deliveries: a period missing them is never compared as if comp
     const m = model([...many(11, { deliver_date: '2026-09-05' }), ...undatedDue(3, '2026-09-10'), ...many(12, { deliver_date: '2026-08-05' })])
     expect(m.undated.inRange).toBe(3)
     expect(m.compare.delivered.state).toBe('unsure')
-    expect(m.compare.delivered.text).toMatch(/3 delivered surveys in your dates have no deliver date/)
-    expect(m.headline).toBe('The team has delivered 11 surveys so far in September.')
+    expect(m.compare.delivered.text).toMatch(/3 delivered studies in your dates have no deliver date/)
+    expect(m.headline).toBe('The team has delivered 11 studies so far in September.')
   })
 
   it('each figure counts only the undated surveys that could move it', () => {
@@ -452,7 +452,7 @@ describe('undated deliveries: a period missing them is never compared as if comp
         ...many(8, { deliver_date: '2026-05-10' }), ...many(5, { deliver_date: null })],
       { filter: F({ range: { preset: 'last-month', from: null, to: null } }) },
     )
-    expect(m.headline).toBe('The team delivered 14 surveys in August, up from 10 in 1–31 Jul 2026.')
+    expect(m.headline).toBe('The team delivered 14 studies in August, up from 10 in 1–31 Jul 2026.')
   })
 
   it('the undated drills list exactly what the tile counts', () => {

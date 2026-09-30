@@ -416,7 +416,7 @@ export function buildChecks(p: Row, sup: SupRow[], blasts: BlastRow[], costs: Co
     checks.push({
       check: 'blast_sent_count_missing', ok: false, advisory: false,
       expected: null, actual: 0,
-      detail: `${provablyUnsentCounted.length} blast(s) record 0 sent but a non-zero number of completes — nobody can complete a survey they were never sent, so the sent count was never entered. Its send cost ($/send × # people) therefore reads $0 and the completion rate reads as divide-by-zero`,
+      detail: `${provablyUnsentCounted.length} blast(s) record 0 sent but a non-zero number of completes — nobody can complete a study they were never sent, so the sent count was never entered. Its send cost ($/send × # people) therefore reads $0 and the completion rate reads as divide-by-zero`,
     })
   }
 
@@ -565,7 +565,7 @@ export function buildChecks(p: Row, sup: SupRow[], blasts: BlastRow[], costs: Co
       checks.push({
         check: 'cost_line_unrouted', ok: false, advisory: true,
         expected: 0, actual: Math.round(amt),
-        detail: `${unrouted.length} flat cost line(s) totalling $${amt.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} say nothing about which fielding route they bought, and this survey used both — so its cost per respondent cannot be split and the survey is held out of the per-route figures. Set route to 'blast' or 'panel' on each (a bought contact list is a blast cost).`,
+        detail: `${unrouted.length} flat cost line(s) totalling $${amt.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} say nothing about which fielding route they bought, and this study used both — so its cost per respondent cannot be split and the study is held out of the per-route figures. Set route to 'blast' or 'panel' on each (a bought contact list is a blast cost).`,
       })
     }
   }

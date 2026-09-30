@@ -39,12 +39,12 @@ export const SUPPLIER_COLUMNS = {
     help: 'This panel’s price per complete against all panels together in this view. +23% means it charged 23% more per complete; −10% means 10% less.',
   },
   surveys: {
-    label: 'Surveys',
-    help: 'Surveys in view this panel delivered completes on.',
+    label: 'Studies',
+    help: 'Studies in view this panel delivered completes on.',
   },
   waves: {
     label: 'Waves',
-    help: 'PureSpectrum launches (waves) this panel delivered completes on. A survey with no launch recorded counts as one wave.',
+    help: 'PureSpectrum launches (waves) this panel delivered completes on. A study with no launch recorded counts as one wave.',
   },
   above: {
     label: 'Paid above the cheapest panel in the same wave',
@@ -54,8 +54,8 @@ export const SUPPLIER_COLUMNS = {
 
 export const WAVE_COLUMNS = {
   survey: {
-    label: 'Survey',
-    help: 'The survey this wave belongs to. Opens the project page, where its Suppliers panel shows the same wave.',
+    label: 'Study',
+    help: 'The study this wave belongs to. Opens the project page, where its Suppliers panel shows the same wave.',
   },
   label: {
     label: 'PS Survey#',

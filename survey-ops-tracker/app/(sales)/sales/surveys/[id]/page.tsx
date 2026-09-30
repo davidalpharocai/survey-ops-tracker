@@ -148,9 +148,9 @@ export default async function SalesSurveyPage({ params }: { params: Promise<{ id
   return (
     <div>
       <nav className="mb-4 flex items-center gap-1.5 text-xs text-muted-foreground">
-        <Link href="/sales/surveys" className="hover:text-foreground hover:underline">Surveys</Link>
+        <Link href="/sales/surveys" className="hover:text-foreground hover:underline">Studies</Link>
         <span>/</span>
-        <span className="text-foreground">{p.project_code ?? 'Survey'}</span>
+        <span className="text-foreground">{p.project_code ?? 'Study'}</span>
       </nav>
 
       <div className="mb-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
@@ -259,7 +259,7 @@ export default async function SalesSurveyPage({ params }: { params: Promise<{ id
           <Card title="Deliverables" className="md:col-span-2">
             {deliverables.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                Nothing filed against this survey yet.
+                Nothing filed against this study yet.
               </p>
             ) : (
               <ul className="divide-y divide-border/60">

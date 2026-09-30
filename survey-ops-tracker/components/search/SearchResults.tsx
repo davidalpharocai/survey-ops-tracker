@@ -177,7 +177,7 @@ export function SearchResults({
           <p className="text-sm text-muted-foreground">No record matches &ldquo;{q}&rdquo;.</p>
           <p className="mt-1 text-xs text-muted-foreground/70">
             Search matches names, codes, emails and the text of notes and activity — try a shorter word,
-            or part of a survey code.
+            or part of a study code.
           </p>
         </div>
       )}

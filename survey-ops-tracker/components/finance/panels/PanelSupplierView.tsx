@@ -98,7 +98,7 @@ export function PanelSupplierView(props: FinanceTabProps) {
       <FinanceCard
         id={CARD_ANCHOR}
         title="Where it was made and lost · by panel supplier"
-        help="Who our PureSpectrum money went to, and what each panel charged per complete, on the panel purchases of the surveys in view. The Spend column adds back to the Panel (PureSpectrum) line of the spend breakdown. Pick a panel to see its waves."
+        help="Who our PureSpectrum money went to, and what each panel charged per complete, on the panel purchases of the studies in view. The Spend column adds back to the Panel (PureSpectrum) line of the spend breakdown. Pick a panel to see its waves."
         scope={props.scope.chip}
         ignored={props.scope.ignored}
         needs={needsFor(props.filter.route)}
@@ -107,7 +107,7 @@ export function PanelSupplierView(props: FinanceTabProps) {
       >
         <CheckStrip ok={model.check.ok} verified={model.check.verified} text={model.check.text} />
         {model.rows.length === 0 ? (
-          <Empty>No panel purchases on the surveys in this view.</Empty>
+          <Empty>No panel purchases on the studies in this view.</Empty>
         ) : (
           <>
             <Summary model={model} />
@@ -202,7 +202,7 @@ function Summary({ model }: { model: PanelsModel }) {
       <span className="font-medium text-foreground">{money(t.spend)}</span> on panels ·{' '}
       {fmtNum(t.completes)} completes bought at <span className="font-medium text-foreground">{cpiText(t.cpc)}</span> each ·{' '}
       {fmtNum(model.rows.length)} panel{model.rows.length === 1 ? '' : 's'} · {fmtNum(t.waves)} wave{t.waves === 1 ? '' : 's'} ·
-      panel purchases on {fmtNum(t.surveys)} of the {fmtNum(t.surveysInView)} surveys in view
+      panel purchases on {fmtNum(t.surveys)} of the {fmtNum(t.surveysInView)} studies in view
     </p>
   )
 }
@@ -323,7 +323,7 @@ function SupplierList({ model, picked, hrefOf }: { model: PanelsModel; picked: s
                 {cpiText(r.cpc)}
                 {r.vsAll != null && <> ({vsAllText(r.vsAll)} {C.vsAll.label})</>}
               </dd>
-              <dt className={dt} title={C.surveys.help}>Surveys · waves</dt><dd>{fmtNum(r.surveys)} · {fmtNum(r.waves)}</dd>
+              <dt className={dt} title={C.surveys.help}>Studies · waves</dt><dd>{fmtNum(r.surveys)} · {fmtNum(r.waves)}</dd>
               <dt className={dt} title={C.above.help}>Above cheapest in wave</dt><dd>{money(r.above)}</dd>
             </dl>
           </li>

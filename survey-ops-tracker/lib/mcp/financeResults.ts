@@ -254,7 +254,7 @@ export function resultsOutput(
           panel_completes: panels.total.completes,
           price_per_complete_all_panels: cents(panels.total.cpc),
           paid_above_the_cheapest_panel: cents(panels.total.above),
-          note: 'Panel spend only, split by supplier. Clients pay per survey, not per panel, so there is no client price or margin by panel; the Panel line of spend_lines is this same money in one figure.',
+          note: 'Panel spend only, split by supplier. Clients pay per study, not per panel, so there is no client price or margin by panel; the Panel line of spend_lines is this same money in one figure.',
         }
         : {
           rows: tile2Rows.slice(0, MAX_ROWS),
@@ -266,7 +266,7 @@ export function resultsOutput(
     summary: `${model.scope.chip}: client price $${(cents(t1.clientPrice) ?? 0).toLocaleString('en-US')}, ` +
       `our cost $${(cents(t1.ourCost) ?? 0).toLocaleString('en-US')}, we keep ` +
       `${t1.kept < 0 ? '−' : ''}$${Math.abs(cents(t1.kept) ?? 0).toLocaleString('en-US')}` +
-      `${t1.keptPct != null ? ` (${pct(t1.keptPct)}%)` : ''} on ${t1.surveys} surveys. ${verdict}`,
+      `${t1.keptPct != null ? ` (${pct(t1.keptPct)}%)` : ''} on ${t1.surveys} ${t1.surveys === 1 ? 'study' : 'studies'}. ${verdict}`,
     note: 'Client price is price per N × billed N (never more than the N sold, never the pre-QA count); "we keep" is field contribution before salaries and overhead. Every figure counts only the margin set — delivered, priced (a $0 price included), with a delivered N and a target, and a recorded cost — and coverage says how much of the delivered spend that is.',
   }
 }

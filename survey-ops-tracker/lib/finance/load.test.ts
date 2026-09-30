@@ -199,7 +199,7 @@ describe('integrityLine', () => {
     const { client } = fakeClient(BOOK)
     const { integrity } = await loadFinanceRaw(client)
     expect(integrityLine(integrity, { canViewFinancials: true, time: '6:40 PM' })).toBe(
-      'Loaded 2 surveys (1 demo left out) · 1 blasts · 0 panel rows · 0 cost lines · 2 prices · ' +
+      'Loaded 2 studies (1 demo left out) · 1 blasts · 0 panel rows · 0 cost lines · 2 prices · ' +
       'recomputed spend = stored on 1 of 2 · 6:40 PM')
   })
 
@@ -209,7 +209,7 @@ describe('integrityLine', () => {
     const { integrity } = await loadFinanceRaw(client)
     const line = integrityLine(integrity, { canViewFinancials: false })
     expect(line).not.toContain('prices')
-    expect(line).toBe('Loaded 2 surveys (1 demo left out) · 1 blasts · 0 panel rows · 0 cost lines · recomputed spend = stored on 1 of 2')
+    expect(line).toBe('Loaded 2 studies (1 demo left out) · 1 blasts · 0 panel rows · 0 cost lines · recomputed spend = stored on 1 of 2')
   })
 })
 
@@ -228,7 +228,7 @@ describe('card-level blocks: a figure built on a failed read says so', () => {
   it('blocks prices when segments failed: a segmented survey would be capped as one line', async () => {
     const load = await loadFinanceRaw(fakeClient(BOOK, { fail: { project_segments: 'x' } }).client)
     expect(priceBlockText(load, { canViewFinancials: true })).toBe(
-      'Blocked: project_segments did not load, so segmented surveys cannot be checked')
+      'Blocked: project_segments did not load, so segmented studies cannot be checked')
   })
 
   it('marks a spend figure as a floor for every cost table that failed', async () => {

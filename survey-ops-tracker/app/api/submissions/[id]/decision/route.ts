@@ -55,7 +55,7 @@ export async function POST(
   const recipients = await getAlphaRocNotifyList(admin, updated.project_id, updated.submitted_by)
 
   const email = decisionEmail({
-    projectName: project?.project_name ?? 'Survey project',
+    projectName: project?.project_name ?? 'Study project',
     version: updated.version,
     decision: body.decision,
     note: body.note?.trim() || null,

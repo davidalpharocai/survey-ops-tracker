@@ -176,7 +176,7 @@ export function DrillPanel({ drill, onClose, codeOf, exportContext }: {
           <p>
             {strip.ok ? <><span aria-hidden>✓ </span>{strip.text}</> : strip.text}
             {strip.ok && spec.expectedTotal == null && (
-              <span className="text-muted-foreground"> This figure is not a sum of the rows, so only the list of surveys is checked.</span>
+              <span className="text-muted-foreground"> This figure is not a sum of the rows, so only the list of studies is checked.</span>
             )}
           </p>
           {!rec.ok && rec.missingIds.length > 0 && (
@@ -195,7 +195,7 @@ export function DrillPanel({ drill, onClose, codeOf, exportContext }: {
               <thead className="sticky top-0 z-10 bg-card">
                 <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
                   <th scope="col" className="whitespace-nowrap px-3 py-1.5 text-left font-medium">
-                    <span className="inline-flex items-center">Survey<InfoTooltip text="The survey's code. It is a real link: click to open the project, or right-click or middle-click to open it in a new tab." /></span>
+                    <span className="inline-flex items-center">Study<InfoTooltip text="The study's code. It is a real link: click to open the project, or right-click or middle-click to open it in a new tab." /></span>
                   </th>
                   {spec.columns.map(c => (
                     <th key={c.key} scope="col"
@@ -216,7 +216,7 @@ export function DrillPanel({ drill, onClose, codeOf, exportContext }: {
                     <th scope="col" className="whitespace-nowrap px-3 py-1.5 text-right font-medium">
                       <span className="inline-flex items-center justify-end">
                         Running share
-                        <InfoTooltip text="This row and every row above it, as a share of the total. If the first few rows reach most of it, the figure is about a few surveys." />
+                        <InfoTooltip text="This row and every row above it, as a share of the total. If the first few rows reach most of it, the figure is about a few studies." />
                       </span>
                     </th>
                   )}
@@ -284,7 +284,7 @@ export function Drillable({ onOpen, children, title }: {
   return (
     <button
       onClick={onOpen}
-      title={title ?? 'Show the surveys behind this'}
+      title={title ?? 'Show the studies behind this'}
       className="text-left underline-offset-4 hover:underline focus:underline focus:outline-none"
     >
       {children}

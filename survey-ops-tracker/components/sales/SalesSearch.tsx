@@ -40,6 +40,11 @@ type Hit = {
 
 const CAP: Record<Hit['kind'], number> = { Account: 8, Contact: 10, Survey: 14 }
 
+/** The group heading only. `kind` is the discriminant AND the key into CAP and
+ *  totals, so the word on screen has to be mapped, never renamed in place. */
+const KIND_HEADING: Record<Hit['kind'], string> =
+  { Account: 'Accounts', Contact: 'Contacts', Survey: 'Studies' }
+
 export function SalesSearch() {
   const supabase = createClient()
   const router = useRouter()
@@ -173,8 +178,8 @@ export function SalesSearch() {
         ref={inputRef}
         type="search"
         value={q}
-        placeholder="Search accounts, contacts, surveys…"
-        aria-label="Search your accounts, contacts and surveys"
+        placeholder="Search accounts, contacts, studies…"
+        aria-label="Search your accounts, contacts and studies"
         onChange={e => {
           setQ(e.target.value)
           setOpen(true)
@@ -210,7 +215,7 @@ export function SalesSearch() {
                 <div key={`${h.kind}-${h.id}`}>
                   {firstOfKind && (
                     <p className="flex items-baseline gap-2 border-t border-border/50 px-3 pt-2 pb-1 text-[10px] uppercase tracking-widest text-muted-foreground/70 first:border-t-0">
-                      <span>{h.kind}s</span>
+                      <span>{KIND_HEADING[h.kind]}</span>
                       <span className="tabular-nums">{totals[h.kind]}</span>
                       {/* Never a silent cap. */}
                       {more > 0 && (

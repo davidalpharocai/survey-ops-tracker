@@ -90,7 +90,7 @@ describe('PerRespondentTab', () => {
     expect(screen.getByRole('region', { name: 'Blast (B2B email and text)' })).toBeInTheDocument()
     // The blast card has three surveys: its floor is not called.
     const blastCard = screen.getByRole('region', { name: 'Blast (B2B email and text)' })
-    expect(within(blastCard).getByText(/Too few surveys here to call: a quote floor needs/)).toBeInTheDocument()
+    expect(within(blastCard).getByText(/Too few studies here to call: a quote floor needs/)).toBeInTheDocument()
     expect(within(screen.getByRole('region', { name: 'Panel (PureSpectrum)' })).getByText(/^Quote at least/)).toBeInTheDocument()
   })
 
@@ -109,7 +109,7 @@ describe('PerRespondentTab', () => {
   it('opens a route drill that reconciles, from the card’s own button', () => {
     const { p, openDrill } = props()
     render(<PerRespondentTab {...p} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Show the 9 surveys →' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Show the 9 studies →' }))
     const spec = openDrill.mock.calls[0][0]
     expect(spec.key).toBe('per-respondent-panel')
     expect(reconcile(spec).ok).toBe(true)
@@ -118,7 +118,7 @@ describe('PerRespondentTab', () => {
   it('links out with real anchors: Improve for the unsplit survey, Results for the panels', () => {
     const { p } = props()
     render(<PerRespondentTab {...p} />)
-    expect(screen.getByText(/1 survey fielded both ways/)).toBeInTheDocument()
+    expect(screen.getByText(/1 study fielded both ways/)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'See what to record on Improve →' }).getAttribute('href')).toBe('/finance?tab=improve')
     expect(screen.getByRole('link', { name: 'See panels →' }).getAttribute('href')).toBe('/finance?by=panel')
   })
@@ -169,9 +169,9 @@ describe('PerRespondentTab', () => {
     expect(within(card).queryByText(/quoted below the floor/)).toBeNull()
     const note = within(card).getByRole('alert')
     expect(note.textContent).toContain('Blocked: project_financials did not load')
-    expect(note.textContent).toContain('no panel survey here can be checked against the floor')
+    expect(note.textContent).toContain('no panel study here can be checked against the floor')
     // And the tile's closing sentence says it as well.
-    expect(screen.getByText(/Client prices are missing, not zero, so no survey in view can be checked against the floor/))
+    expect(screen.getByText(/Client prices are missing, not zero, so no study in view can be checked against the floor/))
       .toBeInTheDocument()
   })
 

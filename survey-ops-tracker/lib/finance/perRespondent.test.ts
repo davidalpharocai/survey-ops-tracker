@@ -175,7 +175,7 @@ describe('Tile 4: the quote floor is set on cost per BILLED respondent', () => {
     expect(q.belowIds.sort()).toEqual(['p1', 'p4'])
     expect(q.belowSafe).toBe(2)
     expect(q.safeCovers).toBe(7)
-    expect(pc.lines.quotePriced).toContain('2 of 3 panel surveys priced above $0')
+    expect(pc.lines.quotePriced).toContain('2 of 3 panel studies priced above $0')
   })
 
   it('has a below-floor drill whose total comes from revenue.ts on the survey records', () => {
@@ -197,9 +197,9 @@ describe('Tile 4: the quote floor is set on cost per BILLED respondent', () => {
     // to read as a book nobody priced.
     expect(pb.priceNote).toContain('Blocked: project_financials did not load')
     expect(pb.priceNote).toContain('missing, not zero')
-    expect(pb.priceNote).toContain('no panel survey here can be checked against the floor')
+    expect(pb.priceNote).toContain('no panel study here can be checked against the floor')
     expect(m.tile4Verdict).toContain('Blocked: project_financials did not load')
-    expect(m.tile4Verdict).toContain('no survey in view can be checked against the floor')
+    expect(m.tile4Verdict).toContain('no study in view can be checked against the floor')
     // Nothing is counted as "not placed" either: there is no comparison to
     // be outside of.
     expect(m.unplacedPriced).toBeNull()
@@ -212,7 +212,7 @@ describe('Tile 4: the quote floor is set on cost per BILLED respondent', () => {
     // b1 is priced at $150 but sits on the blast card, which is too thin to
     // set a floor — so it is in neither the numerator nor the denominator.
     expect(m.unplacedPriced).toMatchObject({ surveys: 1, mixed: 0, noRows: 0, noFloor: 1 })
-    expect(m.unplacedPriced!.text).toContain('One more priced survey in view could not be checked against a route floor')
+    expect(m.unplacedPriced!.text).toContain('One more priced study in view could not be checked against a route floor')
     expect(m.unplacedPriced!.text).toContain('on a route with no quote floor in this view')
     expect(m.tile4Verdict).toContain(m.unplacedPriced!.text)
   })
@@ -227,7 +227,7 @@ describe('Tile 4: the buy multiple', () => {
     expect(pc.buy!.covered).toBe(6)
     expect(pc.buy!.of).toBe(8)
     expect(pc.lines.buy).toContain('Buy 1.5× the target')
-    expect(pc.lines.buy).toContain('covers 6 of 8 past surveys')
+    expect(pc.lines.buy).toContain('covers 6 of 8 past studies')
   })
 })
 
@@ -257,7 +257,7 @@ describe('Tile 4: the too-few rule', () => {
     const m = model()
     expect(m.tile4Verdict).toContain('Quote panel work at $3.34 or more')
     expect(m.tile4Verdict).not.toContain('blast work')
-    expect(m.tile4Verdict).toContain('2 of 3 priced surveys')
+    expect(m.tile4Verdict).toContain('2 of 3 priced studies')
   })
 })
 
@@ -314,7 +314,7 @@ describe('Tile 5: one declared population', () => {
     expect(ids).toContain('live1')
     expect(ids).toContain('ph1') // a placeholder holding data is real work
     for (const x of ['h1', 'sc1', 'ph0', 'u1']) expect(ids).not.toContain(x)
-    expect(m.levers.scope.chip).toMatch(/^Delivered and live · From 1 Jun 2026 · \d+ surveys$/)
+    expect(m.levers.scope.chip).toMatch(/^Delivered and live · From 1 Jun 2026 · \d+ studies$/)
   })
 
   it('keeps SAVE COST and EARN MORE apart, with no total anywhere', () => {
@@ -327,7 +327,7 @@ describe('Tile 5: one declared population', () => {
     expect(m.levers.verdict).toMatch(/widen the date range or clear a filter/)
   })
 
-  it('reads "too few surveys here to call" below MIN_CLASS_N and draws no bar', () => {
+  it('reads "too few studies here to call" below MIN_CLASS_N and draws no bar', () => {
     // The live survey is the only one that raised its bid: one survey.
     const bid = m.levers.save.find(s => s.key === 'bid-premium')!
     expect(bid.lever!.ids).toEqual(['live1'])
@@ -341,7 +341,7 @@ describe('Tile 5: one declared population', () => {
   it('still names a lever with nothing to say, with the reason', () => {
     const dead = m.levers.save.find(s => s.key === 'dead-streak')!
     expect(dead.lever).toBeNull()
-    expect(dead.reason).toBe('No survey in this view kept sending after two dead blasts.')
+    expect(dead.reason).toBe('No study in this view kept sending after two dead blasts.')
   })
 
   it('says what the wave lever cannot see even when it finds nothing', () => {
@@ -429,7 +429,7 @@ describe('Tile 5: each EARN MORE lever on a fixture', () => {
     const all = model({ ...DEFAULT_FILTER, range: { preset: 'all', from: null, to: null } }, {}, r, book)
     const l = all.levers.earn.find(s => s.key === 'sell-range')!.lever!
     expect(l.ids).not.toContain('first')
-    expect(l.why).toContain('Another 30 on 1 first survey')
+    expect(l.why).toContain('Another 30 on 1 first study')
   })
 
   it('lever 7 nets the missing respondents against the route’s own cost per qualified respondent', () => {
@@ -473,9 +473,9 @@ describe('Tile 5: each EARN MORE lever on a fixture', () => {
   it('carries the bid ladder in the bid lever’s drill', () => {
     const s1 = m.levers.save.find(s => s.key === 'bid-premium')!
     expect(s1.callable).toBe(true)
-    expect(s1.lever!.riskTag).toBe('may leave a hard survey short')
+    expect(s1.lever!.riskTag).toBe('may leave a hard study short')
     const spec = leverDrill(s1, m, r)!
-    expect(spec.population).toMatch(/the higher bid got a worse response on \d+ of \d+ surveys/)
+    expect(spec.population).toMatch(/the higher bid got a worse response on \d+ of \d+ studies/)
   })
 
   it('ends in a verb and never adds the two lists together', () => {
@@ -517,7 +517,7 @@ describe('Tile 5: the price gap with no pair to call', () => {
   it('says why it cannot be called and opens onto the surveys it weighed, never onto cost', () => {
     expect(slot.callable).toBe(false)
     expect(slot.lever).not.toBeNull()
-    expect(slot.reason).toContain('enough priced surveys to compare')
+    expect(slot.reason).toContain('enough priced studies to compare')
     const spec = leverDrill(slot, m, r)!
     // No figure is claimed, and nothing in the strip mentions a saving.
     expect(spec.expectedTotal).toBeNull()
@@ -538,7 +538,7 @@ describe('the rejected rules, recomputed', () => {
   it('lists three, each with computed words and the one figure it cannot recompute dated', () => {
     expect(m.rejected.map(x => x.key)).toEqual(['cap-at-yield', 'blast-to-panel', 'sms-to-email'])
     const cap = m.rejected[0]
-    expect(cap.now.join(' ')).toMatch(/Replayed survey by survey on the \d+ surveys/)
+    expect(cap.now.join(' ')).toMatch(/Replayed study by study on the \d+ studies/)
     expect(cap.dated).toContain('11 of 412')
     expect(m.rejected[1].now.join(' ')).toMatch(/costs about \d+× a panel one/)
     // In this book every survey keeps exactly the typical rate, so the cap

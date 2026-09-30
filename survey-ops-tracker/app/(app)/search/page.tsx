@@ -40,7 +40,7 @@ export default async function SearchPage({
         <p className="mt-2 text-sm text-muted-foreground">
           {q.trim()
             ? `Type at least ${MIN_QUERY} characters — one letter matches most of the book and answers nothing.`
-            : 'Search surveys, accounts, contacts, contracts, files, rerun series, people, notes, activity and next steps.'}
+            : 'Search studies, accounts, contacts, contracts, files, rerun series, people, notes, activity and next steps.'}
         </p>
         <p className="mt-4 text-xs text-muted-foreground/70">
           Use the box in the top bar, or press Ctrl/⌘ + / from anywhere. Enter searches everything.

@@ -28,7 +28,7 @@ const MODEL = 'claude-haiku-4-5'
 const MAX_TOKENS = 500
 
 const SYSTEM_PROMPT =
-  'You write a terse, factual status brief for an internal survey-operations tool. ' +
+  'You write a terse, factual status brief for an internal study-operations tool. ' +
   "You are GIVEN exact figures as JSON — NEVER invent, alter, recompute, or round numbers differently; only phrase what you're given. " +
   "If a field is null or 'n/a', omit it gracefully rather than guessing. " +
   "The 'status' (Open / On hold / Archived), 'delivered', and 'deliveredDate' fields are authoritative about lifecycle: if delivered is true or status is Archived, describe the project as finished/archived (past tense) — NEVER as active, ongoing, or 'in progress'. " +

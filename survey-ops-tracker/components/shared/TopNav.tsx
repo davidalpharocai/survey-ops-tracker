@@ -196,7 +196,7 @@ export function TopNav() {
 
   const tabs: Tab[] = [
     { href: '/insights', label: 'Insights', icon: '📊', title: 'Insights — what the team delivered, on time, cycle time, and open work right now, over a date range you choose' },
-    { href: '/reruns', label: 'Reruns', icon: '🔁', title: 'Reruns — recurring surveys on a calendar / list / series view; badge = overdue', badge: rerunOverdue },
+    { href: '/reruns', label: 'Reruns', icon: '🔁', title: 'Reruns — recurring studies on a calendar / list / series view; badge = overdue', badge: rerunOverdue },
     { href: '/calendar', label: 'Calendar', icon: '📅', title: 'Calendar — every dated event on a month grid, filterable by captain, type, client, and more' },
     // Finance holders only (see DEFAULT_TAB_ORDER). Absent from this list for
     // everyone else, so no saved order can bring it back for them.

@@ -150,7 +150,7 @@ interface Lever {
   gives: string
 }
 const SAVE: Lever[] = [
-  { name: 'Lever A: stop a costly habit', low: 0, high: 4000, confidence: 'Depends on others', gives: 'May leave a hard survey short' },
+  { name: 'Lever A: stop a costly habit', low: 0, high: 4000, confidence: 'Depends on others', gives: 'May leave a hard study short' },
   { name: 'Lever B: renegotiate a rate', low: 1000, high: 2500, confidence: 'Measured', gives: 'Needs an invoice first' },
   { name: 'Lever C: buy the cheaper option first', low: null, high: 1500, confidence: 'Direction only', gives: 'Capacity is not recorded' },
   { name: 'Lever D: stop early', low: 500, high: 1200, confidence: 'Measured', gives: 'Gives up some completes' },
@@ -158,7 +158,7 @@ const SAVE: Lever[] = [
 ]
 const EARN: Lever[] = [
   { name: 'Lever F: sell a range next time', low: null, high: 1800, confidence: 'Direction only', gives: 'Most of it is planned cushion' },
-  { name: 'Lever G: top up short surveys', low: 600, high: 1400, confidence: 'Measured', gives: 'Costs field time' },
+  { name: 'Lever G: top up short studies', low: 600, high: 1400, confidence: 'Measured', gives: 'Costs field time' },
 ]
 
 const COVERAGE_ROWS = [
@@ -224,21 +224,21 @@ export default function ChartGalleryPage() {
       </div>
 
       <div className={phone ? 'mx-auto flex w-[358px] max-w-full flex-col gap-4' : 'flex flex-col gap-4'}>
-        <Section title="Columns: price vs cost by month" tip="ColumnChart, grouped. Client price (teal) and our cost (navy) on the same surveys, a hatched bar for spend with no price, kept % in its own strip above (a second unit never shares the dollar axis), survey count under each month, and months with thin cost records faded. Click a month.">
+        <Section title="Columns: price vs cost by month" tip="ColumnChart, grouped. Client price (teal) and our cost (navy) on the same studies, a hatched bar for spend with no price, kept % in its own strip above (a second unit never shares the dollar axis), study count under each month, and months with thin cost records faded. Click a month.">
           <ColumnChart
             ariaLabel="Client price vs our cost by delivery month (sample data)"
             data={MONTHS}
             x={(d) => d.month}
             xLabel="Month"
             series={[
-              { key: 'price', label: 'Client price', value: (d) => d.price, color: 'var(--chart-price)', description: 'What clients pay on surveys with both a price and a cost.' },
-              { key: 'cost', label: 'Our cost', value: (d) => d.cost, color: 'var(--chart-cost)', description: 'Recorded field cost on the same surveys.' },
-              { key: 'np', label: 'Spend with no price', value: (d) => d.unpriced, hatch: true, description: 'Spend on surveys that carry no client price.' },
+              { key: 'price', label: 'Client price', value: (d) => d.price, color: 'var(--chart-price)', description: 'What clients pay on studies with both a price and a cost.' },
+              { key: 'cost', label: 'Our cost', value: (d) => d.cost, color: 'var(--chart-cost)', description: 'Recorded field cost on the same studies.' },
+              { key: 'np', label: 'Spend with no price', value: (d) => d.unpriced, hatch: true, description: 'Spend on studies that carry no client price.' },
             ]}
             valueFormat={fmtMoney}
             axisFormat={fmtMoneyCompact}
             overlay={{ label: 'We keep', value: keptPct, format: (v) => fmtPct(v), color: 'var(--chart-keep)' }}
-            subLabel={{ name: 'Surveys', text: (d) => `${fmtCount(d.surveys)} surv.` }}
+            subLabel={{ name: 'Studies', text: (d) => fmtCount(d.surveys) }}
             opacity={(d) => d.coverage}
             opacityNote="costs not reliably recorded"
             note={(d) => (d.coverage < 1 ? 'Costs not reliably recorded this month' : null)}
@@ -247,9 +247,9 @@ export default function ChartGalleryPage() {
           />
         </Section>
 
-        <Section title="Stacked columns: surveys delivered by type" tip="ColumnChart, stacked, categorical colours in fixed order. A dashed goal line. No money: this is the analyst dashboard shape.">
+        <Section title="Stacked columns: studies delivered by type" tip="ColumnChart, stacked, categorical colours in fixed order. A dashed goal line. No money: this is the analyst dashboard shape.">
           <ColumnChart
-            ariaLabel="Surveys delivered per month by type (sample data)"
+            ariaLabel="Studies delivered per month by type (sample data)"
             mode="stacked"
             data={DELIVERED}
             x={(d) => d.month}
@@ -265,7 +265,7 @@ export default function ChartGalleryPage() {
           />
         </Section>
 
-        <Section title="Diverging bars: what we keep by account" tip="BarChart, diverging. Teal to the right of zero, red to the left, labelled kept % · surveys. Accounts with fewer than 3 surveys are faded and tagged. At phone width the names move above the bars.">
+        <Section title="Diverging bars: what we keep by account" tip="BarChart, diverging. Teal to the right of zero, red to the left, labelled kept % · studies. Accounts with fewer than 3 studies are faded and tagged. At phone width the names move above the bars.">
           <BarChart
             ariaLabel="What we keep by account (sample data)"
             data={GROUPS}
@@ -274,7 +274,7 @@ export default function ChartGalleryPage() {
             value={(d) => d.kept}
             valueName="We keep"
             valueFormat={fmtMoney}
-            valueLabel={{ name: 'We keep · kept % · surveys', text: (d) => `${fmtMoneyCompact(d.kept)} · ${fmtPct(d.pct)} · ${d.n}` }}
+            valueLabel={{ name: 'We keep · kept % · studies', text: (d) => `${fmtMoneyCompact(d.kept)} · ${fmtPct(d.pct)} · ${d.n}` }}
             diverging
             positiveLabel="Kept"
             negativeLabel="Lost"
@@ -283,9 +283,9 @@ export default function ChartGalleryPage() {
           />
         </Section>
 
-        <Section title="Bars: surveys delivered by captain" tip="BarChart, plain. One series, one colour, so no legend box.">
+        <Section title="Bars: studies delivered by captain" tip="BarChart, plain. One series, one colour, so no legend box.">
           <BarChart
-            ariaLabel="Surveys delivered by captain (sample data)"
+            ariaLabel="Studies delivered by captain (sample data)"
             data={CAPTAINS}
             label={(d) => d.name}
             labelHeader="Captain"
@@ -322,9 +322,9 @@ export default function ChartGalleryPage() {
           </Section>
         </div>
 
-        <Section title="Bullets: live surveys this week" tip="BulletChart. Each row on its own scale: the teal track is the contract value (price × target), navy is spend so far (red past the contract value), the ink tick is the budget, the amber tick is the 50%-of-price goal, and the thin bar is N collected against target. A row with no price, or a $0 price (a free trial, 'given away'), shows spend against budget on a hatched track.">
+        <Section title="Bullets: live studies this week" tip="BulletChart. Each row on its own scale: the teal track is the contract value (price × target), navy is spend so far (red past the contract value), the ink tick is the budget, the amber tick is the 50%-of-price goal, and the thin bar is N collected against target. A row with no price, or a $0 price (a free trial, 'given away'), shows spend against budget on a hatched track.">
           <BulletChart
-            ariaLabel="Live surveys: spend against contract value (sample data)"
+            ariaLabel="Live studies: spend against contract value (sample data)"
             data={LIVE}
             label={(d) => d.code}
             sublabel={(d) => d.who}
@@ -337,13 +337,13 @@ export default function ChartGalleryPage() {
           />
         </Section>
 
-        <Section title="Dumbbell: what one respondent costs" tip="DumbbellChart. The two routes differ about 15×, so each gets its own axis automatically. Ring = cost per complete bought, dot = cost per qualified respondent, the line between them is what QA removed, and the box is the typical survey (middle half, median ticked).">
+        <Section title="Dumbbell: what one respondent costs" tip="DumbbellChart. The two routes differ about 15×, so each gets its own axis automatically. Ring = cost per complete bought, dot = cost per qualified respondent, the line between them is what QA removed, and the box is the typical study (middle half, median ticked).">
           <DumbbellChart
             ariaLabel="Cost per respondent by route (sample data)"
             data={ROUTES}
             label={(d) => d.route}
             labelHeader="Route"
-            sublabel={(d) => `${fmtCount(d.n)} surveys`}
+            sublabel={(d) => `${fmtCount(d.n)} studies`}
             start={(d) => d.perComplete}
             end={(d) => d.perQualified}
             connectorLabel={(d) => `QA removed ${fmtPct(d.removed)}`}
@@ -364,7 +364,7 @@ export default function ChartGalleryPage() {
               confidence={(d) => d.confidence}
               muted={(d) => d.confidence === 'Direction only'}
               mutedNote="direction only"
-              missingText={() => 'too few surveys here to call'}
+              missingText={() => 'too few studies here to call'}
               valueName="Could save"
               axisFormat={fmtMoneyCompact}
               onSelect={(d) => pick(d.name)}
@@ -386,7 +386,7 @@ export default function ChartGalleryPage() {
           </Section>
         </div>
 
-        <Section title="Heatmap: what each month's records carry" tip="Heatmap, sequential. Each cell is the share of delivered surveys that month with that field. Labelled rules mark where the data becomes reliable; the highlighted months are what a date filter would select. The hatch means no figure at all. Click a cell (or Tab in and use the arrow keys).">
+        <Section title="Heatmap: what each month's records carry" tip="Heatmap, sequential. Each cell is the share of delivered studies that month with that field. Labelled rules mark where the data becomes reliable; the highlighted months are what a date filter would select. The hatch means no figure at all. Click a cell (or Tab in and use the arrow keys).">
           <Heatmap
             ariaLabel="Record coverage by field and month (sample data)"
             rows={COVERAGE_ROWS}
@@ -422,7 +422,7 @@ export default function ChartGalleryPage() {
         <Section title="Sparklines in KPI tiles" tip="Sparkline. The tile prints the number; the line shows the trend, with an optional dashed goal.">
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             <Kpi label="Delivered this month" value={fmtCount(totalOf(lastOf(DELIVERED)))} sub={lastOf(DELIVERED).month}>
-              <Sparkline ariaLabel="Surveys delivered per month" values={DELIVERED.map(totalOf)} labels={DELIVERED.map((d) => d.month)} />
+              <Sparkline ariaLabel="Studies delivered per month" values={DELIVERED.map(totalOf)} labels={DELIVERED.map((d) => d.month)} />
             </Kpi>
             <Kpi label="On time" value={fmtPct(lastOf(TRENDS).onTime)} sub={`goal ${fmtPct(ON_TIME_GOAL)}`}>
               <Sparkline ariaLabel="On-time share per month" values={TRENDS.map((d) => d.onTime)} labels={TRENDS.map((d) => d.month)} goal={ON_TIME_GOAL} includeZero={false} valueFormat={(v) => fmtPct(v)} color="var(--chart-keep)" />

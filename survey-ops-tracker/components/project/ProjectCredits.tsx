@@ -13,13 +13,13 @@ import { creditValues, valueCredits } from '@/lib/finance/credits'
 
 const TIP = {
   header:
-    'What this survey costs the CLIENT, in credits, and which contract it draws down. This is the revenue side in the client’s own unit — not our cost to run, which is the spend above. Sales can see both of these; cost and margin they cannot.',
+    'What this study costs the CLIENT, in credits, and which contract it draws down. This is the revenue side in the client’s own unit — not our cost to run, which is the spend above. Sales can see both of these; cost and margin they cannot.',
   credits:
-    'Credits for this survey. Entered when the scope is confirmed — i.e. when it moves to an active stage. BLANK IS NOT ZERO: blank means not priced yet, and the client-facing consumption totals count it as unknown rather than free. Enter 0 only for work genuinely done at no charge.',
+    'Credits for this study. Entered when the scope is confirmed — i.e. when it moves to an active stage. BLANK IS NOT ZERO: blank means not priced yet, and the client-facing consumption totals count it as unknown rather than free. Enter 0 only for work genuinely done at no charge.',
   term:
-    'Which contract this survey draws down. Until it is attached, its credits count toward nothing — the client’s remaining balance will not move. Contracts are created on the client page.',
+    'Which contract this study draws down. Until it is attached, its credits count toward nothing — the client’s remaining balance will not move. Contracts are created on the client page.',
   implied:
-    'What these credits work out to per completed interview: (credits × the contract’s dollars per credit) ÷ N. FINANCE ONLY, because it is contract value in dollars — the credit count above is public, this is not. Divided by BILLABLE N once the survey has delivered, because that is what a rate-priced survey bills on and the two have to be comparable; before delivery it divides by target, which is the figure the work was quoted against, and says so.',
+    'What these credits work out to per completed interview: (credits × the contract’s dollars per credit) ÷ N. FINANCE ONLY, because it is contract value in dollars — the credit count above is public, this is not. Divided by BILLABLE N once the study has delivered, because that is what a rate-priced study bills on and the two have to be comparable; before delivery it divides by target, which is the figure the work was quoted against, and says so.',
 }
 
 /**

@@ -21,14 +21,14 @@ import type { Route } from '@/lib/finance/hub'
 import { fmtNum } from '@/lib/utils/number'
 
 const COLS: { key: string; label: string; tip: string; num?: boolean }[] = [
-  { key: 'n', label: 'In margin / all', tip: 'Surveys with both a client price and a recorded cost, out of every delivered survey in the group. The money columns count only the first number.', num: true },
-  { key: 'price', label: 'Client price', tip: 'What clients pay on those surveys: price per N × billed N.', num: true },
-  { key: 'cost', label: 'Our cost', tip: 'Recorded field cost on the same surveys, net of rewards recovered. No salaries or overhead.', num: true },
+  { key: 'n', label: 'In margin / all', tip: 'Studies with both a client price and a recorded cost, out of every delivered study in the group. The money columns count only the first number.', num: true },
+  { key: 'price', label: 'Client price', tip: 'What clients pay on those studies: price per N × billed N.', num: true },
+  { key: 'cost', label: 'Our cost', tip: 'Recorded field cost on the same studies, net of rewards recovered. No salaries or overhead.', num: true },
   { key: 'kept', label: 'Kept $', tip: 'Client price minus our cost, before salaries and overhead.', num: true },
   { key: 'pct', label: 'Kept %', tip: `Kept $ ÷ client price. The goal is ${goalKeptWords()}: green at or above it, red below zero.`, num: true },
   { key: 'ppn', label: 'Price per billed N', tip: 'Client price ÷ billed N: what the group pays per respondent. Blank on a row that blends routes, because a panel price averaged with a blast price describes the mix.', num: true },
-  { key: 'cpn', label: 'Cost per billed N', tip: 'Our cost ÷ billed N, on the same respondents as the price, so the two subtract to what we keep per respondent. A survey whose segment counts do not add up is left out of both figures.', num: true },
-  { key: 'np', label: 'Spend with no price', tip: 'Spend on the group’s delivered surveys that carry no client price: money no margin figure can see. Click it to see those surveys.', num: true },
+  { key: 'cpn', label: 'Cost per billed N', tip: 'Our cost ÷ billed N, on the same respondents as the price, so the two subtract to what we keep per respondent. A study whose segment counts do not add up is left out of both figures.', num: true },
+  { key: 'np', label: 'Spend with no price', tip: 'Spend on the group’s delivered studies that carry no client price: money no margin figure can see. Click it to see those studies.', num: true },
 ]
 
 const pctTone = (p: number | null) =>
@@ -47,8 +47,8 @@ const perRespondentTitle = (blended: boolean, excluded: number, value: number | 
   if (blended) return 'Blends routes: see the route rows below'
   if (excluded === 0) return undefined
   const s = excluded === 1
-    ? '1 survey is left out: its segment counts do not add up, so its cost covers segments its N does not.'
-    : `${fmtNum(excluded)} surveys are left out: their segment counts do not add up, so their cost covers segments their N does not.`
+    ? '1 study is left out: its segment counts do not add up, so its cost covers segments its N does not.'
+    : `${fmtNum(excluded)} studies are left out: their segment counts do not add up, so their cost covers segments their N does not.`
   return value == null ? `${s} Nothing is left to measure here.` : s
 }
 
@@ -96,14 +96,14 @@ function GroupRows({ row: r, onGroup, onUnpriced }: {
         <th scope="row" className="px-3 py-1.5 text-left font-medium">
           {r.measured > 0 ? (
             <button type="button" className={button} onClick={() => onGroup(r)}
-              title={`Show the ${fmtNum(r.measured)} surveys behind ${r.label}, worst first`}>
+              title={`Show the ${fmtNum(r.measured)} studies behind ${r.label}, worst first`}>
               {r.label}
             </button>
           ) : r.label}
           {r.sub && <span className="block text-[11px] font-normal text-muted-foreground">{r.sub}</span>}
           {muted && (
             <span className="ml-1.5 rounded-full border border-dashed border-border px-1.5 text-[10px] font-normal"
-              title={`Fewer than ${fmtNum(GROUP_MIN_N)} surveys with a price and a cost: one survey's price is not a group's pricing.`}>
+              title={`Fewer than ${fmtNum(GROUP_MIN_N)} studies with a price and a cost: one study's price is not a group's pricing.`}>
               too few to judge
             </span>
           )}
@@ -126,7 +126,7 @@ function GroupRows({ row: r, onGroup, onUnpriced }: {
         <td className="px-3 py-1.5 text-right tabular-nums">
           {r.unpricedSurveys > 0 ? (
             <button type="button" className={button} onClick={() => onUnpriced(r)}
-              title={`Show the ${fmtNum(r.unpricedSurveys)} surveys with spend and no client price`}>
+              title={`Show the ${fmtNum(r.unpricedSurveys)} studies with spend and no client price`}>
               {money(r.unpricedSpend)}
             </button>
           ) : <span className="text-muted-foreground">$0</span>}
@@ -136,7 +136,7 @@ function GroupRows({ row: r, onGroup, onUnpriced }: {
         <tr key={`${r.key}-${x.route}`} className="bg-muted/20 text-[12px] text-muted-foreground">
           <th scope="row" className="py-1 pl-7 pr-3 text-left font-normal">
             <button type="button" className={button} onClick={() => onGroup(r, x.route)}
-              title={`Show ${r.label}'s ${x.label.toLowerCase()} surveys, worst first`}>
+              title={`Show ${r.label}'s ${x.label.toLowerCase()} studies, worst first`}>
               {x.label}
             </button>
           </th>

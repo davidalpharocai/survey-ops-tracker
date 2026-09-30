@@ -51,6 +51,13 @@ type Hit = {
   run: () => void
 }
 
+/** The group heading only. `group` is the discriminant AND the key into the
+ *  sort order and the per-group cap, so the word on screen is mapped here
+ *  rather than renamed where it is compared. */
+const GROUP_HEADING: Record<Hit['group'], string> = {
+  Surveys: 'Studies', Contacts: 'Contacts', Accounts: 'Accounts', Actions: 'Actions',
+}
+
 // Roughly double the old caps. Deliberately not unbounded: this is a dropdown
 // under a nav bar, and "everything" is what the results page is for.
 const CAP = { project: 10, client: 6, contact: 8 }
@@ -138,7 +145,7 @@ export function NavSearch() {
       .sort((a, b) => a.r - b.r)
     for (const { c, r } of cl.slice(0, CAP.client)) {
       out.push({ key: `c-${c.id}`, group: 'Accounts', rank: r, title: c.name, sub: c.code ?? 'Account', run: () => go(`/clients/${c.id}`) })
-      out.push({ key: `cs-${c.id}`, group: 'Actions', rank: r, title: `${c.name}'s surveys`, tag: 'list', run: () => go(`/list?view=full&search=${encodeURIComponent(c.name)}`) })
+      out.push({ key: `cs-${c.id}`, group: 'Actions', rank: r, title: `${c.name}'s studies`, tag: 'list', run: () => go(`/list?view=full&search=${encodeURIComponent(c.name)}`) })
     }
 
     const order = { Surveys: 0, Contacts: 1, Accounts: 2, Actions: 3 }
@@ -176,7 +183,7 @@ export function NavSearch() {
         onChange={(e) => { setQ(e.target.value); setOpen(true) }}
         onFocus={() => setOpen(true)}
         onKeyDown={onKeyDown}
-        placeholder="Search surveys, accounts, contacts…"
+        placeholder="Search studies, accounts, contacts…"
         aria-label="Deep search"
         className="w-full bg-muted/60 border border-border rounded-lg pl-7 pr-2 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring focus:bg-background"
       />
@@ -198,7 +205,7 @@ export function NavSearch() {
                 <div key={h.key}>
                   {firstOfGroup && (
                     <p className="flex items-baseline gap-2 px-3 pt-2 pb-1 text-[10px] uppercase tracking-widest text-muted-foreground/70">
-                      <span>{h.group}</span>
+                      <span>{GROUP_HEADING[h.group]}</span>
                       {total != null && <span className="tabular-nums">{total}</span>}
                       {/* Never a silent cap. */}
                       {more > 0 && <span className="normal-case tracking-normal text-muted-foreground/60">+{more} more on the search page</span>}

@@ -129,7 +129,7 @@ export function ContactsTable({ rows }: { rows: ContactRow[] }) {
               <th className="sticky top-0 z-10 bg-muted px-3 py-2 font-medium">Account</th>
               <th className="sticky top-0 z-10 bg-muted px-3 py-2 font-medium">Title</th>
               <th className="sticky top-0 z-10 bg-muted px-3 py-2 font-medium">Email</th>
-              <th className="sticky top-0 z-10 bg-muted px-3 py-2 text-right font-medium" title="Surveys recorded with this person as the requester.">Surveys requested</th>
+              <th className="sticky top-0 z-10 bg-muted px-3 py-2 text-right font-medium" title="Studies recorded with this person as the requester.">Studies requested</th>
             </tr>
           </thead>
           <tbody>

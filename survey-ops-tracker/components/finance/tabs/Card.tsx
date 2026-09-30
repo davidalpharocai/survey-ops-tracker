@@ -65,7 +65,7 @@ export function FinanceCard({
         </h2>
         <span
           className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground"
-          title="The surveys this card counts. Change them with the filters at the top of the page."
+          title="The studies this card counts. Change them with the filters at the top of the page."
         >
           {scope}
         </span>
@@ -127,7 +127,7 @@ export function Figure({ value, label, help, sub, tone, onOpen, openLabel }: {
         <button
           type="button"
           onClick={onOpen}
-          title={openLabel ?? 'Show the surveys behind this figure'}
+          title={openLabel ?? 'Show the studies behind this figure'}
           className="mt-0.5 rounded text-left underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--chart-price)]"
         >
           {number}

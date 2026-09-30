@@ -80,13 +80,13 @@ export default async function SalesPipelinePage() {
         {name && <span className="text-sm text-muted-foreground">{name}</span>}
       </div>
       <p className="mb-5 text-sm text-muted-foreground">
-        Every survey on your accounts. Pick a group to filter, search to narrow, and choose your own
+        Every study on your accounts. Pick a group to filter, search to narrow, and choose your own
         columns.
       </p>
 
       {error && (
         <p className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-          Couldn&apos;t load your surveys. Try again, or tell David if it keeps happening.
+          Couldn&apos;t load your studies. Try again, or tell David if it keeps happening.
         </p>
       )}
 
@@ -96,7 +96,7 @@ export default async function SalesPipelinePage() {
       {!error && rows.length === 0 && (
         <p className="rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground">
           {owner
-            ? `No surveys are currently on ${owner}'s accounts.`
+            ? `No studies are currently on ${owner}'s accounts.`
             : 'Your account is not linked to a salesperson yet — ask David to finish setting it up.'}
         </p>
       )}

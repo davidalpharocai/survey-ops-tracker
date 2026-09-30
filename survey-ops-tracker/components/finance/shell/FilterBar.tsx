@@ -27,8 +27,8 @@ import { DEFAULT_RANGE_WORDS as DEFAULT_WORDS, withoutDimension, type HrefPatch 
 
 const DATE_HELP = (undated: number) =>
   'Filters by delivery date (launch date, then submitted date, if there is none). ' +
-  `Surveys with no date drop out once you pick a range — ${fmtNum(undated)} today.`
-const ACCOUNT_HELP = 'One client account, old name variants rolled together. The count beside each name is its surveys under the other filters; an account with none is greyed.'
+  `Studies with no date drop out once you pick a range — ${fmtNum(undated)} today.`
+const ACCOUNT_HELP = 'One client account, old name variants rolled together. The count beside each name is its studies under the other filters; an account with none is greyed.'
 const ROUTE_HELP = 'How it was actually fielded, read from its cost records — not what it was filed as.'
 
 const control =
@@ -101,8 +101,8 @@ export function FilterBar({
   // prints three lines below, so the (i) and the banner can never contradict
   // each other on the same screen. The other five presets keep their own help.
   const reliabilityHelp = costReliableFrom
-    ? `Costs are recorded on most delivered surveys from ${monthLabel(costReliableFrom.slice(0, 7))}.`
-    : 'No month yet has a recorded cost on most of its delivered surveys.'
+    ? `Costs are recorded on most delivered studies from ${monthLabel(costReliableFrom.slice(0, 7))}.`
+    : 'No month yet has a recorded cost on most of its delivered studies.'
   const dateHelp = preset === DEFAULT_FILTER.range.preset
     ? `${DATE_HELP(undated)} ${reliabilityHelp} ${presetHelp}`
     : `${DATE_HELP(undated)} ${presetHelp}`
@@ -117,7 +117,7 @@ export function FilterBar({
       style={{ top: 'var(--topnav-h, 0px)' }}
     >
       <div className="flex flex-wrap items-end gap-x-3 gap-y-2">
-        <Field id={ids.date} label="Date" help={rule.date ? dateHelp : `${TAB_LABEL[tab]} shows live work whatever its dates, because an overspending survey matters whenever it launched. The date filter still applies on the other tabs.`}>
+        <Field id={ids.date} label="Date" help={rule.date ? dateHelp : `${TAB_LABEL[tab]} shows live work whatever its dates, because an overspending study matters whenever it launched. The date filter still applies on the other tabs.`}>
           {rule.date ? (
             <select id={ids.date} className={control} value={preset} onChange={e => setRange(e.target.value as RangePreset)}>
               {RANGE_PRESETS.map(p => (
@@ -176,7 +176,7 @@ export function FilterBar({
       )}
       {badRange && (
         <p role="alert" className="mt-1 text-[12px] text-red-700 dark:text-red-400">
-          The start date is after the end date, so no survey can match. Change one of them.
+          The start date is after the end date, so no study can match. Change one of them.
         </p>
       )}
 

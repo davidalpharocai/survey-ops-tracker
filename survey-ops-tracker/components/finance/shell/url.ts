@@ -32,7 +32,7 @@ export const DEFAULT_TAB: FinanceTab = 'results'
 /** One line under each tab's name (the title on its link): the question it answers. */
 export const TAB_HINT: Record<FinanceTab, string> = {
   'results': 'What we charged, what it cost and what we kept on delivered work',
-  'this-week': 'Live work: money still moving, surveys past target, and holds',
+  'this-week': 'Live work: money still moving, studies past target, and holds',
   'per-respondent': 'What one respondent costs by route, and where money could come out',
   'improve': 'Which records are missing, and what to fill in first',
 }

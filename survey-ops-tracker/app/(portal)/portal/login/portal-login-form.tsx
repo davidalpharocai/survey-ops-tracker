@@ -73,7 +73,7 @@ export default function PortalLoginForm() {
           <a href="mailto:info@alpharoc.ai?subject=Survey%20Compliance%20Link" className="underline text-amber-500 dark:text-amber-300">
             info@alpharoc.ai
           </a>{' '}
-          with the subject &ldquo;Survey Compliance Link&rdquo;.
+          with the subject &ldquo;Study Compliance Link&rdquo;.
         </p>
       ) : (
         <form onSubmit={handleSendLink} className="flex flex-col gap-4">

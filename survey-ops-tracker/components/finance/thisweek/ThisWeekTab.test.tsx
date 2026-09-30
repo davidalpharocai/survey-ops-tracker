@@ -106,7 +106,7 @@ describe('ThisWeekTab', () => {
     expect(screen.getByText('Decisions this week')).toBeInTheDocument()
     expect(screen.getByText('On hold — its own bucket')).toBeInTheDocument()
     expect(screen.getByText('Credit pools')).toBeInTheDocument()
-    expect(screen.getByText(/8 live surveys · \$971 spent so far/)).toBeInTheDocument()
+    expect(screen.getByText(/8 live studies · \$971 spent so far/)).toBeInTheDocument()
 
     const freeze = sectionOf('FREEZE THE BID')
     const link = within(freeze).getAllByRole('link', { name: 'PR00448' })[0]
@@ -133,7 +133,7 @@ describe('ThisWeekTab', () => {
   it('opens the header drills', () => {
     const openDrill = vi.fn()
     render(wrap(<ThisWeekTab {...props(vi.fn(), openDrill)} />))
-    fireEvent.click(screen.getByTitle('Show the spend on each live survey'))
+    fireEvent.click(screen.getByTitle('Show the spend on each live study'))
     expect(openDrill).toHaveBeenCalledWith(expect.objectContaining({ key: 'this-week-spent' }))
   })
 

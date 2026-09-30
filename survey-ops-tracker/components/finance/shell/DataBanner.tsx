@@ -39,7 +39,7 @@ export function DataBanner({ model, improveHref, defaultHref }: {
           {model.priceGap}{' '}
           {improveHref && (
             <Link href={improveHref} scroll={false} className="font-medium text-primary underline-offset-2 hover:underline">
-              See which surveys need a price on the Improve tab
+              See which studies need a price on the Improve tab
             </Link>
           )}
         </p>

@@ -76,7 +76,7 @@ export function DumbbellChart<D>({
   endLabel = 'Per qualified respondent',
   connectorLabel,
   box,
-  boxLabel = 'Typical survey (middle half, median ticked)',
+  boxLabel = 'Typical study (middle half, median ticked)',
   valueFormat = fmtMoney,
   axisFormat,
   independentScales: independentProp,
@@ -152,7 +152,7 @@ export function DumbbellChart<D>({
           { key: 's', label: startLabel, align: 'right', title: 'The ring on the chart' },
           { key: 'e', label: endLabel, align: 'right', title: 'The filled dot on the chart' },
           ...(connectorLabel ? [{ key: 'c', label: 'Between', align: 'right' as const, title: 'What the gap between the two dots means' }] : []),
-          ...(box ? [{ key: 'b', label: 'Typical (p25–median–p75)', align: 'right' as const, title: 'The middle half of individual surveys, with the median between' }] : []),
+          ...(box ? [{ key: 'b', label: 'Typical (p25–median–p75)', align: 'right' as const, title: 'The middle half of individual studies, with the median between' }] : []),
           ...(note ? [{ key: 'n', label: 'Note', title: 'Caveats on this row (the same note the tooltip shows)' }] : []),
         ],
         rows: data.map((d, i) => {
@@ -213,7 +213,7 @@ export function DumbbellChart<D>({
                 { key: 's', label: startLabel, value: fmtOr(s, valueFormat), color: 'var(--chart-cost)' },
                 { key: 'e', label: endLabel, value: fmtOr(e, valueFormat), color: 'var(--chart-cost)' },
               ]
-              if (b) rows.push({ key: 'b', label: 'Typical survey', value: `${valueFormat(b.low)}–${valueFormat(b.high)} (median ${valueFormat(b.median)})` })
+              if (b) rows.push({ key: 'b', label: 'Typical study', value: `${valueFormat(b.low)}–${valueFormat(b.high)} (median ${valueFormat(b.median)})` })
               // Hover carries everything the row shows, including the line
               // under the name — a reader should never have to read both.
               const noteText = [sub, c, note?.(d)].filter(Boolean).join(' · ') || undefined

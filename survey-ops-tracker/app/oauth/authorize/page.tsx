@@ -137,7 +137,7 @@ export default async function AuthorizePage({
         <div className="mb-6 flex flex-col gap-2 text-sm text-foreground">
           <div className="flex items-start gap-2">
             <span aria-hidden className="mt-0.5 text-muted-foreground">-</span>
-            <span>Read your projects, clients, and past-survey history</span>
+            <span>Read your projects, clients, and past-study history</span>
           </div>
           <div className="flex items-start gap-2">
             <span aria-hidden className="mt-0.5 text-muted-foreground">-</span>

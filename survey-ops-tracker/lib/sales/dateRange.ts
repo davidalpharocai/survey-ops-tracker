@@ -85,7 +85,7 @@ export function etTime(ts: string | null | undefined): string | null {
 export type DateBasis = 'delivered' | 'submitted' | 'launched'
 
 export const DATE_BASES: { id: DateBasis; label: string; hint: string }[] = [
-  { id: 'delivered', label: 'Delivered', hint: 'When the survey was actually delivered. What the client received in the period.' },
+  { id: 'delivered', label: 'Delivered', hint: 'When the study was actually delivered. What the client received in the period.' },
   { id: 'submitted', label: 'Submitted', hint: 'When the request came in. What the client ASKED for in the period, delivered or not.' },
   { id: 'launched', label: 'Launched', hint: 'When fielding started.' },
 ]

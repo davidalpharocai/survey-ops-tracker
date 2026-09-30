@@ -86,7 +86,7 @@ export function complianceGate(input: GateInput): GateResult {
       blocked: true,
       phase: 'before_fielding',
       message:
-        'This client requires the questionnaire to be approved by compliance before the survey is fielded, and it has not been approved yet.',
+        'This client requires the questionnaire to be approved by compliance before the study is fielded, and it has not been approved yet.',
     }
   }
   return { blocked: false, phase: null, message: '' }

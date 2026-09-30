@@ -238,7 +238,7 @@ function AlsoLogControl({ activityId, currentProjectId }: { activityId: string; 
       setOpen(false)
       setQ('')
     } catch {
-      toast("Couldn't log to that survey — please try again.")
+      toast("Couldn't log to that study — please try again.")
     } finally {
       setBusy(false)
     }
@@ -249,9 +249,9 @@ function AlsoLogControl({ activityId, currentProjectId }: { activityId: string; 
       <button
         onClick={() => setOpen(true)}
         className="text-xs text-muted-foreground hover:text-foreground w-fit mt-0.5"
-        title="Log this same email onto another survey's timeline (for a chain that mentions two surveys)"
+        title="Log this same email onto another study's timeline (for a chain that mentions two studies)"
       >
-        ＋ Also log to another survey
+        ＋ Also log to another study
       </button>
     )
   }
@@ -262,7 +262,7 @@ function AlsoLogControl({ activityId, currentProjectId }: { activityId: string; 
         autoFocus
         value={q}
         onChange={e => setQ(e.target.value)}
-        placeholder="Find a survey by name, client, or PR code…"
+        placeholder="Find a study by name, client, or PR code…"
         className="w-full text-xs px-2 py-1.5 rounded-lg border border-border bg-background"
       />
       {matches.map(p => (
@@ -280,7 +280,7 @@ function AlsoLogControl({ activityId, currentProjectId }: { activityId: string; 
         </button>
       ))}
       {s.length >= 1 && matches.length === 0 && (
-        <p className="text-xs text-muted-foreground/60 px-2 py-1">No matching survey.</p>
+        <p className="text-xs text-muted-foreground/60 px-2 py-1">No matching study.</p>
       )}
       <button
         onClick={() => { setOpen(false); setQ('') }}

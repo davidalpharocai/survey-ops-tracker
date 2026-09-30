@@ -29,7 +29,7 @@ export function RerunSeriesBoard() {
   if (!series.length)
     return (
       <div className="bg-card border border-border rounded-xl p-6 text-sm text-muted-foreground">
-        No multi-wave series yet. On any survey&apos;s page, use “↻ Link this as a rerun of another survey” to start one.
+        No multi-wave series yet. On any study&apos;s page, use “↻ Link this as a rerun of another study” to start one.
       </div>
     )
 

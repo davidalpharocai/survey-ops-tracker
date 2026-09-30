@@ -125,7 +125,7 @@ describe('PanelSupplierView', () => {
   it('names a picked panel that bought nothing in this view instead of drawing an empty detail', () => {
     qs = 'by=panel&supplier=ghost'
     render(<PanelSupplierView {...props()} />)
-    expect(screen.getByText(/That panel delivered no completes on the surveys in this view/)).toBeInTheDocument()
+    expect(screen.getByText(/That panel delivered no completes on the studies in this view/)).toBeInTheDocument()
   })
 
   it('shows Blocked, not $0, when the supplier rows did not load', () => {
@@ -159,6 +159,6 @@ describe('PanelSupplierView', () => {
     expect(screen.queryByText(/Blocked: project_blasts did not load/)).toBeNull()
     // The panel money is still right, but which surveys bought only from panels
     // is not known, so the strip says so instead of claiming a check it skipped.
-    expect(screen.getByText(/The blast rows did not load, so which surveys bought from panels alone is not known/)).toBeInTheDocument()
+    expect(screen.getByText(/The blast rows did not load, so which studies bought from panels alone is not known/)).toBeInTheDocument()
   })
 })

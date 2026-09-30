@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils'
 export function RerunChip({ className = '' }: { className?: string }) {
   return (
     <span
-      title="Rerun — a repeat wave of an earlier study. The PS/B2B badge is its base survey type."
+      title="Rerun — a repeat wave of an earlier study. The PS/B2B badge is its base study type."
       className={cn(
         'inline-flex items-center gap-0.5 font-medium rounded border border-teal-500/60 text-teal-700 dark:text-teal-300 bg-transparent whitespace-nowrap text-[11px] px-1.5 py-0.5',
         className,

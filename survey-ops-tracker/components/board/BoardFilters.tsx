@@ -238,7 +238,7 @@ export function BoardFilters({
                   <option value={NEW_CLIENT_VALUE}>+ New Client</option>
                 </select>
               </Field>
-              <Field label="Type" tooltip="Filter by base survey type: PS (PureSpectrum consumer panel) or B2B (expert/business panel).">
+              <Field label="Type" tooltip="Filter by base study type: PS (PureSpectrum consumer panel) or B2B (expert/business panel).">
                 <select
                   value={typeFilter ?? ''}
                   onChange={e => onTypeChange(e.target.value || null)}

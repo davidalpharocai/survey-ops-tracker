@@ -327,7 +327,7 @@ describe('C6 coverage grid', () => {
 
     const whole = build(b).grid
     expect(whole.reliability.price.month).toBe('2026-07')
-    expect(whole.verdict).toMatch(/Price Jun 2026 \(20% today\) up to 25% of delivered surveys/)
+    expect(whole.verdict).toMatch(/Price Jun 2026 \(20% today\) up to 25% of delivered studies/)
 
     // Filtered to UBS the cells read 100% in June, so asking for June again
     // would be asking for work this view has already done.
@@ -354,7 +354,7 @@ describe('header: client price coverage', () => {
     const h = build(priceBook()).header
     expect(h).toMatchObject({ delivered: 4, priced: 1, spend: 650, pricedSpend: 200 })
     expect(h.top.map(a => a.name)).toEqual(['BAM', 'UBS', 'AlphaROC'])
-    expect(h.sentence).toBe('Client price covers 1 of 4 delivered surveys (31% of spend). Pricing all 3 unpriced accounts would take it to 100%.')
+    expect(h.sentence).toBe('Client price covers 1 of 4 delivered studies (31% of spend). Pricing all 3 unpriced accounts would take it to 100%.')
   })
 })
 
@@ -404,7 +404,7 @@ describe('gap 1: client price missing on costed work', () => {
     const g = gapOf(build(b), 'price')
     expect(g.status).toBe('resolved')
     expect(PRICE_COVERAGE_GOAL).toBeLessThan(9000 / 9450)
-    expect(g.note).toMatch(/past the 90% goal; 3 costed surveys are still unpriced/)
+    expect(g.note).toMatch(/past the 90% goal; 3 costed studies are still unpriced/)
   })
 
   it('is BLOCKED, never resolved, when prices did not load — or none came back', () => {
@@ -493,10 +493,10 @@ describe('gaps 3 and 16: field rows missing on the route a survey was filed as',
     // 40 + 5 completes × $10. The 500-complete survey adds nothing.
     expect(g.dollars).toBe(450)
     expect(g.what).toMatch(/SMALL alone is about \$400 of that\./)
-    expect(g.what).toMatch(/1 survey is too large to size this way and is left out of the estimate/)
+    expect(g.what).toMatch(/1 study is too large to size this way and is left out of the estimate/)
     const rows = Object.fromEntries(g.drill!.rows.map(r => [r.id, r]))
     expect(rows.huge.amount).toBeNull()
-    expect(rows.huge.detail).toMatch(/larger than 90% of the 5 B2B surveys that do record their blasts \(50 and under\): not sized/)
+    expect(rows.huge.detail).toMatch(/larger than 90% of the 5 B2B studies that do record their blasts \(50 and under\): not sized/)
     expectDrillOk(g)
   })
 })
@@ -572,7 +572,7 @@ describe('gap 8: budgets', () => {
     }
     const g = gapOf(build(b), 'budgets')
     expect(g).toMatchObject({ status: 'open', count: 2, dollars: 280 })
-    expect(g.details[0]).toMatch(/come to \$2,500 across the 1 survey/)
+    expect(g.details[0]).toMatch(/come to \$2,500 across the 1 study/)
     expectDrillOk(g)
   })
 })
@@ -630,7 +630,7 @@ describe('gap 10: $0 prices to confirm', () => {
   it('asks to confirm a $0 price at an account that pays elsewhere, and notes the deliberate ones', () => {
     const g = gapOf(build(b()), 'zero-price')
     expect(g).toMatchObject({ status: 'open', ids: ['z1'], dollars: 50 })
-    expect(g.what).toMatch(/1 more \$0 price sits at accounts that pay on no survey/)
+    expect(g.what).toMatch(/1 more \$0 price sits at accounts that pay on no study/)
     expectDrillOk(g)
   })
   it('resolves when every $0 price looks deliberate', () => {
@@ -671,7 +671,7 @@ describe('gap 12: segments that disagree with the survey', () => {
     const g = gapOf(build(b), 'segments')
     expect(g).toMatchObject({ status: 'open', count: 2, dollars: 70 })
     expect(g.what).toMatch(/1 of them is only the sum of the counted segments/)
-    expect(g.what).toMatch(/1 survey has a segment priced differently/)
+    expect(g.what).toMatch(/1 study has a segment priced differently/)
     expectDrillOk(g)
   })
 })
@@ -752,7 +752,7 @@ describe('a survey on hold', () => {
     expect(gapOf(m, 'price').ids).toEqual(['d2'])
     const budgets = gapOf(m, 'budgets')
     expect(budgets.ids.slice().sort()).toEqual(['d1', 'lv'])
-    expect(budgets.what).toMatch(/1 of 1 live survey is spending with none/)
+    expect(budgets.what).toMatch(/1 of 1 live study is spending with none/)
     expect([...m.gaps, ...m.resolved].flatMap(g => g.ids)).not.toContain('h1')
   })
 })
@@ -777,7 +777,7 @@ describe('the ranked list', () => {
     expect(open[0].key).toBe('price')
     expect(m.resolved.map(g => g.key)).toContain('route-split')
     expect(m.resolved.every(g => g.note)).toBe(true)
-    expect(m.verdict).toMatch(/^Start with “Client price missing on costed work”: it hides \$520 of recorded cost that no margin can see on 2 surveys\. 5 gaps are open and 11 resolved\./)
+    expect(m.verdict).toMatch(/^Start with “Client price missing on costed work”: it hides \$520 of recorded cost that no margin can see on 2 studies\. 5 gaps are open and 11 resolved\./)
   })
 
   it('ranks a gap with no dollar figure after every gap that has one', () => {
@@ -811,7 +811,7 @@ describe('the ranked list', () => {
   it('lists the six blocked-data items, computing a count where the data allows', () => {
     const m = build(book())
     expect(m.blockedData.map(b => b.key)).toEqual(['B1', 'B2', 'B3', 'B4', 'B5', 'B6'])
-    expect(m.blockedData[0].what).toMatch(/of \d+ blast surveys in view carry no contact-list cost line/)
+    expect(m.blockedData[0].what).toMatch(/of \d+ blast studies in view carry no contact-list cost line/)
     expect(m.blockedData[4].what).toMatch(/price × delivered N/)
     expect(m.blockedData.every(b => b.help.length > 0)).toBe(true)
   })
@@ -821,6 +821,6 @@ describe('the ranked list', () => {
     // would read as a clean zero. A failed read is not "none".
     const m = build(book(), DEFAULT_FILTER, [{ table: 'project_blasts', message: 'x' }])
     expect(m.blockedData[0].what).toMatch(/^Blocked: project_blasts did not load/)
-    expect(m.blockedData[0].what).not.toMatch(/No blast survey in view/)
+    expect(m.blockedData[0].what).not.toMatch(/No blast study in view/)
   })
 })

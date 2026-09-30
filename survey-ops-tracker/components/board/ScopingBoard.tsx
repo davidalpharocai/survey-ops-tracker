@@ -135,7 +135,7 @@ export function ScopingBoard({ projects, wrapInContext = true, sortMode = 'due' 
         {signals.size > 0 && (
           <span className="inline-flex items-center text-xs pl-2 pr-1 py-0.5 rounded-full border bg-amber-500/10 border-amber-500/40 text-amber-700 dark:text-amber-300 whitespace-nowrap">
             {fmtNum(signals.size)} with field activity
-            <InfoTooltip text="Surveys still marked Scoping that already have blasts, panel suppliers, send fees or responses on record. Each card says what was found. If a survey is being fielded, drag it down into the pipeline so every report counts it as live work." />
+            <InfoTooltip text="Studies still marked Scoping that already have blasts, panel suppliers, send fees or responses on record. Each card says what was found. If a study is being fielded, drag it down into the pipeline so every report counts it as live work." />
           </span>
         )}
         <span className="text-xs text-muted-foreground/60">

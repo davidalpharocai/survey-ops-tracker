@@ -175,7 +175,7 @@ describe('/insights, sliced every way', () => {
       // Every card names the window it counts. Usually that is a date range;
       // the live card deliberately ignores the dates and says "right now"
       // instead — work in flight is not a thing that happened in a past month.
-      const chips = [...container.querySelectorAll('[title="Which surveys this card counts"]')]
+      const chips = [...container.querySelectorAll('[title="Which studies this card counts"]')]
         .map(c => c.textContent ?? '')
       expect(chips.length, `no scope chips in ?${slice}`).toBeGreaterThan(0)
       for (const chip of chips) {
@@ -248,11 +248,11 @@ describe('/insights: an empty slice says so rather than drawing nothing', () => 
     qs = 'account=solo&range=custom&from=2026-09-01&to=2026-09-30'
     const { container } = render(<InsightsDashboard />)
     const t = visible(container)
-    expect(t).toMatch(/No delivered surveys|no surveys|nothing/i)
+    expect(t).toMatch(/No delivered studies|no studies|nothing/i)
     expect(t).not.toContain('NaN')
     // And it still says which window it was looking at, so the reader knows
     // what to widen.
-    const chips = [...container.querySelectorAll('[title="Which surveys this card counts"]')]
+    const chips = [...container.querySelectorAll('[title="Which studies this card counts"]')]
         .map(c => c.textContent ?? '')
     expect(chips.some(c => /Sep 2026/.test(c))).toBe(true)
   })
@@ -297,7 +297,7 @@ describe('/insights: the numbers agree with each other', () => {
       qs = slice
       const { container, unmount } = render(<InsightsDashboard />)
       const tile = [...container.querySelectorAll('[data-part="kpi-tile"]')]
-        .find(el => /Surveys delivered/i.test(el.textContent ?? '')) as HTMLElement | undefined
+        .find(el => /Studies delivered/i.test(el.textContent ?? '')) as HTMLElement | undefined
       if (tile) {
         const big = within(tile).queryByTestId?.('kpi-value')?.textContent
           ?? (tile.textContent ?? '').match(/\d[\d,]*/)?.[0] ?? ''

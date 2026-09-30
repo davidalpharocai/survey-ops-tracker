@@ -34,7 +34,7 @@ export function InsightsCard({
         {scope && (
           <span
             className="rounded-full border border-border bg-muted/50 px-2 py-0.5 text-[11px] text-muted-foreground"
-            title="Which surveys this card counts"
+            title="Which studies this card counts"
           >
             {scope}
           </span>

@@ -156,7 +156,7 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'search_projects',
     description:
-      'Search survey projects by name/code/client with optional filters. Filter by captain (the team member running it) and/or salesperson (the AlphaROC seller, e.g. "Alex Pinsky" — a partial name like "Alex" matches) — use the salesperson filter to answer "which projects have <person> as sales". Returns only in-flight active projects by default (excludes Archived, Cancelled, On-Hold, Delivered, and pre-sale Scoping); pass active_only:false to search ALL projects regardless of status — e.g. to find a specific past or archived project. Pass status:"Cancelled" to find projects the client cancelled. Pass mine:true to scope to your own captained projects. ("Archived" is the status for finished/legacy projects kept for history; "Cancelled" is for projects a client asked to cancel.)',
+      'Search study projects by name/code/client with optional filters. Filter by captain (the team member running it) and/or salesperson (the AlphaROC seller, e.g. "Alex Pinsky" — a partial name like "Alex" matches) — use the salesperson filter to answer "which projects have <person> as sales". Returns only in-flight active projects by default (excludes Archived, Cancelled, On-Hold, Delivered, and pre-sale Scoping); pass active_only:false to search ALL projects regardless of status — e.g. to find a specific past or archived project. Pass status:"Cancelled" to find projects the client cancelled. Pass mine:true to scope to your own captained projects. ("Archived" is the status for finished/legacy projects kept for history; "Cancelled" is for projects a client asked to cancel.)',
     kind: 'read',
     schema: {
       query: z.string().optional(),
@@ -186,7 +186,7 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'get_project',
     description:
-      'Get full detail for one survey project by PR-code or name (cost lines, blasts, steps, activity, deliverables, segments, compliance, your reminders on it).',
+      'Get full detail for one study project by PR-code or name (cost lines, blasts, steps, activity, deliverables, segments, compliance, your reminders on it).',
     kind: 'read',
     schema: { project: z.string() },
     handler: async (rawArgs, ctx) => {
@@ -215,7 +215,7 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'survey_stats',
     description:
-      "Count surveys by type and lifecycle event over a flexible period. `event` is submitted (submitted_date), launched (launch_date), or delivered (deliver_date). The period is flexible — pass month (+year), a whole year, a single date, or a from/to span; month without a year defaults to the current year. Optionally filter to one type (PS / B2B / Rerun); otherwise the result breaks down by type plus a total. Excludes internal projects. Example: “how many PS launched in July 2026” → event:'launched', type:'PS', month:7, year:2026.",
+      "Count studies by type and lifecycle event over a flexible period. `event` is submitted (submitted_date), launched (launch_date), or delivered (deliver_date). The period is flexible — pass month (+year), a whole year, a single date, or a from/to span; month without a year defaults to the current year. Optionally filter to one type (PS / B2B / Rerun); otherwise the result breaks down by type plus a total. Excludes internal projects. Example: “how many PS launched in July 2026” → event:'launched', type:'PS', month:7, year:2026.",
     kind: 'read',
     schema: {
       event: z.enum(['submitted', 'launched', 'delivered']),
@@ -234,8 +234,8 @@ export const TOOLS: AssistantTool[] = [
       if ('error' in period) return { error: period.error }
       const stats = await surveyStats({ event: args.event, from: period.from, to: period.to, type: args.type })
       const base = args.type
-        ? `${stats.total} ${args.type} survey(s) ${args.event} in ${period.label}.`
-        : `${stats.total} survey(s) ${args.event} in ${period.label} — PS ${stats.by_type.PS}, B2B ${stats.by_type.B2B}, Rerun ${stats.by_type.Rerun}.`
+        ? `${stats.total} ${args.type} ${stats.total === 1 ? 'study' : 'studies'} ${args.event} in ${period.label}.`
+        : `${stats.total} ${stats.total === 1 ? 'study' : 'studies'} ${args.event} in ${period.label} — PS ${stats.by_type.PS}, B2B ${stats.by_type.B2B}, Rerun ${stats.by_type.Rerun}.`
       const summary = stats.note ? `${base} ${stats.note}` : base
       return {
         ok: true, event: args.event, type: args.type ?? 'all', period,
@@ -247,7 +247,7 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'survey_report',
     description:
-      "Build a report of the surveys matching an event + period (same flexible period as survey_stats), optionally filtered by type. Returns the matching rows as a preview table plus a link to download the FULL report as an Excel (.xlsx). Choose columns via `fields`: call once WITHOUT fields to get `available_fields` + the default set, then re-call with the subset you want. Use for “report of everything delivered in Q2” or “excel of PS launches in July with client, captain, N collected”.",
+      "Build a report of the studies matching an event + period (same flexible period as survey_stats), optionally filtered by type. Returns the matching rows as a preview table plus a link to download the FULL report as an Excel (.xlsx). Choose columns via `fields`: call once WITHOUT fields to get `available_fields` + the default set, then re-call with the subset you want. Use for “report of everything delivered in Q2” or “excel of PS launches in July with client, captain, N collected”.",
     kind: 'read',
     schema: {
       event: z.enum(['submitted', 'launched', 'delivered']),
@@ -317,7 +317,7 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'rerun_radar',
     description:
-      "Recurring reruns that need attention, bucketed: overdue (past their next-wave date), prep_window (due within the lead time), and upcoming. Reads the first-class rerun_series_status model (paused/ended series excluded); each item lists client, survey, cadence, last wave, due date, and owner. Pass mine:true to scope to reruns you own. Use for “what reruns are overdue / coming up”.",
+      "Recurring reruns that need attention, bucketed: overdue (past their next-wave date), prep_window (due within the lead time), and upcoming. Reads the first-class rerun_series_status model (paused/ended series excluded); each item lists client, study, cadence, last wave, due date, and owner. Pass mine:true to scope to reruns you own. Use for “what reruns are overdue / coming up”.",
     kind: 'read',
     schema: { mine: z.boolean().optional() },
     handler: async (rawArgs, ctx) => {
@@ -335,7 +335,7 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'search_reruns',
     description:
-      "Search first-class rerun series (the new source of truth for recurring/longitudinal studies) by client / survey name, with optional filters: base_type (PS/B2B), status (in_service / paused / ended / overdue), and owner. Pass mine:true to scope to the reruns you own. Each hit returns the series id, client, survey name, cadence, service mode, whether it's in service / paused / overdue, the owner, and the next due date. Use for “which reruns are overdue / paused / in service”, “list this client's reruns”. For a single triage of what's due this week/month use rerun_calendar; for one series' waves use get_rerun_series.",
+      "Search first-class rerun series (the new source of truth for recurring/longitudinal studies) by client / study name, with optional filters: base_type (PS/B2B), status (in_service / paused / ended / overdue), and owner. Pass mine:true to scope to the reruns you own. Each hit returns the series id, client, study name, cadence, service mode, whether it's in service / paused / overdue, the owner, and the next due date. Use for “which reruns are overdue / paused / in service”, “list this client's reruns”. For a single triage of what's due this week/month use rerun_calendar; for one series' waves use get_rerun_series.",
     kind: 'read',
     schema: {
       query: z.string().optional(),
@@ -357,7 +357,7 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'get_rerun_series',
     description:
-      "Get one rerun series' detail plus all its waves (each wave is a normal survey project: code, dates, N target/collected/actual, survey-tool id, stage/status), ordered by wave number. Identify the series by its id (from search_reruns / rerun_calendar) or by a client / survey-name query. Use for “show me the <survey> rerun series”, “how many waves has <survey> had”, “what's the history of this rerun”.",
+      "Get one rerun series' detail plus all its waves (each wave is a normal study project: code, dates, N target/collected/actual, survey-tool id, stage/status), ordered by wave number. Identify the series by its id (from search_reruns / rerun_calendar) or by a client / study-name query. Use for “show me the <study> rerun series”, “how many waves has <study> had”, “what's the history of this rerun”.",
     kind: 'read',
     schema: { series: z.string() },
     handler: async (rawArgs, ctx) => {
@@ -385,7 +385,7 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'put_in_rerun_service',
     description:
-      "Put a project into rerun service — promote it to Wave 1 of a new first-class rerun series so future waves are tracked (and auto-spawned in 'auto' mode). Needs the project, its base_type (PS/B2B), and a cadence (monthly / quarterly / semiannual / yearly / adhoc — adhoc = no fixed cadence). Optional service_mode (auto = spawn automatically, manual = create each wave by hand; default auto) and delivery_cadence note. ONLY for a study that has NO series yet: this creates a BRAND-NEW series and sweeps every survey linked to the project as a rerun into it, so if the project — or anything linked to it — is already in a series, it refuses and names add_survey_to_series, which adds the survey to the EXISTING series instead of duplicating it. Preview first; confirm to apply.",
+      "Put a project into rerun service — promote it to Wave 1 of a new first-class rerun series so future waves are tracked (and auto-spawned in 'auto' mode). Needs the project, its base_type (PS/B2B), and a cadence (monthly / quarterly / semiannual / yearly / adhoc — adhoc = no fixed cadence). Optional service_mode (auto = spawn automatically, manual = create each wave by hand; default auto) and delivery_cadence note. ONLY for a study that has NO series yet: this creates a BRAND-NEW series and sweeps every study linked to the project as a rerun into it, so if the project — or anything linked to it — is already in a series, it refuses and names add_survey_to_series, which adds the study to the EXISTING series instead of duplicating it. Preview first; confirm to apply.",
     kind: 'write',
     schema: {
       project: z.string(),
@@ -436,7 +436,7 @@ export const TOOLS: AssistantTool[] = [
           blocked_by: familyConflict.codes,
           series_id: familyConflict.seriesIds[0],
           // NOT a single `use_instead` directive. The guard knows a rerun LINK
-          // exists between these surveys, not that they are the same study —
+          // exists between these projects, not that they are the same study —
           // and a structured "do this instead" is read as an instruction and
           // acted on. Live case: PR00197 ("SWK - Construction") is blocked by
           // PR00232 ("SWK - Consumer - Wave 2") being linked to it; obeying
@@ -445,9 +445,9 @@ export const TOOLS: AssistantTool[] = [
           // the honest answer when the tool cannot tell which fact is wrong.
           options: [
             {
-              if: 'the blocked surveys are the same study as this one',
+              if: 'the blocked projects really are waves of the same study as this one',
               use: 'add_survey_to_series',
-              note: 'adds this survey to the series they are already in',
+              note: 'adds this study to the series they are already in',
             },
             {
               if: 'they are NOT the same study — the rerun link between them is the mistake',
@@ -487,7 +487,7 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'add_survey_to_series',
     description:
-      "Add an EXISTING survey to an EXISTING rerun series, so it is tracked as one of that series' waves. Use this when a wave was created by hand, or when a survey should have been part of a series but isn't — it is the fix for a survey that shows up on its own instead of grouped with the rest of the series on the client page. NOT the same as put_in_rerun_service, which promotes a project to Wave 1 of a BRAND-NEW series: using that on a survey whose family already has a series creates a second, duplicate series. Identify the survey by PR code or name, and the series by id or a client / survey-name query. IMPORTANT: if the survey has other surveys linked to it as reruns, they are added TOO - the whole linked family moves together, which the preview lists by name. The series is then renumbered by date, so other waves' numbers can shift. Preview first; confirm to apply.",
+      "Add an EXISTING study to an EXISTING rerun series, so it is tracked as one of that series' waves. Use this when a wave was created by hand, or when a study should have been part of a series but isn't — it is the fix for a study that shows up on its own instead of grouped with the rest of the series on the client page. NOT the same as put_in_rerun_service, which promotes a project to Wave 1 of a BRAND-NEW series: using that on a study whose family already has a series creates a second, duplicate series. Identify the study by PR code or name, and the series by id or a client / study-name query. IMPORTANT: if the study has other studies linked to it as reruns, they are added TOO - the whole linked family moves together, which the preview lists by name. The series is then renumbered by date, so other waves' numbers can shift. Preview first; confirm to apply.",
     kind: 'write',
     schema: {
       project: z.string(),
@@ -517,7 +517,7 @@ export const TOOLS: AssistantTool[] = [
       if (p.series_id) {
         return {
           error:
-            'This survey is already in a different rerun series. Remove it from that one first (remove_survey_from_series), then add it here.',
+            'This study is already in a different rerun series. Remove it from that one first (remove_survey_from_series), then add it here.',
           series_id: p.series_id as string,
         }
       }
@@ -536,7 +536,7 @@ export const TOOLS: AssistantTool[] = [
           return {
             summary:
               extra.length > 0
-                ? `Add ${p.project_code ?? p.project_name} to ${label} — along with ${extra.length} survey(s) linked to it: ${extra.join(', ')}`
+                ? `Add ${p.project_code ?? p.project_name} to ${label} — along with ${extra.length} ${extra.length === 1 ? 'study' : 'studies'} linked to it: ${extra.join(', ')}`
                 : `Add ${p.project_code ?? p.project_name} to ${label} as a wave`,
             also_moves: extra,
             note: 'The whole series is renumbered by date afterwards, so other wave numbers may shift.',
@@ -569,7 +569,7 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'remove_survey_from_series',
     description:
-      "Take a survey OUT of its rerun series, so it stands alone again. Clears the series link, the lineage pointer and any manual wave order, and resets its wave number. The remaining waves are renumbered, so their numbers may shift. Wave 1 cannot be removed — the series is anchored to it, so end the series instead (end_rerun) or add another survey first. Every cleared value is written to the change history, so this is recoverable. Identify the survey by PR code or name. Preview first; confirm to apply.",
+      "Take a study OUT of its rerun series, so it stands alone again. Clears the series link, the lineage pointer and any manual wave order, and resets its wave number. The remaining waves are renumbered, so their numbers may shift. Wave 1 cannot be removed — the series is anchored to it, so end the series instead (end_rerun) or add another study first. Every cleared value is written to the change history, so this is recoverable. Identify the study by PR code or name. Preview first; confirm to apply.",
     kind: 'write',
     schema: {
       project: z.string(),
@@ -585,7 +585,7 @@ export const TOOLS: AssistantTool[] = [
       meta.project_id = p.id as string
 
       if (!p.series_id) {
-        return { error: 'This survey is not in a rerun series, so there is nothing to remove it from.' }
+        return { error: 'This study is not in a rerun series, so there is nothing to remove it from.' }
       }
 
       return confirmable(
@@ -615,7 +615,7 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'link_surveys',
     description:
-      "Record that two surveys are RELATED without either being a repeat wave of the other — a soft launch and its full launch, the B2B and consumer halves of one study, a survey that replaced a cancelled one. This is NOT the rerun tool: it adds no wave number, no series membership and no auto-spawn, and is the right answer whenever add_survey_to_series would mean calling something a wave that is not one. The link is symmetric, so it shows on both surveys. Optional note says HOW they are related. Linking an already-linked pair just updates the note. Identify each survey by PR code or name. Preview first; confirm to apply.",
+      "Record that two studies are RELATED without either being a repeat wave of the other — a soft launch and its full launch, the B2B and consumer halves of one study, a study that replaced a cancelled one. This is NOT the rerun tool: it adds no wave number, no series membership and no auto-spawn, and is the right answer whenever add_survey_to_series would mean calling something a wave that is not one. The link is symmetric, so it shows on both studies. Optional note says HOW they are related. Linking an already-linked pair just updates the note. Identify each study by PR code or name. Preview first; confirm to apply.",
     kind: 'write',
     schema: {
       project: z.string(),
@@ -631,11 +631,11 @@ export const TOOLS: AssistantTool[] = [
       if ('error' in a) return a
       if ('ambiguous' in a) return a
       const b = await resolveProjectWritable(args.other)
-      if (!b) return { error: `No survey found matching "${args.other}".` }
+      if (!b) return { error: `No study found matching "${args.other}".` }
       if ('error' in b) return b
       if ('ambiguous' in b) return b
       meta.project_id = a.id as string
-      if (a.id === b.id) return { error: 'A survey cannot be linked to itself.' }
+      if (a.id === b.id) return { error: 'A study cannot be linked to itself.' }
 
       const aLabel = (a.project_code as string | null) ?? (a.project_name as string)
       const bLabel = (b.project_code as string | null) ?? (b.project_name as string)
@@ -643,10 +643,10 @@ export const TOOLS: AssistantTool[] = [
       return confirmable(
         args,
         async () => ({
-          summary: `Link ${aLabel} and ${bLabel} as related surveys`,
+          summary: `Link ${aLabel} and ${bLabel} as related studies`,
           note:
             'A related link is not a rerun wave: no wave number, no series, no auto-spawn. ' +
-            'It shows on both surveys and can be removed with unlink_surveys.',
+            'It shows on both studies and can be removed with unlink_surveys.',
           related_as: args.note?.trim() || '(no note)',
         }),
         async () => {
@@ -673,7 +673,7 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'unlink_surveys',
     description:
-      'Remove the related-survey link between two surveys. Does not touch rerun lineage or wave numbers — for that, use remove_survey_from_series. Identify each survey by PR code or name. Preview first; confirm to apply.',
+      'Remove the related-study link between two studies. Does not touch rerun lineage or wave numbers — for that, use remove_survey_from_series. Identify each study by PR code or name. Preview first; confirm to apply.',
     kind: 'write',
     schema: {
       project: z.string(),
@@ -687,7 +687,7 @@ export const TOOLS: AssistantTool[] = [
       if ('error' in a) return a
       if ('ambiguous' in a) return a
       const b = await resolveProjectWritable(args.other)
-      if (!b) return { error: `No survey found matching "${args.other}".` }
+      if (!b) return { error: `No study found matching "${args.other}".` }
       if ('error' in b) return b
       if ('ambiguous' in b) return b
       meta.project_id = a.id as string
@@ -709,7 +709,7 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'list_related_surveys',
     description:
-      'List the surveys linked to one survey as RELATED — the non-rerun links made by link_surveys. Rerun waves are not included; get_rerun_series covers those. Identify the survey by PR code or name.',
+      'List the studies linked to one study as RELATED — the non-rerun links made by link_surveys. Rerun waves are not included; get_rerun_series covers those. Identify the study by PR code or name.',
     kind: 'read',
     schema: { project: z.string() },
     handler: async (rawArgs) => {
@@ -737,7 +737,7 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'set_rerun_defaults',
     description:
-      "Set the defaults every FUTURE wave of a rerun series inherits — N target, audience, money model, template, and the per-series compliance-required override. Only the fields you pass are changed; the rest are left as-is. Identify the series by id or a client / survey-name query. Preview first; confirm to apply.",
+      "Set the defaults every FUTURE wave of a rerun series inherits — N target, audience, money model, template, and the per-series compliance-required override. Only the fields you pass are changed; the rest are left as-is. Identify the series by id or a client / study-name query. Preview first; confirm to apply.",
     kind: 'write',
     schema: {
       series: z.string(),
@@ -794,7 +794,7 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'set_rerun_notes',
     description:
-      "Write the three free-text fields on a rerun series: `guidance` (how the series is meant to be RUN — the standing instruction that should outlast whoever picks up the next wave: fielding windows, who must be asked, what must not change between waves), `notes` (whatever is worth recording about it right now), and `data_qa_note` (a known quirk in this study's DATA — a question that always needs recoding, a segment that under-fills). Only the fields you pass are changed; the rest are left alone. Pass an empty string to CLEAR one. This does not touch what future waves inherit — that is set_rerun_defaults. Identify the series by id or a client / survey-name query. Preview first; confirm to apply.",
+      "Write the three free-text fields on a rerun series: `guidance` (how the series is meant to be RUN — the standing instruction that should outlast whoever picks up the next wave: fielding windows, who must be asked, what must not change between waves), `notes` (whatever is worth recording about it right now), and `data_qa_note` (a known quirk in this study's DATA — a question that always needs recoding, a segment that under-fills). Only the fields you pass are changed; the rest are left alone. Pass an empty string to CLEAR one. This does not touch what future waves inherit — that is set_rerun_defaults. Identify the series by id or a client / study-name query. Preview first; confirm to apply.",
     kind: 'write',
     schema: {
       series: z.string(),
@@ -848,7 +848,7 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'pause_rerun',
     description:
-      "Pause a rerun series — auto-spawn stops and it drops off the due calendar until resumed. Identify the series by id or a client / survey-name query. If a next wave was already spawned but hasn't started fielding, the preview flags it; pass cancel_pending:true to cancel that wave too (else it's left as-is). Preview first; confirm to apply.",
+      "Pause a rerun series — auto-spawn stops and it drops off the due calendar until resumed. Identify the series by id or a client / study-name query. If a next wave was already spawned but hasn't started fielding, the preview flags it; pass cancel_pending:true to cancel that wave too (else it's left as-is). Preview first; confirm to apply.",
     kind: 'write',
     schema: { series: z.string(), cancel_pending: z.boolean().optional(), confirm: z.boolean().optional() },
     handler: async (rawArgs, ctx, meta) => {
@@ -882,7 +882,7 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'resume_rerun',
     description:
-      "Resume a paused rerun series — auto-spawn restarts and it rejoins the due calendar. The next due date is rebased off today so it isn't instantly overdue. Identify the series by id or a client / survey-name query. Preview first; confirm to apply.",
+      "Resume a paused rerun series — auto-spawn restarts and it rejoins the due calendar. The next due date is rebased off today so it isn't instantly overdue. Identify the series by id or a client / study-name query. Preview first; confirm to apply.",
     kind: 'write',
     schema: { series: z.string(), confirm: z.boolean().optional() },
     handler: async (rawArgs, ctx, meta) => {
@@ -907,7 +907,7 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'end_rerun',
     description:
-      "End a rerun series — it's taken out of service permanently (no more waves, off the due calendar). Use resume_rerun for a temporary stop instead. Identify the series by id or a client / survey-name query. If a next wave was already spawned but hasn't started fielding, the preview flags it; pass cancel_pending:true to cancel that wave too. Preview first; confirm to apply.",
+      "End a rerun series — it's taken out of service permanently (no more waves, off the due calendar). Use resume_rerun for a temporary stop instead. Identify the series by id or a client / study-name query. If a next wave was already spawned but hasn't started fielding, the preview flags it; pass cancel_pending:true to cancel that wave too. Preview first; confirm to apply.",
     kind: 'write',
     schema: { series: z.string(), cancel_pending: z.boolean().optional(), confirm: z.boolean().optional() },
     handler: async (rawArgs, ctx, meta) => {
@@ -941,7 +941,7 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'create_next_wave',
     description:
-      "Manually create (spawn) the next wave of a rerun series now — the new wave inherits the series' future defaults (N target, audience, captain, etc.) with run data reset. This also arms auto-spawn going forward. Identify the series by id or a client / survey-name query. If a wave can't be created (e.g. one is already pending), the result explains why. Preview first; confirm to apply.",
+      "Manually create (spawn) the next wave of a rerun series now — the new wave inherits the series' future defaults (N target, audience, captain, etc.) with run data reset. This also arms auto-spawn going forward. Identify the series by id or a client / study-name query. If a wave can't be created (e.g. one is already pending), the result explains why. Preview first; confirm to apply.",
     kind: 'write',
     schema: { series: z.string(), confirm: z.boolean().optional() },
     handler: async (rawArgs, ctx, meta) => {
@@ -1016,7 +1016,7 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'finance_results',
     description:
-      "FINANCE-ONLY (view_financials). The finance page's Results tab, same numbers: on DELIVERED surveys in a date range, what clients pay vs what we spent — client price (price per N × billed N, never above the N sold), our cost, what we keep ($ and %, plus the % on paid work without surveys given away at $0), and the median budget per $1 of price — all on the margin set (delivered, priced incl. $0, with a delivered N and target, and a recorded cost). Also: the coverage line (the margin set's share of delivered spend, and the spend with no client price), the spend split by line (panel, blast rewards gross, rewards recovered, SMS sends, other), spend on cancelled / archived work not in the figures, the months (price vs cost vs kept %), the verdict sentence, and Tile 2 rows grouped by account (default), route, month, contact, type, survey (the three-way ledger with budget, spend ÷ budget, spend ÷ price and LOST MONEY / OVER BUDGET / GIVEN AWAY $0 / NO PRICE tags), or panel (panel spend by supplier, with price per complete and what each panel paid above the cheapest in the same wave — panel spend only, no client price or margin, because clients pay per survey and not per panel). Range: a preset (default since-jun-1) or from/to. Account: a name, Cl code or client id. Route is measured from each survey's rows. Refuses callers without finance access — then say you cannot show these figures. Use for “did we make money in August”, “margin by account”, “which surveys lost money”.",
+      "FINANCE-ONLY (view_financials). The finance page's Results tab, same numbers: on DELIVERED studies in a date range, what clients pay vs what we spent — client price (price per N × billed N, never above the N sold), our cost, what we keep ($ and %, plus the % on paid work without studies given away at $0), and the median budget per $1 of price — all on the margin set (delivered, priced incl. $0, with a delivered N and target, and a recorded cost). Also: the coverage line (the margin set's share of delivered spend, and the spend with no client price), the spend split by line (panel, blast rewards gross, rewards recovered, SMS sends, other), spend on cancelled / archived work not in the figures, the months (price vs cost vs kept %), the verdict sentence, and Tile 2 rows grouped by account (default), route, month, contact, type, survey (the three-way ledger with budget, spend ÷ budget, spend ÷ price and LOST MONEY / OVER BUDGET / GIVEN AWAY $0 / NO PRICE tags), or panel (panel spend by supplier, with price per complete and what each panel paid above the cheapest in the same wave — panel spend only, no client price or margin, because clients pay per study and not per panel). Range: a preset (default since-jun-1) or from/to. Account: a name, Cl code or client id. Route is measured from each study's rows. Refuses callers without finance access — then say you cannot show these figures. Use for “did we make money in August”, “margin by account”, “which studies lost money”.",
     kind: 'read',
     schema: {
       range: z.enum(['since-jun-1', 'this-month', 'last-month', 'this-quarter', 'all']).optional(),
@@ -1144,7 +1144,7 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'reconcile_project',
     description:
-      "Cross-field consistency check for ONE project: does actual_spend match Σ(cpi×collected)+Σ(bid×completes)+Σ(people×$/send)+Σ(cost amount); do segment N totals sum to the project N; DOES THE PROJECT'S N MATCH WHAT ITS BLASTS AND PURESPECTRUM LAUNCHES ACTUALLY COLLECTED (respondents arrive only those two ways, so a shortfall means a launch or blast was never logged and its cost is missing from spend — that is an issue; an excess usually just means n_collected is stale — that is advisory); is a survey-ID discrepancy flagged; are the dates in a sane order — plus advisory notes (a project carrying N with no blast or supplier row at all; supplier N collected vs the delivered N, which legitimately differ via QA attrition). Returns the failing `issues`, `advisories`, and the full `checks`. Use for “does <project>'s money/N add up”, “is anything off on <project>”, “where did this survey's N come from”, or to explain a spend/N number that looks wrong.",
+      "Cross-field consistency check for ONE project: does actual_spend match Σ(cpi×collected)+Σ(bid×completes)+Σ(people×$/send)+Σ(cost amount); do segment N totals sum to the project N; DOES THE PROJECT'S N MATCH WHAT ITS BLASTS AND PURESPECTRUM LAUNCHES ACTUALLY COLLECTED (respondents arrive only those two ways, so a shortfall means a launch or blast was never logged and its cost is missing from spend — that is an issue; an excess usually just means n_collected is stale — that is advisory); is a survey-ID discrepancy flagged; are the dates in a sane order — plus advisory notes (a project carrying N with no blast or supplier row at all; supplier N collected vs the delivered N, which legitimately differ via QA attrition). Returns the failing `issues`, `advisories`, and the full `checks`. Use for “does <project>'s money/N add up”, “is anything off on <project>”, “where did this study's N come from”, or to explain a spend/N number that looks wrong.",
     kind: 'read',
     schema: { project: z.string() },
     handler: async (rawArgs) => {
@@ -1155,7 +1155,7 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'data_health',
     description:
-      "Portfolio-wide anomaly scan — DO THE NUMBERS AGREE WITH EACH OTHER. Runs the reconcile_project checks over every project and returns the ones with real integrity issues (spend mismatch, segment totals off, survey-ID discrepancy, impossible date order, and N that its blasts and PureSpectrum launches cannot account for), with counts_by_check and separate advisory_counts. Defaults to the active operational set; pass active_only:false to scan all non-deleted projects — which is also how to pull the BACKFILL QUEUE, the projects carrying an N with no blast or supplier row at all to say how it was fielded (150 of them on 2026-09-17, all reporting $0 fielding spend). Use for “is our data healthy / anything drifting”, a spend audit, “which surveys have N we can't account for”, or a pre-report sanity pass. This is the ARITHMETIC checker and it reports money — for whether the FIELDS ARE FILLED IN (no salesperson, no captain, no due date, no type) use data_cleanup instead.",
+      "Portfolio-wide anomaly scan — DO THE NUMBERS AGREE WITH EACH OTHER. Runs the reconcile_project checks over every project and returns the ones with real integrity issues (spend mismatch, segment totals off, survey-ID discrepancy, impossible date order, and N that its blasts and PureSpectrum launches cannot account for), with counts_by_check and separate advisory_counts. Defaults to the active operational set; pass active_only:false to scan all non-deleted projects — which is also how to pull the BACKFILL QUEUE, the projects carrying an N with no blast or supplier row at all to say how it was fielded (150 of them on 2026-09-17, all reporting $0 fielding spend). Use for “is our data healthy / anything drifting”, a spend audit, “which studies have N we can't account for”, or a pre-report sanity pass. This is the ARITHMETIC checker and it reports money — for whether the FIELDS ARE FILLED IN (no salesperson, no captain, no due date, no type) use data_cleanup instead.",
     kind: 'read',
     schema: { active_only: z.boolean().optional(), limit: z.number().int().min(1).max(200).optional() },
     handler: async (rawArgs) => {
@@ -1166,7 +1166,7 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'data_cleanup',
     description:
-      "The admin data-cleanup dashboard (/admin/cleanup) — ARE THE FIELDS FILLED IN. Runs 25 completeness checks over every live, non-cancelled survey and returns a tile per check: no salesperson, no captain, not linked to an account, no requested-by contact, no due date, no submitted date, no launch date where the survey provably launched, delivered with no delivery date or no final N, no survey type, no survey-tool ID past programming, a tool ID claimed by two surveys, no N target, fielding rows recorded while the card sits before Fielding, closed without ever being delivered, delivered before submitted, longitudinal flag contradicted, Occam delivered to a contact never invited, and more — grouped as ownership / dates / classification / measurement / consistency. The GOAL IS EVERY TILE AT ZERO; `clean`, `tiles_at_zero` and `surveys_needing_work` answer “how far off are we”. Pass `check` (an id like no_captain, or words from a tile's label) to drill in and get the failing surveys WITH THEIR PROJECT CODES and what each field holds today; add csv:true for the round-trippable worksheet David edits and hands back. Rerun waves are counted and listed SEPARATELY from the headline (`wave_count` / `rerun_waves`, include_waves:true to list them), so the headline is the work a person would pick up and nothing is hidden. Scope defaults to surveys created AFTER the 2026-06-10 legacy sheet import; include_legacy_import:true adds those older rows. Carries NO money — this is about completeness, not value; for whether the NUMBERS AGREE (spend reconciliation, segment totals, N vs what the panels collected) use data_health instead. If a table did not load, the affected checks come back `measured:false` with `surveys:null` and `clean` false — report those as unmeasured, NEVER as a count of 0, because a failed read is not a clean database.",
+      "The admin data-cleanup dashboard (/admin/cleanup) — ARE THE FIELDS FILLED IN. Runs 25 completeness checks over every live, non-cancelled study and returns a tile per check: no salesperson, no captain, not linked to an account, no requested-by contact, no due date, no submitted date, no launch date where the study provably launched, delivered with no delivery date or no final N, no project type, no survey-tool ID past programming, a tool ID claimed by two studies, no N target, fielding rows recorded while the card sits before Fielding, closed without ever being delivered, delivered before submitted, longitudinal flag contradicted, Occam delivered to a contact never invited, and more — grouped as ownership / dates / classification / measurement / consistency. The GOAL IS EVERY TILE AT ZERO; `clean`, `tiles_at_zero` and `surveys_needing_work` answer “how far off are we”. Pass `check` (an id like no_captain, or words from a tile's label) to drill in and get the failing studies WITH THEIR PROJECT CODES and what each field holds today; add csv:true for the round-trippable worksheet David edits and hands back. Rerun waves are counted and listed SEPARATELY from the headline (`wave_count` / `rerun_waves`, include_waves:true to list them), so the headline is the work a person would pick up and nothing is hidden. Scope defaults to studies created AFTER the 2026-06-10 legacy sheet import; include_legacy_import:true adds those older rows. Carries NO money — this is about completeness, not value; for whether the NUMBERS AGREE (spend reconciliation, segment totals, N vs what the panels collected) use data_health instead. If a table did not load, the affected checks come back `measured:false` with `surveys:null` and `clean` false — report those as unmeasured, NEVER as a count of 0, because a failed read is not a clean database.",
     kind: 'read',
     schema: {
       check: z.string().optional(),
@@ -1476,7 +1476,7 @@ export const TOOLS: AssistantTool[] = [
   },
   {
     name: 'add_note',
-    description: 'Log a manual data-change note on a project (paper trail of edits to the survey data).',
+    description: 'Log a manual data-change note on a project (paper trail of edits to the study data).',
     kind: 'write',
     schema: { project: z.string(), text: z.string().min(1).max(2000) },
     previewSummary: (args) => {
@@ -1943,7 +1943,7 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'log_blast',
     description:
-      "Log (or update) a B2B blast against ANY project, whatever its project_type — a survey typed PS that also ran blasts takes both, and both roll into the same actual_spend — its $/bid (the per-completion reward), the # of people it went to, the # of those who COMPLETED the survey, when it ran (optional), and an optional description of the audience. It costs TWO things, both counting toward the project's spend: the REWARD, $/bid × completes (we only pay people who completed), and the SEND, $/send × people (paid for every message, answered or not). $/send defaults to the configured rate — currently $0.02 — so OMIT cost_per_send unless you have been told this blast was charged differently. It is charged PER SEND, not per unique person: re-sending to the same list costs again each time. ALWAYS SET `channel` WHEN YOU KNOW IT: 'email' means there is NO send cost at all — the incentive is the whole cost — while 'sms' is metered per message. Leaving it out records \"channel unknown\", and an unknown channel IS charged for its sends, so omitting it on an email blast invents spend that never happened (12,000 people × $0.02 = $240 on the project's budget and margin). Nothing infers it from your description; say it. UNRECORDED IS NOT ZERO: OMIT a figure you don't know and it is stored as \"not recorded\" (the app shows an em dash and reports the cost as unknown); pass 0 ONLY when you know the real answer is zero — a blast that genuinely produced nothing, or an unpaid send. Never substitute 0 for a number you haven't been told, because 0 is read as a result and it silently drags the project's spend and response rate down. Completes usually aren't known at send time — omit them, then fill them in later by re-calling with the SAME idem_key (it upserts, like log_launch; omitting a figure on the re-call LEAVES the recorded one alone rather than wiping it), or via update_blast. You can also ingest a blast-platform campaign screenshot: per blast, map Reward→bid, that blast's Sent→people, Rewards Count→completes (so spend matches the platform's Total Issued; NOT the higher \"Completed\" count), its Scheduled date/time→blast_at, and channel/audience/template→description; if the screenshot is the Overview tab and shows no Rewards Count, omit completes rather than sending 0. Resolve the project by campaign name or Survey ID, and set idem_key to \"<SurveyID>#<BlastLabel>\" so re-importing the same screenshot updates that same blast instead of double-logging. Preview first (shows create vs update); confirm to apply.",
+      "Log (or update) a B2B blast against ANY project, whatever its project_type — a study typed PS that also ran blasts takes both, and both roll into the same actual_spend — its $/bid (the per-completion reward), the # of people it went to, the # of those who COMPLETED the study, when it ran (optional), and an optional description of the audience. It costs TWO things, both counting toward the project's spend: the REWARD, $/bid × completes (we only pay people who completed), and the SEND, $/send × people (paid for every message, answered or not). $/send defaults to the configured rate — currently $0.02 — so OMIT cost_per_send unless you have been told this blast was charged differently. It is charged PER SEND, not per unique person: re-sending to the same list costs again each time. ALWAYS SET `channel` WHEN YOU KNOW IT: 'email' means there is NO send cost at all — the incentive is the whole cost — while 'sms' is metered per message. Leaving it out records \"channel unknown\", and an unknown channel IS charged for its sends, so omitting it on an email blast invents spend that never happened (12,000 people × $0.02 = $240 on the project's budget and margin). Nothing infers it from your description; say it. UNRECORDED IS NOT ZERO: OMIT a figure you don't know and it is stored as \"not recorded\" (the app shows an em dash and reports the cost as unknown); pass 0 ONLY when you know the real answer is zero — a blast that genuinely produced nothing, or an unpaid send. Never substitute 0 for a number you haven't been told, because 0 is read as a result and it silently drags the project's spend and response rate down. Completes usually aren't known at send time — omit them, then fill them in later by re-calling with the SAME idem_key (it upserts, like log_launch; omitting a figure on the re-call LEAVES the recorded one alone rather than wiping it), or via update_blast. You can also ingest a blast-platform campaign screenshot: per blast, map Reward→bid, that blast's Sent→people, Rewards Count→completes (so spend matches the platform's Total Issued; NOT the higher \"Completed\" count), its Scheduled date/time→blast_at, and channel/audience/template→description; if the screenshot is the Overview tab and shows no Rewards Count, omit completes rather than sending 0. Resolve the project by campaign name or Survey ID, and set idem_key to \"<SurveyID>#<BlastLabel>\" so re-importing the same screenshot updates that same blast instead of double-logging. Preview first (shows create vs update); confirm to apply.",
     kind: 'write',
     schema: {
       project: z.string(),
@@ -2121,7 +2121,7 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'log_launch',
     description:
-      "Log a PureSpectrum launch (a fielding wave) on ANY project with its sample-supplier rows — each supplier's name, $/complete (CPI, in dollars e.g. 0.75), an optional per-supplier cap, and # collected so far. A project can have several launches; call once per launch. NOT RESTRICTED BY project_type: a survey typed B2B that was fielded partly through blasts and partly through PureSpectrum takes both — log the blasts with log_blast and the PureSpectrum waves here, and both roll into the same actual_spend. PR00425 is exactly that shape. Do not decline because the project is typed B2B, and do not re-type the project to record a launch; project_type says what the survey IS, not how it was fielded. Actual spend = Σ(CPI × collected) — pay per complete, like blasts — and rolls up to the project automatically. Pass a target (goal N for the launch) so the pre-fielding estimate range shows, and an optional `note` (freeform — e.g. why this wave, supplier issues, timing). Supplier names not already in the roster are added. If the source has a Survey# (e.g. from a supplier-panel screenshot), pass it as `label` — it then serves as the stable unique key to update this same launch later (re-import = upsert, not a duplicate). Preview first; confirm to apply.",
+      "Log a PureSpectrum launch (a fielding wave) on ANY project with its sample-supplier rows — each supplier's name, $/complete (CPI, in dollars e.g. 0.75), an optional per-supplier cap, and # collected so far. A project can have several launches; call once per launch. NOT RESTRICTED BY project_type: a study typed B2B that was fielded partly through blasts and partly through PureSpectrum takes both — log the blasts with log_blast and the PureSpectrum waves here, and both roll into the same actual_spend. PR00425 is exactly that shape. Do not decline because the project is typed B2B, and do not re-type the project to record a launch; project_type says what the study IS, not how it was fielded. Actual spend = Σ(CPI × collected) — pay per complete, like blasts — and rolls up to the project automatically. Pass a target (goal N for the launch) so the pre-fielding estimate range shows, and an optional `note` (freeform — e.g. why this wave, supplier issues, timing). Supplier names not already in the roster are added. If the source has a Survey# (e.g. from a supplier-panel screenshot), pass it as `label` — it then serves as the stable unique key to update this same launch later (re-import = upsert, not a duplicate). Preview first; confirm to apply.",
     kind: 'write',
     schema: {
       project: z.string(),
@@ -2452,12 +2452,12 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'add_contract',
     description:
-      "Record a CONTRACT on a client — an allowance of CREDITS the client has bought, which their surveys then draw down. " +
-      "Credits are the client's unit of spend with us; they are NOT our cost to run a survey (that is blasts, suppliers and cost lines) and NOT dollars. " +
+      "Record a CONTRACT on a client — an allowance of CREDITS the client has bought, which their studies then draw down. " +
+      "Credits are the client's unit of spend with us; they are NOT our cost to run a study (that is blasts, suppliers and cost lines) and NOT dollars. " +
       "`credits` may be omitted when the contract does not state one: blank means NOT RECORDED, which is a different fact from a contract that bought zero, and the consumption figures shown to clients depend on that distinction. " +
       "Dates are optional for the same reason — 44 of the 48 contracts in the CCM export carry none. " +
       "The DOLLAR value of a contract cannot be set here: it lives in a separate finance-gated table by design. " +
-      "A contract on its own draws down nothing — attach surveys to it with set_survey_credits. Preview first; confirm to apply.",
+      "A contract on its own draws down nothing — attach studies to it with set_survey_credits. Preview first; confirm to apply.",
     kind: 'write',
     schema: {
       client: z.string(),
@@ -2517,7 +2517,7 @@ export const TOOLS: AssistantTool[] = [
           return {
             ok: true,
             contract: { id: row.id, name: row.name, credits: row.credits_total, starts_on: row.starts_on, renews_on: row.renews_on },
-            note: 'No surveys are attached yet, so this contract shows zero consumed. Use set_survey_credits to attach and price them.',
+            note: 'No studies are attached yet, so this contract shows zero consumed. Use set_survey_credits to attach and price them.',
           }
         }
       )
@@ -2587,8 +2587,8 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'set_survey_credits',
     description:
-      "Price a survey in CREDITS and attach it to the client's contract — the two halves of one decision, because a priced survey attached to nothing draws down nothing, and an attached survey with no price counts as unknown rather than zero. " +
-      "Credits are entered when the scope is confirmed, i.e. when the survey moves to an active stage. " +
+      "Price a study in CREDITS and attach it to the client's contract — the two halves of one decision, because a priced study attached to nothing draws down nothing, and an attached study with no price counts as unknown rather than zero. " +
+      "Credits are entered when the scope is confirmed, i.e. when the study moves to an active stage. " +
       "PASSING null FOR `credits` UN-PRICES IT, which is NOT the same as 0: blank means not priced yet and the client-facing totals report it as unknown, whereas 0 asserts the work was genuinely free. " +
       "`contract` takes the contract's name or id; pass null to detach. Omit either argument to leave it alone. Preview first; confirm to apply.",
     kind: 'write',
@@ -2621,7 +2621,7 @@ export const TOOLS: AssistantTool[] = [
           patch.term_id = null
         } else {
           const clientId = p.client_id as string | null
-          if (!clientId) return { error: 'This survey has no client, so it cannot be attached to a contract.' }
+          if (!clientId) return { error: 'This study has no client, so it cannot be attached to a contract.' }
           const t = await resolveTerm(clientId, args.contract)
           if (!t) {
             const have = await listTermsForClient(clientId)
@@ -2672,9 +2672,9 @@ export const TOOLS: AssistantTool[] = [
       "THIS IS NOT A BLAST, and that is the whole point: a blast carries a reward, a send count and completes, so filing a data purchase as one lands the right dollars while inflating contacts-sent and the response rate. " +
       "KIND is a closed set, enforced by the database: 'contacts_export' = what it cost to ACQUIRE contacts. 'sms_email_blast' = a FIXED platform charge that does NOT scale with messages sent — the per-message cost is $/send on the blast itself and is already in spend, so putting it here charges it twice. 'other' = anything else — translation, a panel fee, an incentive paid outside a blast — and it REQUIRES a description saying what it was. Reach for 'other' rather than filing a cost under whichever of the first two is closer: kind is what the double-count check reads, and a mislabelled row is a false positive there forever. " +
       "MONEY, one of two ways: `amount` for a flat invoice, or `unit_cost` + `quantity` when it is per-unit (0.07 × 22,121 → $1,548.47) — the product is computed here, shown in the preview, and stored, and `quantity` is kept so cost-per-unit stays derivable. Passing both is fine only if they agree. " +
-      "A NEGATIVE amount is a CREDIT, and the main real use is recovered blast incentives: a reward that goes unclaimed comes back to us, and the survey's spend should fall by what we got back rather than keep showing what we issued. It has to be a cost line — project_blasts CHECKs bid, people and completes as non-negative, so a negative blast cannot exist — and it should carry route 'blast', because a returned incentive reduces what a BLAST respondent cost. Say so in the description: a bare minus sign is unreadable a month later. " +
+      "A NEGATIVE amount is a CREDIT, and the main real use is recovered blast incentives: a reward that goes unclaimed comes back to us, and the study's spend should fall by what we got back rather than keep showing what we issued. It has to be a cost line — project_blasts CHECKs bid, people and completes as non-negative, so a negative blast cannot exist — and it should carry route 'blast', because a returned incentive reduces what a BLAST respondent cost. Say so in the description: a bare minus sign is unreadable a month later. " +
       "IDEMPOTENCY: without an idem_key a second call ADDS A SECOND LINE and spend counts both, so pass one whenever a retry is possible. With one, a re-send updates that same line, and any field you OMIT keeps its recorded value rather than being blanked — use update_cost to un-record something deliberately. The key must be one you chose; an id put there matches nothing and inserts a duplicate. " +
-      "ROUTE (optional) says which fielding route the money bought: 'blast' or 'panel'. It only matters on a survey fielded BOTH ways, and there it matters a great deal — a contacts export is bought in order to blast it, so on PR00425 leaving its $8,697.85 ZoomInfo line unrouted priced the blast side at $170.63 a respondent against a true $714.25. An unrouted line is not spread pro rata; it holds the whole survey out of the per-route rates until someone says where it belongs. On a single-route survey there is only one place it can go, so leave it off. " +
+      "ROUTE (optional) says which fielding route the money bought: 'blast' or 'panel'. It only matters on a study fielded BOTH ways, and there it matters a great deal — a contacts export is bought in order to blast it, so on PR00425 leaving its $8,697.85 ZoomInfo line unrouted priced the blast side at $170.63 a respondent against a true $714.25. An unrouted line is not spread pro rata; it holds the whole study out of the per-route rates until someone says where it belongs. On a single-route study there is only one place it can go, so leave it off. " +
       "Preview says create vs update and warns if the project already carries a line of the same kind and amount; confirm to apply.",
     kind: 'write',
     schema: {
@@ -2835,7 +2835,7 @@ export const TOOLS: AssistantTool[] = [
     name: 'update_cost',
     description:
       "Change a cost line on a project — its kind, amount, quantity, description, date or route. Identify it by `cost_ref` = its idem_key or its id. Only the fields you pass change. Pass `unit_cost` with `quantity` to recompute the amount from the pair. " +
-      "ROUTE is which fielding route the money bought, 'blast' or 'panel', and it is how you fix a survey fielded both ways that the per-route rates are refusing to price. Pass null to un-record it. It changes no dollar of the project's spend — only which side of the CPQR comparison those dollars count on. " +
+      "ROUTE is which fielding route the money bought, 'blast' or 'panel', and it is how you fix a study fielded both ways that the per-route rates are refusing to price. Pass null to un-record it. It changes no dollar of the project's spend — only which side of the CPQR comparison those dollars count on. " +
       "The project's actual spend recomputes. Preview first; confirm to apply.",
     kind: 'write',
     schema: {
@@ -3291,7 +3291,7 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'update_client',
     description:
-      "Update a client's compliance settings, its display_name (the name printed on client documents such as the Survey Activity Statement, e.g. \"The D. E. Shaw Group\"; null clears it so the internal name prints), or assign/fix its Cl##### code on a code-less client (preview first; confirm to apply). Use rename_client to change the internal name.",
+      "Update a client's compliance settings, its display_name (the name printed on client documents such as the Study Activity Statement, e.g. \"The D. E. Shaw Group\"; null clears it so the internal name prints), or assign/fix its Cl##### code on a code-less client (preview first; confirm to apply). Use rename_client to change the internal name.",
     kind: 'write',
     schema: { client: z.string(), fields: z.record(z.unknown()), confirm: z.boolean().optional() },
     handler: async (rawArgs, _ctx, meta) => {
@@ -3644,7 +3644,7 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'create_project',
     description:
-      "Create a new survey project (preview first; confirm to apply). Set ALL provided fields in THIS one call — it accepts the dates (launch/due/deliver/submitted), the N target range (n_target is the minimum, n_target_max the maximum — pass both when the project was sold as a range) + internal target, audience + audience size, budget, row-level flag, the Y/N flags, latest-next-steps, and requested_by (the client contact who requested it — pass their name or email; it resolves an existing contact of that client and tags them) directly, so no follow-up update or set_requested_by is needed. budget is the TOTAL planned $ we intend to SPEND (a cost ceiling, not client revenue) — if the user gives a per-N rate (e.g. \"$37.5/N\"), multiply by the N being collected (usually the internal target) and note the assumption. It is finance-only: without finance access the project is still created and everything else is set, but budget is left blank and `budget_note` says so — pass it on, don't silently drop it. Warns about possible duplicate projects before creating.",
+      "Create a new study project (preview first; confirm to apply). Set ALL provided fields in THIS one call — it accepts the dates (launch/due/deliver/submitted), the N target range (n_target is the minimum, n_target_max the maximum — pass both when the project was sold as a range) + internal target, audience + audience size, budget, row-level flag, the Y/N flags, latest-next-steps, and requested_by (the client contact who requested it — pass their name or email; it resolves an existing contact of that client and tags them) directly, so no follow-up update or set_requested_by is needed. budget is the TOTAL planned $ we intend to SPEND (a cost ceiling, not client revenue) — if the user gives a per-N rate (e.g. \"$37.5/N\"), multiply by the N being collected (usually the internal target) and note the assumption. It is finance-only: without finance access the project is still created and everything else is set, but budget is left blank and `budget_note` says so — pass it on, don't silently drop it. Warns about possible duplicate projects before creating.",
     kind: 'write',
     schema: {
       project_name: z.string(),

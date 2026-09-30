@@ -96,9 +96,9 @@ export function HomeSearch({ rows }: { rows: HomeSearchRow[] }) {
           type="search"
           value={q}
           onChange={e => setQ(e.target.value)}
-          placeholder="Search all your surveys — name, code, account or who asked…"
+          placeholder="Search all your studies — name, code, account or who asked…"
           className="h-9 min-w-[18rem] flex-1 rounded-md border border-border bg-background px-3 text-sm"
-          aria-label="Search your surveys"
+          aria-label="Search your studies"
         />
         <select
           value={client}
@@ -126,7 +126,7 @@ export function HomeSearch({ rows }: { rows: HomeSearchRow[] }) {
             <span className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
               {hits.length === 0
                 ? 'No match'
-                : `${fmtNum(hits.length)} match${hits.length === 1 ? '' : 'es'} in your ${fmtNum(rows.length)} surveys`}
+                : `${fmtNum(hits.length)} match${hits.length === 1 ? '' : 'es'} in your ${fmtNum(rows.length)} studies`}
             </span>
             <Link href={full} className="text-xs text-muted-foreground hover:text-foreground hover:underline">
               Open in the full list →

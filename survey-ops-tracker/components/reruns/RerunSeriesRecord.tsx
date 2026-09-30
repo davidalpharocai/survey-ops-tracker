@@ -859,7 +859,7 @@ function SeriesDetailsSection({
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <Field label="Cadence" value={cadenceLabel(series.cadence_months)} tip="How often a new wave runs (monthly, quarterly, etc.). Drives the next-wave due date." />
           <Field label="Delivery cadence" value={series.delivery_cadence ?? '—'} tip="When each wave is delivered to the client (free text, e.g. “Beginning of month”)." />
-          <Field label="Source template" value={series.template_id ?? '—'} tip="The survey template the original wave was built from. Later waves can use different survey IDs — see the Waves table." />
+          <Field label="Source template" value={series.template_id ?? '—'} tip="The study template the original wave was built from. Later waves can use different survey IDs — see the Waves table." />
           <Field label="Owner" value={series.owner_email ?? '—'} tip="Who owns this rerun series — receives the weekly rerun digest and is the go-to person for it." />
           <Field label="Fielding start (anchor)" value={formatDate(series.anchor_date)} tip="Fallback due-date anchor for a seeded/fresh series with no wave dates yet." />
           <Field
@@ -895,7 +895,7 @@ function SeriesDetailsSection({
       ) : (
         <div className="flex flex-col gap-2.5">
           <label className="flex flex-col gap-1">
-            <span className="text-[12px] text-muted-foreground">Survey name</span>
+            <span className="text-[12px] text-muted-foreground">Study name</span>
             <input value={surveyName} onChange={(e) => setSurveyName(e.target.value)} className={inputCls} />
           </label>
           <div className="flex flex-wrap gap-x-3 gap-y-2 items-center">

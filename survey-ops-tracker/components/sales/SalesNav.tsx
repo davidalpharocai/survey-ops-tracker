@@ -31,7 +31,7 @@ const TABS = [
   // not one. It shows the LIVE book judged and ordered: 144 of Alex's 187
   // surveys are delivered, so the surveys table opens onto history every morning.
   { href: '/sales/home', label: 'Home' },
-  { href: '/sales/surveys', label: 'Surveys' },
+  { href: '/sales/surveys', label: 'Studies' },
   { href: '/sales/accounts', label: 'Accounts' },
   { href: '/sales/contacts', label: 'Contacts' },
   { href: '/sales/whats-new', label: "What's new" },

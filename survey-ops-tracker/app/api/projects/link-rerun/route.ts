@@ -105,20 +105,20 @@ export async function POST(req: Request) {
 
     // ---- Link: attach child under the parent's series root ----
     if (parentId === childId)
-      return NextResponse.json({ error: "A survey can't be a rerun of itself." }, { status: 400 })
+      return NextResponse.json({ error: "A study can't be a rerun of itself." }, { status: 400 })
 
     const { data: parent } = await admin
       .from('survey_projects')
       .select('id, rerun_series_id, rerun_number, series_id')
       .eq('id', parentId)
       .maybeSingle()
-    if (!parent) return NextResponse.json({ error: 'Parent survey not found.' }, { status: 404 })
+    if (!parent) return NextResponse.json({ error: 'Parent study not found.' }, { status: 404 })
 
     const p = parent as Row
     const root = p.rerun_series_id ?? p.id
     if (root === childId)
       return NextResponse.json(
-        { error: "That survey is already part of this one's series — pick a different original." },
+        { error: "That study is already part of this one's series — pick a different original." },
         { status: 400 }
       )
 
@@ -140,7 +140,7 @@ export async function POST(req: Request) {
       return NextResponse.json(
         {
           error:
-            'That survey is already in a different rerun series. Remove it from that one first, then link it here.',
+            'That study is already in a different rerun series. Remove it from that one first, then link it here.',
         },
         { status: 409 }
       )

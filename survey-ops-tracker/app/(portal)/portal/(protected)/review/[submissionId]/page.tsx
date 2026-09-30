@@ -48,7 +48,7 @@ export default async function ReviewPage({
         </Link>
         <div className="flex items-start justify-between mt-3 flex-wrap gap-2">
           <div>
-            <h1 className="text-xl font-bold text-slate-900 dark:text-white">{project?.project_name ?? 'Survey project'}</h1>
+            <h1 className="text-xl font-bold text-slate-900 dark:text-white">{project?.project_name ?? 'Study project'}</h1>
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
               Version {submission.version}
               {submission.version > 1 && ' — resubmitted after feedback'} · submitted{' '}
@@ -91,7 +91,7 @@ export default async function ReviewPage({
         <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-300 dark:border-amber-500/30 rounded-xl px-4 py-3 mb-6 text-sm">
           <p className="text-xs font-medium text-amber-700 dark:text-amber-400 mb-1">After-fielding review — questions + results</p>
           <p className="text-slate-700 dark:text-slate-300 mb-2">
-            Please review the questions below together with the survey results.
+            Please review the questions below together with the study results.
           </p>
           {submission.results_url ? (
             <a

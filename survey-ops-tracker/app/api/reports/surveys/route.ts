@@ -95,11 +95,11 @@ export async function GET(req: NextRequest) {
   if (placeholderClause) XLSX.utils.sheet_add_aoa(ws, [[], [placeholderClause]], { origin: -1 })
 
   const wb = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(wb, ws, 'Surveys')
+  XLSX.utils.book_append_sheet(wb, ws, 'Studies')
   const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) as Buffer
 
   const safe = period.label.replace(/[^0-9A-Za-z]+/g, '_')
-  const fname = `surveys-${event}${type ? '-' + type : ''}-${safe}.xlsx`
+  const fname = `studies-${event}${type ? '-' + type : ''}-${safe}.xlsx`
   return new NextResponse(new Uint8Array(buf), {
     status: 200,
     headers: {

@@ -43,7 +43,7 @@ describe('deriveWaitingOn', () => {
   it('walks the pipeline stages in order', () => {
     expect(deriveWaitingOn(base)).toBe('Us — doc programming')
     expect(deriveWaitingOn({ ...base, stage_doc_programming: true }))
-      .toBe('Us — survey programming')
+      .toBe('Us — study programming')
     expect(deriveWaitingOn({
       ...base,
       stage_doc_programming: true,

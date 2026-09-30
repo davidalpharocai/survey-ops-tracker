@@ -68,7 +68,7 @@ describe('reconcileText: plain words, red only for a real disagreement', () => {
     const t = reconcileText(reconcile({ rows: [R('a', 100)], expectedTotal: 3686, expectedIds: ['a', 'b'] }), money)
     expect(t.ok).toBe(false)
     expect(t.text).toContain('$100 but the figure says $3,686')
-    expect(t.text).toContain('1 of the surveys the figure counted are missing')
+    expect(t.text).toContain('1 of the studies the figure counted are missing')
     expect(t.text).toContain('Do not rely on either number')
   })
 
