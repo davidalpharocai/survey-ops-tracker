@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { fmtNum } from '@/lib/utils/number'
 import { formatNRange } from '@/lib/utils/nRange'
 import { drillRows, type DrillRow, type InsightsModel } from '@/lib/insights/model'
+import { stageLabel } from '@/lib/utils/stage'
 import type { DrillRequest } from './drill'
 
 /**
@@ -163,7 +164,7 @@ function Row({ r, delivered, today }: { r: DrillRow; delivered: boolean; today: 
         </>
       ) : (
         <>
-          <td className="whitespace-nowrap px-3 py-1.5 text-muted-foreground">{r.stage}</td>
+          <td className="whitespace-nowrap px-3 py-1.5 text-muted-foreground">{stageLabel(r.stage)}</td>
           <td className={`whitespace-nowrap px-3 py-1.5 text-right tabular-nums ${r.due && r.due < today ? 'text-red-600 dark:text-red-400' : ''}`}>
             {r.due ?? '—'}
           </td>

@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
-import { STAGE_ORDER } from '@/lib/utils/stage'
+import { STAGE_ORDER, stageLabel } from '@/lib/utils/stage'
 import { DELIVERED_WINDOW_LABELS, type DeliveredWindow } from '@/lib/utils/date'
 import { InfoTooltip } from '@/components/shared/InfoTooltip'
 import { useClients } from '@/lib/hooks/useClients'
@@ -307,8 +307,10 @@ export function BoardFilters({
                 >
                   <option value="">All Stages</option>
                   {STAGE_ORDER.map(stage => (
+                    /* value is the enum -- it filters board_column. Only the
+                       text a person reads goes through stageLabel. */
                     <option key={stage} value={stage}>
-                      {stage}
+                      {stageLabel(stage)}
                     </option>
                   ))}
                   <option value="Closed">Archived</option>

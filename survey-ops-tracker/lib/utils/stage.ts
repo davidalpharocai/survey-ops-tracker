@@ -25,7 +25,7 @@ export const STAGE_DESCRIPTIONS: Record<string, string> = {
   'Study Questions Review': 'The questionnaire is still going back and forth with the client. Approving it greenlights the study.',
   'Submitted': 'Questions approved and accepted into operations — work not started yet.',
   'Doc Programming': 'The questionnaire document is being programmed.',
-  'Survey Programming': 'The survey is being built in the survey tool.',
+  'Survey Programming': 'The study is being built in the survey tool.',
   'EdWin QA': 'Internal QA pass in Edwin before fielding.',
   'Fielding': 'Live and collecting responses.',
   'Data QA': 'Cleaning and validating the collected data.',
@@ -37,10 +37,35 @@ export const STAGE_DESCRIPTIONS: Record<string, string> = {
   'Awaiting Approval': 'Waiting on the client to approve the work commercially — approval moves the project into operations at Study Questions Review, where the questionnaire itself is agreed.',
 }
 
-/** User-facing label for a board column. The final stage reads as "Delivered"
- * (the deliverable is sent) while the underlying enum value stays 'Delivery'. */
+/**
+ * The user-facing label for a board column.
+ *
+ * THE ENUM VALUES ARE THE DATA. `public.board_column` (002) is a Postgres enum;
+ * every project row stores one of these strings, and two live trigger functions
+ * name them as SQL literals -- log_stage_entry (063) and
+ * set_launch_date_on_fielding (072). Renaming a value in the database therefore
+ * means a migration that also rebuilds both functions in the same transaction,
+ * because the moment the value changes those literals stop casting and every
+ * stage move fails. No display name is worth that.
+ *
+ * So the rename lives here. It is the same trade 'Delivery' has always made:
+ * the stage reads as "Delivered", because that is what has happened to the
+ * survey, while the stored value stays 'Delivery'. 'Survey Programming' now
+ * reads as "Study Programming" for the same reason -- front-facing we say
+ * Study; the column keeps its name.
+ *
+ * EVERY DISPLAY SITE ROUTES THROUGH HERE. What must NOT is a value: a filter's
+ * <option value>, a drill-down query key, an MCP argument, a CSV the sheet
+ * reads back. Those are the enum, and a label passed where a value belongs
+ * matches nothing and does it silently.
+ */
+const STAGE_LABEL: Record<string, string> = {
+  'Survey Programming': 'Study Programming',
+  'Delivery': 'Delivered',
+}
+
 export function stageLabel(column: string): string {
-  return column === 'Delivery' ? 'Delivered' : column
+  return STAGE_LABEL[column] ?? column
 }
 
 export type StageFields = {

@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import {
   STAGE_ORDER,
+  STAGE_DESCRIPTIONS,
   deriveCurrentStage,
   getCheckboxesForColumn,
+  stageLabel,
   type BoardColumn,
   type StageFields,
 } from './stage'
@@ -142,5 +144,45 @@ describe('a database that has not run migration 128 yet', () => {
     expect(deriveCurrentStage({ ...legacy, stage_questions_approved: false })).toBe('Study Questions Review')
     expect(deriveCurrentStage({ ...legacy, stage_questions_approved: null })).toBe('Survey Programming')
     expect(deriveCurrentStage({ ...legacy, stage_questions_approved: true })).toBe('Survey Programming')
+  })
+})
+
+/**
+ * The display layer is where the survey->Study rename happens for a stage,
+ * because the stage name is an ENUM VALUE in the database, not a string in this
+ * repo -- see the note on stageLabel. These tests pin both halves of that: what
+ * a person reads, and what is still stored.
+ */
+describe('stageLabel', () => {
+  it('says Study Programming, and Delivered', () => {
+    expect(stageLabel('Survey Programming')).toBe('Study Programming')
+    expect(stageLabel('Delivery')).toBe('Delivered')
+  })
+
+  // The point of doing it here rather than in a migration: board_column keeps
+  // its value, so the two trigger functions that name it as a SQL literal
+  // (063 log_stage_entry, 072 set_launch_date_on_fielding) keep working.
+  it('leaves the stored enum values alone', () => {
+    expect(STAGE_ORDER).toContain('Survey Programming')
+    expect(STAGE_ORDER).toContain('Delivery')
+    expect(STAGE_ORDER as readonly string[]).not.toContain('Study Programming')
+  })
+
+  it('passes through anything it has no opinion about', () => {
+    for (const s of ['Submitted', 'Doc Programming', 'EdWin QA', 'Fielding', 'Data QA', 'Study Questions Review']) {
+      expect(stageLabel(s)).toBe(s)
+    }
+    // Insights buckets everything off-pipeline as 'Other' and renders it
+    // through the same function.
+    expect(stageLabel('Other')).toBe('Other')
+  })
+
+  // Every stage a person can see has to have a label AND a tooltip, or the
+  // rename leaves a stage explaining itself in the old words.
+  it('describes every stage without calling the study a survey', () => {
+    for (const s of STAGE_ORDER) {
+      expect(STAGE_DESCRIPTIONS[s], `no description for ${s}`).toBeTruthy()
+    }
+    expect(STAGE_DESCRIPTIONS['Survey Programming']).not.toMatch(/The survey/)
   })
 })

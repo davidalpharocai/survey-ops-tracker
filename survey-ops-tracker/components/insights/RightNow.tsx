@@ -6,6 +6,7 @@ import { InfoTooltip } from '@/components/shared/InfoTooltip'
 import { fmtNum } from '@/lib/utils/number'
 import { formatNRange } from '@/lib/utils/nRange'
 import { NO_CAPTAIN } from '@/lib/insights/filters'
+import { stageLabel } from '@/lib/utils/stage'
 import { DUE_SOON_DAYS, pctText, type InsightsModel, type StageRow, type WorkloadRow } from '@/lib/insights/model'
 import { InsightsCard } from './InsightsCard'
 import { sideBucketRequest, type DrillRequest, type OpenDrill } from './drill'
@@ -42,10 +43,13 @@ export function RightNow({ model: m, open }: { model: InsightsModel; open: OpenD
     }
   }
 
+  // `key`, `query` and the list filter below carry d.stage RAW: they are the
+  // board_column enum value, and a label there would match nothing. Only the
+  // two strings a person reads are relabelled.
   const openStage = (d: StageRow) => open({
     key: `stage-${d.stage}`,
-    title: `In flight · ${d.stage}`,
-    population: `In flight · ${d.stage}${words}`,
+    title: `In flight · ${stageLabel(d.stage)}`,
+    population: `In flight · ${stageLabel(d.stage)}${words}`,
     query: { kind: 'open', stage: d.stage },
     expected: d.count,
     expectedWhere: 'on the bar',
@@ -146,7 +150,7 @@ export function RightNow({ model: m, open }: { model: InsightsModel; open: OpenD
           <BarChart
             ariaLabel="In-flight surveys by stage"
             data={n.byStage}
-            label={d => d.stage}
+            label={d => stageLabel(d.stage)}
             labelHeader="Stage"
             value={d => d.count}
             valueName="Surveys"
