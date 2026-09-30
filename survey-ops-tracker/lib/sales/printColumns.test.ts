@@ -535,6 +535,28 @@ describe('notes about the choice', () => {
       expect(n.map(x => x.id)).not.toContain('no-response-figure')
     })
 
+    /**
+     * ── FOUND BY AN ADVERSARIAL REVIEW OF THIS COMMIT, 2026-09-29 ────────────
+     *
+     * The subtraction was guarded on `p.estimate`, which looked right and was
+     * not: printsOf FORCES estimate=false whenever Final is off, so unticking
+     * Final (with Target still on) fired the subtraction while suppressing the
+     * note it was subtracting on behalf of. The panel then reported a dash
+     * count short by exactly the number of projectable rows, and named none of
+     * the missing ones. The guard is now "did that note actually fire".
+     */
+    it('subtracts only what the estimate note actually claimed, so Final-off does not lose rows', () => {
+      const noFinal = printsOf(choice(['final']), 'statement')
+      expect(noFinal.final).toBe(false)
+      expect(noFinal.estimate).toBe(false)
+      const n = choiceNotes(noFinal, { estimated: 2, noResponseFigure: 5 })
+      // No estimate note (there is no Final column for a projection to sit in),
+      // so all five dashes belong to the generic note.
+      expect(n.map(x => x.id)).toEqual(['no-response-figure'])
+      expect(n[0].text).toContain('5 studies')
+      expect(n[0].text).not.toContain('3 studies')
+    })
+
     it('still reports the dashes that are nothing to do with the tick', () => {
       // 5 dashes, 2 of which could have been projected. The other 3 are studies
       // that have not reached quality review and could never carry a figure.
@@ -552,6 +574,24 @@ describe('notes about the choice', () => {
       expect(choiceNotes(printsOf(choice(['final'], [], ['estimate']), 'statement'), { estimated: 3 })
         .map(x => x.id)).not.toContain('estimate-on')
     })
+  })
+
+  /**
+   * ── ALSO FROM THAT REVIEW: THE ▼ WAS LEFT STRANDED ────────────────────────
+   *
+   * Removing the met/short tally took away the only legend for the
+   * below-target mark outside the notes. With Notes unticked a client was left
+   * with "▼ 940" and nothing on the page defining the triangle — and
+   * UnexplainedMark had no case for it, so the warning that exists for exactly
+   * this could not fire.
+   */
+  it('warns that the ▼ has nothing left to explain it once the notes are off', () => {
+    const p = printsOf(SYSTEM_DEFAULT, 'statement')
+    expect(choiceNotes(p, { unexplained: ['below'] })).toEqual([])
+    const off = printsOf(choice([], ['notes']), 'statement')
+    const n = choiceNotes(off, { unexplained: ['below'] })
+    expect(n.map(x => x.id)).toEqual(['notes-off'])
+    expect(n[0].text).toContain('the ▼')
   })
 
   it('warns, without blocking, when Final prints without Target', () => {

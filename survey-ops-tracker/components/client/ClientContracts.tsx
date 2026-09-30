@@ -161,7 +161,8 @@ export function ClientContracts({ clientId }: { clientId: string }) {
   const setDollars = useSetTermDollars()
   const { data: member } = useCurrentMember()
   const canFinance = useCanViewFinancials()
-  const { data: dollars = {} } = useTermDollars(terms.map(t => t.id))
+  // `dollarsReady` is load-bearing, not a loading spinner. See save().
+  const { data: dollars = {}, isSuccess: dollarsReady } = useTermDollars(terms.map(t => t.id))
 
   const [expanded, setExpanded] = useState(true)
   const [adding, setAdding] = useState(false)
@@ -215,7 +216,25 @@ export function ClientContracts({ clientId }: { clientId: string }) {
         onSuccess: () => {
           // The dollars are a second table and a second write. Sequencing them
           // after the first keeps a refused edit from still moving the money.
-          if (canFinance) setDollars.mutate({ termId: id, dollars })
+          //
+          // AND `dollarsReady`, WHICH STOPS AN EDIT DESTROYING THE FIGURE IT
+          // NEVER SHOWED. useTermDollars is a SECOND query that only starts
+          // once `terms` has resolved, so there is a window where the rows are
+          // on screen and `dollars` is still {}. Open the editor inside it and
+          // the Value box is blank -- not "0", blank, exactly as it looks for a
+          // contract with no value -- so pressing Save wrote num('') = null
+          // straight over a real figure, in a finance-only table, with nothing
+          // on screen to contradict it. Adding the ✎ button made that window
+          // easier to hit and the new "Contract saved" toast made it look
+          // deliberate.
+          //
+          // Null still has to be WRITABLE here: clearing a contract's value is
+          // a real thing to want, which is why this write is unguarded where
+          // the create branch's is guarded by `dollars != null`. So the gate is
+          // on whether the figure was ever LOADED, not on whether it is null.
+          // Not loaded means the person cannot have seen it and cannot have
+          // meant to change it, so the safe write is no write.
+          if (canFinance && dollarsReady) setDollars.mutate({ termId: id, dollars })
           setEditingId(null)
           setDraft(empty)
         },

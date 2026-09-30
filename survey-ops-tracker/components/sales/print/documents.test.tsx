@@ -580,12 +580,17 @@ describe('nothing quotes a figure the chosen document leaves out', () => {
     // The fixture's Final column carries an italic "not recorded", whose only
     // explanation is the "Final and collected" note.
     const both = statement({ printChoice: { sectionsOff: ['notes'] } })
-    expect(both).toContain('nothing on the page explains why a figure says “at least” or “Not yet priced” '
-      + 'or why a response says “not recorded”.')
+    // THREE clauses since 2026-09-29, not two: the fixture also has a delivered
+    // study under target, and removing the met/short tally took away the ▼'s
+    // only legend outside the notes, so it joined the list this warning exists
+    // to keep. See "counts the below-target mark as unexplained" below.
+    expect(both).toContain('nothing on the page explains why a figure says “at least” or “Not yet priced”, '
+      + 'why a response says “not recorded” or what the ▼ beside a final count means.')
     // Credits and the contract panel off too: nothing says "at least" any more,
     // and the mark left over is the one that used to raise no warning at all.
     const h = statement({ printChoice: { colsOff: ['credits'], sectionsOff: ['contract', 'notes'] } })
-    expect(h).toContain('nothing on the page explains why a response says “not recorded”.')
+    expect(h).toContain('nothing on the page explains why a response says “not recorded” '
+      + 'or what the ▼ beside a final count means.')
     expect(h).not.toContain('at least” or “Not yet priced')
     // With the Final column off, the mark is gone and so is the warning.
     expect(statement({ printChoice: { colsOff: ['credits', 'final'], sectionsOff: ['contract', 'notes'] } }))
@@ -608,6 +613,31 @@ describe('nothing quotes a figure the chosen document leaves out', () => {
     // off there is no ≈ on the page, so there is nothing left unexplained and
     // the panel has no business warning about it.
     expect(unexplainedMarks({ ...args, prints: { ...PRINTS_ALL, estimate: false } })).toEqual([])
+  })
+
+  /**
+   * ── THE ▼, WHICH THIS COMMIT NEARLY STRANDED (2026-09-29) ─────────────────
+   *
+   * Removing the "3 fell short (▼)" tally from both captions was what David
+   * asked for, and it also removed the mark's only legend outside the notes.
+   * The mark still prints per row — deliberately, so a client auditing one
+   * study can see which came in under target — so with Notes unticked the page
+   * carried a glyph it never defined.
+   */
+  it('counts the below-target mark as unexplained, like the estimate', () => {
+    const under = (o: Partial<StatementRow>): StatementRow => ({
+      id: 'u', project_code: 'PR7', project_name: 'Study Yankee - Audience', board_column: 'Delivery',
+      status: 'Closed', phase: 'Active', n_target: 1000, n_target_max: null, n_collected: 980,
+      n_actual: 940, credits: 10, deliver_date: '2026-09-01', delivered_at: '2026-09-01', ...o,
+    })
+    const args = { rows: [under({})], neverRecorded: new Set<string>(), notes: [] }
+    expect(unexplainedMarks({ ...args, prints: PRINTS_ALL })).toEqual(['below'])
+    // It lives in the Final column, so it goes with it.
+    expect(unexplainedMarks({ ...args, prints: { ...PRINTS_ALL, final: false } })).toEqual([])
+    // A final AT or OVER target carries no mark and nothing to explain.
+    expect(unexplainedMarks({
+      rows: [under({ n_actual: 1000 })], neverRecorded: new Set<string>(), notes: [], prints: PRINTS_ALL,
+    })).toEqual([])
   })
 
   // The projection's own rendering is pinned in Ledger.test.tsx, on a row in

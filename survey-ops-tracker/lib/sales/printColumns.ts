@@ -623,13 +623,24 @@ export function offeredColumns(doc: PrintDoc, { internal = false }: { internal?:
 export interface ChoiceNote { id: string; text: string }
 
 /** A mark on the page whose only explanation is a note. */
-export type UnexplainedMark = 'floor' | 'estimate' | 'not-recorded'
+export type UnexplainedMark = 'floor' | 'estimate' | 'not-recorded' | 'below'
 
 /** What each one would leave unexplained, in the words the page prints. */
 const UNEXPLAINED_TEXT: Record<UnexplainedMark, string> = {
   floor: 'why a figure says “at least” or “Not yet priced”',
   estimate: 'what an “≈ est.” figure is based on',
   'not-recorded': 'why a response says “not recorded”',
+  // ── ADDED 2026-09-29, AND IT IS THIS DIFF'S OWN DOING ──────────────────────
+  // The ▼ was explained in TWO places: the notes, and the Activity/List caption
+  // that read "…; 3 fell short (▼)". David asked for that tally removed so the
+  // documents only highlight positives, which was right — but it was also the
+  // only legend for the mark OUTSIDE the notes. Untick Notes and a client was
+  // left with "▼ 940" in the Final column and nothing anywhere on the page
+  // saying what the triangle meant.
+  //
+  // The mark itself stays. A client auditing one study should see which came in
+  // under target; what they must not get is an unexplained glyph.
+  below: 'what the ▼ beside a final count means',
 }
 
 /** "A", "A and B", "A, B and C" — the panel's own copy, so this module needs
@@ -698,7 +709,15 @@ export function choiceNotes(
   // specific note is the more useful of the two, so it keeps them. With the
   // estimate on those rows print a projection and are not dashes at all, so
   // there is nothing to subtract.
-  const otherDashes = Math.max(0, noResponseFigure - (p.estimate ? 0 : estimated))
+  //
+  // SUBTRACT ONLY WHAT THAT NOTE ACTUALLY CLAIMED. `p.estimate` alone is the
+  // wrong test: printsOf forces estimate=false whenever FINAL is off, so with
+  // Final unticked and Target still on, the subtraction fired while the note
+  // that was supposed to account for those rows did not — and the panel
+  // reported a dash count short by exactly the number of projectable rows,
+  // with nothing naming the difference.
+  const estimateNoteClaimed = p.final && estimated > 0 && !p.estimate
+  const otherDashes = Math.max(0, noResponseFigure - (estimateNoteClaimed ? estimated : 0))
   if (otherDashes > 0 && (p.final || p.target)) {
     const one = otherDashes === 1
     out.push({

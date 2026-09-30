@@ -93,6 +93,11 @@ export function unexplainedMarks({ rows, neverRecorded, prints, notes }: {
     const finals = rows.map(p => responseCells(p, neverRecorded.has(p.id), { estimate: prints.estimate }).final)
     if (finals.some(f => f.kind === 'estimate')) out.push('estimate')
     if (finals.some(f => f.kind === 'not-recorded')) out.push('not-recorded')
+    // The ▼. Its caption-level legend was removed on 2026-09-29 with the
+    // met/short tally, leaving finalNote below as its only explanation — so
+    // turning the notes off now strands it, which is precisely what this
+    // function exists to report.
+    if (finals.some(f => f.kind === 'final' && f.below)) out.push('below')
   }
   return out
 }

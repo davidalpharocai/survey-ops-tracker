@@ -18,8 +18,9 @@ import type { PrintChoiceControls } from './usePrintChoice'
  * WHAT PRINTS: a checkbox per column and per section, each unticked one gone
  * from the page below at once, so the preview IS the print. "Save as my
  * default" makes the current choice this person's starting point for this
- * document next time; "Reset to system default" turns everything back on and
- * forgets the saved one. Notes about the choice itself (Final without Target)
+ * document next time; "Reset to system default" puts every tick back where it
+ * started (which is not "everything on": Ref. and the final estimate are opt-in)
+ * and forgets the saved one. Notes about the choice itself (Final without Target)
  * sit under the checklist and never count as an item to check: they do not
  * stop the dialog opening, because the choice is the salesperson's to make.
  *
@@ -122,8 +123,15 @@ export function PreSendPanel({ heading, modeLine, checks, name, onPrint, choice,
 const FEEDBACK: Record<Exclude<PrintChoiceControls['feedback'], 'none'>, string> = {
   saved: 'Saved. This document will start from this choice next time.',
   'save-failed': 'This browser would not save it (a private window, or site data is blocked). This print still uses your choice.',
-  reset: 'Everything prints again, and your saved default is cleared.',
-  'reset-failed': 'Everything prints again on this print, but this browser would not clear your saved default.',
+  // ── CORRECTED 2026-09-29 ────────────────────────────────────────────────
+  // These three said "everything prints again". Reset goes to SYSTEM_DEFAULT,
+  // and since Ref. and the final estimate became opt-in that is no longer
+  // everything — reset turns those two OFF. The same day's change rewrote the
+  // identical claim in CHOICE_SOURCE_TEXT.system and in the user guide and
+  // missed these, which is the one place a person is told what the button they
+  // just pressed did.
+  reset: 'Every tick is back where it started, and your saved default is cleared.',
+  'reset-failed': 'Every tick is back where it started on this print, but this browser would not clear your saved default.',
 }
 
 /** The column and section checkboxes, and the default buttons. */
@@ -181,7 +189,7 @@ function WhatPrints({ c }: { c: PrintChoiceControls }) {
         <button type="button" onClick={c.reset} disabled={c.source === 'system' && !c.hasSaved} className={button}>
           Reset to system default
         </button>
-        <InfoTooltip text="Turns every column and section back on, and forgets your saved default, so the next one starts with everything too." />
+        <InfoTooltip text="Puts every tick back where it started — most columns and sections on, Ref. and Final estimate off — and forgets your saved default, so the next one starts the same way." />
         <span className="text-xs text-muted-foreground" aria-live="polite">
           {c.feedback !== 'none'
             ? FEEDBACK[c.feedback]
