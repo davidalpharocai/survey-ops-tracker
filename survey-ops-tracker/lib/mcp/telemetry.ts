@@ -48,7 +48,7 @@ export function scrubDetail(detail: unknown): unknown {
 export function cleanErrorMessage(err: unknown): string {
   const raw = err instanceof Error ? err.message : String(err)
   if (/relation .* does not exist/i.test(raw) || /schema cache/i.test(raw)) {
-    return "The Survey Ops database tables for this feature aren't set up yet — ask David to run the latest database migration in Supabase."
+    return "The Study Ops database tables for this feature aren't set up yet — ask David to run the latest database migration in Supabase."
   }
   return 'Something went wrong handling that request. Please try again.'
 }

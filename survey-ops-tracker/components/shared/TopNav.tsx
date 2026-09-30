@@ -329,7 +329,7 @@ export function TopNav() {
           alt="AlphaROC"
           className="h-5 w-auto shrink-0 invert dark:invert-0"
         />
-        Survey Ops
+        Study Ops
       </Link>
 
       <div className="flex items-center gap-0.5 flex-wrap">

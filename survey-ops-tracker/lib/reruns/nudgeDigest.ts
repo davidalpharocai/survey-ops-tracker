@@ -69,7 +69,7 @@ export function buildRerunNudge(
     parts.push(`<p style="color:#666;font-size:12px;">Backup owner: ${escapeHtml(backup)}.</p>`)
   }
   parts.push(
-    `<p style="color:#666;font-size:12px;">You're the owner of these reruns in the Survey Ops Command Center.</p>`
+    `<p style="color:#666;font-size:12px;">You're the owner of these reruns in the Study Ops Command Center.</p>`
   )
 
   // Subject leads with the more urgent count.

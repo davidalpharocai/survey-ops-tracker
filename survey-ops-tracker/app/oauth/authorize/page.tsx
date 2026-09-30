@@ -41,7 +41,7 @@ function NotAvailableCard({ selfUrl }: { selfUrl: string }) {
       <div className="w-full max-w-sm p-8 bg-card rounded-xl border border-border text-center">
         <h1 className="text-lg font-bold text-foreground mb-2">Wrong account</h1>
         <p className="text-sm text-muted-foreground mb-4">
-          This browser is signed into Survey Ops with an account that can&apos;t use the connector —
+          This browser is signed into Study Ops with an account that can&apos;t use the connector —
           it&apos;s for internal AlphaROC analysts only. Sign in with your @alpharoc.ai analyst
           account to continue.
         </p>
@@ -71,7 +71,7 @@ export default async function AuthorizePage({
   }
   const client = await getClient(clientId)
   if (!client) {
-    return <ErrorCard title="Unknown client" message="This connector is not registered with Survey Ops." />
+    return <ErrorCard title="Unknown client" message="This connector is not registered with Study Ops." />
   }
   const registeredUris = (client.redirect_uris ?? []) as string[]
   if (!redirectUri || !registeredUris.includes(redirectUri)) {
@@ -92,7 +92,7 @@ export default async function AuthorizePage({
     return <ErrorCard title="Unsupported PKCE method" message="Only the S256 code challenge method is supported." />
   }
   if (resource && resource !== MCP_RESOURCE()) {
-    return <ErrorCard title="Unknown resource" message="This authorization request targets a resource Survey Ops doesn't recognize." />
+    return <ErrorCard title="Unknown resource" message="This authorization request targets a resource Study Ops doesn't recognize." />
   }
 
   // ---- Session gate ----
@@ -130,7 +130,7 @@ export default async function AuthorizePage({
         <div className="mb-6">
           <h1 className="text-xl font-bold text-foreground">Connect {client.name}</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {client.name} wants to connect to your Survey Ops Command Center account.
+            {client.name} wants to connect to your Study Ops Command Center account.
             This will return you to <span className="font-medium text-foreground">{redirectHost}</span>.
           </p>
         </div>

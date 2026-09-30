@@ -1288,7 +1288,7 @@ export const TOOLS: AssistantTool[] = [
   {
     name: 'decode_survey_id',
     description:
-      'Decode a Survey Ops survey ID into owner initials, client+project abbreviation, date, and region.',
+      'Decode a Study Ops survey ID into owner initials, client+project abbreviation, date, and region.',
     kind: 'read',
     schema: { id: z.string() },
     handler: async (rawArgs) => {

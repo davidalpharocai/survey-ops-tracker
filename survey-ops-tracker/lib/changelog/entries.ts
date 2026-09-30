@@ -80,6 +80,43 @@ export function changelogFor(audience: ChangeAudience): ChangelogEntry[] {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    date: '2026-09-30',
+    changes: [
+      {
+        kind: 'IMPROVED',
+        text: 'The app is now the Study Ops Command Center. Same initials, and nothing you have bookmarked changes.',
+        audience: 'all',
+      },
+      {
+        kind: 'IMPROVED',
+        text: 'The pipeline stage that used to read "Survey Programming" now reads "Study Programming".',
+        audience: 'all',
+      },
+      // Four fixes to yesterday's release. The contract one is NOT tagged: a
+      // contract's dollar value is finance-only, so the fact that it could be
+      // lost is finance-only too.
+      {
+        kind: 'FIXED',
+        text: 'On a printed statement the ▼ beside a low final count had nothing explaining it unless the notes were switched on. Turning the notes off now warns you that the mark will print unexplained.',
+        audience: 'all',
+      },
+      {
+        kind: 'FIXED',
+        text: 'The print picker miscounted how many dashes a document would show once the final count was switched off, reporting fewer than would actually print.',
+        audience: 'all',
+      },
+      {
+        kind: 'FIXED',
+        text: '"Reset to system default" still described itself as turning everything back on, which stopped being true when columns that start switched off were added.',
+        audience: 'all',
+      },
+      {
+        kind: 'FIXED',
+        text: 'Opening a contract to edit it and saving immediately could blank its value, because the figure had not finished loading into the box. The value now loads before the form will save it.',
+      },
+    ],
+  },
+  {
     date: '2026-09-29',
     changes: [
       // ── The client documents. These ARE the sales tier's own screens, so

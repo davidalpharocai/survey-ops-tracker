@@ -54,7 +54,7 @@ function UpdatePasswordForm() {
         <div className="mb-6">
           <h1 className="text-xl font-bold text-foreground">Set your password</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Choose a password to finish setting up your Survey Ops account.
+            Choose a password to finish setting up your Study Ops account.
           </p>
         </div>
         {ready === false ? (

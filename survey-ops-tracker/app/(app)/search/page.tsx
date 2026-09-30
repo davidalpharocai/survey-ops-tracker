@@ -4,7 +4,7 @@ import { isSearchable, MIN_QUERY } from '@/lib/search/match'
 import { SearchResults } from '@/components/search/SearchResults'
 
 export const dynamic = 'force-dynamic'
-export const metadata = { title: 'Search — Survey Ops Command Center' }
+export const metadata = { title: 'Search — Study Ops Command Center' }
 
 /**
  * System-wide search, grouped by object.

@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Survey Ops Command Center",
+  title: "Study Ops Command Center",
   description: "AlphaRoc survey operations tracker",
 };
 

@@ -118,7 +118,7 @@ export async function GET(req: NextRequest) {
     .order('created_at', { ascending: false })
     .limit(8)
 
-  const sections: string[] = [`☀️ *Survey Ops daily digest* — ${fmt(today)}`]
+  const sections: string[] = [`☀️ *Study Ops daily digest* — ${fmt(today)}`]
   if (badEvents && badEvents.length) {
     const lines = badEvents.map(e => `• \`${escSlack(e.source)}\` ${escSlack(e.status)} — ${escSlack(e.detail ?? '')}`.trim())
     sections.push(`⚠️ *Backend issues in the last day (${badEvents.length})*\n${lines.join('\n')}`)

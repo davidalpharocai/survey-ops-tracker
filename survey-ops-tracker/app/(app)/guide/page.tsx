@@ -2,7 +2,7 @@ import { marked } from 'marked'
 import guideMd from '@/USER_GUIDE.md'
 import { GuideNav, type TocItem } from './GuideNav'
 
-export const metadata = { title: 'User Guide — Survey Ops Command Center' }
+export const metadata = { title: 'User Guide — Study Ops Command Center' }
 
 function slugify(s: string): string {
   return (

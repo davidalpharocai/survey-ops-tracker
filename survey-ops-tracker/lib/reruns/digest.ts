@@ -210,7 +210,7 @@ function shell(rangeLabel: string, baseUrl: string, bodyHtml: string): string {
         <tr>
           <td style="background:${NAVY};padding:20px 28px;">
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
-              <td style="font-size:16px;font-weight:bold;color:#ffffff;font-family:Arial,Helvetica,sans-serif;">AlphaROC &middot; Survey Ops</td>
+              <td style="font-size:16px;font-weight:bold;color:#ffffff;font-family:Arial,Helvetica,sans-serif;">AlphaROC &middot; Study Ops</td>
             </tr><tr>
               <td style="font-size:13px;color:#c7d2fe;font-family:Arial,Helvetica,sans-serif;padding-top:4px;">Reruns this week &middot; ${escapeHtml(rangeLabel)}</td>
             </tr></table>

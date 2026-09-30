@@ -127,7 +127,7 @@ export default function LoginForm() {
   return (
     <div className="w-full max-w-sm p-8 bg-card rounded-xl border border-border">
       <div className="mb-6">
-        <h1 className="text-xl font-bold text-foreground">Survey Ops Command Center</h1>
+        <h1 className="text-xl font-bold text-foreground">Study Ops Command Center</h1>
         <p className="text-sm text-muted-foreground mt-1">
           Sign in with your @{ALLOWED_EMAIL_DOMAIN} account — no password needed.
         </p>

@@ -41,7 +41,7 @@ describe('buildDigest', () => {
       row({ id: '2', text: 'Call client', due_date: '2026-07-02' }),
     ]
     const digest = buildDigest('a@alpharoc.ai', rows)
-    expect(digest.subject).toBe('Survey Ops reminders — 2 due')
+    expect(digest.subject).toBe('Study Ops reminders — 2 due')
     expect(digest.ids).toEqual(['1', '2'])
     expect(digest.html).toContain('Send invoice')
     expect(digest.html).toContain('Call client')

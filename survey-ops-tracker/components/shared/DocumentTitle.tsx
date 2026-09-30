@@ -3,7 +3,7 @@
 import { useEffect } from 'react'
 
 /** The app's own name, and what the tab reads when nothing specific is open. */
-export const APP_TITLE = 'Survey Ops Command Center'
+export const APP_TITLE = 'Study Ops Command Center'
 
 /**
  * Puts the open survey's name in the browser tab.

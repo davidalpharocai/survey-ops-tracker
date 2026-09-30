@@ -48,12 +48,12 @@ export function buildDigest(userEmail: string, rows: ReminderRow[]): UserDigest 
   const html = [
     `<p>You have ${rows.length} reminder${rows.length === 1 ? '' : 's'} due:</p>`,
     `<ul>${lines.join('')}</ul>`,
-    `<p style="color:#666;font-size:12px;">Reminders are managed via your connected Claude (Survey Ops connector).</p>`,
+    `<p style="color:#666;font-size:12px;">Reminders are managed via your connected Claude (Study Ops connector).</p>`,
   ].join('\n')
   return {
     userEmail,
     ids: rows.map(r => r.id),
-    subject: `Survey Ops reminders — ${rows.length} due`,
+    subject: `Study Ops reminders — ${rows.length} due`,
     html,
   }
 }

@@ -50,7 +50,7 @@ export default async function ConnectPage() {
       <div>
         <h1 className="text-2xl font-bold text-foreground">Connect your Claude</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Link Survey Ops to Claude (claude.ai, Claude Desktop, or Claude Code) so you can ask
+          Link Study Ops to Claude (claude.ai, Claude Desktop, or Claude Code) so you can ask
           about your projects and set reminders right from a chat — &quot;what&apos;s due this
           week?&quot;, &quot;remind me Friday to chase the deliverable&quot;. It logs in as you,
           reads the same data you can already see, and reminders arrive by email the morning

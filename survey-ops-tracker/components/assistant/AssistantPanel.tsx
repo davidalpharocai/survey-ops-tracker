@@ -102,12 +102,12 @@ export function AssistantPanel() {
     <div
       className="no-print fixed bottom-5 right-5 z-50 flex flex-col w-[380px] max-w-[calc(100vw-2.5rem)] h-[520px] max-h-[calc(100vh-5rem)] bg-card border border-border rounded-2xl shadow-2xl overflow-hidden"
       role="dialog"
-      aria-label="Survey Ops Assistant"
+      aria-label="Study Ops Assistant"
     >
       {/* Header */}
       <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
         <span className="text-blue-600 dark:text-blue-400">✦</span>
-        <span className="text-sm font-semibold text-foreground">Survey Ops Assistant</span>
+        <span className="text-sm font-semibold text-foreground">Study Ops Assistant</span>
         <Link
           href="/assistant"
           onClick={() => setOpen(false)}
