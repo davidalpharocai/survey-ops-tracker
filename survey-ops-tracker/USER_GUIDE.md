@@ -205,6 +205,16 @@ Every tile, column, bar and count opens a list of exactly the surveys behind it,
 
 A few rules worth knowing: a survey is placed by its **deliver date** (the day the client had it); **on time** means delivered on or before the due date; **cycle time** is calendar days from submitted to delivered, using the median so one outlier can't drag it; empty rerun placeholders and demo accounts are left out, and the footer says how many. A read that fails shows as **Blocked**, never as zero.
 
+## 4e. Insights for sales — the same dashboard, one book
+
+Salespeople get their own **Insights** tab in the sales portal (between Contacts and What's new). It answers the same question §4d does — what has actually been delivered — narrowed to the accounts on that person's book, and it is the **same tested model** underneath, so a cycle time or an on-time share means exactly what it means on the analyst page.
+
+What is there: a sentence stating the period in words, then four tiles (**studies delivered**, **respondents delivered**, **on time**, **typical time to deliver**), delivered per month by type, on time and time-to-deliver against their goal lines, delivered **by account** and **by type**, the **largest deliveries**, and an **Open right now** card (in flight, overdue, due within a week, being scoped, and the pipeline by stage). Filters are **dates**, **type** and **account**; "Open right now" ignores the dates, because it describes today.
+
+What is deliberately **not** there: any dollar figure, and anything about who internally ran a study or how work is spread across the team — that is an operations view, not a book view, and the page says so at its foot rather than leaving a silent gap.
+
+**Account pages** also now carry **Value of delivered work** for the dates chosen. Read it carefully: it is what the delivered studies were **worth**, not a record of what the client has **paid** — the app holds no invoices or payments. Where a study has no price recorded the tile says "not known yet" instead of counting it as nothing, and where only some are priced it says how many it left out. Most accounts have little pricing recorded today, so an empty tile is normal and is not a statement about the client.
+
 ## 5. The AI Assistant
 
 ![The ✦ Assistant panel](/guide-img/assistant-panel.png)

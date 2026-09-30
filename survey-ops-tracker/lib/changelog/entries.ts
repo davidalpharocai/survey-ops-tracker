@@ -83,6 +83,21 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: '2026-09-30',
     changes: [
       {
+        kind: 'NEW',
+        text: 'Sales has an Insights tab: how your book has been doing over any period — studies delivered, respondents, how many landed on time, and how long they typically take — by account, by type and by month. It is the same dashboard the analysts read, narrowed to your accounts, and it carries no dollar figures.',
+        audience: 'all',
+      },
+      // NOT tagged, and the decision is worth recording where the next person
+      // adding a line will see it. The tile itself is on the salesperson's own
+      // screen, so announcing it to them leaks nothing they cannot already
+      // read. But "what a delivered study was worth" is what we charge, and
+      // this file's rule on that is flat. David can flip it; nobody should flip
+      // it on his behalf by pattern-matching the entry above.
+      {
+        kind: 'NEW',
+        text: 'An account page now shows what the delivered work on it was worth, over the dates you have chosen. It is the value of what was delivered, not a record of what has been paid — we do not hold payments — and where a study has no price recorded it says so rather than counting it as nothing.',
+      },
+      {
         kind: 'IMPROVED',
         text: 'The app is now the Study Ops Command Center. Same initials, and nothing you have bookmarked changes.',
         audience: 'all',

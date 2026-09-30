@@ -18,10 +18,11 @@ import { AsOf } from './AsOf'
  * page load, to render badges for surfaces they cannot open. Forking the
  * component would mean carrying that.
  *
- * Five destinations, few enough for a horizontal ribbon. Order is deliberate:
- * Home first because it is the reason to open the tool, Surveys behind it for
+ * Six destinations, few enough for a horizontal ribbon. Order is deliberate:
+ * Home first because it is the reason to open the tool, Studies behind it for
  * the full table, Accounts and Contacts as the two ways of slicing the same
- * book, and What's new last because it is read once a week, not once an hour.
+ * book, Insights for how that book has been doing, and What's new last because
+ * it is read once a week, not once an hour.
  */
 
 const TABS = [
@@ -34,6 +35,12 @@ const TABS = [
   { href: '/sales/surveys', label: 'Studies' },
   { href: '/sales/accounts', label: 'Accounts' },
   { href: '/sales/contacts', label: 'Contacts' },
+  // Insights sits AFTER the three ways of reading the book and before What's
+  // new, because it answers a different question from all of them: Home is what
+  // needs doing today and the three tables are what exists, while this is how
+  // the book has been doing. It is opened weekly, not hourly — but more often
+  // than the release notes behind it.
+  { href: '/sales/insights', label: 'Insights' },
   { href: '/sales/whats-new', label: "What's new" },
 ] as const
 
@@ -86,7 +93,7 @@ export function SalesNav({ name, renderedAt }: { name: string | null; renderedAt
           {name && (
             <span className="hidden shrink-0 pl-1 text-xs text-muted-foreground sm:inline">{name}</span>
           )}
-          {/* Not optional furniture. This shell has four tabs and no other way
+          {/* Not optional furniture. This shell has six tabs and no other way
               out: before this link a sales user could not end their session at
               all, and an admin whose "view as" cookie expired was stranded in
               here with a read-only session and nothing to click. Always shown,

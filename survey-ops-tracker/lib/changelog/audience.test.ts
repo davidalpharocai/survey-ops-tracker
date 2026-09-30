@@ -73,10 +73,18 @@ describe('nothing restricted reaches the sales changelog', () => {
   }
 
   it('says nothing about a page the sales tier cannot open', () => {
-    // The board, Insights, the Context tab, the guide, PureSpectrum, Edwin:
-    // internal surfaces. A bullet about one is at best confusing and at worst a
+    // The board, the Context tab, the guide, PureSpectrum, Edwin: internal
+    // surfaces. A bullet about one is at best confusing and at worst a
     // description of machinery we do not discuss with clients.
-    for (const w of ['Context tab', 'PureSpectrum', 'EdWin', 'Insights tab', 'the board']) {
+    //
+    // 'Insights tab' WAS on this list and came off on 2026-09-30, when the
+    // sales portal got one of its own (/sales/insights — the same model as the
+    // analyst dashboard, scoped to one book, no money). The phrase now names a
+    // page the reader can open, so forbidding it would stop a bullet naming the
+    // tab someone has to click. What it never licensed, and still does not, is
+    // a bullet about the ANALYST dashboard: that is a tagging decision, and the
+    // money and target checks above are the guard that matters.
+    for (const w of ['Context tab', 'PureSpectrum', 'EdWin', 'the board']) {
       expect(text.toLowerCase(), w).not.toContain(w.toLowerCase())
     }
   })
