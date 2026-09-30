@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { requireSalesUser } from '@/lib/sales-auth'
+import { deliveredValueByProject } from '@/lib/server/deliveredValue'
 import { AccountDetail, type AccountProject } from '@/components/sales/AccountDetail'
 
 export const dynamic = 'force-dynamic'
@@ -84,6 +85,23 @@ export default async function SalesAccountPage({ params }: { params: Promise<{ i
   const seen = new Set((freshRes.data ?? []).map(f => f.project_id))
   const neverRecordedIds = freshRes.error ? [] : ids.filter(i => !seen.has(i))
 
+  // What the delivered work was worth (David, 2026-09-30). Computed here, as
+  // service role, because the rate is finance-only and only the DOLLARS are
+  // meant to reach a sales session — see lib/server/deliveredValue.ts. The
+  // rows handed over are the ones sales_projects already returned, so this can
+  // only speak about projects this salesperson can already see.
+  //
+  // Maps and Sets do not survive the server/client boundary, so it crosses as
+  // plain JSON. An id absent from `byId` has no figure, which is not zero.
+  const value = await deliveredValueByProject(projects)
+  const valueProps = {
+    byId: Object.fromEntries(
+      [...value.byId].filter((e): e is [string, number] => e[1] != null)
+    ),
+    withN: [...value.withN],
+    blocked: value.blocked,
+  }
+
   return (
     <div>
       <nav className="mb-4 flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -98,6 +116,7 @@ export default async function SalesAccountPage({ params }: { params: Promise<{ i
         contacts={contactsRes.data ?? []}
         terms={termsRes.data ?? []}
         neverRecordedIds={neverRecordedIds}
+        value={valueProps}
       />
     </div>
   )

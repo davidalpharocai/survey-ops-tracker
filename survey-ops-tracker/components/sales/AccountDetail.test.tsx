@@ -35,13 +35,17 @@ const V1 = 'socc-sales-account-columns'
 
 const CLIENT = { ...FIXTURE_CLIENT, salesperson: 'A Salesperson', created_at: '2024-01-01' }
 
-const show = () => render(
+/** No study priced — the state 52 of 63 owned accounts are actually in. */
+const NO_VALUE = { byId: {} as Record<string, number>, withN: [] as string[], blocked: false }
+
+const show = (value = NO_VALUE) => render(
   <AccountDetail
     client={CLIENT}
     projects={FIXTURE_ROWS}
     contacts={[]}
     terms={FIXTURE_TERMS}
     neverRecordedIds={FIXTURE_NEVER_RECORDED}
+    value={value}
   />,
 )
 
@@ -152,5 +156,43 @@ describe('AccountDetail: a column choice saved when Collected existed', () => {
     expect(headers()).toContain('Target')
     expect(headers()).toContain('Final')
     expect(headers()).not.toContain('Collected')
+  })
+})
+
+/**
+ * The value of delivered work (David, 2026-09-30).
+ *
+ * The figure is computed on the server from lib/finance/revenue.ts and arrives
+ * as plain JSON, so what these assert is the half that can mislead: what the
+ * tile says when there is no figure. Measured on live data the day it was
+ * built, 52 of 63 owned accounts with delivered work had NOTHING priced — so
+ * the empty state is the normal state, not the edge case, and "$0" there would
+ * read to a salesperson as "this client has paid us nothing".
+ */
+describe('value of delivered work', () => {
+  const valueText = () =>
+    screen.getByText('Value of delivered work').parentElement?.textContent ?? ''
+
+  it('shows no dollar amount when nothing on the account is priced', () => {
+    show()
+    const t = valueText()
+    expect(t).not.toMatch(/\$[\d,]*[1-9]/)
+    expect(t).toMatch(/Not known yet/)
+    expect(t).toMatch(/not the same as \$0/)
+  })
+
+  it('sums the studies that do have a figure, and says what it left out', () => {
+    show({ byId: { 'p-00433': 5000, 'p-00390': 7500 }, withN: ['p-00433', 'p-00390'], blocked: false })
+    const t = valueText()
+    expect(t).toMatch(/\$12,500/)
+    expect(t).toMatch(/across 2 studies of \d+ delivered/)
+    expect(t).toMatch(/understates/)
+  })
+
+  it('says a failed read did not load, rather than showing zero', () => {
+    show({ byId: { 'p-00433': 5000 }, withN: ['p-00433'], blocked: true })
+    const t = valueText()
+    expect(t).toMatch(/did not load/)
+    expect(t).not.toMatch(/\$[\d,]*[1-9]/)
   })
 })

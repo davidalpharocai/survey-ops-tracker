@@ -11,6 +11,8 @@ import {
   type DateBasis, type PresetId, type Range,
 } from '@/lib/sales/dateRange'
 import { drawnFigure, finalText, responseCells, sortForStatement } from '@/lib/sales/statement'
+import { summariseValue, describeValue } from '@/lib/sales/deliveredValue'
+import { money } from '@/lib/finance/format'
 
 /**
  * One account: contacts, credit position, and a filterable survey list that can
@@ -184,7 +186,7 @@ export function cellFor(p: AccountProject, id: ColId, neverRecorded = false): st
 }
 
 export function AccountDetail({
-  client, projects, contacts, terms, neverRecordedIds,
+  client, projects, contacts, terms, neverRecordedIds, value,
 }: {
   client: { id: string; name: string; code: string | null; salesperson: string | null; created_at: string }
   projects: AccountProject[]
@@ -193,6 +195,10 @@ export function AccountDetail({
   /** Surveys whose N collected was never recorded (no freshness row). Empty
    *  when freshness could not be read — a failed read marks nothing. */
   neverRecordedIds: string[]
+  /** What the delivered work was worth, computed server-side from the one
+   *  revenue definition. `byId` holds only the studies that HAVE a figure —
+   *  an absent id means no figure, which is not $0. */
+  value: { byId: Record<string, number>; withN: string[]; blocked: boolean }
 }) {
   const [basis, setBasis] = useState<DateBasis>('delivered')
   const [preset, setPreset] = useState<PresetId>('all')
@@ -256,6 +262,23 @@ export function AccountDetail({
   // carries "At least" on the same rule as the PDF's period line: only when an
   // unpriced survey in the range has drawn.
   const inRange = useMemo(() => rollUp(rows, null), [rows])
+
+  // What the delivered work in the SELECTED RANGE was worth. Same rows as the
+  // table, so the figure and the list can never describe different work.
+  const worth = useMemo(() => {
+    const byId = new Map<string, number | null>(Object.entries(value.byId))
+    const withN = new Set(value.withN)
+    return summariseValue(
+      rows.map(p => ({
+        id: p.id,
+        delivered: bucketOf({ status: p.status, phase: p.phase, board_column: p.board_column }) === 'delivered',
+        n_actual: p.n_actual,
+        segmentsCounted: withN.has(p.id),
+      })),
+      byId,
+      value.blocked,
+    )
+  }, [rows, value])
 
   // No `cols`: the PDF has its own choice of what prints, starting from the
   // reader's saved default (lib/sales/printColumns), so the picker shapes this
@@ -327,6 +350,23 @@ export function AccountDetail({
                 </>}
           </p>
         )}
+      </section>
+
+      {/* ---- Value of delivered work ---- */}
+      <section className="mb-5 rounded-lg border border-border bg-card p-4">
+        <h2
+          className="mb-2 text-xs font-medium uppercase tracking-widest text-muted-foreground"
+          // Says what it is NOT, deliberately. "Value of delivered work" can
+          // still be read as "what they paid us", and SOCC has no invoice and
+          // no payment record to back that up.
+          title="What the delivered studies in this range were worth at the price the client agreed — the study's price per N times its delivered N, capped at the top of the sold range. It is NOT a record of payment: SOCC does not track invoices or cash received."
+        >
+          Value of delivered work
+        </h2>
+        {!worth.blocked && worth.priced > 0 && (
+          <p className="text-2xl font-semibold tabular-nums text-foreground">{money(worth.total)}</p>
+        )}
+        <p className="mt-1 text-sm text-foreground">{describeValue(worth)}</p>
       </section>
 
       {/* ---- Filter ---- */}
