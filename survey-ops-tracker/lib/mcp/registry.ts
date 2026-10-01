@@ -3076,7 +3076,7 @@ export const TOOLS: AssistantTool[] = [
       const willMarkDelivered = !!args.mark_delivered && !p.stage_delivery
       const gi = await loadGateInput(p.id as string)
       const gate = complianceGate({
-        targetColumn: stage.board_column, willMarkDelivered,
+        targetColumn: stage.board_column, currentColumn: p.board_column as BoardColumn, willMarkDelivered,
         client: gi.client, override: gi.override, submissions: gi.submissions,
         rerunNumber: gi.rerunNumber ?? undefined, complianceRequiredOverride: gi.complianceRequiredOverride,
       })

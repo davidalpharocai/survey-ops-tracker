@@ -292,6 +292,9 @@ export default function BoardPage() {
         const firm = moved.client.split(' - ')[0].trim()
         const gate = complianceGate({
           targetColumn: newColumn,
+          // Where it is now: the before-fielding gate blocks the step that STARTS
+          // the fielding, not every step after it.
+          currentColumn: moved.board_column as BoardColumnType,
           willMarkDelivered: newColumn === 'Delivery',
           client: complianceMaps.clientByFirm.get(firm) ?? null,
           override: moved.compliance_override ?? null,

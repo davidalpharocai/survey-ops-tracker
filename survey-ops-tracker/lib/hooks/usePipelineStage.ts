@@ -154,6 +154,7 @@ export function usePipelineStage(project: SurveyProject) {
     const willMarkDelivered = newState.stage_delivery === true && !project.stage_delivery
     const g = complianceGate({
       targetColumn: newColumn,
+      currentColumn: project.board_column as BoardColumn,
       willMarkDelivered,
       client: compliance?.client ?? null,
       override: project.compliance_override ?? null,

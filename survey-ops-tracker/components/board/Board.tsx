@@ -241,6 +241,9 @@ export function Board({ projects, teamMembers, onMoveProject, wrapInContext = tr
       const firm = moved.client.split(' - ')[0].trim()
       const gate = complianceGate({
         targetColumn: newColumn,
+        // Where it is now: the before-fielding gate blocks the step that STARTS
+        // the fielding, not every step after it.
+        currentColumn: moved.board_column as BoardColumnType,
         // Dropping onto the Delivered column marks the project delivered (and now
         // archives it), so run the after-fielding gate too — not just before-fielding.
         willMarkDelivered: newColumn === 'Delivery',

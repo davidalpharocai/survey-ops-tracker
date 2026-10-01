@@ -24,13 +24,23 @@ export function ComplianceBanner({ project }: { project: SurveyProject }) {
   // "surveys under some accounts flag a compliance stage between fielding and
   // data qa. theres no client that has that. its only after qa pre delivery."
   //
-  // The GATE was always correct — complianceGate only blocks on the move to
-  // Delivered — but a permanently-amber banner reads as a stage of its own
-  // sitting in the pipeline, which is exactly what he saw. So the prompt now
-  // waits until the survey has reached Data QA, which is the first moment
-  // anyone could actually send questions AND results for review.
+  // The AFTER-fielding gate was always correct — complianceGate only blocks it
+  // on the move to Delivered — but a permanently-amber banner reads as a stage
+  // of its own sitting in the pipeline, which is exactly what he saw. So the
+  // prompt now waits until the survey has reached Data QA, which is the first
+  // moment anyone could actually send questions AND results for review.
+  //
+  // THAT FIX WAS HALF THE PROBLEM, and the half it missed is worth recording
+  // here because this comment used to assert the gate was fine. The BEFORE-
+  // fielding gate was not: it fired on any target at or past Fielding, so it
+  // re-asked on Fielding -> Data QA too, and David reported the same symptom
+  // again on 2026-10-01 — "DE shaw keeps asking for compliance approval when i
+  // try to move from fielding to data qa". That is now fixed at the source
+  // (lib/utils/compliance.ts: the gate blocks the step that CROSSES into
+  // fielding, not every step after it).
   const stageIdx = STAGE_ORDER.indexOf(project.board_column as BoardColumn)
   const atOrPastDataQa = stageIdx >= STAGE_ORDER.indexOf('Data QA')
+  const alreadyFielding = stageIdx >= STAGE_ORDER.indexOf('Fielding')
   const afterRequired =
     afterFieldingRequired(cs.client, cs.override, project.rerun_number, project.compliance_required_override) &&
     !afterFieldingMet(cs.submissions)
@@ -65,9 +75,24 @@ export function ComplianceBanner({ project }: { project: SurveyProject }) {
           Compliance review outstanding for {firm}
         </p>
         <ul className="text-muted-foreground mt-0.5 leading-relaxed list-disc pl-4">
+          {/* Past tense once the study is already fielding. The gate no longer
+              stops a fielded study moving on — asking for approval to prevent
+              something that has happened helps nobody — so this line is the only
+              thing still saying the review was skipped, and it has to say what
+              is actually true rather than name a condition already behind us. */}
           {beforeOutstanding && (
             <li>
-              <span className="text-foreground">Before fielding:</span> the questionnaire must be approved before this study can be fielded.
+              {alreadyFielding ? (
+                <>
+                  <span className="text-foreground">Before fielding:</span> this study is already fielding and the
+                  questionnaire was never approved.
+                </>
+              ) : (
+                <>
+                  <span className="text-foreground">Before fielding:</span> the questionnaire must be approved before
+                  this study can be fielded.
+                </>
+              )}
             </li>
           )}
           {afterOutstanding && (

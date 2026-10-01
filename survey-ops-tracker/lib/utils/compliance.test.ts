@@ -108,3 +108,82 @@ describe('complianceGate', () => {
     expect(g.phase).toBe('before_fielding')
   })
 })
+
+/**
+ * The before-fielding gate blocks the STEP that starts the fielding, not every
+ * step after it.
+ *
+ * David, 2026-10-01: "between fielding and data QA there is no compliance
+ * requirement. after fielding = pre delivery. DE shaw keeps asking for
+ * compliance approval when i try to move from fielding to data qa."
+ *
+ * The old test was `targetIdx >= FIELDING_IDX`, which is right about a jump
+ * that skips Fielding and wrong about every move made after fielding has
+ * already begun. DE Shaw is flagged before AND after, so PR00466 tripped it on
+ * each forward step — asking for approval to prevent something that had already
+ * happened, and stopping the only person who could close the study out.
+ *
+ * Both halves are pinned here, because fixing one by breaking the other is the
+ * obvious way to get this wrong.
+ */
+describe('complianceGate: before-fielding fires on the crossing, not the destination', () => {
+  const reqBoth = client({ compliance_before_fielding: true, compliance_after_fielding: true })
+  const strict = (o: Partial<Parameters<typeof complianceGate>[0]>) =>
+    complianceGate({
+      willMarkDelivered: false, client: reqBoth, override: null, submissions: [],
+      targetColumn: 'Data QA', ...o,
+    })
+
+  // The reported bug.
+  it('does not block Fielding -> Data QA, because the study is already fielding', () => {
+    expect(strict({ currentColumn: 'Fielding', targetColumn: 'Data QA' }).blocked).toBe(false)
+  })
+
+  it('does not block any later forward step either', () => {
+    expect(strict({ currentColumn: 'Data QA', targetColumn: 'Delivery' }).blocked).toBe(false)
+  })
+
+  // The reason the old rule was written the way it was. Keep it.
+  it('still blocks a jump that skips Fielding entirely', () => {
+    const g = strict({ currentColumn: 'Submitted', targetColumn: 'Data QA' })
+    expect(g.blocked).toBe(true)
+    expect(g.phase).toBe('before_fielding')
+  })
+
+  it('still blocks the move that actually starts the fielding', () => {
+    const g = strict({ currentColumn: 'Doc Programming', targetColumn: 'Fielding' })
+    expect(g.blocked).toBe(true)
+    expect(g.phase).toBe('before_fielding')
+  })
+
+  // Sending a study back does not re-ask: it has already been fielded, and the
+  // gate exists to stop that happening unapproved, not to punish it afterwards.
+  it('does not block a move backwards from Data QA to Fielding', () => {
+    expect(strict({ currentColumn: 'Data QA', targetColumn: 'Fielding' }).blocked).toBe(false)
+  })
+
+  // A gate that degrades into "allow" is worse than one that degrades into
+  // "ask again", so an unported caller keeps the old behaviour.
+  it('still blocks when the caller does not say where the study is', () => {
+    const g = strict({ currentColumn: undefined, targetColumn: 'Data QA' })
+    expect(g.blocked).toBe(true)
+    expect(g.phase).toBe('before_fielding')
+  })
+
+  // "after fielding = pre delivery": relaxing the mid-pipeline gate must not
+  // touch the one that guards delivery. DE Shaw requires both, and this is the
+  // one that still has work to do.
+  it('still blocks delivery on the after-fielding review, with no before-fielding approval in sight', () => {
+    const g = strict({ currentColumn: 'Data QA', targetColumn: 'Delivery', willMarkDelivered: true })
+    expect(g.blocked).toBe(true)
+    expect(g.phase).toBe('after_fielding')
+  })
+
+  it('lets a fielded study through to delivery once the after-fielding review is approved', () => {
+    const g = strict({
+      currentColumn: 'Data QA', targetColumn: 'Delivery', willMarkDelivered: true,
+      submissions: [sub('after_fielding', 'approved')],
+    })
+    expect(g.blocked).toBe(false)
+  })
+})
