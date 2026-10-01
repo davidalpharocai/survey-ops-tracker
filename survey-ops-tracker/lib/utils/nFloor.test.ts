@@ -411,11 +411,23 @@ describe('nFloorCheck — a missing internal target is a SETUP gap, not a shortf
     const r = nFloorCheck({
       audience: 'General population',
       n_internal_target: null,
-      n_actual: 900,
+      n_collected: 900,
+      collectionFinal: true,
     })
     expect(r.band).toBe('unset')
-    expect(r.shortfallActual).toBe(true)
+    expect(r.shortfallCollected).toBe(true)
     expect(r.requiresOverride).toBe(true)
+  })
+
+  // The same study judged on what it DELIVERED instead: silent. A delivered
+  // figure under the floor is the cushion working, not a shortfall.
+  it('asks for nothing when only the delivered N is under the floor', () => {
+    const r = nFloorCheck({
+      audience: 'General population',
+      n_internal_target: null,
+      n_actual: 900,
+    })
+    expect(r.requiresOverride).toBe(false)
   })
 
   it('never demands anything when the check does not apply at all', () => {
@@ -441,8 +453,13 @@ describe('nFloorCheck — the FACTS: N actual and N collected', () => {
     })
     expect(r.band).toBe('ok')
     expect(r.shortfallCollected).toBe(false)
-    expect(r.shortfallActual).toBe(true)
-    expect(r.requiresOverride).toBe(true)
+    // CHANGED 2026-10-01. This used to demand an override because n_actual
+    // (1,209) sat under the 1,350 floor. David: "1350 is the internal target so
+    // we can deliver 1000" — the floor is what we aim to COLLECT so that QA can
+    // strip the bad completes and still leave the client's number. A delivered
+    // figure below it is that cushion working. This study planned above the
+    // floor and collected above it; there is nothing to sign off.
+    expect(r.requiresOverride).toBe(false)
   })
 
   it('ignores a light n_collected while fielding is still running', () => {
@@ -500,7 +517,6 @@ describe('nFloorCheck — the FACTS: N actual and N collected', () => {
     })
     expect(r.band).toBe('warning')
     expect(r.shortfallCollected).toBe(true)
-    expect(r.shortfallActual).toBe(true)
     expect(r.requiresOverride).toBe(true)
   })
 
@@ -564,7 +580,13 @@ describe('nFloorDeliveryGate', () => {
     expect(g.blocked).toBe(false) // 900 clears the 500 state floor
   })
 
-  it('blocks on a light delivered N even when collection looked fine', () => {
+  // CHANGED 2026-10-01. This test asserted the opposite, and the behaviour it
+  // pinned is the one David reported: "1350 is the internal target so we can
+  // deliver 1000". The study below planned 1,400, collected 1,500 and delivered
+  // 1,100 — it over-collected exactly as intended and handed over a clean
+  // sample. Stopping that delivery to demand a typed override was the floor
+  // measuring a deliverable against a collection goal.
+  it('does not block a delivery that is lighter than the floor when collection cleared it', () => {
     const g = nFloorDeliveryGate({
       audience: 'gen pop',
       n_internal_target: 1400,
@@ -572,8 +594,22 @@ describe('nFloorDeliveryGate', () => {
       n_actual: 1100,
       willMarkDelivered: true,
     })
+    expect(g.blocked).toBe(false)
+  })
+
+  // The gate it keeps: the COLLECTION came in light, which is the case the
+  // standard is actually about.
+  it('still blocks when the N we collected came in under the floor', () => {
+    const g = nFloorDeliveryGate({
+      audience: 'gen pop',
+      n_internal_target: 1400,
+      n_collected: 900,
+      n_actual: 880,
+      willMarkDelivered: true,
+    })
     expect(g.blocked).toBe(true)
-    expect(g.message).toContain('N actual 1,100')
+    expect(g.message).toContain('N collected 900')
+    expect(g.message).not.toContain('N actual')
   })
 
   it('lets a zero-collected placeholder wave deliver untouched', () => {

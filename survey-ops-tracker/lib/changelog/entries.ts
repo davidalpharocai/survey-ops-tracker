@@ -80,6 +80,22 @@ export function changelogFor(audience: ChangeAudience): ChangelogEntry[] {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    date: '2026-10-01',
+    changes: [
+      // Neither bullet is tagged: both are internal screens a salesperson
+      // cannot open, so tagging them would describe machinery to someone who
+      // has no way to see it.
+      {
+        kind: 'FIXED',
+        text: 'A study for a compliance client stopped asking for approval again every time you moved it forward. The questionnaire review is still required before a study is fielded, and the results review before it is delivered — but nothing is asked in between, so moving from Fielding to Data QA is no longer blocked.',
+      },
+      {
+        kind: 'FIXED',
+        text: 'The gen-pop N floor no longer warns about the number you delivered. We aim to collect 1,350 on a national study so that after QA we can still hand over the number the client bought, so a smaller delivered figure is that cushion working. The warning now watches what we planned to collect and what we actually collected.',
+      },
+    ],
+  },
+  {
     date: '2026-09-30',
     changes: [
       {

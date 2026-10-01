@@ -19,11 +19,30 @@
 // remain.
 //
 // It also runs against FACTS, not just plans: once fielding is over, the N we
-// actually collected, and the cleaned N we deliver. A study that internally
-// targeted 1,400 and came home with 900 is exactly the case the floor exists to
-// catch, and nothing else in the app looks at n_collected against the floor.
-// `collectionFinal` turns that pass on. (Bryan's own project is the example:
-// n_collected 1,410 cleared the floor, but n_actual came in at 1,209.)
+// actually COLLECTED. A study that internally targeted 1,400 and came home with
+// 900 is exactly the case the floor exists to catch, and nothing else in the app
+// looks at n_collected against the floor. `collectionFinal` turns that pass on.
+//
+// ── AND IT DOES NOT JUDGE n_actual (2026-10-01, David) ──────────────────────
+// It used to, and that was the same mistake as the old `n_target` check wearing
+// different clothes. David: "1350 is the internal target so we can deliver
+// 1000". The floor is a COLLECTION standard: we aim at 1,350 so that after QA
+// strips the bad completes we can still hand over the 1,000 the client bought.
+// So the delivered number is SUPPOSED to sit below the floor — that gap is the
+// cushion working, not a shortfall — and measuring it against 1,350 double-
+// counts the cushion and scolds a correctly run study. The warning it produced
+// read "N actual 1,000 is under the 1,350 we target internally", which is true
+// and completely beside the point.
+//
+// What it is NOT: a way to stop noticing a thin delivery. "Did we hand over
+// what we sold?" is a different question with a different denominator — the
+// client's own target — and it is already answered, per surface, by
+// lib/sales/finalCell.ts and lib/sales/deliveredN.ts. Re-asking it here against
+// OUR number was never that check; it only looked like it.
+//
+// (Bryan's project was cited here as the example: n_collected 1,410 cleared the
+// floor, n_actual came in at 1,209. Under the rule above that study is fine —
+// it collected above the floor and delivered what it had to.)
 //
 // ── WHO IT APPLIES TO ───────────────────────────────────────────────────────
 // Any population-representative study. The old `salesperson includes 'jenna'`
@@ -226,8 +245,6 @@ export interface NFloorResult {
   band: NFloorBand
   /** The number actually being judged, echoed so callers name it in copy. */
   internalTarget: number | null
-  /** n_actual is set and below the floor — the cleaned sample we deliver. */
-  shortfallActual: boolean
   /**
    * Fielding is finished and n_collected came in under the floor — the
    * delivery-time re-check. Only ever true when `collectionFinal` was passed,
@@ -237,10 +254,11 @@ export interface NFloorResult {
   shortfallCollected: boolean
   /**
    * A typed override is required: our internal target is short, or the N we
-   * actually collected is, or the N we delivered is. A collected/delivered
-   * number is a fact, not a plan, so a light one needs the sign-off even when
-   * the internal target itself was fine. A MISSING internal target does not —
-   * there is nothing to sign off on, only a field to fill in.
+   * actually collected is. A collected number is a fact, not a plan, so a light
+   * one needs the sign-off even when the internal target itself was fine. A
+   * MISSING internal target does not — there is nothing to sign off on, only a
+   * field to fill in. The DELIVERED number is never grounds on its own; see the
+   * header.
    */
   requiresOverride: boolean
 }
@@ -274,7 +292,6 @@ export function nFloorCheck(p: {
       floor: NATIONAL_FLOOR,
       band: 'ok',
       internalTarget: null,
-      shortfallActual: false,
       shortfallCollected: false,
       requiresOverride: false,
     }
@@ -285,11 +302,6 @@ export function nFloorCheck(p: {
   const band: NFloorBand =
     internalTarget == null ? 'unset' : internalTarget < floor ? 'warning' : 'ok'
 
-  // No `> 0` guard here, unlike shortfallCollected below, and the asymmetry is
-  // deliberate rather than an oversight: n_actual is nullable with no default,
-  // so an unfielded project reads null and is skipped, whereas n_collected is
-  // NOT NULL DEFAULT 0 and would otherwise flag every placeholder wave.
-  const shortfallActual = p.n_actual != null && p.n_actual < floor
   // The `> 0` guard is not cosmetic: a placeholder wave (migration 075 —
   // assumed-delivered, no real data yet, Sree backfills later) sits at 0
   // collected and gets marked delivered on purpose. Demanding a typed override
@@ -303,9 +315,8 @@ export function nFloorCheck(p: {
     floor,
     band,
     internalTarget,
-    shortfallActual,
     shortfallCollected,
-    requiresOverride: band === 'warning' || shortfallActual || shortfallCollected,
+    requiresOverride: band === 'warning' || shortfallCollected,
   }
 }
 
@@ -350,17 +361,14 @@ export function nFloorDeliveryGate(p: {
   // planning question and belongs to the card during scoping; blocking delivery
   // on it would re-litigate a decision at the worst possible moment. What must
   // not pass unremarked is the N we ended up with.
-  if (!check.applies || !(check.shortfallCollected || check.shortfallActual)) {
+  if (!check.applies || !check.shortfallCollected) {
     return { blocked: false, message: '' }
   }
   const scopeLabel = check.scope === 'state' ? 'state-level' : 'national'
-  const short: string[] = []
-  if (check.shortfallCollected) short.push(`N collected ${fmtNum(p.n_collected ?? 0)}`)
-  if (check.shortfallActual) short.push(`N actual ${fmtNum(p.n_actual ?? 0)}`)
   return {
     blocked: true,
     message:
-      `Fielding finished with ${short.join(' and ')}, under the ${fmtNum(check.floor)} we target ` +
+      `Fielding finished with N collected ${fmtNum(p.n_collected ?? 0)}, under the ${fmtNum(check.floor)} we target ` +
       `internally for a ${scopeLabel} general-population study. Confirm this N is intentional ` +
       `before delivering.`,
   }

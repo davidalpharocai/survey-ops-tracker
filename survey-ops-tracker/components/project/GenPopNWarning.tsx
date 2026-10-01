@@ -127,12 +127,13 @@ export function GenPopNWarning({ project }: { project: P }) {
   // Name every number that is genuinely short and only those — and name them as
   // what they are, so a typed override reason is given against the figure the
   // project actually carries. A list rather than nested ternaries because the
-  // three shortfalls are independent — our internal target, the N we collected,
-  // the N we delivered — and any combination is real.
+  // two shortfalls are independent — our internal target and the N we collected
+  // — and either or both is real. The N we DELIVERED is deliberately not one of
+  // them: the floor is a collection standard, and a delivered figure below it is
+  // the QA cushion working as intended (see lib/utils/nFloor.ts).
   const short: string[] = []
   if (check.band === 'warning') short.push(`N internal target ${fmtNum(check.internalTarget ?? 0)}`)
   if (check.shortfallCollected) short.push(`N collected ${fmtNum(project.n_collected ?? 0)}`)
-  if (check.shortfallActual) short.push(`N actual ${fmtNum(project.n_actual ?? 0)}`)
   const shortfallText = `${joinAnd(short)} ${short.length > 1 ? 'are' : 'is'}`
 
   return (
