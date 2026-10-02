@@ -1,7 +1,7 @@
 import type { InsightsProject } from '@/lib/insights/load'
 import { serializeInsightsFilter, type InsightsFilter } from '@/lib/insights/filters'
 import {
-  buildInsightsModel, daysText, pctText, type InsightsModel,
+  buildInsightsModel, daysText, deliveredIn, matchesDims, pctText, type InsightsModel,
 } from '@/lib/insights/model'
 import { fmtNum } from '@/lib/utils/number'
 
@@ -199,6 +199,67 @@ export function buildSalesInsights(input: SalesInsightsInput): SalesInsightsMode
     today: input.today,
   })
   return { model, headline: salesHeadline(model, input.owner ?? null) }
+}
+
+/* ── REPEAT WORK ────────────────────────────────────────────────────────── */
+
+/**
+ * Delivered reruns, split by what the study underneath them actually is.
+ *
+ * WHY THIS EXISTS. Rerun is a DIMENSION, not a type (lib/reruns/isRerun.ts, and
+ * the product says so on screen: "Rerun is not a type"). So the by-type chart
+ * counts a rerun of a PS study inside the PS bar, and the only bar that says
+ * "Rerun" holds the handful of studies filed under the legacy type before the
+ * dimension existed. MEASURED 2026-09-30: that legacy bar was 6 delivered
+ * studies while the real repeat population was 111 of 388 — so the one rerun
+ * signal on this page was off by a factor of eighteen, in the misleading
+ * direction. The tile this feeds is the fix.
+ *
+ * It also answers what David asked for on 2026-10-01 — "a type for 'Rerun -
+ * B2B' and 'Rerun - PS'" — without inventing either as a type key. Crossing the
+ * dimensions into TYPE_KEYS would change what `?type=PS` means on every link
+ * anyone has shared, and make "all PS work" unaskable.
+ *
+ * THE SET IS REBUILT FROM THE MODEL'S OWN PREDICATES, not re-derived: the same
+ * `matchesDims` and `deliveredIn` buildInsightsModel uses, over the same items,
+ * filter and range it returned. `cur.reruns` is the count of exactly this set,
+ * so a test asserts the split adds back to it — which is what catches the day
+ * someone changes how `cur` is built and this quietly stops agreeing with the
+ * tile printed beside it.
+ */
+export interface RerunSplit {
+  /** Must equal model.cur.reruns. A test holds that line. */
+  total: number
+  ps: number
+  b2b: number
+  /** Reruns with no base type to report: the legacy 'Rerun' type (which is the
+   *  information that was lost when it was a type), or no type at all. */
+  untyped: number
+}
+
+export function rerunSplit(m: InsightsModel): RerunSplit {
+  const cur = deliveredIn(m.items.filter(it => matchesDims(it, m.filter)), m.range)
+  const out: RerunSplit = { total: 0, ps: 0, b2b: 0, untyped: 0 }
+  for (const it of cur) {
+    if (!it.rerun) continue
+    out.total++
+    if (it.type === 'PS') out.ps++
+    else if (it.type === 'B2B') out.b2b++
+    else out.untyped++
+  }
+  return out
+}
+
+/** "69 PS, 36 B2B" — the split in words, or null when there is nothing to split.
+ *  The untyped remainder is NAMED rather than folded into either side: it is the
+ *  base type we no longer know, and rounding it into PS would be inventing one. */
+export function describeRerunSplit(s: RerunSplit): string | null {
+  if (!s.total) return null
+  const parts: string[] = []
+  if (s.ps) parts.push(`${fmtNum(s.ps)} PS`)
+  if (s.b2b) parts.push(`${fmtNum(s.b2b)} B2B`)
+  if (s.untyped) parts.push(`${fmtNum(s.untyped)} with no base type recorded`)
+  return parts.join(', ')
 }
 
 /* ── THE SENTENCE AT THE TOP ────────────────────────────────────────────── */

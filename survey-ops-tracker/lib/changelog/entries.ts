@@ -82,7 +82,14 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     date: '2026-10-01',
     changes: [
-      // Neither bullet is tagged: both are internal screens a salesperson
+      // Tagged: it is a sales screen, it is counts only, and the thing it
+      // corrects was misleading a salesperson about their own book.
+      {
+        kind: 'NEW',
+        text: 'Sales Insights has a Repeat work tile: how many of the studies you delivered were a later wave of one this account had bought before, split by what the underlying studies were (PS or B2B). Until now a repeat of a PS study was counted inside the PS bar, and the only bar labelled "Rerun" held a handful of old studies filed that way years ago — so the page understated repeat business badly.',
+        audience: 'all',
+      },
+      // Neither of the next two bullets is tagged: both are internal screens a salesperson
       // cannot open, so tagging them would describe machinery to someone who
       // has no way to see it.
       {

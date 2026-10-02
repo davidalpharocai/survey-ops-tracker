@@ -190,3 +190,48 @@ describe('the filters', () => {
     expect(container.textContent).not.toMatch(/captain/i)
   })
 })
+
+/**
+ * Repeat work on screen.
+ *
+ * Before this tile existed, the only rerun signal on the page was the "Rerun
+ * (older type)" bar in the by-type chart — the legacy typing artifact. On live
+ * data that bar was 6 delivered studies while the real repeat population was
+ * 111 of 388, so the page understated repeat business by a factor of eighteen
+ * while appearing to report it.
+ */
+describe('repeat work', () => {
+  const tile = () =>
+    screen.getByText('Repeat work').parentElement?.parentElement?.textContent ?? ''
+
+  const wave = (over: Partial<SalesProjectRow> = {}) =>
+    P({ series_id: 's1', rerun_number: 2, ...over })
+
+  it('counts reruns of PS and B2B studies, which the type chart hides inside their own bars', () => {
+    show([
+      ...Array.from({ length: 3 }, (_, i) => wave({ project_type: 'PS', deliver_date: `2026-09-0${i + 1}` })),
+      wave({ project_type: 'B2B', deliver_date: '2026-09-05' }),
+      P({ project_type: 'PS', deliver_date: '2026-09-06' }),
+    ])
+    const t = tile()
+    expect(t).toMatch(/3 PS, 1 B2B/)
+    expect(t).toMatch(/80% of what you delivered/)
+  })
+
+  it('says so plainly when there is no repeat work, rather than printing a bare 0', () => {
+    show()
+    expect(tile()).toMatch(/None of the delivered studies here is a repeat wave/)
+  })
+
+  // The legacy type is the lost information: it says a study is a rerun and
+  // nothing about what it was a rerun of.
+  it('does not guess a base type for a study filed under the legacy Rerun type', () => {
+    show([P({ project_type: 'Rerun', deliver_date: '2026-09-02' })])
+    expect(tile()).toMatch(/no base type recorded/)
+  })
+
+  it('still shows no dollar figure anywhere', () => {
+    const { container } = show([wave({ project_type: 'PS', deliver_date: '2026-09-02' })])
+    expect(container.textContent).not.toMatch(/\$/)
+  })
+})

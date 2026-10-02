@@ -16,7 +16,8 @@ import {
 } from '@/lib/insights/model'
 import {
   PLACEHOLDER_MIGRATION, PLACEHOLDER_ON_FLAG_ALONE, SALES_DROPS,
-  buildSalesInsights, salesInsightsHref, salesInsightsState, type SalesProjectRow,
+  buildSalesInsights, describeRerunSplit, rerunSplit, salesInsightsHref, salesInsightsState,
+  type SalesProjectRow,
 } from '@/lib/sales/insights'
 
 /**
@@ -265,8 +266,9 @@ function Tile({ label, help, value, lines, compare }: {
 
 function Tiles({ model: m }: { model: InsightsModel }) {
   const c = m.cur
+  const reruns = rerunSplit(m)
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
       <Tile
         label="Studies delivered"
         help="Studies on your book that were delivered, placed by the day they were delivered. Empty rerun waves the system created ahead of time are not counted."
@@ -308,6 +310,26 @@ function Tiles({ model: m }: { model: InsightsModel }) {
           c.cycleMissing ? `${s(c.cycleMissing, 'study', 'studies')} missing a date and left out` : null,
         ]}
         compare={m.compare.cycle}
+      />
+      {/* Repeat work. The by-type chart below cannot answer this: a rerun of a
+          PS study is counted in the PS bar, and the bar labelled "Rerun" holds
+          only the few studies filed under the legacy type. On live data that
+          bar read 6 while the real repeat population was 111 — so without this
+          tile the one rerun signal on the page was wrong by a factor of
+          eighteen, in the direction that understates the account. */}
+      <Tile
+        label="Repeat work"
+        help="Delivered studies that are a later wave of an earlier one — a repeat of work this account has bought before. Counted whichever type the study is, because a rerun is a repeat of a study, not a kind of study. The split says what the underlying studies were."
+        value={fmtNum(reruns.total)}
+        lines={[
+          reruns.total
+            ? describeRerunSplit(reruns)
+            : 'None of the delivered studies here is a repeat wave',
+          reruns.total && c.delivered
+            ? `${pctText(reruns.total / c.delivered)} of what you delivered`
+            : null,
+        ]}
+        compare={m.compare.reruns}
       />
     </div>
   )

@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import type { InsightsFilter } from '@/lib/insights/filters'
 import {
-  buildSalesInsights, salesHeadline, salesInsightsHref, salesInsightsState,
-  toInsightsProject, type SalesProjectRow,
+  buildSalesInsights, describeRerunSplit, rerunSplit, salesHeadline, salesInsightsHref,
+  salesInsightsState, toInsightsProject, type SalesProjectRow,
 } from './insights'
 
 /**
@@ -212,5 +212,99 @@ describe('salesHeadline on a built model', () => {
     const t = salesHeadline(model, 'Jenna Shrove')
     expect(t).toMatch(/50% on time/)
     expect(t).toMatch(/from start to delivery/)
+  })
+})
+
+/**
+ * Repeat work, split by base type.
+ *
+ * David, 2026-10-01: "i think there should be a type for 'Rerun - B2B' and
+ * 'Rerun - PS'". This is that answer without touching TYPE_KEYS — crossing the
+ * dimensions into the type list would change what `?type=PS` means on every
+ * shared link and make "all PS work" unaskable.
+ *
+ * The population matters more than the arithmetic here. A rerun of a PS study
+ * carries project_type 'PS', so it is invisible in the type breakdown; the bar
+ * that says "Rerun" is the handful of studies filed under the legacy type
+ * before rerun became a dimension. Measured on live data the two differed by a
+ * factor of eighteen.
+ */
+describe('repeat work, split by base type', () => {
+  const model = (rows: SalesProjectRow[]) =>
+    buildSalesInsights({ rows, accounts: ACCOUNTS, filter: f(), today: TODAY }).model
+
+  /** A later wave: the dimension is series_id / rerun_number, never the type. */
+  const wave = (over: Partial<SalesProjectRow> = {}): SalesProjectRow =>
+    row({ series_id: 's1', rerun_number: 2, ...over })
+
+  it('counts a PS rerun as PS, not as the legacy Rerun type', () => {
+    const s = rerunSplit(model([wave({ id: 'r1', project_type: 'PS' })]))
+    expect(s).toEqual({ total: 1, ps: 1, b2b: 0, untyped: 0 })
+  })
+
+  it('splits PS and B2B reruns apart', () => {
+    const s = rerunSplit(model([
+      wave({ id: 'r1', project_type: 'PS' }),
+      wave({ id: 'r2', project_type: 'PS' }),
+      wave({ id: 'r3', project_type: 'B2B' }),
+    ]))
+    expect(s.ps).toBe(2)
+    expect(s.b2b).toBe(1)
+    expect(describeRerunSplit(s)).toBe('2 PS, 1 B2B')
+  })
+
+  // The legacy type IS the lost information — it says the study is a rerun and
+  // nothing about what it was a rerun OF. Folding it into PS would invent one.
+  it('names the legacy Rerun type as having no base type, rather than guessing', () => {
+    const s = rerunSplit(model([row({ id: 'r1', project_type: 'Rerun' })]))
+    expect(s).toEqual({ total: 1, ps: 0, b2b: 0, untyped: 1 })
+    expect(describeRerunSplit(s)).toBe('1 with no base type recorded')
+  })
+
+  it('does not count a first wave as repeat work', () => {
+    const s = rerunSplit(model([row({ id: 'p1', project_type: 'PS' })]))
+    expect(s.total).toBe(0)
+    expect(describeRerunSplit(s)).toBeNull()
+  })
+
+  // THE INVARIANT. `cur.reruns` is the number the tile prints beside this split,
+  // computed by the model over its own set. If someone changes how `cur` is
+  // built and this is rebuilt from different predicates, the tile would show a
+  // total that does not match its own breakdown. This is what catches that.
+  it('adds back to the count the model computed independently', () => {
+    const m = model([
+      wave({ id: 'r1', project_type: 'PS' }),
+      wave({ id: 'r2', project_type: 'B2B' }),
+      row({ id: 'r3', project_type: 'Rerun' }),
+      row({ id: 'p1', project_type: 'PS' }),
+      row({ id: 'p2', project_type: 'B2B', deliver_date: null, board_column: 'Fielding' }),
+    ])
+    const s = rerunSplit(m)
+    expect(s.total).toBe(m.cur.reruns)
+    expect(s.ps + s.b2b + s.untyped).toBe(s.total)
+  })
+
+  // The split must obey the page's filters, or the tile would describe a
+  // different set from every other figure on screen.
+  it('obeys the account and type filters the rest of the page uses', () => {
+    const rows = [
+      wave({ id: 'r1', project_type: 'PS' }),
+      wave({ id: 'r2', project_type: 'B2B' }),
+    ]
+    const only = buildSalesInsights({
+      rows, accounts: ACCOUNTS, today: TODAY, filter: f({ type: 'B2B' }),
+    }).model
+    const s = rerunSplit(only)
+    expect(s.total).toBe(1)
+    expect(s.b2b).toBe(1)
+    expect(s.ps).toBe(0)
+  })
+
+  it('leaves an empty rerun shell out, like every other figure', () => {
+    const s = rerunSplit(model([
+      wave({ id: 'r1', project_type: 'PS' }),
+      wave({ id: 'shell', project_type: 'PS', is_placeholder: true, n_actual: null, n_collected: null }),
+    ]))
+    expect(s.total).toBe(1)
   })
 })
